@@ -32,61 +32,7 @@ class AuthzServiceTest {
 
     @BeforeEach
     void setUp() {
-        authzService = new AuthzService(
-            loanApplicationRepository,
-            guarantorRequestRepository,
-            boardReviewRepository,
-            new AccessControlService()
-        );
-    }
-
-    @Test
-    void aGroupBorrowerIsNeverMistakenForThePersonalLoanOwner() {
-        var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build();
-        var principal=new AppUserPrincipal(member,java.util.Set.of(UserClaim.MEMBER_LOANS_VIEW,UserClaim.LOAN_DOCUMENTS_VIEW),false);
-        var loan=LoanApplication.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").borrowerPartyId(UUID.randomUUID()).status(LoanStatus.DRAFT).build();
-        when(loanApplicationRepository.findAccessRowById(loan.getId())).thenReturn(Optional.of(accessRow(loan)));
-        assertThat(authzService.isLoanOwner(loan.getId(),principal)).isFalse();assertThat(authzService.canViewLoan(loan.getId(),principal)).isFalse();
-    }
-
-    @Test
-    void ownershipAndAssignmentsAreEnforced() {
-        UUID memberId = UUID.randomUUID();
-        String saccoId = "CIRCLE-1001";
-        UUID loanId = UUID.randomUUID();
-        UUID reqId = UUID.randomUUID();
-
-        Member member = Member.builder().id(memberId).saccoId(saccoId).memberNo("MEM1").fullName("A")
-            .status(MemberStatus.ACTIVE).position(Position.BOARD)
-            .staffNo("BOARD-1")
-            .staffAccessStatus(StaffAccessStatus.ACTIVE)
-            .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.BOARD)))
-            .passwordHash("x").createdAt(OffsetDateTime.now()).build();
-        AppUserPrincipal principal = new AppUserPrincipal(member, java.util.Set.of(
-            UserClaim.MEMBER_LOANS_VIEW,
-            UserClaim.GUARANTOR_REQUESTS_VIEW,
-            UserClaim.BOARD_QUEUE_VIEW
-        ));
-
-        LoanApplication app = LoanApplication.builder().id(loanId).saccoId(saccoId).applicantMemberId(memberId)
-            .loanType(LoanType.EDUCATION_LOAN).amount(BigDecimal.TEN).tenorMonths(1).status(LoanStatus.DRAFT)
-            .formData("{}").requiredGuarantors(3).policySnapshot("{}").createdAt(OffsetDateTime.now())
-            .updatedAt(OffsetDateTime.now()).version(0).build();
-
-        GuarantorRequest req = GuarantorRequest.builder().id(reqId).loanApplicationId(loanId).guarantorMemberId(memberId)
-            .status(GuarantorRequestStatus.PENDING).createdAt(OffsetDateTime.now()).version(0).build();
-
-        BoardReview boardReview = BoardReview.builder().id(UUID.randomUUID()).loanApplicationId(loanId)
-            .boardMemberId(memberId).decision(BoardDecision.PENDING).createdAt(OffsetDateTime.now()).build();
-
-        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
-        when(guarantorRequestRepository.findByIdAndGuarantorMemberId(reqId, memberId)).thenReturn(Optional.of(req));
-        when(boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
-            loanId, memberId, ApprovalWorkflowStage.BOARD)).thenReturn(Optional.of(boardReview));
-
-        assertThat(authzService.isLoanOwner(loanId, principal)).isTrue();
-        assertThat(authzService.isGuarantorAssignee(reqId, principal)).isTrue();
-        assertThat(authzService.isBoardAssignee(loanId, principal)).isTrue();
+        authzService = new AuthzService(loanApplicationRepository,new AccessControlService());
     }
 
     @Test
@@ -107,7 +53,7 @@ class AuthzServiceTest {
             .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
-            .build();
+            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
         AppUserPrincipal principal = new AppUserPrincipal(admin, java.util.Set.of(UserClaim.DISBURSEMENT_QUEUE_VIEW));
 
         LoanApplication app = LoanApplication.builder()
@@ -126,8 +72,6 @@ class AuthzServiceTest {
             .updatedAt(OffsetDateTime.now())
             .version(0)
             .build();
-
-        when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
 
         assertThat(authzService.canViewLoan(loanId, principal)).isFalse();
         assertThat(authzService.notAdminClass(principal)).isFalse();
@@ -159,7 +103,7 @@ class AuthzServiceTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        AppUserPrincipal claimOnlyPrincipal = new AppUserPrincipal(
+        AppUserPrincipal claimOnlyPrincipal = com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(
             claimOnlyMember,
             java.util.Set.of(UserClaim.STAFF_ANALYTICS_VIEW)
         );
@@ -178,11 +122,11 @@ class AuthzServiceTest {
         when(loanApplicationRepository.findAccessRowById(loanId)).thenReturn(Optional.of(accessRow(app)));
 
         AppUserPrincipal both = scopedPrincipal("CIRCLE-1001", "ST-1",
-            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
+            java.util.Set.of(UserClaim.LOAN_RECORDING_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
         AppUserPrincipal processedOnly = scopedPrincipal("CIRCLE-1001", "ST-1",
-            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW));
+            java.util.Set.of(UserClaim.LOAN_RECORDING_VIEW));
         AppUserPrincipal otherStation = scopedPrincipal("CIRCLE-1001", "ST-2",
-            java.util.Set.of(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
+            java.util.Set.of(UserClaim.LOAN_RECORDING_VIEW, UserClaim.LOAN_DOCUMENTS_VIEW));
 
         assertThat(authzService.canViewLoan(loanId, both)).isTrue();
         assertThat(authzService.canViewLoan(loanId, processedOnly)).isFalse();
@@ -224,7 +168,7 @@ class AuthzServiceTest {
             .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).position(Position.MANAGER)
             .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.MANAGER))).passwordHash("x")
             .createdAt(OffsetDateTime.now()).build();
-        return new AppUserPrincipal(member, claims, true);
+        return new AppUserPrincipal(member,claims);
     }
 
     private AppUserPrincipal principalWith(Position position, boolean memberAccess) {
@@ -259,6 +203,6 @@ class AuthzServiceTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, claims == null ? Collections.emptySet() : claims);
+        return staffRoles.isEmpty() ? com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,claims) : new AppUserPrincipal(member, claims == null ? Collections.emptySet() : claims);
     }
 }

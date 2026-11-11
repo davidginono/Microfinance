@@ -640,6 +640,11 @@ public class LoanAnalyticsService {
                     review.getDecision() == BoardDecision.REJECTED,
                     false)));
         }
+        if(access.staffAnalyticsAccess(principal)) {
+            var decisions=loanApplicationRepository.groupReviewAnalytics(principal.getMemberId(),saccoId,stationId,createdFrom,createdToExclusive);
+            if(decisions.size()>5000)throw new IllegalArgumentException("Use a shorter report period.");
+            for(var d:decisions)reviewRefs.add(new ReviewRef(d.getLoanId(),d.getReviewedAt(),"APPROVE".equals(d.getDecision()),"REJECT".equals(d.getDecision()),false));
+        }
         if (reviewRefs.isEmpty()) {
             return List.of();
         }
@@ -666,33 +671,11 @@ public class LoanAnalyticsService {
     }
 
     private List<ApprovalWorkflowStage> managerStagesFor(AppUserPrincipal principal) {
-        List<ApprovalWorkflowStage> stages = new ArrayList<>();
-        if (access.canAccessManagerArea(principal)) {
-            stages.add(ApprovalWorkflowStage.MANAGER);
-        }
-        if (access.canAccessAccountantArea(principal)) {
-            stages.add(ApprovalWorkflowStage.ACCOUNTANT);
-        }
-        if (access.canAccessDisbursementArea(principal)) {
-            stages.add(ApprovalWorkflowStage.DISBURSEMENT_OFFICER);
-        }
-        return stages;
+        return access.staffAnalyticsAccess(principal)?List.of(ApprovalWorkflowStage.MANAGER,ApprovalWorkflowStage.ACCOUNTANT,ApprovalWorkflowStage.DISBURSEMENT_OFFICER):List.of();
     }
-
     private List<ApprovalWorkflowStage> boardStagesFor(AppUserPrincipal principal) {
-        List<ApprovalWorkflowStage> stages = new ArrayList<>();
-        if (access.canAccessLoanOfficerArea(principal)) {
-            stages.add(ApprovalWorkflowStage.LOAN_OFFICER);
-        }
-        if (access.canAccessBoardArea(principal)) {
-            stages.add(ApprovalWorkflowStage.BOARD);
-        }
-        if (access.canAccessCreditCommitteeArea(principal)) {
-            stages.add(ApprovalWorkflowStage.CREDIT_COMMITTEE);
-        }
-        return stages;
+        return access.staffAnalyticsAccess(principal)?List.of(ApprovalWorkflowStage.LOAN_OFFICER,ApprovalWorkflowStage.BOARD,ApprovalWorkflowStage.CHAIRPERSON,ApprovalWorkflowStage.CREDIT_COMMITTEE):List.of();
     }
-
     private OffsetDateTime resolveBoardReviewDate(BoardReview review) {
         return review.getDecidedAt() == null ? review.getCreatedAt() : review.getDecidedAt();
     }

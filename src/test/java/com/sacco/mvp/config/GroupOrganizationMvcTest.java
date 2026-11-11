@@ -29,7 +29,7 @@ class GroupOrganizationMvcTest {
     @Autowired WebApplicationContext context;@Autowired GroupOrganizationService service;@Autowired com.sacco.mvp.grouplending.service.GroupOrganizationDocumentService documents;
     MockMvc mvc;AppUserPrincipal actor;UUID cycle=UUID.randomUUID(),authority=UUID.randomUUID(),client=UUID.randomUUID();
     String path(){return "/finance/groups/cycles/"+cycle+"/organization";}
-    @BeforeEach void setup(){reset(service,documents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+    @BeforeEach void setup(){reset(service,documents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     void editor(){when(service.workspace(eq(actor),eq(cycle),any(CycleForm.class))).thenAnswer(i->new GroupOrganizationService.Workspace(null,null,null,null,i.getArgument(2),true));}
     @Test void submissionRequiresCsrfAndCannotBindPersonalBorrowerOrTenantFields()throws Exception{
         mvc.perform(post(path()).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(service);

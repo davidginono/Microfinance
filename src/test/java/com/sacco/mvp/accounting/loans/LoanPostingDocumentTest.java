@@ -28,7 +28,7 @@ class LoanPostingDocumentTest {
         when(service.posting(actor,id)).thenReturn(posting);
         var row=new ScheduleRow(26,LocalDate.of(2026,12,31),new BigDecimal("33.34"),new BigDecimal("1.01"),new BigDecimal("34.35"));
         var stored=new Page<>(List.of(row),1,true);when(service.actualRepaymentSchedule(actor,loan,1)).thenReturn(Optional.of(stored));
-        var controller=new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
+        var controller=new LoanRecordingController(service,mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class),mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
         var model=new ExtendedModelMap();
         assertThat(controller.posting(actor,id,1,model)).isEqualTo("accounting/loans/posting");
         assertThat(model.get("actualSchedule")).isSameAs(stored);
@@ -39,7 +39,7 @@ class LoanPostingDocumentTest {
         var service=mock(LoanRecordingService.class);var actor=mock(AppUserPrincipal.class);var id=UUID.randomUUID();var loan=UUID.randomUUID();var posting=mock(Posting.class);
         when(posting.kind()).thenReturn("DISBURSEMENT");when(posting.loanId()).thenReturn(loan);when(posting.actorId()).thenReturn(UUID.randomUUID());
         when(service.posting(actor,id)).thenReturn(posting);
-        var controller=new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
+        var controller=new LoanRecordingController(service,mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class),mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
         var model=new ExtendedModelMap();controller.posting(actor,id,0,model);
         assertThat(model.get("actualSchedule")).isNull();verify(service,never()).detail(any(),any());
         assertThatThrownBy(()->controller.posting(actor,id,24,new ExtendedModelMap())).hasMessage("recording.error.filter");
@@ -48,7 +48,7 @@ class LoanPostingDocumentTest {
     @Test void receiptDisbursementAndReversalUseSameScopedPdfForPrintAndDownload()throws Exception {
         var service=mock(LoanRecordingService.class);var actor=mock(AppUserPrincipal.class);
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
-        var controller=new LoanRecordingController(service,new LoanRecordingPdfService(new ReportExportLimiter(1)),mock(ApplicationClock.class),messages,mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
+        var controller=new LoanRecordingController(service,mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class),new LoanRecordingPdfService(new ReportExportLimiter(1)),mock(ApplicationClock.class),messages,mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
         for(var kind:List.of("PAYMENT","DISBURSEMENT","REVERSAL"))for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
             UUID id=UUID.randomUUID(),loan=UUID.randomUUID();var principal=new BigDecimal("1000.25");var interest=new BigDecimal(kind.equals("DISBURSEMENT")?"0.00":"100.10");
             var posting=new Posting(id,loan,"100001","Synthetic client","C001",kind,LocalDate.of(2026,10,12),"REF-"+kind,principal.add(interest),principal,interest,
@@ -73,7 +73,7 @@ class LoanPostingDocumentTest {
     @Test void foreignBranchFailsBeforeRenderingOrLoadingBranding(){
         var service=mock(LoanRecordingService.class);var pdf=mock(LoanRecordingPdfService.class);var logos=mock(SaccoLogoStorageService.class);var actor=mock(AppUserPrincipal.class);var id=UUID.randomUUID();
         when(service.posting(actor,id)).thenThrow(new org.springframework.security.access.AccessDeniedException("Outside branch"));
-        var controller=new LoanRecordingController(service,pdf,mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),logos,org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
+        var controller=new LoanRecordingController(service,mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class),pdf,mock(ApplicationClock.class),mock(org.springframework.context.MessageSource.class),logos,org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
         assertThatThrownBy(()->controller.postingExport(actor,id,new MockHttpServletRequest("GET","/finance/loan-postings/"+id+"/print"),Locale.ENGLISH,new ExtendedModelMap())).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         verifyNoInteractions(pdf,logos);
     }

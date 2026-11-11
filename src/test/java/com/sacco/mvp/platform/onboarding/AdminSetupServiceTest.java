@@ -23,8 +23,7 @@ class AdminSetupServiceTest {
     String temporary="SyntheticTemporarySecret!";
     AppUserPrincipal actor() {
         return new AppUserPrincipal(Member.builder().id(id).memberNo("ADM001").position(Position.ADMIN)
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).platformSetupRequired(true).build(),
-            Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE),true);
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).platformSetupRequired(true).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
     }
     AdminSetupForm form() {
         var f=new AdminSetupForm();f.setFullName("Synthetic Test Administrator");f.setEmail("admin@example.invalid");f.setPhone("0712345678");
@@ -78,11 +77,11 @@ class AdminSetupServiceTest {
         verify(audit).logEvent(eq("PLATFORM_ADMIN"),eq(id),eq("INITIAL_SETUP"),eq(id),eq(AuditEventStatus.SUCCESS),anyString(),anyString(),anyString(),isNull(),isNull(),eq(Map.of()));
     }
     @Test void otherRolesMissingClaimAndFinishedSessionsCannotSetup() {
-        var staff=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE),true);
+        var staff=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
         assertThatThrownBy(()->service.authorize(staff)).isInstanceOf(AccessDeniedException.class);
-        var root=Member.builder().id(id).position(Position.ADMIN).platformSetupRequired(true).build();
-        assertThatThrownBy(()->service.authorize(new AppUserPrincipal(root,Set.of(),true))).isInstanceOf(AccessDeniedException.class);
+        var root=Member.builder().id(id).position(Position.ADMIN).platformSetupRequired(true).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
+        assertThatThrownBy(()->service.authorize(new AppUserPrincipal(root,Set.of()))).isInstanceOf(AccessDeniedException.class);
         root.setPlatformSetupRequired(false);
-        assertThatThrownBy(()->service.authorize(new AppUserPrincipal(root,Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE),true))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.authorize(new AppUserPrincipal(root,Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE)))).isInstanceOf(AccessDeniedException.class);
     }
 }

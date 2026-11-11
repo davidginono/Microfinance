@@ -2,13 +2,10 @@ package com.sacco.mvp.service;
 
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
-import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
-import com.sacco.mvp.domain.ManagerDecision;
-import com.sacco.mvp.domain.ManagerReview;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.RepaymentFrequency;
@@ -45,21 +42,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ManagerServiceTest {
-    @Test
-    void borrowerCannotMakeManagerOrAccountantDecisionOnTheirOwnLoan() {
-        UUID actor = UUID.randomUUID();
-        var loan = LoanApplication.builder().id(UUID.randomUUID()).saccoId("I1").applicantMemberId(actor).build();
-        when(loanApplicationRepository.findById(loan.getId())).thenReturn(Optional.of(loan));
-        when(roleDirectoryService.hasActiveClaimInSacco(eq(actor), eq("I1"), any())).thenReturn(true);
-        for (ManagerDecision decision : new ManagerDecision[]{ManagerDecision.ACCEPT, ManagerDecision.REJECT}) {
-            assertThatThrownBy(() -> managerService.decide(loan.getId(), actor, decision, "Reason", "Signature", OffsetDateTime.now()))
-                .hasMessage("staffClient.error.ownLoan");
-            assertThatThrownBy(() -> managerService.decideAccountant(loan.getId(), actor, decision, "Reason", "Signature", OffsetDateTime.now()))
-                .hasMessage("staffClient.error.ownLoan");
-        }
-        verify(managerReviewRepository, never()).save(any());
-        verify(loanApplicationRepository, never()).save(any());
-    }
 
     @Test
     void borrowerCannotDisburseTheirOwnLoan() {
@@ -97,79 +79,6 @@ class ManagerServiceTest {
 
     @org.junit.jupiter.api.BeforeEach void automaticLoanNumber(){
         org.mockito.Mockito.lenient().doAnswer(call->{LoanApplication loan=call.getArgument(0);loan.setLoanId("1");loan.setLoanAccountingPeriodId(UUID.randomUUID());return null;}).when(disbursementNumbers).assign(any(),any(),any());
-    }
-    @Test
-    void decideRejectsManagerFromAnotherSacco() {
-        UUID loanId = UUID.randomUUID();
-        UUID managerId = UUID.randomUUID();
-        LoanApplication app = LoanApplication.builder()
-            .id(loanId)
-            .saccoId("SACCO-A")
-            .applicantMemberId(UUID.randomUUID())
-            .status(LoanStatus.READY_FOR_MANAGER)
-            .createdAt(OffsetDateTime.now())
-            .updatedAt(OffsetDateTime.now())
-            .build();
-
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(roleDirectoryService.hasActiveClaimInSacco(managerId, "SACCO-A", UserClaim.MANAGER_QUEUE_REJECT)).thenReturn(false);
-
-        assertThatThrownBy(() -> managerService.decide(
-            loanId,
-            managerId,
-            ManagerDecision.REJECT,
-            "No",
-            "M. Manager",
-            OffsetDateTime.parse("2026-07-01T09:00:00Z")
-        ))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Forbidden");
-
-        verify(managerReviewRepository, never()).save(org.mockito.ArgumentMatchers.any());
-        verify(loanApplicationRepository, never()).save(org.mockito.ArgumentMatchers.any(LoanApplication.class));
-    }
-
-    @Test
-    void rejectStoresManagerSignatureSnapshotAndClearsApplicantAcknowledgement() {
-        UUID loanId = UUID.randomUUID();
-        UUID managerId = UUID.randomUUID();
-        OffsetDateTime acknowledgedAt = OffsetDateTime.parse("2026-06-30T09:00:00Z");
-        OffsetDateTime signatureVerifiedAt = OffsetDateTime.parse("2026-07-01T09:00:00Z");
-        LoanApplication app = LoanApplication.builder()
-            .id(loanId)
-            .saccoId("SACCO-A")
-            .stationId("ST-1")
-            .applicantMemberId(UUID.randomUUID())
-            .status(LoanStatus.READY_FOR_MANAGER)
-            .requiredGuarantors(0)
-            .applicantRejectionAcknowledgedAt(acknowledgedAt)
-            .createdAt(OffsetDateTime.now())
-            .updatedAt(OffsetDateTime.now())
-            .build();
-
-        when(loanApplicationRepository.findById(loanId)).thenReturn(Optional.of(app));
-        when(roleDirectoryService.hasActiveClaimInSacco(managerId, "SACCO-A", UserClaim.MANAGER_QUEUE_REJECT)).thenReturn(true);
-
-        managerService.decide(
-            loanId,
-            managerId,
-            ManagerDecision.REJECT,
-            "  Insufficient capacity  ",
-            "  M. Manager  ",
-            signatureVerifiedAt
-        );
-
-        org.mockito.ArgumentCaptor<ManagerReview> reviewCaptor = org.mockito.ArgumentCaptor.forClass(ManagerReview.class);
-        verify(managerReviewRepository).save(reviewCaptor.capture());
-        ManagerReview review = reviewCaptor.getValue();
-        assertThat(review.getReviewStage()).isEqualTo(ApprovalWorkflowStage.MANAGER);
-        assertThat(review.getDecision()).isEqualTo(ManagerDecision.REJECT);
-        assertThat(review.getReasons()).isEqualTo("Insufficient capacity");
-        assertThat(review.getManagerSignatureText()).isEqualTo("M. Manager");
-        assertThat(review.getManagerSignatureVerifiedAt()).isEqualTo(signatureVerifiedAt);
-        assertThat(app.getStatus()).isEqualTo(LoanStatus.MANAGER_REJECTED);
-        assertThat(app.getApplicantRejectionAcknowledgedAt()).isNull();
-        verify(loanApplicationRepository).save(app);
     }
 
     @Test

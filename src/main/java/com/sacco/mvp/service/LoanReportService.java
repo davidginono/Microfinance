@@ -5,8 +5,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
-import com.sacco.mvp.domain.GuarantorRequest;
-import com.sacco.mvp.domain.GuarantorRequestStatus;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
@@ -19,7 +17,6 @@ import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.domain.SaccoStation;
 import com.sacco.mvp.repository.BoardReviewRepository;
-import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.repository.LoanProductSettingRepository;
 import com.sacco.mvp.repository.ManagerReviewRepository;
@@ -82,7 +79,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -115,7 +111,6 @@ public class LoanReportService {
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final MemberRepository memberRepository;
-    private final GuarantorRequestRepository guarantorRequestRepository;
     private final BoardReviewRepository boardReviewRepository;
     private final ManagerReviewRepository managerReviewRepository;
     private final ObjectMapper objectMapper;
@@ -124,233 +119,6 @@ public class LoanReportService {
     private final SaccoStationRepository saccoStationRepository;
     private final ApplicationClock applicationClock;
     private final SaccoLogoStorageService saccoLogoStorageService;
-
-    public MemberLoanReport memberReport(UUID memberId) {
-        Member member = memberRepository.findById(memberId)
-            .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        List<LoanApplication> loans = loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(memberId).stream()
-            .sorted(Comparator.comparing(this::memberReportSortDate, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .toList();
-        List<LoanApplication> summaryLoans = loans.stream()
-            .filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus()))
-            .toList();
-        return new MemberLoanReport(member, summarize(summaryLoans), summarizeMemberAnalytics(loans), loans, buildMemberLoanDetails(member, loans));
-    }
-
-    public ManagerLoanReport managerReport(String saccoId, Integer year, boolean returnedOnly) {
-        int effectiveYear = year == null ? applicationClock.today().getYear() : year;
-        LocalDate fromDate = LocalDate.of(effectiveYear, 1, 1);
-        LocalDate toDate = LocalDate.of(effectiveYear, 12, 31);
-        List<LoanApplication> loans = loanApplicationRepository.findDisbursedInRange(
-            saccoId,
-            returnedOnly ? List.of(LoanStatus.PAID) : DISBURSED_STATUSES,
-            fromDate,
-            toDate
-        );
-
-        Set<UUID> applicantIds = loans.stream().map(LoanApplication::getApplicantMemberId).collect(java.util.stream.Collectors.toSet());
-        Map<UUID, Member> applicantMap = new LinkedHashMap<>();
-        if (!applicantIds.isEmpty()) {
-            for (Member member : memberRepository.findAllById(applicantIds)) {
-                applicantMap.put(member.getId(), member);
-            }
-        }
-        return new ManagerLoanReport(saccoId, effectiveYear, returnedOnly, summarize(loans), loans, applicantMap);
-    }
-
-    public List<Integer> managerReportYears(String saccoId) {
-        List<Integer> years = new ArrayList<>(
-            loanApplicationRepository.findDisbursementYears(saccoId, DISBURSED_STATUSES));
-        int currentYear = applicationClock.today().getYear();
-        if (!years.contains(currentYear)) {
-            years.add(0, currentYear);
-        }
-        return years;
-    }
-
-    public AccountantLoanReport accountantReport(UUID accountantId,
-                                                 String saccoId,
-                                                 String stationId,
-                                                 LocalDate fromDate,
-                                                 LocalDate toDate,
-                                                 String decisionFilter) {
-        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
-        LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
-        if (effectiveFrom.isAfter(effectiveTo)) {
-            throw new IllegalArgumentException("From date cannot be after to date.");
-        }
-
-        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
-        OffsetDateTime toAt = applicationClock.endOfDay(effectiveTo);
-        ManagerDecision expectedDecision = resolveAccountantDecisionFilter(decisionFilter);
-        String effectiveFilter = expectedDecision == null
-            ? "ALL"
-            : (expectedDecision == ManagerDecision.ACCEPT ? "APPROVED" : "REJECTED");
-
-        List<ManagerReview> reviews = managerReviewRepository.findForWorkflowReport(
-            accountantId, ApprovalWorkflowStage.ACCOUNTANT, saccoId, blankToNull(stationId),
-            expectedDecision, fromAt, toAt);
-
-        Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
-                reviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
-
-        List<AccountantReviewEntry> entries = reviews.stream()
-            .map(review -> {
-                LoanApplication loan = loanMap.get(review.getLoanApplicationId());
-                return loan == null ? null : new AccountantReviewEntry(review, loan);
-            })
-            .filter(java.util.Objects::nonNull)
-            .sorted(Comparator.comparing((AccountantReviewEntry entry) -> entry.review().getCreatedAt()).reversed())
-            .toList();
-
-        Map<UUID, Member> applicantMap = memberRepository.findAllById(
-                entries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, member -> member, (left, right) -> left, LinkedHashMap::new));
-
-        long approvedCount = entries.stream().filter(entry -> entry.review().getDecision() == ManagerDecision.ACCEPT).count();
-        long rejectedCount = entries.stream().filter(entry -> entry.review().getDecision() == ManagerDecision.REJECT).count();
-        BigDecimal totalAmount = entries.stream()
-            .map(entry -> entry.loan().getAmount())
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return new AccountantLoanReport(
-            accountantId,
-            saccoId,
-            effectiveFrom,
-            effectiveTo,
-            effectiveFilter,
-            new AccountantReviewSummary(entries.size(), approvedCount, rejectedCount, totalAmount),
-            entries,
-            applicantMap
-        );
-    }
-
-    public ManagerWorkflowReport managerWorkflowReport(UUID managerId,
-                                                       String saccoId,
-                                                       String stationId,
-                                                       LocalDate fromDate,
-                                                       LocalDate toDate,
-                                                       String decisionFilter) {
-        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
-        LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
-        if (effectiveFrom.isAfter(effectiveTo)) {
-            throw new IllegalArgumentException("From date cannot be after to date.");
-        }
-
-        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
-        OffsetDateTime toAt = applicationClock.endOfDay(effectiveTo);
-        ManagerDecision expectedDecision = resolveAccountantDecisionFilter(decisionFilter);
-        String effectiveFilter = expectedDecision == null
-            ? "ALL"
-            : (expectedDecision == ManagerDecision.ACCEPT ? "APPROVED" : "REJECTED");
-
-        List<ManagerReview> reviews = managerReviewRepository.findForWorkflowReport(
-            managerId, ApprovalWorkflowStage.MANAGER, saccoId, blankToNull(stationId),
-            expectedDecision, fromAt, toAt);
-
-        Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
-                reviews.stream().map(ManagerReview::getLoanApplicationId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
-
-        List<ManagerWorkflowEntry> entries = reviews.stream()
-            .map(review -> {
-                LoanApplication loan = loanMap.get(review.getLoanApplicationId());
-                return loan == null ? null : new ManagerWorkflowEntry(review, loan);
-            })
-            .filter(java.util.Objects::nonNull)
-            .sorted(Comparator.comparing((ManagerWorkflowEntry entry) -> entry.review().getCreatedAt()).reversed())
-            .toList();
-
-        Map<UUID, Member> applicantMap = memberRepository.findAllById(
-                entries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, member -> member, (left, right) -> left, LinkedHashMap::new));
-
-        long approvedCount = entries.stream().filter(entry -> entry.review().getDecision() == ManagerDecision.ACCEPT).count();
-        long rejectedCount = entries.stream().filter(entry -> entry.review().getDecision() == ManagerDecision.REJECT).count();
-        BigDecimal totalAmount = entries.stream()
-            .map(entry -> entry.loan().getAmount())
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return new ManagerWorkflowReport(
-            managerId,
-            saccoId,
-            effectiveFrom,
-            effectiveTo,
-            effectiveFilter,
-            new ManagerWorkflowSummary(entries.size(), approvedCount, rejectedCount, totalAmount),
-            entries,
-            applicantMap
-        );
-    }
-
-    public BoardWorkflowReport boardWorkflowReport(UUID reviewerId,
-                                                   String saccoId,
-                                                   String stationId,
-                                                   ApprovalWorkflowStage reviewStage,
-                                                   LocalDate fromDate,
-                                                   LocalDate toDate,
-                                                   String decisionFilter) {
-        LocalDate effectiveTo = toDate == null ? applicationClock.today() : toDate;
-        LocalDate effectiveFrom = fromDate == null ? effectiveTo.withDayOfMonth(1) : fromDate;
-        if (effectiveFrom.isAfter(effectiveTo)) {
-            throw new IllegalArgumentException("From date cannot be after to date.");
-        }
-
-        OffsetDateTime fromAt = applicationClock.startOfDay(effectiveFrom);
-        OffsetDateTime toExclusive = applicationClock.dayAfter(effectiveTo);
-        BoardDecision expectedDecision = resolveBoardDecisionFilter(decisionFilter);
-        String effectiveFilter = expectedDecision == null ? "ALL" : expectedDecision.name();
-
-        List<BoardReview> reviews = boardReviewRepository.findForWorkflowReport(
-            reviewerId, reviewStage, saccoId, blankToNull(stationId),
-            expectedDecision, fromAt, toExclusive);
-
-        Map<UUID, LoanApplication> loanMap = loanApplicationRepository.findAllById(
-                reviews.stream().map(BoardReview::getLoanApplicationId).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(LoanApplication::getId, loan -> loan, (left, right) -> left, LinkedHashMap::new));
-
-        List<BoardWorkflowEntry> entries = reviews.stream()
-            .map(review -> {
-                LoanApplication loan = loanMap.get(review.getLoanApplicationId());
-                return loan == null ? null : new BoardWorkflowEntry(review, loan);
-            })
-            .filter(Objects::nonNull)
-            .sorted(Comparator.comparing((BoardWorkflowEntry entry) -> reviewSortTime(entry.review())).reversed())
-            .toList();
-
-        Map<UUID, Member> applicantMap = memberRepository.findAllById(
-                entries.stream().map(entry -> entry.loan().getApplicantMemberId()).collect(Collectors.toSet()))
-            .stream()
-            .collect(Collectors.toMap(Member::getId, member -> member, (left, right) -> left, LinkedHashMap::new));
-
-        long approvedCount = entries.stream().filter(entry -> entry.review().getDecision() == BoardDecision.APPROVED).count();
-        long rejectedCount = entries.stream().filter(entry -> entry.review().getDecision() == BoardDecision.REJECTED).count();
-        BigDecimal totalAmount = entries.stream()
-            .map(entry -> entry.loan().getAmount())
-            .filter(Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return new BoardWorkflowReport(
-            reviewerId,
-            saccoId,
-            reviewStage,
-            effectiveFrom,
-            effectiveTo,
-            effectiveFilter,
-            new BoardWorkflowSummary(entries.size(), approvedCount, rejectedCount, totalAmount),
-            entries,
-            applicantMap
-        );
-    }
 
     public DisbursementLoanReport disbursementReport(UUID disbursementOfficerId,
                                                      String saccoId,
@@ -548,145 +316,6 @@ public class LoanReportService {
         }
     }
 
-    public byte[] buildMemberPdf(MemberLoanReport report) {
-        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            MemberPdfRenderer renderer = new MemberPdfRenderer(
-                document,
-                report,
-                DATE_FORMATTER.format(applicationClock.today()),
-                saccoLogoBytes(report.member().getSaccoId())
-            );
-            renderer.render();
-            document.save(output);
-            return output.toByteArray();
-        } catch (IOException ex) {
-            throw new IllegalStateException("Unable to generate PDF report.", ex);
-        }
-    }
-
-    public byte[] buildMemberExcel(MemberLoanReport report) {
-        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            XSSFSheet sheet = workbook.createSheet("Member Loan Report");
-            int rowIndex = 0;
-            Row header = sheet.createRow(rowIndex++);
-            String[] columns = {
-                "Loan Application ID",
-                "Loan ID",
-                "Member Details",
-                "Approved Product",
-                "Approved Amount",
-                "Tenure",
-                "Estimated Fee / Insurance / Processing Deductions",
-                "Application Fee",
-                "Insurance Fee",
-                "Loan Processing Fee",
-                "Total Deductions",
-                "Guarantor Details",
-                "Approval Decision Summary",
-                "Disbursement Date",
-                "Final Due Date",
-                "Status",
-                "Prepared By",
-                "Prepared Date"
-            };
-            for (int i = 0; i < columns.length; i++) {
-                Cell cell = header.createCell(i);
-                cell.setCellValue(columns[i]);
-            }
-            for (MemberLoanDetail detail : report.details()) {
-                Row row = sheet.createRow(rowIndex++);
-                int column = 0;
-                row.createCell(column++).setCellValue(detail.loanApplicationIdLabel());
-                row.createCell(column++).setCellValue(detail.loanIdLabel());
-                row.createCell(column++).setCellValue(detail.memberDetailsLabel());
-                row.createCell(column++).setCellValue(detail.approvedProductLabel());
-                row.createCell(column++).setCellValue(detail.approvedAmountLabel());
-                row.createCell(column++).setCellValue(detail.tenureLabel());
-                row.createCell(column++).setCellValue(detail.deductionSummaryLabel());
-                row.createCell(column++).setCellValue(detail.applicationFeeLabel());
-                row.createCell(column++).setCellValue(detail.insuranceFeeLabel());
-                row.createCell(column++).setCellValue(detail.processingFeeLabel());
-                row.createCell(column++).setCellValue(detail.totalDeductionsLabel());
-                row.createCell(column++).setCellValue(detail.guarantorDetailsLabel());
-                row.createCell(column++).setCellValue(detail.approvalDecisionSummaryLabel());
-                row.createCell(column++).setCellValue(detail.disbursementDateLabel());
-                row.createCell(column++).setCellValue(detail.finalDueDateLabel());
-                row.createCell(column++).setCellValue(detail.statusLabel());
-                row.createCell(column++).setCellValue(detail.preparedByLabel());
-                row.createCell(column).setCellValue(detail.preparedDateLabel());
-            }
-            for (int i = 0; i < columns.length; i++) {
-                sheet.autoSizeColumn(i);
-            }
-            workbook.write(output);
-            return output.toByteArray();
-        } catch (IOException ex) {
-            throw new IllegalStateException("Unable to generate Excel report.", ex);
-        }
-    }
-
-    public AnalyticsExportReport memberAnalyticsExportReport(AppUserPrincipal principal,
-                                                             LocalDate fromDate,
-                                                             LocalDate toDate,
-                                                             com.sacco.mvp.domain.LoanType loanType) {
-        return memberAnalyticsExportReport(principal, fromDate, toDate, loanType, null);
-    }
-
-    public AnalyticsExportReport memberAnalyticsExportReport(AppUserPrincipal principal,
-                                                             LocalDate fromDate,
-                                                             LocalDate toDate,
-                                                             com.sacco.mvp.domain.LoanType loanType,
-                                                             UUID loanProductId) {
-        DateRange range = resolveReportRange(fromDate, toDate);
-        Member member = memberRepository.findById(principal.getMemberId())
-            .orElseThrow(() -> new IllegalArgumentException("Member not found"));
-        List<LoanApplication> loans = filterByLoanProductId(hydrateReportRows(
-            loanApplicationRepository.findMemberReportRows(
-                principal.getMemberId(), startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null)), loanProductId);
-        LoanAnalyticsService.MemberLoanAnalytics analytics =
-            loanAnalyticsService.forMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, loanProductId, null);
-        List<LoanAnalyticsService.MetricTrendSeries> trendSeries =
-            loanAnalyticsService.statusTrendForMember(principal.getMemberId(), range.fromDate(), range.toDate(), loanType, loanProductId, null);
-        ExportContext context = exportContext(principal, range, loanType);
-        return new AnalyticsExportReport(
-            ReportKind.MEMBER,
-            context.saccoName(),
-            principal.getSaccoId(),
-            "MEMBER LOAN REPORT",
-            context.stationId(),
-            context.branchName(),
-            range.fromDate(),
-            range.toDate(),
-            applicationClock.today(),
-            principal.getFullName(),
-            exporterRoleLabel(principal),
-            loanProductLabel(principal.getSaccoId(), loanProductId, loanType),
-            member,
-            analytics,
-            memberPortfolio(analytics),
-            productRowsFromLoans(loans),
-            productFinancialRowsFromLoans(loans),
-            null,
-            trendSeries,
-            recentActivityRows(loans),
-            activeLoanRowsFromLoans(loans),
-            financialSummary(loans, analytics),
-            observations(analytics),
-            "This report summarizes the loan performance and status of the member within the selected period."
-        );
-    }
-
-    public List<ActiveLoanDetailRow> memberActiveLoanDetails(UUID memberId,
-                                                             LocalDate fromDate,
-                                                             LocalDate toDate,
-                                                             com.sacco.mvp.domain.LoanType loanType) {
-        DateRange range = resolveReportRange(fromDate, toDate);
-        List<LoanApplication> loans = hydrateReportRows(
-            loanApplicationRepository.findMemberReportRowsByStatuses(
-                memberId, ACTIVE_STATUSES, startOfDay(range.fromDate()), dayAfter(range.toDate()), loanType, null));
-        return activeLoanRowsFromLoans(loans);
-    }
-
     public AnalyticsExportReport staffAnalyticsExportReport(AppUserPrincipal principal,
                                                             LocalDate fromDate,
                                                             LocalDate toDate,
@@ -820,119 +449,6 @@ public class LoanReportService {
         } catch (IOException ex) {
             throw new IllegalStateException("Unable to generate staff analytics Excel report.", ex);
         }
-    }
-
-    public byte[] buildManagerPdf(ManagerLoanReport report) {
-        List<String> lines = new ArrayList<>();
-        lines.add("Manager Disbursed Loans Report");
-        lines.add("SACCO: " + report.saccoId());
-        lines.add("Generated: " + DATE_FORMATTER.format(applicationClock.today()));
-        lines.add("Year: " + report.year());
-        lines.add("Returned Only: " + (report.returnedOnly() ? "Yes" : "No"));
-        lines.add("");
-        lines.add("Summary");
-        lines.add("Disbursed loans in report: " + report.summary().disbursedCount());
-        lines.add("Returned / paid: " + report.summary().paidCount());
-        lines.add("Ongoing loans: " + report.summary().ongoingCount());
-        lines.add("Disbursed amount: " + formatMoney(report.summary().disbursedAmount()));
-        lines.add("Returned amount: " + formatMoney(report.summary().paidAmount()));
-        lines.add("");
-        lines.add("Loan List");
-        for (LoanApplication loan : report.loans()) {
-            Member applicant = report.applicantMap().get(loan.getApplicantMemberId());
-            lines.add(shortLoanRow(loan, applicant));
-        }
-        return renderPdf(lines, report.saccoId());
-    }
-
-    public byte[] buildAccountantPdf(AccountantLoanReport report) {
-        List<String[]> rows = new ArrayList<>();
-        Map<UUID, String> productNames = productNamesForSacco(report.saccoId());
-        for (AccountantReviewEntry entry : report.entries()) {
-            Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
-            LoanApplication loan = entry.loan();
-            rows.add(new String[]{
-                applicationLabel(loan),
-                loanIdLabel(loan),
-                applicantLabel(applicant),
-                loanTypeLabel(loan, productNames),
-                formatMoney(loan.getAmount()),
-                entry.review().getDecision() == ManagerDecision.ACCEPT ? "Ready for Disbursement" : "Rejected",
-                formatTimestamp(entry.review().getCreatedAt()),
-                humanizeLoanStatusForReport(loan.getStatus())
-            });
-        }
-        return renderStaffReviewPdf(
-            report.saccoId(),
-            "ACCOUNTANT REVIEW REPORTS",
-            "Accountant Decisions on Loan Applications",
-            "Decision Filter: " + accountantDecisionFilterLabel(report.decisionFilter())
-                + " | Reviewed: " + report.summary().reviewedCount()
-                + " | Amount: " + formatMoney(report.summary().reviewedAmount()),
-            new String[]{"LOAN APPLICATION ID", "LOAN ID", "APPLICANT", "LOAN TYPE", "AMOUNT", "DECISION", "REVIEWED AT", "CURRENT STATUS"},
-            new float[]{78f, 66f, 80f, 70f, 72f, 74f, 74f, 84f},
-            rows,
-            "No accountant-reviewed loans matched the selected period.",
-            "Accountant Review Reports",
-            report.fromDate(),
-            report.toDate()
-        );
-    }
-
-    public byte[] buildManagerWorkflowPdf(ManagerWorkflowReport report) {
-        List<String[]> rows = new ArrayList<>();
-        Map<UUID, String> productNames = productNamesForSacco(report.saccoId());
-        for (ManagerWorkflowEntry entry : report.entries()) {
-            Member applicant = report.applicantMap().get(entry.loan().getApplicantMemberId());
-            LoanApplication loan = entry.loan();
-            rows.add(new String[]{
-                applicationLabel(loan),
-                loanIdLabel(loan),
-                applicantLabel(applicant),
-                loanTypeLabel(loan, productNames),
-                formatMoney(loan.getAmount()),
-                entry.review().getDecision() == ManagerDecision.ACCEPT ? "Approved" : "Rejected",
-                formatTimestamp(entry.review().getCreatedAt()),
-                humanizeLoanStatusForReport(loan.getStatus())
-            });
-        }
-        return renderStaffReviewPdf(
-            report.saccoId(),
-            "MANAGER REVIEW REPORTS",
-            "Manager Decisions on Loan Applications",
-            "Decision Filter: " + managerDecisionFilterLabel(report.decisionFilter())
-                + " | Reviewed: " + report.summary().reviewedCount()
-                + " | Amount: " + formatMoney(report.summary().reviewedAmount()),
-            new String[]{"LOAN APPLICATION ID", "LOAN ID", "APPLICANT", "LOAN TYPE", "AMOUNT", "MANAGER DECISION", "REVIEWED AT", "CURRENT STATUS"},
-            new float[]{78f, 66f, 80f, 70f, 72f, 74f, 74f, 84f},
-            rows,
-            "No manager-reviewed loans matched the selected period.",
-            "Manager Review Reports",
-            report.fromDate(),
-            report.toDate()
-        );
-    }
-
-    public byte[] buildBoardWorkflowPdf(BoardWorkflowReport report) {
-        return buildBoardStageWorkflowPdf(
-            report,
-            "BOARD REVIEW REPORTS",
-            "Board Decisions on Loan Applications",
-            "BOARD DECISION",
-            "No board-reviewed loans matched the selected period.",
-            "Board Review Reports"
-        );
-    }
-
-    public byte[] buildLoanOfficerWorkflowPdf(BoardWorkflowReport report) {
-        return buildBoardStageWorkflowPdf(
-            report,
-            "LOAN OFFICER REVIEW REPORTS",
-            "Loan Officer Decisions on Loan Applications",
-            "LOAN OFFICER DECISION",
-            "No loan officer-reviewed loans matched the selected period.",
-            "Loan Officer Review Reports"
-        );
     }
 
     private byte[] buildBoardStageWorkflowPdf(BoardWorkflowReport report,
@@ -1214,25 +730,6 @@ public class LoanReportService {
         return loanApplicationRepository.findReportRowsById(ids);
     }
 
-    private LoanApplication toReportLoan(LoanApplicationRepository.ReportLoanRow row) {
-        LoanApplication loan = new LoanApplication();
-        loan.setId(row.getId());
-        loan.setApplicationNumber(row.getApplicationNumber());
-        loan.setLoanId(row.getLoanId());
-        loan.setStatus(row.getStatus());
-        loan.setLoanType(row.getLoanType());
-        loan.setLoanProductSettingId(row.getLoanProductSettingId());
-        loan.setCreatedAt(row.getCreatedAt());
-        loan.setUpdatedAt(row.getUpdatedAt());
-        loan.setAmount(row.getAmount());
-        loan.setSaccoId(row.getSaccoId());
-        loan.setStationId(row.getStationId());
-        loan.setApplicantMemberId(row.getApplicantMemberId());
-        loan.setDisbursementDate(row.getDisbursementDate());
-        loan.setFinancialSnapshot(row.getFinancialSnapshot());
-        return loan;
-    }
-
     private List<LoanApplication> stationFinancialLoans(String saccoId, String stationId, com.sacco.mvp.domain.LoanType loanType) {
         if (saccoId == null || saccoId.isBlank()) {
             return List.of();
@@ -1260,40 +757,9 @@ public class LoanReportService {
             .toList();
     }
 
-    private List<ActiveLoanDetailRow> activeLoanRowsFromLoans(List<LoanApplication> loans) {
-        Map<UUID, String> productNames = productNamesForLoans(loans);
-        return loans.stream()
-            .filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus()))
-            .sorted(Comparator.comparing(LoanApplication::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-            .map(loan -> {
-                BigDecimal outstanding = outstandingBalanceAmount(loan);
-                BigDecimal requiredInterest = requiredInterestAmount(loan);
-                BigDecimal remainingInterest = interestUnpaidAmount(loan);
-                return new ActiveLoanDetailRow(
-                    loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
-                    loanProductName(loan, productNames),
-                    moneyPlain(loan.getAmount()),
-                    moneyPlain(outstanding),
-                    moneyPlain(requiredInterest),
-                    moneyPlain(principalPaidAmount(loan)),
-                    moneyPlain(interestPaidAmount(loan)),
-                    moneyPlain(remainingInterest)
-                );
-            })
-            .toList();
-    }
-
     private BigDecimal requiredInterestAmount(LoanApplication loan) {
         BigDecimal snapshotInterest = financialSnapshotAmount(loan, "interestAmount");
         return snapshotInterest == null ? BigDecimal.ZERO : snapshotInterest;
-    }
-
-    private BigDecimal outstandingBalanceAmount(LoanApplication loan) {
-        BigDecimal syncedOutstanding = financialSnapshotAmount(loan, LoanFinancialSnapshotKeys.PAYMENT_SUMMARY_TOTAL_OUTSTANDING);
-        if (syncedOutstanding != null) {
-            return syncedOutstanding.max(BigDecimal.ZERO);
-        }
-        return outstandingPrincipalAmount(loan).add(interestUnpaidAmount(loan)).max(BigDecimal.ZERO);
     }
 
     private BigDecimal outstandingPrincipalAmount(LoanApplication loan) {
@@ -1429,10 +895,6 @@ public class LoanReportService {
         rows.add("Approval rate remains at " + approvalRate + "%.");
         rows.add("Portfolio risk level remains " + memberPortfolio(analytics).riskLevel() + ".");
         return rows;
-    }
-
-    private boolean fitsMemberOnePage(AnalyticsExportReport report) {
-        return report.activityRows().size() <= 4 && report.productRows().size() <= 5 && report.trendSeries().size() <= 7;
     }
 
     private List<String[]> statusRows(AnalyticsExportReport report) {
@@ -2126,65 +1588,6 @@ public class LoanReportService {
         return value instanceof Number number ? number.longValue() : 0L;
     }
 
-    private LoanSummary summarize(Collection<LoanApplication> loans) {
-        long paidCount = loans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
-        long ongoingCount = loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.DISBURSED
-                || loan.getStatus() == LoanStatus.PAR
-                || loan.getStatus() == LoanStatus.DEFAULTED)
-            .count();
-        BigDecimal disbursedAmount = loans.stream().map(LoanApplication::getAmount).filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal paidAmount = loans.stream()
-            .filter(loan -> loan.getStatus() == LoanStatus.PAID)
-            .map(LoanApplication::getAmount)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new LoanSummary(loans.size(), paidCount, ongoingCount, disbursedAmount, paidAmount);
-    }
-
-    private MemberLoanAnalyticsSummary summarizeMemberAnalytics(Collection<LoanApplication> loans) {
-        Collection<LoanApplication> safeLoans = loans == null ? List.of() : loans;
-        long appliedCount = safeLoans.stream().filter(loan -> loan.getStatus() != LoanStatus.DRAFT).count();
-        long activeCount = safeLoans.stream().filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus())).count();
-        long disbursedCount = safeLoans.stream().filter(loan -> DISBURSED_STATUSES.contains(loan.getStatus())).count();
-        long paidCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.PAID).count();
-        long defaultedCount = safeLoans.stream().filter(loan -> loan.getStatus() == LoanStatus.DEFAULTED).count();
-        long rejectedCount = safeLoans.stream().filter(loan -> REJECTED_STATUSES.contains(loan.getStatus())).count();
-        BigDecimal activeAmount = safeLoans.stream()
-            .filter(loan -> ACTIVE_STATUSES.contains(loan.getStatus()))
-            .map(LoanApplication::getAmount)
-            .filter(java.util.Objects::nonNull)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new MemberLoanAnalyticsSummary(
-            appliedCount,
-            activeCount,
-            disbursedCount,
-            paidCount,
-            defaultedCount,
-            rejectedCount,
-            activeAmount
-        );
-    }
-
-    private byte[] renderPdf(List<String> lines, String saccoId) {
-        try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            PDFCursor cursor = new PDFCursor(document, saccoLogoBytes(saccoId));
-            cursor.openPage();
-            for (String line : lines) {
-                if (line == null) {
-                    continue;
-                }
-                cursor.writeWrapped(line);
-            }
-            cursor.close();
-            document.save(output);
-            return output.toByteArray();
-        } catch (IOException ex) {
-            throw new IllegalStateException("Unable to generate PDF report.", ex);
-        }
-    }
-
     private byte[] renderStaffReviewPdf(String saccoId,
                                         String title,
                                         String subtitle,
@@ -2322,96 +1725,6 @@ public class LoanReportService {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    private String titleCase(String value) {
-        if (value == null || value.isBlank()) {
-            return "-";
-        }
-        StringBuilder label = new StringBuilder();
-        int wordIndex = 0;
-        for (String part : value.toLowerCase(Locale.ROOT).split("\\s+")) {
-            if (part.isBlank()) {
-                continue;
-            }
-            if (!label.isEmpty()) {
-                label.append(' ');
-            }
-            label.append(wordIndex > 0 && isLowercaseConnectorWord(part)
-                ? part
-                : Character.toUpperCase(part.charAt(0)) + part.substring(1));
-            wordIndex++;
-        }
-        return label.isEmpty() ? value : label.toString();
-    }
-
-    private boolean isLowercaseConnectorWord(String value) {
-        return "wa".equals(value) || "ya".equals(value) || "la".equals(value) || "na".equals(value);
-    }
-
-    private String shortLoanRow(LoanApplication loan, Member applicant) {
-        StringBuilder line = new StringBuilder();
-        line.append(shortId(loan.getId())).append(" | ");
-        if (applicant != null) {
-            line.append(applicant.getFullName()).append(" (").append(applicant.getMemberNo()).append(") | ");
-        }
-        line.append(loan.getLoanType() == null ? "-" : humanizeLoanType(loan.getLoanType().name())).append(" | ");
-        line.append(formatMoney(loan.getAmount())).append(" | ");
-        line.append("Disbursed ").append(formatDate(loan.getDisbursementDate())).append(" | ");
-        line.append("Due ").append(formatDate(loan.getFinalDueDate())).append(" | ");
-        line.append(switch (loan.getStatus()) {
-            case PAID -> "PAID on " + formatTimestamp(loan.getPaidAt());
-            case PAR -> "PORTFOLIO AT RISK";
-            case DEFAULTED -> "DEFAULTED";
-            default -> "ONGOING";
-        });
-        return line.toString();
-    }
-
-    private String accountantLoanRow(AccountantReviewEntry entry, Member applicant) {
-        LoanApplication loan = entry.loan();
-        ManagerReview review = entry.review();
-        StringBuilder line = new StringBuilder();
-        line.append(loan.getApplicationNumber() == null ? shortId(loan.getId()) : loan.getApplicationNumber()).append(" | ");
-        if (applicant != null) {
-            line.append(applicant.getFullName()).append(" (").append(applicant.getMemberNo()).append(") | ");
-        }
-        line.append(loan.getLoanType() == null ? "-" : humanizeLoanType(loan.getLoanType().name())).append(" | ");
-        line.append(formatMoney(loan.getAmount())).append(" | ");
-        line.append(review.getDecision() == ManagerDecision.ACCEPT ? "READY FOR DISBURSEMENT" : "REJECTED").append(" | ");
-        line.append("Reviewed ").append(formatTimestamp(review.getCreatedAt()));
-        return line.toString();
-    }
-
-    private String managerWorkflowRow(ManagerWorkflowEntry entry, Member applicant) {
-        LoanApplication loan = entry.loan();
-        ManagerReview review = entry.review();
-        StringBuilder line = new StringBuilder();
-        line.append(loan.getApplicationNumber() == null ? shortId(loan.getId()) : loan.getApplicationNumber()).append(" | ");
-        if (applicant != null) {
-            line.append(applicant.getFullName()).append(" (").append(applicant.getMemberNo()).append(") | ");
-        }
-        line.append(loan.getLoanType() == null ? "-" : humanizeLoanType(loan.getLoanType().name())).append(" | ");
-        line.append(formatMoney(loan.getAmount())).append(" | ");
-        line.append(review.getDecision() == ManagerDecision.ACCEPT ? "APPROVED" : "REJECTED").append(" | ");
-        line.append("Reviewed ").append(formatTimestamp(review.getCreatedAt())).append(" | ");
-        line.append("Current status ").append(humanizeLoanStatusForReport(loan.getStatus()));
-        return line.toString();
-    }
-
-    private String disbursementLoanRow(DisbursementReviewEntry entry, Member applicant) {
-        LoanApplication loan = entry.loan();
-        StringBuilder line = new StringBuilder();
-        line.append(loan.getLoanId() == null || loan.getLoanId().isBlank() ? shortId(loan.getId()) : loan.getLoanId()).append(" | ");
-        line.append(loan.getApplicationNumber() == null ? shortId(loan.getId()) : loan.getApplicationNumber()).append(" | ");
-        if (applicant != null) {
-            line.append(applicant.getFullName()).append(" (").append(applicant.getMemberNo()).append(") | ");
-        }
-        line.append(loan.getLoanType() == null ? "-" : humanizeLoanType(loan.getLoanType().name())).append(" | ");
-        line.append(formatMoney(loan.getAmount())).append(" | ");
-        line.append("Disbursed ").append(formatTimestamp(entry.review().getCreatedAt())).append(" | ");
-        line.append("Current status ").append(humanizeLoanStatusForReport(loan.getStatus()));
-        return line.toString();
-    }
-
     private String humanizeLoanStatusForReport(LoanStatus status) {
         if (status == null) {
             return "-";
@@ -2509,193 +1822,6 @@ public class LoanReportService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
-    }
-
-    private boolean matchesApplicantStation(LoanApplication loan, String stationId) {
-        if (loan == null || stationId == null || stationId.isBlank()) {
-            return true;
-        }
-        return loan.getStationId() != null
-            && !loan.getStationId().isBlank()
-            && stationId.equalsIgnoreCase(loan.getStationId().trim());
-    }
-
-    private LocalDate memberReportSortDate(LoanApplication loan) {
-        if (loan == null) {
-            return null;
-        }
-        if (loan.getDisbursementDate() != null) {
-            return loan.getDisbursementDate();
-        }
-        return loan.getCreatedAt() == null ? null : loan.getCreatedAt().toLocalDate();
-    }
-
-    private List<MemberLoanDetail> buildMemberLoanDetails(Member member, List<LoanApplication> loans) {
-        if (loans.isEmpty()) {
-            return List.of();
-        }
-        Set<UUID> loanIds = loans.stream().map(LoanApplication::getId).collect(Collectors.toCollection(java.util.LinkedHashSet::new));
-        Map<UUID, List<GuarantorRequest>> guarantorsByLoan = guarantorRequestRepository.findByLoanApplicationIdIn(loanIds)
-            .stream()
-            .collect(Collectors.groupingBy(GuarantorRequest::getLoanApplicationId, LinkedHashMap::new, Collectors.toList()));
-        Map<UUID, List<BoardReview>> boardReviewsByLoan = boardReviewRepository.findByLoanApplicationIdIn(loanIds)
-            .stream()
-            .collect(Collectors.groupingBy(BoardReview::getLoanApplicationId, LinkedHashMap::new, Collectors.toList()));
-
-        Set<UUID> memberIds = new java.util.LinkedHashSet<>();
-        guarantorsByLoan.values().forEach(requests -> requests.stream()
-            .map(GuarantorRequest::getGuarantorMemberId)
-            .filter(Objects::nonNull)
-            .forEach(memberIds::add));
-        boardReviewsByLoan.values().forEach(reviews -> reviews.forEach(review -> memberIds.add(review.getBoardMemberId())));
-
-        Map<UUID, Member> memberMap = memberRepository.findAllById(memberIds).stream()
-            .collect(Collectors.toMap(Member::getId, item -> item));
-        Map<UUID, String> productNames = productNamesForLoans(loans);
-
-        return loans.stream()
-            .map(loan -> buildMemberLoanDetail(
-                member,
-                loan,
-                guarantorsByLoan.getOrDefault(loan.getId(), List.of()),
-                boardReviewsByLoan.getOrDefault(loan.getId(), List.of()),
-                memberMap,
-                productNames
-            ))
-            .toList();
-    }
-
-    private MemberLoanDetail buildMemberLoanDetail(Member member,
-                                                   LoanApplication loan,
-                                                   List<GuarantorRequest> guarantorRequests,
-                                                   List<BoardReview> boardReviews,
-                                                   Map<UUID, Member> memberMap,
-                                                   Map<UUID, String> productNames) {
-        Map<String, Object> financialSnapshot = parseJsonMap(loan.getFinancialSnapshot());
-        String applicationFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("applicationFee")));
-        String insuranceFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("insuranceFee")));
-        String processingFeeLabel = formatMoney(readBigDecimal(financialSnapshot.get("processingFee")));
-        String totalDeductionsLabel = formatMoney(resolveTotalDeductions(financialSnapshot));
-        String deductionSummary = "Application Fee: " + applicationFeeLabel
-            + ", Insurance Fee: " + insuranceFeeLabel
-            + ", Loan Processing Fee: " + processingFeeLabel
-            + ", Total Deductions: " + totalDeductionsLabel;
-        return new MemberLoanDetail(
-            loan.getId(),
-            loan.getApplicationNumber() == null ? shortId(loan.getId()) : loan.getApplicationNumber().toString(),
-            loan.getLoanId() == null || loan.getLoanId().isBlank() ? "-" : loan.getLoanId(),
-            formatMemberDetails(member),
-            loanTypeLabel(loan, productNames),
-            formatMoney(loan.getAmount()),
-            loan.getTenorMonths() == null ? "-" : loan.getTenorMonths() + " month(s)",
-            applicationFeeLabel,
-            insuranceFeeLabel,
-            processingFeeLabel,
-            totalDeductionsLabel,
-            deductionSummary,
-            formatGuarantorDetails(guarantorRequests, memberMap),
-            formatApprovalSummary(boardReviews, memberMap),
-            formatDate(loan.getDisbursementDate()),
-            formatDate(loan.getFinalDueDate()),
-            formatMemberLoanStatus(loan),
-            member.getFullName(),
-            DATE_FORMATTER.format(applicationClock.today())
-        );
-    }
-
-    private Map<String, Object> parseJsonMap(String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
-        }
-        try {
-            return objectMapper.readValue(json, new TypeReference<>() {});
-        } catch (Exception ex) {
-            return Map.of();
-        }
-    }
-
-    private BigDecimal readBigDecimal(Object value) {
-        if (value == null) {
-            return BigDecimal.ZERO;
-        }
-        try {
-            return new BigDecimal(String.valueOf(value)).setScale(2, RoundingMode.HALF_UP);
-        } catch (NumberFormatException ex) {
-            return BigDecimal.ZERO;
-        }
-    }
-
-    private BigDecimal resolveTotalDeductions(Map<String, Object> financialSnapshot) {
-        BigDecimal explicit = readBigDecimal(financialSnapshot.get("totalDeductions"));
-        if (explicit.compareTo(BigDecimal.ZERO) > 0) {
-            return explicit;
-        }
-        return readBigDecimal(financialSnapshot.get("applicationFee"))
-            .add(readBigDecimal(financialSnapshot.get("insuranceFee")))
-            .add(readBigDecimal(financialSnapshot.get("processingFee")))
-            .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private String formatMemberDetails(Member member) {
-        List<String> parts = new ArrayList<>();
-        parts.add(member.getFullName() + " (" + member.getMemberNo() + ")");
-        if (member.getEmail() != null && !member.getEmail().isBlank()) {
-            parts.add(member.getEmail());
-        }
-        if (member.getPhone() != null && !member.getPhone().isBlank()) {
-            parts.add(member.getPhone());
-        }
-        return String.join(" | ", parts);
-    }
-
-    private String formatGuarantorDetails(List<GuarantorRequest> guarantorRequests, Map<UUID, Member> memberMap) {
-        if (guarantorRequests == null || guarantorRequests.isEmpty()) {
-            return "No guarantor details available";
-        }
-        return guarantorRequests.stream()
-            .map(request -> {
-                Member guarantor = memberMap.get(request.getGuarantorMemberId());
-                String guarantorLabel = guarantor == null
-                    ? firstNonBlank(request.getExternalFullName(), request.getExternalMemberNo(),
-                        request.getGuarantorMemberId() == null ? null : shortId(request.getGuarantorMemberId()))
-                    : guarantor.getFullName() + " (" + guarantor.getMemberNo() + ")";
-                return guarantorLabel + " - " + humanizeGuarantorStatus(request.getStatus());
-            })
-            .collect(Collectors.joining("; "));
-    }
-
-    private String humanizeGuarantorStatus(GuarantorRequestStatus status) {
-        if (status == null) {
-            return "Unknown";
-        }
-        return switch (status) {
-            case APPROVED -> "Approved";
-            case REJECTED -> "Rejected";
-            case EXPIRED -> "Expired";
-            case PENDING -> "Pending";
-        };
-    }
-
-    private String formatApprovalSummary(List<BoardReview> boardReviews,
-                                         Map<UUID, Member> memberMap) {
-        if (boardReviews != null && !boardReviews.isEmpty()) {
-            return boardReviews.stream()
-                .map(review -> {
-                    Member boardMember = memberMap.get(review.getBoardMemberId());
-                    String boardName = boardMember == null ? "Board Member" : boardMember.getFullName();
-                    String status = review.getDecision() == null ? "Pending" : switch (review.getDecision()) {
-                        case APPROVED -> "Approved";
-                        case REJECTED -> "Rejected";
-                        case PENDING -> "Pending";
-                    };
-                    String note = review.getComment() == null || review.getComment().isBlank()
-                        ? ""
-                        : " (" + review.getComment().trim() + ")";
-                    return boardName + ": " + status + note;
-                })
-                .collect(Collectors.joining("; "));
-        }
-        return "No board committee decision details available";
     }
 
     private StationParticipationSummary buildStationParticipation(long activeMembers, List<LoanApplication> appliedLoans) {
@@ -2899,47 +2025,6 @@ public class LoanReportService {
         }
     }
 
-    private int writeTitle(XSSFSheet sheet, CellStyle titleStyle, String title) {
-        Row row = sheet.createRow(0);
-        Cell cell = row.createCell(0);
-        cell.setCellValue(title);
-        cell.setCellStyle(titleStyle);
-        return 1;
-    }
-
-    private int writeKeyValueTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<String[]> rows) {
-        Row header = sheet.createRow(rowIndex++);
-        header.createCell(0).setCellValue("Field");
-        header.createCell(1).setCellValue("Value");
-        header.getCell(0).setCellStyle(headerStyle);
-        header.getCell(1).setCellStyle(headerStyle);
-        for (String[] item : rows) {
-            Row row = sheet.createRow(rowIndex++);
-            row.createCell(0).setCellValue(item[0]);
-            row.createCell(1).setCellValue(item[1]);
-        }
-        return rowIndex;
-    }
-
-    private int writeStatusTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<StationStatusRow> rows) {
-        Row title = sheet.createRow(rowIndex++);
-        title.createCell(0).setCellValue("LOAN STATUS SUMMARY");
-        title.getCell(0).setCellStyle(headerStyle);
-        Row header = sheet.createRow(rowIndex++);
-        String[] columns = {"Metric", "Count", "Number of Applicants"};
-        for (int i = 0; i < columns.length; i++) {
-            header.createCell(i).setCellValue(columns[i]);
-            header.getCell(i).setCellStyle(headerStyle);
-        }
-        for (StationStatusRow item : rows) {
-            Row row = sheet.createRow(rowIndex++);
-            row.createCell(0).setCellValue(item.metric());
-            row.createCell(1).setCellValue(item.count());
-            row.createCell(2).setCellValue(item.applicantCount());
-        }
-        return rowIndex;
-    }
-
     private int writeProductTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<StationProductRow> rows) {
         Row header = sheet.createRow(rowIndex++);
         String[] columns = {
@@ -2970,37 +2055,6 @@ public class LoanReportService {
             row.createCell(column++).setCellValue(item.defaulted());
             row.createCell(column++).setCellValue(item.rejected());
             row.createCell(column++).setCellValue(item.totalPaidInterest().doubleValue());
-            row.createCell(column).setCellValue(item.fullyPaidLoanInterest().doubleValue());
-        }
-        return rowIndex;
-    }
-
-    private int writeYearlyTable(XSSFSheet sheet, int rowIndex, CellStyle headerStyle, List<StationYearlySummaryRow> rows) {
-        Row header = sheet.createRow(rowIndex++);
-        String[] columns = {
-            "Year",
-            "Total Loan Applications",
-            "Unique Applicants",
-            "Defaulted Loans",
-            "Default Rate",
-            "Total Paid Loans",
-            "Total Paid Interest Accumulated",
-            "Total Interest of Fully Paid Loan"
-        };
-        for (int i = 0; i < columns.length; i++) {
-            header.createCell(i).setCellValue(columns[i]);
-            header.getCell(i).setCellStyle(headerStyle);
-        }
-        for (StationYearlySummaryRow item : rows) {
-            Row row = sheet.createRow(rowIndex++);
-            int column = 0;
-            row.createCell(column++).setCellValue(item.year());
-            row.createCell(column++).setCellValue(item.totalLoanApplications());
-            row.createCell(column++).setCellValue(item.uniqueApplicants());
-            row.createCell(column++).setCellValue(item.defaultedLoans());
-            row.createCell(column++).setCellValue(item.defaultRateLabel());
-            row.createCell(column++).setCellValue(item.totalPaidLoans());
-            row.createCell(column++).setCellValue(item.totalPaidInterestAccumulated().doubleValue());
             row.createCell(column).setCellValue(item.fullyPaidLoanInterest().doubleValue());
         }
         return rowIndex;
@@ -3050,44 +2104,6 @@ public class LoanReportService {
         }
     }
 
-    private String formatMemberLoanStatus(LoanApplication loan) {
-        if (loan == null || loan.getStatus() == null) {
-            return "Unknown";
-        }
-        return switch (loan.getStatus()) {
-            case WITHDRAWN, WRITTEN_OFF, DISBURSEMENT_REVERSED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("loan.status."+loan.getStatus().name());
-            case RECORDED -> java.util.ResourceBundle.getBundle("messages", org.springframework.context.i18n.LocaleContextHolder.getLocale()).getString("recording.status.RECORDED");
-            case DRAFT -> "Draft";
-            case SUBMITTED -> "Submitted";
-            case AWAITING_GUARANTORS -> "Awaiting Guarantors";
-            case ALL_GUARANTORS_APPROVED -> "All Guarantors Approved";
-            case READY_FOR_MANAGER -> "On Review By Manager";
-            case MANAGER_REJECTED -> "Manager Rejected";
-            case MANAGER_ACCEPTED -> "Ready for Disbursement";
-            case AWAITING_LOAN_OFFICER -> "On Review By Loan Officer";
-            case LOAN_OFFICER_REJECTED -> "Loan Officer Rejected";
-            case LOAN_OFFICER_APPROVED -> "Loan Officer Approved";
-            case AWAITING_CHAIRPERSON -> "On Review By Chairperson";
-            case CHAIRPERSON_REJECTED -> "Chairperson Rejected";
-            case CHAIRPERSON_APPROVED -> "Chairperson Approved";
-            case AWAITING_BOARD -> "On Review By Board";
-            case AWAITING_CREDIT_COMMITTEE -> "On Review By Credit Committee";
-            case BOARD_REJECTED -> "Board Rejected";
-            case BOARD_APPROVED -> "Reviewed";
-            case CREDIT_COMMITTEE_REJECTED -> "Credit Committee Rejected";
-            case CREDIT_COMMITTEE_APPROVED -> "Reviewed";
-            case AWAITING_ACCOUNTANT -> "On Review By Accountant";
-            case ACCOUNTANT_REJECTED -> "Accountant Rejected";
-            case ACCOUNTANT_APPROVED -> "Accountant Approved";
-            case READY_FOR_DISBURSEMENT -> "Ready for Disbursement";
-            case REJECTED -> "Rejected";
-            case DISBURSED -> "Disbursed";
-            case PAR -> "Portfolio At Risk";
-            case DEFAULTED -> "Defaulted / Not Paid";
-            case PAID -> "Paid";
-        };
-    }
-
     private String formatMoney(BigDecimal amount) {
         BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
         java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
@@ -3098,40 +2114,12 @@ public class LoanReportService {
         return id == null ? "-" : id.toString().substring(0, 8);
     }
 
-    private String firstNonBlank(String... values) {
-        if (values == null) {
-            return "-";
-        }
-        for (String value : values) {
-            if (value != null && !value.isBlank()) {
-                return value.trim();
-            }
-        }
-        return "-";
-    }
-
-    private String humanizeLoanType(String text) {
-        return text == null ? "" : text.replace('_', ' ').toLowerCase(Locale.ROOT);
-    }
-
     private String formatDate(LocalDate date) {
         return date == null ? "-" : DATE_FORMATTER.format(date);
     }
 
     private String formatTimestamp(OffsetDateTime dateTime) {
         return dateTime == null ? "-" : applicationClock.zoned(dateTime).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm"));
-    }
-
-    private static String sanitizePdfText(String text) {
-        if (text == null || text.isBlank()) {
-            return "-";
-        }
-        return text.replace('\r', ' ').trim();
-    }
-
-    private static String sanitizePdfLineText(String text) {
-        String sanitized = sanitizePdfText(text).replaceAll("\\p{Cntrl}+", " ").trim();
-        return sanitized.isEmpty() ? "-" : sanitized;
     }
 
     public enum ReportKind {
@@ -4382,18 +3370,6 @@ public class LoanReportService {
         LoanApplication loan
     ) {}
 
-    private static String formatMoneyStatic(BigDecimal amount) {
-        BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
-        return "TSh " + format.format(safe);
-    }
-
-    private static String formatMoneyPlainStatic(BigDecimal amount) {
-        BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
-        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
-        return format.format(safe);
-    }
-
     private static final class StaffReviewPdfRenderer {
         private static final float MARGIN = 34f;
         private static final float TOP_MARGIN = 42f;
@@ -5604,4 +4580,47 @@ public class LoanReportService {
             return stacked;
         }
     }
+    private LoanApplication toReportLoan(LoanApplicationRepository.ReportLoanRow row) {
+        LoanApplication loan = new LoanApplication();
+        loan.setId(row.getId());
+        loan.setApplicationNumber(row.getApplicationNumber());
+        loan.setLoanId(row.getLoanId());
+        loan.setStatus(row.getStatus());
+        loan.setLoanType(row.getLoanType());
+        loan.setLoanProductSettingId(row.getLoanProductSettingId());
+        loan.setCreatedAt(row.getCreatedAt());
+        loan.setUpdatedAt(row.getUpdatedAt());
+        loan.setAmount(row.getAmount());
+        loan.setSaccoId(row.getSaccoId());
+        loan.setStationId(row.getStationId());
+        loan.setApplicantMemberId(row.getApplicantMemberId());
+        loan.setDisbursementDate(row.getDisbursementDate());
+        loan.setFinancialSnapshot(row.getFinancialSnapshot());
+        return loan;
+    }
+
+    private static String formatMoneyPlainStatic(BigDecimal amount) {
+        BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
+        return format.format(safe);
+    }
+
+    private static String formatMoneyStatic(BigDecimal amount) {
+        BigDecimal safe = amount == null ? BigDecimal.ZERO : amount.setScale(2, RoundingMode.HALF_UP);
+        java.text.DecimalFormat format = new java.text.DecimalFormat("#,##0.##", new java.text.DecimalFormatSymbols(Locale.US));
+        return "TSh " + format.format(safe);
+    }
+
+    private static String sanitizePdfLineText(String text) {
+        String sanitized = sanitizePdfText(text).replaceAll("\\p{Cntrl}+", " ").trim();
+        return sanitized.isEmpty() ? "-" : sanitized;
+    }
+
+    private static String sanitizePdfText(String text) {
+        if (text == null || text.isBlank()) {
+            return "-";
+        }
+        return text.replace('\r', ' ').trim();
+    }
+
 }

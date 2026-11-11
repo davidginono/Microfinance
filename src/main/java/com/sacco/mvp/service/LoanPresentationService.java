@@ -68,9 +68,8 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class LoanPresentationService {
 
-    private static final Set<UserClaim> BORROWER_NAME_READ_CLAIMS=Set.of(UserClaim.MANAGER_QUEUE_VIEW,UserClaim.ACCOUNTANT_QUEUE_VIEW,
-        UserClaim.DISBURSEMENT_QUEUE_VIEW,UserClaim.DISBURSEMENT_QUEUE_DISBURSE,UserClaim.LOAN_OFFICER_QUEUE_VIEW,
-        UserClaim.BOARD_QUEUE_VIEW,UserClaim.CHAIRPERSON_QUEUE_VIEW,UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW);
+    private static final Set<UserClaim> BORROWER_NAME_READ_CLAIMS=Set.of(UserClaim.LOAN_RECORDING_VIEW,
+        UserClaim.DISBURSEMENT_QUEUE_VIEW,UserClaim.DISBURSEMENT_QUEUE_DISBURSE);
     private final ObjectMapper objectMapper;
     private final ManagerReviewRepository managerReviewRepository;
     private final BoardReviewRepository boardReviewRepository;
@@ -101,14 +100,7 @@ public class LoanPresentationService {
             throw new org.springframework.security.access.AccessDeniedException("Loan workspace permission required");
         staffScope.requireActor(actor,permission.name());
         if(loanId==null)throw new IllegalArgumentException("Loan required");
-        String stage=switch(permission) {
-            case BOARD_QUEUE_VIEW -> "BOARD";
-            case CHAIRPERSON_QUEUE_VIEW -> "CHAIRPERSON";
-            case CREDIT_COMMITTEE_QUEUE_VIEW -> "CREDIT_COMMITTEE";
-            case LOAN_OFFICER_QUEUE_VIEW -> "LOAN_OFFICER";
-            default -> null;
-        };
-        var row=loanApplicationRepository.findBorrowerProfile(actor.getSaccoId(),actor.getStationId(),loanId,actor.getMemberId(),stage)
+        var row=loanApplicationRepository.findBorrowerProfile(actor.getSaccoId(),actor.getStationId(),loanId)
             .orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Loan unavailable"));
         boolean person="CLIENT".equals(row.getKind());
         return new LoanBorrowerProfile(row.getPartyId(),row.getKind(),person?row.getClientId():null,person?null:row.getGroupId(),

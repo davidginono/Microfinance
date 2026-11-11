@@ -28,8 +28,8 @@ class SharedCreditExposurePostgresTest {
     LoanQualificationPolicyService qualification(){return new LoanQualificationPolicyService(f.context.getBean(SaccoSettingsRepository.class),f.context.getBean(GuarantorRequestRepository.class),f.context.getBean(MemberRepository.class),mock(ExternalGuarantorRegistryRepository.class),mock(SaccoStationPolicyRepository.class),analytics(),credit);}
     void policy(){f.jdbc.update("insert into sacco_settings(sacco_id,board_quorum,board_size,created_at,updated_at,default_language,external_station_id,max_loan_savings_ratio,required_guarantors,applicant_max_defaulted_loans,guarantor_max_defaulted_loans,guarantor_with_active_loan_allowed) values(?,1,1,now(),now(),'en','B1',0,0,1,1,false)",f.institution);}
     void joint(){var stop=new TerminationForm();stop.setExpectedVersion(1);stop.setReason("Synthetic replacement with joint-and-several terms");g.cycles.withdraw(f.actor,s.s.cycle,stop);s.s.s.rule(SharedLiability.JOINT_AND_SEVERAL);s.s.cycle=s.s.s.submit();s.loan=g.cycles.sharedFacility(f.actor,s.s.cycle).orElseThrow().loanId();
-        for(var id:List.of(f.client,g.second))assertThat(g.consents.accept(g.client(id),s.s.cycle,true,"")).isNull();
-        String hash=s.s.open();assertThat(s.s.agreements.confirm(s.s.client,s.s.cycle,hash,true,"")).isNull();var other=g.client(g.second);s.s.agreements.exportClient(other,s.s.cycle,Locale.ENGLISH);assertThat(s.s.agreements.confirm(other,s.s.cycle,s.s.agreements.packet(other,s.s.cycle).row().hash(),true,"")).isNull();
+        for(var id:List.of(f.client,g.second))GroupPaperFixture.record(f,s.s.cycle,"TERMS",id);
+        s.s.open();GroupPaperFixture.record(f,s.s.cycle,"SHARED_PAYOUT",f.client);GroupPaperFixture.record(f,s.s.cycle,"SHARED_PAYOUT",g.second);
     }
     @Test void anUnfundedAcceptedFacilityReservesAnApplicationWithoutInventingPostedDebt(){
         var x=own();assertThat(x.pending()).isEqualTo(1);assertThat(x.active()).isZero();assertThat(x.liability()).isZero();assertThat(x.monthlyPayment()).isZero();assertThat(x.known()).isTrue();
@@ -59,9 +59,7 @@ class SharedCreditExposurePostgresTest {
     }
     @Test void ordinaryProductCountsSharedDebtAndAffordabilityUsesTheKnownMonthlyShare(){
         f.service.disburse(f.actor,s.funding());var product=f.context.getBean(LoanProductSettingRepository.class).findById(f.product).orElseThrow();
-        assertThatThrownBy(()->g.f.context.getBean(LoanWorkflowService.class).assertCanApplyForProduct(f.institution,f.client,product)).hasMessageContaining("shared-loan obligation");
         product.setAllowApplicationWithActiveLoan(true);product.setMaximumActiveLoans(0);
-        assertThatThrownBy(()->g.f.context.getBean(LoanWorkflowService.class).assertCanApplyForProduct(f.institution,f.client,product)).hasMessageContaining("at most 0 existing active loans");
         var eligibility=new EligibilityService(f.context.getBean(LoanProductSettingRepository.class),analytics(),f.context.getBean(tools.jackson.databind.ObjectMapper.class),credit);product.setAffordabilityCheckRequired(true);
         var result=eligibility.check(f.institution,f.client,product,new BigDecimal("1000.00"),Map.of("monthlyIncome",new BigDecimal("1000"),"monthlyExpenses",new BigDecimal("100"),"otherDebtRepayments",BigDecimal.ZERO),Map.of("monthlyRepaymentAmount",new BigDecimal("350")));
         assertThat(result.eligible()).isFalse();assertThat(result.otherDebtRepayments()).isEqualByComparingTo("125.91");

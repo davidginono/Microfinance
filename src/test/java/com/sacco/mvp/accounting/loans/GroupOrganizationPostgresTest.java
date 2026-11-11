@@ -49,7 +49,6 @@ class GroupOrganizationPostgresTest {
         }catch(java.io.IOException e){throw new IllegalStateException(e);}
     }
     String status(UUID loan){return f.jdbc.queryForObject("select status from loan_applications where id=?",String.class,loan);}
-    void advance(UUID id,ApprovalWorkflowStage stage){new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class)).executeWithoutResult(tx->{var r=f.context.getBean(com.sacco.mvp.repository.LoanApplicationRepository.class);var l=r.findForDisbursement(id).orElseThrow();f.context.getBean(WorkflowRoutingService.class).advanceAfterApproval(l,stage,f.actor.getMemberId());r.saveAndFlush(l);});}
     UUID submit(){var form=form();return service.submit(f.actor,create(form),form);}
     @Test void oneOrganizationOwnsOneContractWithoutPersonalDebtMembershipOrMoney(){
         var form=form();var cycle=create(form);var loan=service.submit(f.actor,cycle,form);assertThat(service.submit(f.actor,cycle,form)).isEqualTo(loan);
@@ -58,13 +57,9 @@ class GroupOrganizationPostgresTest {
         assertThat(groups.detail(f.actor,group).members()).isZero();assertThat(count("loan_applications")).isEqualTo(1);assertThat(count("lending_group_facility")).isEqualTo(1);
         for(String table:List.of("loan_ledgers","gl_journal","lending_group_guarantee","lending_group_participant"))assertThat(count(table)).as(table).isZero();
         var detail=f.service.detail(f.actor,loan);assertThat(detail.loan().clientId()).isEqualTo(f.jdbc.queryForObject("select borrower_party_id from loan_applications where id=?",UUID.class,loan));assertThat(detail.loan().client()).isEqualTo("Synthetic organization <Company>");assertThat(detail.contractualInterest()).isEqualByComparingTo("20.00");
-        assertThat(service.workspace(f.actor,cycle,null).loan().loanId()).isEqualTo(loan);assertThat(status(loan)).isEqualTo("READY_FOR_DISBURSEMENT");
+        assertThat(service.workspace(f.actor,cycle,null).loan().loanId()).isEqualTo(loan);assertThat(status(loan)).isEqualTo("RECORDED");
     }
-    @Test void productReviewOrderAndFrozenPricingRemainAuthoritative(){
-        f.jdbc.update("update loan_product_settings set manager_review_required=true,manager_priority=1,accountant_review_required=true,accountant_priority=6 where id=?",f.product);var loan=submit();assertThat(status(loan)).isEqualTo("READY_FOR_MANAGER");
-        f.jdbc.update("update loan_product_settings set interest_rate=0.9,manager_review_required=false,accountant_review_required=false where id=?",f.product);
-        advance(loan,ApprovalWorkflowStage.MANAGER);assertThat(status(loan)).isEqualTo("AWAITING_ACCOUNTANT");advance(loan,ApprovalWorkflowStage.ACCOUNTANT);assertThat(status(loan)).isEqualTo("READY_FOR_DISBURSEMENT");assertThat(f.service.detail(f.actor,loan).contractualInterest()).isEqualByComparingTo("20.00");
-    }
+
     @Test void fundingCannotBypassPendingOrganizationContractAndPayoutImplementation(){
         var loan=submit();assertThatThrownBy(()->f.service.disburse(f.actor,f.post(loan,"1000.00","ORG-BLOCKED"))).hasMessage("recording.error.organizationFundingPending");
         assertThatThrownBy(()->f.jdbc.update("update loan_applications set status='DISBURSED' where id=?",loan)).isInstanceOf(DataAccessException.class);

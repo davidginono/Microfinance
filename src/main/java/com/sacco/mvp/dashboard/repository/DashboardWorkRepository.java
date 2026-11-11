@@ -30,29 +30,14 @@ public class DashboardWorkRepository {
             (r,n) -> new Bucket(r.getString("category"),r.getString("type"),r.getLong("n"),r.getBigDecimal("amount"),r.getObject("oldest",OffsetDateTime.class)),args.toArray());
     }
 
-    public List<Bucket> loans(AppUserPrincipal actor, List<String> statuses, boolean owner, String reviewStage,
+    public List<Bucket> loans(AppUserPrincipal actor, List<String> statuses,
                               OffsetDateTime before, BigDecimal minimum) {
         if (statuses.isEmpty()) return List.of();
         var args = new ArrayList<Object>(List.of(actor.getSaccoId(),actor.getStationId()));
         args.addAll(statuses); args.add(before); args.add(minimum);
-        String scope = "";
-        if (owner) { scope += " and l.applicant_member_id=?"; args.add(actor.getMemberId()); }
-        if (reviewStage != null) {
-            scope += " and exists(select 1 from board_reviews r where r.loan_application_id=l.id and r.board_member_id=? and r.review_stage=? and r.decision='PENDING')";
-            args.add(actor.getMemberId()); args.add(reviewStage);
-        }
         return jdbc.query("select l.status category,l.status grp,count(*) n,sum(l.amount) amount,min(l.created_at) oldest from loan_applications l where l.sacco_id=? and lower(l.station_id)=lower(?) and l.status in ("
-            + String.join(",",Collections.nCopies(statuses.size(),"?")) + ") and l.created_at<=? and l.amount>=?" + scope + " group by l.status",
+            + String.join(",",Collections.nCopies(statuses.size(),"?")) + ") and l.created_at<=? and l.amount>=?" + " group by l.status",
             (r,n)->new Bucket(r.getString("category"),r.getString("grp"),r.getLong("n"),r.getBigDecimal("amount"),r.getObject("oldest",OffsetDateTime.class)),args.toArray());
     }
 
-    public List<Bucket> guarantees(AppUserPrincipal actor, OffsetDateTime before) {
-        return jdbc.query("""
-            select g.status category,g.status grp,count(*) n,null::numeric amount,min(g.created_at) oldest
-            from guarantor_requests g join loan_applications l on l.id=g.loan_application_id
-            where l.sacco_id=? and lower(l.station_id)=lower(?) and g.guarantor_member_id=? and g.status='PENDING' and g.created_at<=?
-              and not exists(select 1 from loan_applications newer where newer.top_up_source_loan_id=l.id and newer.status<>'DRAFT')
-            group by g.status
-            """,(r,n)->new Bucket(r.getString("category"),r.getString("grp"),r.getLong("n"),null,r.getObject("oldest",OffsetDateTime.class)),actor.getSaccoId(),actor.getStationId(),actor.getMemberId(),before);
-    }
 }

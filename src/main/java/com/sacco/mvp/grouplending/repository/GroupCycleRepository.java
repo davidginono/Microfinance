@@ -1,7 +1,6 @@
 package com.sacco.mvp.grouplending.repository;
 
 import com.sacco.mvp.grouplending.dto.GroupCycleDtos.*;
-import com.sacco.mvp.grouplending.dto.GroupConsentDtos.Challenge;
 import com.sacco.mvp.grouplending.dto.GroupLendingDtos.Choice;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.support.ResourceTableSort;
@@ -185,41 +184,14 @@ public class GroupCycleRepository {
         left join lending_group_shared_allocation sa on sa.participant_id=x.id left join loan_applications l on l.id=coalesce(x.loan_id,sf.loan_id)
         where x.cycle_id=? and x.sacco_id=? and x.station_id=? order by
         """+ResourceTableSort.order("group-cycle-participants",Map.of("client","member_no","principal","x.principal","monthly","x.monthly_payment","loan","loan_number","consent","consented","status","l.status"),"x.id","member_no,x.id")+" limit 50",(r,n)->new Participant(r.getObject("id",UUID.class),r.getObject("client_id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getBigDecimal("principal"),r.getBigDecimal("monthly_payment"),r.getBigDecimal("guarantee_capacity"),r.getObject("resolved_loan_id",UUID.class),r.getString("loan_number"),r.getString("loan_status"),r.getBoolean("consented")),cycle,a.getSaccoId(),a.getStationId());}
-    public List<ClientCycle> clientCycles(AppUserPrincipal a,int page){return jdbc.query("""
-        select * from (
-         select c.id,g.name,c.submitted_at,c.state,c.model,
-          exists(select 1 from lending_group_consent_evidence s where s.cycle_id=c.id and s.client_id=x.client_id) accepted,false payout_only
-         from lending_group_participant x join lending_group_cycle c on c.id=x.cycle_id join lending_group g on g.id=c.group_id
-         where x.sacco_id=? and x.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED')
-         union all
-         select c.id,g.name,c.submitted_at,c.state,c.model,
-          case when x.may_sign then exists(select 1 from lending_group_org_signature s where s.cycle_id=c.id and s.client_id=x.client_id)
-           else exists(select 1 from lending_group_org_payout q where q.cycle_id=c.id) end accepted,not x.may_sign payout_only
-         from lending_group_org_agreement p join lending_group_authority_signer x on x.authority_id=p.authority_id and (x.may_sign or x.may_receive)
-         join lending_group_cycle c on c.id=p.cycle_id join lending_group g on g.id=c.group_id
-         where p.sacco_id=? and p.station_id=? and x.client_id=? and c.state in ('SUBMITTED','CANCELLED')
-        ) requests order by
-        """+ResourceTableSort.order("client-group-loans",Map.of("group","name","date","submitted_at","accepted","accepted","state","state"),"id","submitted_at desc,id desc")+" limit 26 offset ?",
-        (r,n)->new ClientCycle(r.getObject("id",UUID.class),r.getString("name"),r.getObject("submitted_at",OffsetDateTime.class),r.getBoolean("accepted"),r.getString("state"),Model.valueOf(r.getString("model")),r.getBoolean("payout_only")),a.getSaccoId(),a.getStationId(),a.getMemberId(),a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
+
     public boolean participant(AppUserPrincipal a,UUID cycle){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_participant where cycle_id=? and sacco_id=? and station_id=? and client_id=?)",Boolean.class,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
     public List<Guarantee> guarantees(AppUserPrincipal a,UUID cycle){return jdbc.query("""
         select g.*,m.full_name guarantor,b.full_name borrower,coalesce(l.loan_id,l.application_number::text) loan_number
         from lending_group_guarantee g join members m on m.id=g.guarantor_id join members b on b.id=g.borrower_id join loan_applications l on l.id=g.loan_id
         where g.cycle_id=? and g.sacco_id=? and g.station_id=? and g.guarantor_id=? order by
         """+ResourceTableSort.order("group-personal-guarantees",Map.of("borrower","b.full_name","loan","loan_number","cap","g.amount_cap","agreement","g.terms_reference"),"g.id","b.member_no,g.id")+" limit 49",(r,n)->new Guarantee(r.getObject("id",UUID.class),r.getObject("guarantor_id",UUID.class),r.getString("guarantor"),r.getObject("borrower_id",UUID.class),r.getString("borrower"),r.getString("loan_number"),r.getBigDecimal("amount_cap"),r.getString("terms_reference")),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId());}
-    public void consent(AppUserPrincipal a,UUID cycle,UUID policy,String signature,UUID challenge,OffsetDateTime now){consent(a,cycle,policy,signature,challenge,now,null);}
-    public void consent(AppUserPrincipal a,UUID cycle,UUID policy,String signature,UUID challenge,OffsetDateTime now,String language){
-        jdbc.update("insert into lending_group_consent(cycle_id,sacco_id,station_id,client_id,accepted_at) values(?,?,?,?,?) on conflict(cycle_id,client_id) do nothing",cycle,a.getSaccoId(),a.getStationId(),a.getMemberId(),now);
-        jdbc.update("insert into lending_group_consent_evidence(cycle_id,sacco_id,station_id,client_id,policy_id,signature_text,signed_at,otp_required,challenge_id,preferred_language) values(?,?,?,?,?,?,?,?,?,?)",cycle,a.getSaccoId(),a.getStationId(),a.getMemberId(),policy,signature,now,challenge!=null,challenge,language);
-    }
-    public List<Challenge> challenges(AppUserPrincipal a,UUID cycle){return jdbc.query("select * from lending_group_consent_challenge where cycle_id=? and sacco_id=? and station_id=? and client_id=? order by issued_at desc,id desc limit 4 for update",
-        (r,n)->new Challenge(r.getObject("id",UUID.class),r.getString("code_hash"),r.getObject("issued_at",OffsetDateTime.class),r.getObject("expires_at",OffsetDateTime.class),r.getObject("delivered_at",OffsetDateTime.class),r.getObject("consumed_at",OffsetDateTime.class),r.getInt("attempts")),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId());}
-    public void challenge(AppUserPrincipal a,UUID cycle,UUID id,String hash,OffsetDateTime now,OffsetDateTime expires){jdbc.update("insert into lending_group_consent_challenge(id,cycle_id,sacco_id,station_id,client_id,code_hash,issued_at,expires_at) values(?,?,?,?,?,?,?,?)",id,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId(),hash,now,expires);}
-    public void challengeDelivered(UUID id,OffsetDateTime now){jdbc.update("update lending_group_consent_challenge set delivered_at=? where id=? and delivered_at is null and consumed_at is null",now,id);}
-    public void challengeAttempt(UUID id){jdbc.update("update lending_group_consent_challenge set attempts=attempts+1 where id=? and attempts<5 and consumed_at is null",id);}
-    public void challengeConsumed(UUID id,OffsetDateTime now){jdbc.update("update lending_group_consent_challenge set consumed_at=? where id=? and consumed_at is null",now,id);}
-    public boolean consented(AppUserPrincipal a,UUID cycle){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_consent_evidence where cycle_id=? and sacco_id=? and station_id=? and client_id=?)",Boolean.class,cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
-    public Optional<com.sacco.mvp.grouplending.dto.GroupConsentDtos.Acceptance> acceptance(AppUserPrincipal a,UUID cycle){return jdbc.query("select preferred_language from lending_group_consent_evidence where cycle_id=? and sacco_id=? and station_id=? and client_id=?",(r,n)->new com.sacco.mvp.grouplending.dto.GroupConsentDtos.Acceptance(r.getString(1)),cycle,a.getSaccoId(),a.getStationId(),a.getMemberId()).stream().findFirst();}
+
     public Terms ownTerms(AppUserPrincipal a,UUID cycle){return jdbc.query("""
         select l.amount,(l.financial_snapshot->>'interestRate')::numeric rate,(l.financial_snapshot->>'interestAmount')::numeric interest,
         l.installment_amount,l.repayment_frequency,l.financial_snapshot->>'tenureUnit' tenure_unit,(l.financial_snapshot->>'tenureValue')::integer tenure_value,

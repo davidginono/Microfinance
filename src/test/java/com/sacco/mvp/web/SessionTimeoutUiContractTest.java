@@ -53,30 +53,18 @@ class SessionTimeoutUiContractTest {
 
     @Test
     void platformSettingsRendersEmailAndSmsGatewayCards() throws Exception {
-        String jsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
-
-        assertThat(jsp).contains("/admin/platform-settings/email");
-        assertThat(jsp).contains("/admin/platform-settings/email/test");
-        assertThat(jsp).contains("/admin/platform-settings/sms-gateway");
-        assertThat(jsp).contains("/admin/platform-settings/sms-gateway/test");
-        assertThat(jsp).contains("../fragments/alerts.jspf");
-        assertThat(jsp).contains("Save Email Settings");
-        assertThat(jsp).contains("Save SMS Gateway");
-        assertThat(jsp).contains("class=\"aws-settings-checkbox-row\"");
-        assertThat(jsp).contains("class=\"aws-settings-checkbox\"");
-        assertThat(jsp).doesNotContain("settings-checkbox-card");
-        assertThat(jsp).doesNotContain("name=\"password\" value=");
-        assertThat(jsp).doesNotContain("name=\"apiKey\" value=");
+        String overview=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
+        String editor=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings-edit.jsp"));
+        assertThat(overview).contains("/admin/platform-settings/email/edit", "/admin/platform-settings/sms-gateway/edit", "../fragments/alerts.jspf");
+        assertThat(editor).contains("_csrf", "apiKey", "password").doesNotContain("name=\"password\" value=", "name=\"apiKey\" value=");
     }
 
     @Test
     void platformSettingsRendersSaccoLoanTopUpFeatureToggle() throws Exception {
-        String jsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
-
-        assertThat(jsp)
-            .contains("/admin/platform-settings/sacco-loan-top-up")
-            .contains("name=\"loanTopUpEnabled\"")
-            .contains("${sacco.loanTopUpEnabled ? 'checked' : ''}")
-            .contains("Loan Top-Up Access");
+        String overview=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings.jsp"));
+        String editor=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings-top-up.jsp"));
+        assertThat(overview).contains("/admin/platform-settings/loan-top-up");
+        assertThat(editor).contains("institution.loanTopUpEnabled", "data-platform-topup-row");
+        assertThat(Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/platform-settings-edit.jsp"))).contains("loanTopUpEnabled", "_csrf");
     }
 }

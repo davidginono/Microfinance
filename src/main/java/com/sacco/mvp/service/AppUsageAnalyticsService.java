@@ -248,12 +248,6 @@ public class AppUsageAnalyticsService {
 
     private boolean isApplicationPath(String path) {
         return path.startsWith("/admin/")
-            || path.startsWith("/app/")
-            || path.startsWith("/manager/")
-            || path.startsWith("/board/")
-            || path.startsWith("/chairperson/")
-            || path.startsWith("/loan-officer/")
-            || path.startsWith("/accountant/")
             || path.startsWith("/disbursement/")
             || path.startsWith("/staff/");
     }

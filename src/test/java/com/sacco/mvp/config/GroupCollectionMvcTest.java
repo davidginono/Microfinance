@@ -32,11 +32,11 @@ class GroupCollectionMvcTest {
     MockMvc mvc;AppUserPrincipal actor;final UUID cycle=UUID.randomUUID(),payer=UUID.randomUUID(),loan=UUID.randomUUID(),receipt=UUID.randomUUID();
     String path(){return "/finance/groups/cycles/"+cycle+"/receipts";}
     @BeforeEach void setup(){reset(collections);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
+        actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
         when(collections.cycle(actor,cycle)).thenReturn(new GroupCollectionDtos.Cycle(cycle,"GRP-1","Synthetic group","INDIVIDUAL","SUBMITTED"));when(collections.selected(eq(actor),eq(cycle),any())).thenReturn(Map.of(payer,"C1 - Payer",loan,"LN1 - Borrower"));}
     @Test void postingRequiresCsrfAndStaffSession()throws Exception{
         mvc.perform(post(path()).with(user(actor)).param("action","post")).andExpect(status().isForbidden());
-        var member=new AppUserPrincipal(Member.builder().id(payer).saccoId("I1").stationId("B1").memberAccount(true).position(Position.MEMBER).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        var member=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(payer).saccoId("I1").stationId("B1").memberAccount(true).position(Position.MEMBER).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
         mvc.perform(get(path()+"/new").with(user(member))).andExpect(status().isForbidden());verifyNoInteractions(collections);
     }
     @Test void previewBindsCommandsAndNeverAcceptsFinancialAllocationsOrScope()throws Exception{

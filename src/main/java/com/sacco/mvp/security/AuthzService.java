@@ -1,24 +1,17 @@
 package com.sacco.mvp.security;
 
-import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.UserClaim;
-import com.sacco.mvp.repository.BoardReviewRepository;
-import com.sacco.mvp.repository.GuarantorRequestRepository;
 import com.sacco.mvp.repository.LoanApplicationRepository;
 import com.sacco.mvp.service.AccessControlService;
-import com.sacco.mvp.service.ChairpersonProcessedLoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @Component("authz")
 @RequiredArgsConstructor
 public class AuthzService {
     private final LoanApplicationRepository loanApplicationRepository;
-    private final GuarantorRequestRepository guarantorRequestRepository;
-    private final BoardReviewRepository boardReviewRepository;
     private final AccessControlService access;
 
     /**
@@ -43,7 +36,9 @@ public class AuthzService {
     }
 
     public boolean workspaceAdminOnly(AppUserPrincipal principal) {
-        return access.isWorkspaceAdminScope(principal);
+        return principal!=null&&principal.isStaffSession()&&!principal.isPlatformIdentity()
+            &&principal.getSaccoId()!=null&&!principal.getSaccoId().isBlank()
+            &&principal.getStationId()!=null&&!principal.getStationId().isBlank();
     }
 
     /**
@@ -54,152 +49,11 @@ public class AuthzService {
         return access.isPlatformIdentity(principal);
     }
 
-    public boolean isLoanOwner(UUID loanId, AppUserPrincipal principal) {
-        if (principal == null || !access.has(principal, UserClaim.MEMBER_LOANS_VIEW)) {
-            return false;
-        }
+    public boolean canViewLoan(UUID loanId, AppUserPrincipal p) {
+        if(p==null||!p.isStaffSession()||access.isPlatformIdentity(p)||!access.has(p,UserClaim.LOAN_DOCUMENTS_VIEW)
+            || !access.hasAny(p,UserClaim.LOAN_RECORDING_VIEW,UserClaim.DISBURSEMENT_QUEUE_VIEW)
+            || p.getSaccoId()==null||p.getStationId()==null||p.getStationId().isBlank())return false;
         return loanApplicationRepository.findAccessRowById(loanId)
-            .map(app -> principal.getMemberId()!=null && principal.getMemberId().equals(app.getApplicantMemberId()))
-            .orElse(false);
-    }
-
-    public boolean isGuarantorAssignee(UUID requestId, AppUserPrincipal principal) {
-        if (principal == null || !access.has(principal, UserClaim.GUARANTOR_REQUESTS_VIEW)) {
-            return false;
-        }
-        return guarantorRequestRepository.findByIdAndGuarantorMemberId(requestId, principal.getMemberId())
-            .map(req -> true)
-            .orElse(false);
-    }
-
-    public boolean isBoardAssignee(UUID loanId, AppUserPrincipal principal) {
-        return assignedReviewStage(loanId, principal).isPresent();
-    }
-
-    public boolean isBoardReviewer(AppUserPrincipal principal) {
-        return access.canAccessChairpersonArea(principal)
-            || access.canAccessBoardArea(principal)
-            || access.canAccessCreditCommitteeArea(principal);
-    }
-
-    public boolean canPrepareBoardDecision(UUID loanId, AppUserPrincipal principal) {
-        return assignedReviewStage(loanId, principal)
-            .map(stage -> access.hasAny(principal, boardApproveClaim(stage), boardRejectClaim(stage)))
-            .orElse(false);
-    }
-
-    public boolean canSubmitBoardDecision(UUID loanId, AppUserPrincipal principal, Object decision) {
-        return assignedReviewStage(loanId, principal)
-            .map(stage -> access.canDecide(principal, decision, boardApproveClaim(stage), boardRejectClaim(stage)))
-            .orElse(false);
-    }
-
-    public boolean isLoanOfficerAssignee(UUID loanId, AppUserPrincipal principal) {
-        return access.canAccessLoanOfficerArea(principal)
-            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.LOAN_OFFICER);
-    }
-
-    public boolean canViewLoan(UUID loanId, AppUserPrincipal principal) {
-        if (principal == null) {
-            return false;
-        }
-        return loanApplicationRepository.findAccessRowById(loanId)
-            .map(app -> {
-                if (principal.getMemberId()!=null && principal.getMemberId().equals(app.getApplicantMemberId())
-                    && access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)) {
-                    return true;
-                }
-                if (access.isWorkspaceAdminScope(principal)
-                    && access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
-                    && app.getSaccoId().equals(principal.getSaccoId())
-                    && sameStationScope(app, principal)) {
-                    return true;
-                }
-                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
-                    && (access.canAccessManagerArea(principal)
-                    || access.canAccessAccountantArea(principal)
-                    || access.canAccessDisbursementArea(principal))
-                    && app.getSaccoId().equals(principal.getSaccoId())
-                    && sameStationScope(app, principal)) {
-                    return true;
-                }
-                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
-                    && access.canAccessLoanOfficerArea(principal)) {
-                    return hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.LOAN_OFFICER);
-                }
-                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
-                    && isBoardAssignee(loanId, principal)) {
-                    return true;
-                }
-                if (access.has(principal, UserClaim.LOAN_DOCUMENTS_VIEW)
-                    && access.canViewProcessedLoans(principal)
-                    && ChairpersonProcessedLoanService.isProcessedStatus(app.getStatus())
-                    && app.getSaccoId().equals(principal.getSaccoId())
-                    && sameStationScope(app, principal)) {
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
-    }
-
-    private boolean hasAssignedReviewInScope(UUID loanId,
-                                             AppUserPrincipal principal,
-                                             ApprovalWorkflowStage stage) {
-        if (principal == null) {
-            return false;
-        }
-        return boardReviewRepository.findByLoanApplicationIdAndBoardMemberIdAndReviewStage(
-                loanId, principal.getMemberId(), stage)
-            .flatMap(review -> loanApplicationRepository.findAccessRowById(loanId))
-            .filter(app -> app.getSaccoId().equals(principal.getSaccoId()))
-            .filter(app -> sameStationScope(app, principal))
-            .isPresent();
-    }
-
-    private Optional<ApprovalWorkflowStage> assignedReviewStage(UUID loanId, AppUserPrincipal principal) {
-        if (principal == null) {
-            return Optional.empty();
-        }
-        if (access.canAccessChairpersonArea(principal)
-            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.CHAIRPERSON)) {
-            return Optional.of(ApprovalWorkflowStage.CHAIRPERSON);
-        }
-        if (access.canAccessBoardArea(principal)
-            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.BOARD)) {
-            return Optional.of(ApprovalWorkflowStage.BOARD);
-        }
-        if (access.canAccessCreditCommitteeArea(principal)
-            && hasAssignedReviewInScope(loanId, principal, ApprovalWorkflowStage.CREDIT_COMMITTEE)) {
-            return Optional.of(ApprovalWorkflowStage.CREDIT_COMMITTEE);
-        }
-        return Optional.empty();
-    }
-
-    private String boardApproveClaim(ApprovalWorkflowStage stage) {
-        return switch (stage) {
-            case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_APPROVE.name();
-            case BOARD -> UserClaim.BOARD_QUEUE_APPROVE.name();
-            case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE.name();
-            default -> "";
-        };
-    }
-
-    private String boardRejectClaim(ApprovalWorkflowStage stage) {
-        return switch (stage) {
-            case CHAIRPERSON -> UserClaim.CHAIRPERSON_QUEUE_REJECT.name();
-            case BOARD -> UserClaim.BOARD_QUEUE_REJECT.name();
-            case CREDIT_COMMITTEE -> UserClaim.CREDIT_COMMITTEE_QUEUE_REJECT.name();
-            default -> "";
-        };
-    }
-
-    private boolean sameStationScope(LoanApplicationRepository.LoanAccessRow app, AppUserPrincipal principal) {
-        if (principal == null || principal.getStationId() == null || principal.getStationId().isBlank()) {
-            return true;
-        }
-        return app != null
-            && app.getStationId() != null
-            && principal.getStationId().equalsIgnoreCase(app.getStationId());
+            .filter(l->p.getSaccoId().equals(l.getSaccoId())&&p.getStationId().equalsIgnoreCase(l.getStationId())).isPresent();
     }
 }

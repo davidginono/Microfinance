@@ -1,6 +1,5 @@
 package com.sacco.mvp.web;
 
-import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.EmailOtpPurpose;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
@@ -36,47 +35,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthControllerSaccoAccessTest {
-    @Test void activationOtpIssuanceBindsTheExistingClientIdentity() {
-        var form=new com.sacco.mvp.web.form.MemberRegistrationForm();form.setUsername("synthetic.client");form.setEmail("synthetic@example.invalid");form.setPhone("255700000001");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());
-        UUID id=UUID.randomUUID();var verified=new MemberRegistrationService.VerifiedExternalMember("",form.getEmail(),"SYNTHETIC PROVISIONAL CLIENT","I1","B1","Synthetic institution");
-        when(memberRegistrationService.verifyExternalMember(form)).thenReturn(verified);when(memberRegistrationService.validatePublicRegistration(form,verified)).thenReturn(id);
-        assertThat(controller().requestMemberRegistrationOtp(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm")).getStatusCode().is2xxSuccessful()).isTrue();
-        verify(emailOtpService).issueOtp(org.mockito.ArgumentMatchers.eq(form.getEmail()),org.mockito.ArgumentMatchers.eq(EmailOtpPurpose.REGISTRATION),org.mockito.ArgumentMatchers.eq(id),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.eq("I1"),org.mockito.ArgumentMatchers.eq("B1"),org.mockito.ArgumentMatchers.eq(form.getPhone()));
-    }
-    @Test void activatingAProvisionalClientConsumesOnlyItsBoundRegistrationCode() {
-        var form=new com.sacco.mvp.web.form.MemberRegistrationForm();form.setUsername("synthetic.client");form.setEmail("synthetic@example.invalid");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
-        UUID id=UUID.randomUUID();var verified=new MemberRegistrationService.VerifiedExternalMember("",form.getEmail(),"SYNTHETIC PROVISIONAL CLIENT","I1","B1","Synthetic institution");
-        when(memberRegistrationService.verifyExternalMember(form)).thenReturn(verified);when(memberRegistrationService.validatePublicRegistration(form,verified)).thenReturn(id);
-        var registered=Member.builder().id(id).memberNo("CL-00000001").username(form.getUsername()).saccoId("I1").stationId("B1").build();when(memberRegistrationService.register(form,id)).thenReturn(registered);
-        var errors=new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm");var flash=new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
-        assertThat(controller().registerMemberSubmit(form,errors,new org.springframework.ui.ExtendedModelMap(),flash)).isEqualTo("redirect:/login");
-        var order=org.mockito.Mockito.inOrder(emailOtpService,memberRegistrationService);order.verify(emailOtpService).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,id,"123456");order.verify(memberRegistrationService).register(form,id);
-        verify(emailOtpService,never()).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,"123456");assertThat(flash.getFlashAttributes().get("assignedClientNumber")).isEqualTo("CL-00000001");
-    }
-    @Test
-    void provisionalClientCannotUseLoginOtpOrPasswordReset() {
-        var provisional=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("CL-00000001")
-            .fullName("Synthetic Provisional Client").email("synthetic@example.invalid").memberAccount(true).clientPortalEnabled(false)
-            .status(MemberStatus.ACTIVE).position(Position.MEMBER).build();
-        when(memberDirectoryService.findByEmail("synthetic@example.invalid")).thenReturn(Optional.of(provisional));
-        when(memberDirectoryService.findClientLoginAccount(org.mockito.ArgumentMatchers.anyString())).thenReturn(Optional.empty());
-        assertThat(controller().requestMemberLoginOtp("synthetic@example.invalid").getStatusCode().value()).isEqualTo(400);
-        assertThat(controller().verifyMemberLoginOtp("synthetic@example.invalid","123456",new MockHttpServletRequest()).getStatusCode().value()).isEqualTo(400);
-        assertThat(controller().requestPasswordResetOtp("synthetic@example.invalid","member").getStatusCode().value()).isEqualTo(400);
-        org.mockito.Mockito.verifyNoInteractions(emailOtpService);
-    }
-
     @Test
     void anonymousRootShowsPublicLandingPage() {
-        assertThat(controller().root(null)).isEqualTo("landing");
-    }
-
-    @Test
-    void employeeNumberAvailabilityOnlyReturnsTheAvailabilityFlag() {
-        when(memberRegistrationService.employeeNumberAvailable("EMP-100", "SACCO-01", "AR704")).thenReturn(true);
-
-        assertThat(controller().employeeNumberAvailability("EMP-100", "SACCO-01", "AR704"))
-            .containsExactly(Map.entry("available", true));
+        assertThat(controller().root(null)).isEqualTo("redirect:/login");
     }
 
     @Mock private MemberRegistrationService memberRegistrationService;
@@ -87,41 +48,6 @@ class AuthControllerSaccoAccessTest {
     @Mock private AdminScopeService adminScopeService;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AuditService auditService;
-
-    @Test
-    void usernameAvailabilityReturnsOnlyAnUncachedBoolean() {
-        when(memberRegistrationService.usernameAvailable("asha.mushi")).thenReturn(true);
-        var response = controller().usernameAvailability("asha.mushi");
-        assertThat(response.getBody()).containsExactly(Map.entry("available", true));
-        assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
-    }
-
-    @Test
-    void takenUsernameKeepsTheRegistrationFormAndDoesNotConsumeTheCode() {
-        var form = new com.sacco.mvp.web.form.MemberRegistrationForm();
-        form.setUsername("asha.mushi");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
-        org.mockito.Mockito.doThrow(new MemberRegistrationService.UsernameTakenException()).when(memberRegistrationService).requireUsernameAvailable("asha.mushi");
-        var errors = new org.springframework.validation.BeanPropertyBindingResult(form, "registrationForm");
-        assertThat(controller().registerMemberSubmit(form, errors, new org.springframework.ui.ExtendedModelMap(),
-            new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap())).isEqualTo("register-member");
-        assertThat(errors.getFieldError("username").getCode()).isEqualTo("registration.username.taken");
-        org.mockito.Mockito.verifyNoInteractions(emailOtpService);
-        verify(memberRegistrationService,never()).register(org.mockito.ArgumentMatchers.any());
-    }
-
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"client.user", "client@example.com"})
-    void passwordRecoveryUsesTheRegisteredAccountForEitherLoginIdentifier(String login) {
-        Member client = member(true);
-        when(memberDirectoryService.findClientLoginAccount(login.toUpperCase(java.util.Locale.ROOT))).thenReturn(Optional.of(client));
-        when(passwordEncoder.encode("NewTestPassword")).thenReturn("encoded-password");
-        assertThat(controller().requestPasswordResetOtp(login, "member").getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(controller().verifyPasswordResetOtp(login, "member", "123456").getStatusCode().is2xxSuccessful()).isTrue();
-        assertThat(controller().savePasswordReset(login, "member", "123456", "NewTestPassword", "NewTestPassword").getStatusCode().is2xxSuccessful()).isTrue();
-        verify(emailOtpService).validateOtp(client.getEmail(), EmailOtpPurpose.PASSWORD_RESET, client.getId(), "123456");
-        verify(emailOtpService).consumeOtp(client.getEmail(), EmailOtpPurpose.PASSWORD_RESET, client.getId(), "123456");
-        verify(memberDirectoryService).updatePasswordHash(client, "encoded-password");
-    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {"manager.one", "manager@example.com"})
@@ -136,51 +62,6 @@ class AuthControllerSaccoAccessTest {
         verify(emailOtpService).validateOtp(staff.getEmail(), EmailOtpPurpose.PASSWORD_RESET, staff.getId(), "123456");
         verify(emailOtpService).consumeOtp(staff.getEmail(), EmailOtpPurpose.PASSWORD_RESET, staff.getId(), "123456");
         verify(memberDirectoryService).updatePasswordHash(staff, "encoded-password");
-    }
-
-    @Test
-    void registrationReturnsAssignedNumberOnlyAfterOtpAndRegistrationSucceed() {
-        var form = new com.sacco.mvp.web.form.MemberRegistrationForm();
-        form.setEmail("client@example.invalid");form.setUsername("client42");form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());form.setOtpCode("123456");
-        var registered = member(true);registered.setMemberNo("CL-00000042");registered.setUsername("client42");
-        when(memberRegistrationService.register(form)).thenReturn(registered);
-        var flash = new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
-        String view = controller().registerMemberSubmit(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm"),new org.springframework.ui.ExtendedModelMap(),flash);
-        assertThat(view).isEqualTo("redirect:/login");
-        assertThat(flash.getFlashAttributes().get("assignedClientNumber")).isEqualTo("CL-00000042");
-        assertThat(flash.getFlashAttributes().get("assignedUsername")).isEqualTo("client42");
-        var order = org.mockito.Mockito.inOrder(emailOtpService,memberRegistrationService);
-        order.verify(emailOtpService).consumeOtp(form.getEmail(),EmailOtpPurpose.REGISTRATION,"123456");
-        order.verify(memberRegistrationService).register(form);
-    }
-
-    @Test
-    void missingOtpDoesNotRegisterOrExposeAnAssignedNumber() {
-        var form = new com.sacco.mvp.web.form.MemberRegistrationForm();form.setPassword("SyntheticPassword");form.setConfirmPassword(form.getPassword());
-        var flash = new org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap();
-        assertThat(controller().registerMemberSubmit(form,new org.springframework.validation.BeanPropertyBindingResult(form,"registrationForm"),new org.springframework.ui.ExtendedModelMap(),flash)).isEqualTo("register-member");
-        verify(memberRegistrationService,never()).register(org.mockito.ArgumentMatchers.any());
-        assertThat(flash.getFlashAttributes()).doesNotContainKey("assignedClientNumber");
-    }
-
-    @Test
-    void memberOtpRequestIsBlockedWhenSaccoIsSuspended() {
-        Member member = member(true);
-        when(memberDirectoryService.findByEmail("member@example.com")).thenReturn(Optional.of(member));
-        when(saccoRegistryService.findStation("SACCO-01", "AR704")).thenReturn(Optional.of(suspendedStation("payment overdue")));
-
-        ResponseEntity<Map<String, Object>> response = controller().requestMemberLoginOtp("member@example.com");
-
-        assertThat(response.getStatusCode().is4xxClientError()).isTrue();
-        assertThat(response.getBody()).containsEntry("valid", false);
-        assertThat(response.getBody()).containsEntry("message", "This station workspace has been suspended: payment overdue");
-        verify(emailOtpService, never()).issueOtp(
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.any(),
-            org.mockito.ArgumentMatchers.anyString(),
-            org.mockito.ArgumentMatchers.anyString()
-        );
     }
 
     @Test
@@ -221,17 +102,7 @@ class AuthControllerSaccoAccessTest {
     }
 
     private AuthController controller() {
-        return new AuthController(
-            memberRegistrationService,
-            emailOtpService,
-            memberDirectoryService,
-            userClaimService,
-            saccoRegistryService,
-            adminScopeService,
-            new ObjectMapper(),
-            passwordEncoder,
-            auditService
-        );
+        return new AuthController(saccoRegistryService,emailOtpService,memberDirectoryService,userClaimService,adminScopeService,passwordEncoder,auditService);
     }
 
     private Member member(boolean memberAccess) {

@@ -36,14 +36,12 @@
 <div><dt><spring:message code="admin.workspace.phone" /></dt><dd><c:out value="${user.phone}" /></dd></div>
 <div><dt><spring:message code="admin.workspace.roles" /></dt><dd><c:out value="${user.roleSummary}" /></dd></div>
 <div><dt><spring:message code="admin.workspace.loginId" /></dt><dd><c:out value="${user.loginId}" /></dd></div>
-<div><dt><spring:message code="admin.workspace.accessType" /></dt><dd><c:out value="${user.membershipLabel}" /></dd></div><div><dt><spring:message code="common.status" /></dt><dd><span data-resource-status="${user.status}"><c:out value="${user.displayStatus}" /></span></dd></div><c:if test="${not empty user.acknowledgementStatus}"><div><dt><spring:message code="admin.workspace.acknowledgement" /></dt><dd><c:out value="${user.acknowledgementStatus}" /></dd></div></c:if></dl></div></section>
+<div><dt><spring:message code="admin.workspace.accessType" /></dt><dd><c:out value="${user.membershipLabel}" /></dd></div><div><dt><spring:message code="common.status" /></dt><dd><span data-resource-status="${user.status}"><c:out value="${user.displayStatus}" /></span></dd></div></dl></div></section>
 
     <section id="user-access-roles" class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header">
             <h2><spring:message code="admin.workspace.staffRoles" /></h2>
-            <c:if test="${user.memberAccess}">
-                <p><spring:message code="admin.workspace.clientOnly" /></p>
-            </c:if>
+
         </div>
         <div class="admin-role-grid">
             <c:forEach items="${staffPositions}" var="position">
@@ -55,7 +53,7 @@
                            ${user.staffRoles.contains(position) ? 'checked' : ''}
                            class="admin-cloud-checkbox" />
                     <span class="admin-role-card-name"><spring:message code="admin.role.${position}" text="${position.displayName}" /></span>
-                    <svg fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="admin-role-card-image" viewBox="0 0 120 100" aria-hidden="true" focusable="false"><use href="<c:url value='/images/staff-role-icons.svg' />#${position}" /></svg>
+
                 </label>
             </c:forEach>
         </div>
@@ -146,7 +144,7 @@
     </form>
 </c:if>
 
-<%@ include file="staff-client-access.jspf" %>
+
 
 <c:if test="${user.canDeleteStaffRecord and canDeleteUsers}">
     <div class="app-modal-overlay hidden" data-user-modal="delete-user-${user.accountId}">

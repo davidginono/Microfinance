@@ -61,7 +61,7 @@ class LoanAnalyticsServiceTest {
         );
 
         when(managerReviewRepository.findForAnalytics(
-            any(), any(), any(), any(), any(), any()
+            any(), org.mockito.ArgumentMatchers.eq(ApprovalWorkflowStage.MANAGER), any(), any(), any(), any()
         ))
             .thenReturn(List.of(
                 review(paidLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(2)),
@@ -121,7 +121,7 @@ class LoanAnalyticsServiceTest {
             new ApplicationClock("Africa/Nairobi"),
             JsonMapper.builder().findAndAddModules().build(),sharedCredit
         );
-        when(managerReviewRepository.findForAnalytics(any(), any(), any(), any(), any(), any()))
+        when(managerReviewRepository.findForAnalytics(any(), org.mockito.ArgumentMatchers.eq(ApprovalWorkflowStage.MANAGER), any(), any(), any(), any()))
             .thenReturn(List.of(
                 review(firstLoanId, staffId, ManagerDecision.ACCEPT, now.minusDays(1)),
                 review(secondLoanId, staffId, ManagerDecision.ACCEPT, now)
@@ -208,7 +208,7 @@ class LoanAnalyticsServiceTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, Collections.singleton(UserClaim.MANAGER_QUEUE_VIEW));
+        return new AppUserPrincipal(member, Collections.singleton(UserClaim.STAFF_ANALYTICS_VIEW));
     }
 
     private ManagerReview review(UUID loanId, UUID staffId, ManagerDecision decision, OffsetDateTime createdAt) {

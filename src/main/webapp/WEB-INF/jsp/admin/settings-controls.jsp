@@ -130,82 +130,7 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'board'}">
-    <div class="erp-panel mb-4">
-        <div class="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-                <p class="erp-widget-title"><spring:message code="admin.settings.approvalFlow.eyebrow" text="Approval Flow" /></p>
-                <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.approvalFlow.title" text="Tenant Approval Configuration" /></h2>
-                <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.approvalFlow.subtitle" text="Product workflows decide the review path. Final release remains manual and claim-protected." /></p>
-            </div>
-        </div>
-        <form action="/admin/settings-controls/review-rules" method="post" class="erp-panel-body grid gap-4">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
 
-            <div class="grid gap-4 lg:grid-cols-2">
-                <label class="flex items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="loanOfficerReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.loanOfficerReviewRequired ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.loanOfficerRequired" text="Require Loan Officer Review" /></span>
-                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.loanOfficerHelp" text="Sets the tenant default for products that inherit Loan Officer review." /></span>
-                    </span>
-                </label>
-                <label class="flex items-start gap-3 border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
-                    <input name="boardReviewRequired" type="checkbox" value="true" class="mt-1" ${settings.boardReviewRequired ? 'checked' : ''} />
-                    <span>
-                        <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.approvalFlow.boardRequired" text="Require Credit Committee Review" /></span>
-                        <span class="mt-1 block text-slate-500"><spring:message code="admin.settings.approvalFlow.boardHelp" text="Sets the tenant default for products that inherit Credit Committee review." /></span>
-                    </span>
-                </label>
-            </div>
-
-            <div class="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Default Committee Reviewers Per Review
-                    <input name="boardQuorum"
-                           type="number"
-                           min="1"
-                           max="${activeBoardMemberCount gt 0 ? activeBoardMemberCount : 1}"
-                           class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800"
-                           value="${settings.boardQuorum}" />
-                    <span class="mt-2 block text-sm font-normal normal-case tracking-normal text-slate-500">
-                        Used when a workflow falls back to tenant Credit Committee settings.
-                    </span>
-                </label>
-
-                <div class="border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.approvalFlow.resolved" text="Resolved Flow" /></p>
-                    <div class="mt-3 flex flex-wrap items-center gap-2">
-                        <c:forEach items="${approvalFlowStageLabels}" var="stage" varStatus="status">
-                            <span class="rounded-full bg-white px-3 py-1 font-semibold text-slate-800 ring-1 ring-slate-200">${stage}</span>
-                            <c:if test="${not status.last}">
-                                <span class="text-slate-400">→</span>
-                            </c:if>
-                        </c:forEach>
-                    </div>
-                    <p class="mt-3 text-xs text-slate-500"><spring:message code="admin.settings.approvalFlow.examples" text="Examples: Branch Manager to Accountant to Disbursement, or Loan Officer to Credit Committee to Accountant to Disbursement." /></p>
-                </div>
-            </div>
-
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Loan Officers: <strong>${activeLoanOfficerCount}</strong>
-                </div>
-                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Committee Members: <strong>${activeBoardMemberCount}</strong>
-                </div>
-                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Accountants: <strong>${activeAccountantCount}</strong>
-                </div>
-                <div class="border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                    Active Disbursement Claim Holders: <strong>${activeDisbursementClaimHolderCount}</strong>
-                </div>
-            </div>
-
-            <div class="aws-settings-footer">
-                <button type="submit" class="app-btn btn-launch"><spring:message code="common.save" text="Save" /></button>
-            </div>
-        </form>
-    </div>
 </c:if>
 
 <c:if test="${settingsSection eq 'guarantor'}">
@@ -372,7 +297,7 @@
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <input type="hidden" name="modalKey" value="create-product" />
                     <input type="hidden" name="productCode" value="" data-product-code-field data-product-code-generated="true" />
-                    <input type="hidden" name="workflowStartStage" value="MANAGER" data-workflow-start-stage-field />
+
                     <c:if test="${openProductModalKey eq 'create-product' and not empty loanProductFormDraft}">
                         <div hidden data-loan-product-form-draft>
                             <c:forEach items="${loanProductFormDraft}" var="draftField">
@@ -484,257 +409,14 @@
                         </div>
                     </section>
 
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
-                            <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></h2>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.workflow.subtitle" text="Configure the approval path for this loan product." /></p>
-                        </div>
-                        <div class="product-builder-section-body">
-                            <div class="workflow-subsection mt-4">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.reviewStages" text="Review Stages" /></p>
-                                <div class="workflow-table">
-                                    <div class="workflow-table-head">
-                                        <div><spring:message code="admin.settings.workflow.stage" text="Stage" /></div>
-                                        <div><spring:message code="admin.settings.workflow.required" text="Required" /></div>
-                                        <div><spring:message code="admin.settings.workflow.priority" text="Priority" /></div>
-                                        <div><spring:message code="admin.settings.workflow.notes" text="Notes" /></div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.manager" text="Manager" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="managerReviewRequired" type="checkbox" value="true" checked data-workflow-manager aria-label="Manager required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="managerPriority" class="workflow-priority-select" data-workflow-manager-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 1 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'><spring:message code="admin.settings.workflow.managerLoanOfficerPriorityNote" text="Priority follows active review roles." /></div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.loanOfficer" text="Loan Officer" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="loanOfficerReviewRequired" type="checkbox" value="true" ${settings.loanOfficerReviewRequired ? 'checked' : ''} data-workflow-loan-officer aria-label="Loan Officer required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="loanOfficerPriority" class="workflow-priority-select" data-workflow-loan-officer-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 2 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <c:choose>
-                                                <c:when test="${settings.loanOfficerReviewRequired}">
-                                                    <spring:message code="admin.settings.workflow.loanOfficerPriorityNote" text="Priority follows active review roles." />
-                                                </c:when>
-                                                <c:otherwise>
-                                                    <spring:message code="admin.settings.workflow.enableLoanOfficerNote" text="Enable Loan Officer review in tenant approval flow settings to use this stage." />
-                                                </c:otherwise>
-                                            </c:choose>
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.chairperson" text="Chairperson" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="chairpersonReviewRequired" type="checkbox" value="true" data-workflow-chairperson aria-label="Chairperson required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="chairpersonPriority" class="workflow-priority-select" data-workflow-chairperson-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 3 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Priority follows active review roles." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.boardMember" text="Committee Member" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="boardReviewRequired" type="checkbox" value="true" data-workflow-board aria-label="Committee Member required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="boardPriority" class="workflow-priority-select" data-workflow-board-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 3 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Priority follows active review roles." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.committee" text="Credit Committee" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="committeeReviewRequired" type="checkbox" value="true" ${settings.boardReviewRequired ? 'checked' : ''} data-workflow-committee aria-label="Committee required" /></label>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="committeePriority" class="workflow-priority-select" data-workflow-committee-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 4 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Priority follows active review roles." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.accountant" text="Accountant" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="accountantReviewRequired" type="checkbox" value="true" checked data-workflow-accountant aria-label="Accountant required" /></label>
-                                            <input type="hidden" name="accountantReviewRequired" value="false" />
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select name="accountantPriority" class="workflow-priority-select" data-workflow-accountant-priority>
-                                                <c:forEach begin="1" end="6" var="priorityOption">
-                                                    <option value="${priorityOption}" ${priorityOption eq 5 ? 'selected' : ''}>${priorityOption}</option>
-                                                </c:forEach>
-                                            </select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.openPriorityNote" text="Priority follows active review roles." />
-                                        </div>
-                                    </div>
-                                    <div class="workflow-table-row">
-                                        <div class="workflow-table-cell workflow-table-stage" data-label='<spring:message code="admin.settings.workflow.stage" text="Stage" />'><spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" /></div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.required" text="Required" />'>
-                                            <label class="workflow-checkbox-lock"><input name="disbursementOfficerRequired" type="checkbox" value="true" checked data-workflow-disbursement-officer aria-label="Disbursement/Teller Officer required" /></label>
-                                            <input type="hidden" name="disbursementOfficerRequired" value="false" />
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.priority" text="Priority" />'>
-                                            <select class="workflow-priority-select" disabled><option selected>7</option></select>
-                                        </div>
-                                        <div class="workflow-table-cell" data-label='<spring:message code="admin.settings.workflow.notes" text="Notes" />'>
-                                            <spring:message code="admin.settings.workflow.disbursementOfficerNote" text="Role requirement for final manual release." />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    <section class="product-builder-section"><div class="product-builder-section-body product-builder-grid two-up">
+<label><spring:message code="recording.guarantors"/><input name="guarantorsRequired" type="number" min="0" max="15" value="2" class="aws-control"/></label>
+<label><input type="checkbox" name="disbursementProofRequired" value="true" checked/><spring:message code="admin.settings.disbursementProofRequired" text="Disbursement proof"/></label>
+<label><input type="checkbox" name="applicantAttachmentRequired" value="true" data-required-attachments-toggle/><spring:message code="recording.attachments"/></label><input type="hidden" name="applicantAttachmentRequired" value="false"/>
+<div class="hidden" data-required-attachments-panel><button type="button" class="app-btn btn-neutral" data-add-required-attachment><spring:message code="applications.add"/></button><div data-required-attachments-list></div></div>
+</div></section>
 
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.boardMember" text="Committee Member" /></p>
-                                <div class="grid gap-3">
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Committee Members Assigned
-                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search Committee Members..." data-board-reviewer-search />
-                                    </label>
-                                    <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-board-reviewer-list>
-                                        <c:forEach items="${boardReviewerOptions}" var="reviewer">
-                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-board-reviewer-option data-board-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)}">
-                                                <input name="boardReviewerIds" type="checkbox" value="${reviewer.id}" />
-                                                <span>
-                                                    <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}</span>
-                                                </span>
-                                            </label>
-                                        </c:forEach>
-                                        <c:if test="${empty boardReviewerOptions}">
-                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active Committee Members are available.</div>
-                                        </c:if>
-                                    </div>
-                                    <p class="text-xs text-slate-500">Every selected Committee Member will be assigned and notified for this product.</p>
-                                </div>
-                            </div>
 
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.committee" text="Credit Committee" /></p>
-                                <div class="grid gap-3">
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Credit Committee Assigned
-                                        <input type="search" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="Search credit committee..." data-credit-committee-reviewer-search />
-                                    </label>
-                                    <div class="grid max-h-56 gap-2 overflow-y-auto overscroll-contain rounded border border-slate-200 bg-slate-50 p-3 sm:max-h-64" data-credit-committee-reviewer-list>
-                                        <c:forEach items="${creditCommitteeReviewerOptions}" var="reviewer">
-                                            <label class="settings-checkbox-card flex items-start gap-2 rounded border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700" data-credit-committee-reviewer-option data-credit-committee-reviewer-text="${fn:toLowerCase(reviewer.fullName)} ${fn:toLowerCase(reviewer.memberNo)}">
-                                                <input name="creditCommitteeReviewerIds" type="checkbox" value="${reviewer.id}" />
-                                                <span>
-                                                    <span class="block font-semibold text-slate-900">${reviewer.fullName}</span>
-                                                    <span class="block text-xs text-slate-500">${reviewer.memberNo}</span>
-                                                </span>
-                                            </label>
-                                        </c:forEach>
-                                        <c:if test="${empty creditCommitteeReviewerOptions}">
-                                            <div class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">No active credit committee Members are available.</div>
-                                        </c:if>
-                                    </div>
-                                    <p class="text-xs text-slate-500">Every selected credit committee Member will be assigned and notified for this product.</p>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="common.applicant" text="Applicant" /></p>
-                                <div class="workflow-support-grid">
-                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="applicantAttachmentRequired" type="checkbox" value="true" data-required-attachments-toggle />
-                                        <span><spring:message code="admin.settings.requireApplicantAttachment" text="Require applicant attachment while applying" /></span>
-                                    </label>
-                                    <input type="hidden" name="applicantAttachmentRequired" value="false" />
-                                </div>
-                                <div class="mt-3 hidden border border-slate-200 bg-white p-3" data-required-attachments-panel>
-                                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
-                                        <button type="button" class="app-btn btn-neutral" data-add-required-attachment>Add Name of Required Attachment</button>
-                                    </div>
-                                    <div class="grid gap-2" data-required-attachments-list></div>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="role.disbursementOfficer" text="Disbursement/Teller Officer" /></p>
-                                <div class="workflow-support-grid">
-                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="disbursementProofRequired" type="checkbox" value="true" checked />
-                                        <span><spring:message code="admin.settings.requireProofBeforeDisbursement" text="Require proof attachment before disbursement" /></span>
-                                    </label>
-                                    <input type="hidden" name="disbursementProofRequired" value="false" />
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.guarantorSettings" text="Guarantor Settings" /></p>
-                                <div class="workflow-support-grid">
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        <spring:message code="admin.settings.workflow.guarantorsRequired" text="Guarantors Required" />
-                                        <input name="guarantorsRequired" type="number" min="0" max="15" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="2" data-number-range-max="15" data-workflow-guarantors />
-                                    </label>
-                                    <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                        Minimum Guarantor Disposable Income
-                                        <input name="guarantorMinimumSavings" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
-                                    </label>
-                                    <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                        <input name="guarantorMinSavingsCheckRequired" type="checkbox" value="true" />
-                                        <span><spring:message code="admin.settings.checkGuarantorSavings" text="Check guarantor minimum Disposable Income before selection" /></span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="workflow-subsection">
-                                <p class="workflow-subsection-title"><spring:message code="admin.settings.workflow.validation" text="Validation" /></p>
-                                <div class="workflow-warning-stack mt-4" data-workflow-warnings></div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.workflow.preview" text="Preview" /></p>
-                            <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.workflow.resolvedFlow" text="Resolved Flow" /></h2>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.workflow.resolvedFlowHelp" text="The runtime path below reflects what the system would execute with current tenant settings." /></p>
-                        </div>
-                        <div class="product-builder-section-body">
-                            <div class="workflow-preview-shell">
-                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500"><spring:message code="admin.settings.workflow.title" text="Approval Workflow" /></p>
-                                <div class="mt-3 workflow-preview-runtime" data-workflow-preview-runtime></div>
-                            </div>
-                        </div>
-                    </section>
 
                     <div class="admin-form-actions">
                         <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls?section=loan' />"><spring:message code="common.cancel" /></a>
@@ -746,28 +428,6 @@
 </c:if>
 
 
-<spring:message code="admin.settings.workflow.warning.noReviewStage" text="At least one review or approval stage must be enabled before disbursement." var="warningNoReviewStage" />
-<spring:message code="admin.settings.workflow.warning.noLoanOfficers" text="Loan Officer review is enabled for this product, but there are no active Loan Officers assigned yet." var="warningNoLoanOfficers" />
-<spring:message code="admin.settings.workflow.warning.managerLoanOfficerSamePriority" text="Manager and Loan Officer cannot share the same priority." var="warningManagerLoanOfficerSamePriority" />
-<spring:message code="admin.settings.workflow.warning.duplicatePriorities" text="Each enabled review stage must use a different priority." var="warningDuplicatePriorities" />
-<spring:message code="admin.settings.workflow.warning.noBoardReviewers" text="Committee Member review is configured, but there are no active Committee Members available for assignment." var="warningNoBoardReviewers" />
-<spring:message code="admin.settings.workflow.warning.noChairpersons" text="Chairperson review is configured, but there are no active chairpersons available for assignment." var="warningNoChairpersons" />
-<spring:message code="admin.settings.workflow.warning.noCommitteeReviewers" text="Credit Committee review is configured, but there are no active credit committee Members available for assignment." var="warningNoCommitteeReviewers" />
-<spring:message code="admin.settings.workflow.warning.committeeAccountantSamePriority" text="Committee and Accountant cannot share the same priority slot." var="warningCommitteeAccountantSamePriority" />
-<spring:message code="admin.settings.workflow.warning.noAccountants" text="Accountant review is enabled for this product, but there are no active accountants available." var="warningNoAccountants" />
-<spring:message code="admin.settings.workflow.warning.noDisbursementOfficers" text="Disbursement/Teller Officer is required, but there are no active Disbursement/Teller Officers assigned yet." var="warningNoDisbursementOfficers" />
-<spring:message code="admin.settings.workflow.warning.noDisbursementClaimHolders" text="Disbursement/Teller Officer is optional, but no active staff user has both disbursement claims." var="warningNoDisbursementClaimHolders" />
-<spring:message code="admin.settings.workflow.warning.loadedFinancialRequired" text="Clients must provide current assessment data before this product can move into review." var="warningLoadedFinancialRequired" />
-<spring:message code="admin.settings.workflow.warning.guarantorPrefix" text="This product waits for" var="warningGuarantorPrefix" />
-<spring:message code="admin.settings.workflow.warning.guarantorApproval" text="guarantor approval" var="warningGuarantorApproval" />
-<spring:message code="admin.settings.workflow.warning.guarantorApprovals" text="guarantor approvals" var="warningGuarantorApprovals" />
-<spring:message code="admin.settings.workflow.warning.guarantorSuffix" text="before the review flow starts." var="warningGuarantorSuffix" />
-<spring:message code="admin.settings.workflow.runtime.member" text="Client" var="runtimeMember" />
-<spring:message code="admin.settings.workflow.runtime.loadedFinancialData" text="Loaded Financial Data (Credit Assessment Data)" var="runtimeLoadedFinancialData" />
-<spring:message code="admin.settings.workflow.runtime.guarantor" text="Guarantor" var="runtimeGuarantor" />
-<spring:message code="admin.settings.workflow.runtime.guarantors" text="Guarantors" var="runtimeGuarantors" />
-<spring:message code="admin.settings.workflow.runtime.fixManagerLoanOfficerPriority" text="Fix Priority Slots" var="runtimeFixManagerLoanOfficerPriority" />
-<spring:message code="admin.settings.workflow.runtime.disbursementRelease" text="Disbursement Release" var="runtimeDisbursementRelease" />
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />
 <spring:message code="role.chairperson" text="Chairperson" var="runtimeChairperson" />
@@ -806,6 +466,7 @@
 <spring:message code="admin.settings.validation.assignDisbursementClaims" text="Grant both disbursement claims to at least one active staff user before removing this role requirement." var="validationAssignDisbursementClaims" />
 <spring:message code="admin.settings.validation.applicationFee" text="Application fee cannot be negative." var="validationApplicationFee" />
 <spring:message code="admin.settings.validation.processingFeePercent" text="Loan processing fee percentage cannot be negative." var="validationProcessingFeePercent" />
-<%@ include file="../fragments/loan-product-workflow-script.jspf" %>
 
-<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../fragments/footer.jspf" %>
+
+<link rel="stylesheet" href="<c:url value='/css/loan-tenure-config.css' />" /><script src="<c:url value='/js/loan-tenure-config.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../fragments/loan-product-editor-script.jspf" %>
+<%@ include file="../fragments/footer.jspf" %>

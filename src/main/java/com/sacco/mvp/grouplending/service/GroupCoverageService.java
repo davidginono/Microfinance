@@ -28,7 +28,6 @@ import java.util.*;
 public class GroupCoverageService {
     private final GroupCoverageRepository cases;
     private final GeneralLedgerService access;
-    private final GroupConsentService clients;
     private final ApplicationClock clock;
     private final AuditService audit;
     private final ObjectMapper json;
@@ -36,12 +35,12 @@ public class GroupCoverageService {
     private final ReportExportLimiter exports;
     private final java.util.concurrent.Semaphore uploads=new java.util.concurrent.Semaphore(2);
     private void staff(AppUserPrincipal a,String action){access.requireActor(a,"GROUP_LENDING_VIEW");access.requireActor(a,"LOAN_RECORDING_VIEW");access.requireActor(a,"GROUP_COVERAGE_VIEW");if(action!=null)access.requireActor(a,"GROUP_COVERAGE_"+action);}
-    private void own(AppUserPrincipal a,UserClaim... claims){if(a==null||a.isStaffSession())throw new AccessDeniedException("Named person session required");var required=EnumSet.of(UserClaim.GROUP_COVERAGE_OWN_VIEW);Collections.addAll(required,claims);clients.authorize(a,required.toArray(UserClaim[]::new));}
-    private void view(AppUserPrincipal a,boolean own){if(own)own(a);else staff(a,null);}
-    public Set<String> actions(AppUserPrincipal a,boolean own){
-        view(a,own);var result=new HashSet<String>();
-        for(var action:own?List.of("RESPOND","EXPORT"):List.of("CREATE","UPDATE","CONFIGURE","LINK","REVERSE","EXPORT"))try{
-            if(own)own(a,UserClaim.valueOf("GROUP_COVERAGE_OWN_"+action));else staff(a,action);
+
+    private void view(AppUserPrincipal a){staff(a,null);}
+    public Set<String> actions(AppUserPrincipal a){
+        view(a);var result=new HashSet<String>();
+        for(var action:List.of("CREATE","UPDATE","CONFIGURE","LINK","REVERSE","EXPORT"))try{
+            staff(a,action);
             result.add(action);
         }catch(AccessDeniedException ignored){}
         return Set.copyOf(result);
@@ -55,18 +54,18 @@ public class GroupCoverageService {
         check(p.payerId()==null||p.payerId().equals(c.client()),"payer");
         check(!p.date().isBefore(c.callDate())&&!p.recordedAt().isBefore(c.recordedAt())&&!cases.linked(p),"payment");return p;
     }
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail document(AppUserPrincipal a,UUID id,boolean own){
-        view(a,own);if(own)own(a,UserClaim.GROUP_COVERAGE_OWN_EXPORT);else staff(a,"EXPORT");
-        var c=cases.detail(a,id,clock.today(),own);var events=cases.events(c,0,501);var payments=cases.payments(c,0,501);
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail document(AppUserPrincipal a,UUID id){
+        view(a);staff(a,"EXPORT");
+        var c=cases.detail(a,id,clock.today(),false);var events=cases.events(c,0,501);var payments=cases.payments(c,0,501);
         check(events.size()<=500&&payments.size()<=500,"documentRange");
-        if(own)payments=payments.stream().map(p->new Payment(p.id(),p.posting(),p.receipt(),p.reference(),p.date(),p.payer(),p.amount(),p.principal(),p.interest(),p.charges(),p.net(),p.reversedBy(),p.correctedBy(),"",p.linkedAt(),null,"",p.correctedAt())).toList();
-        return new Detail(c,new Page<>(events,0,false),new Page<>(payments,0,false),!own,cases.frozenPolicy(c),cases.noticeFacts(c,own),clock.today());
+
+        return new Detail(c,new Page<>(events,0,false),new Page<>(payments,0,false),true,cases.frozenPolicy(c),cases.noticeFacts(c,false),clock.today());
     }
-    @Transactional(readOnly=true) public Trace trace(AppUserPrincipal a,UUID cycle,UUID client,LocalDate from,LocalDate through,int page,boolean own,boolean export){
-        try{view(a,own);if(export){if(own)own(a,UserClaim.GROUP_COVERAGE_OWN_EXPORT);else staff(a,"EXPORT");}}catch(AccessDeniedException denied){return null;}
+    @Transactional(readOnly=true) public Trace trace(AppUserPrincipal a,UUID cycle,UUID client,LocalDate from,LocalDate through,int page,boolean export){
+        try{view(a);if(export){staff(a,"EXPORT");}}catch(AccessDeniedException denied){return null;}
         page(page);if(cycle==null||through==null||through.isAfter(clock.today())||through.getYear()<1||from!=null&&(from.getYear()<1||from.isAfter(through)))throw new IllegalArgumentException("group.error.query");
-        var rows=cases.trace(a,cycle,own?a.getMemberId():client,clock.today(),from,through,export?0:page*25,export?501:26);
-        check(!export||rows.size()<=500,"documentRange");return new Trace(export?rows:rows.stream().limit(25).toList(),page,!export&&rows.size()>25,own);
+        var rows=cases.trace(a,cycle,client,clock.today(),from,through,export?0:page*25,export?501:26);
+        check(!export||rows.size()<=500,"documentRange");return new Trace(export?rows:rows.stream().limit(25).toList(),page,!export&&rows.size()>25,false);
     }
     @Transactional(readOnly=true) public void authorize(AppUserPrincipal a,String action){staff(a,action);}
     @Transactional(readOnly=true) public Optional<Policy> policy(AppUserPrincipal a,UUID cycle){staff(a,null);return cases.policy(a,cases.product(a,cycle));}
@@ -81,12 +80,12 @@ public class GroupCoverageService {
     @Transactional(readOnly=true) public Page<PaymentSource> paymentChoices(AppUserPrincipal a,UUID id,String search,int page){staff(a,"LINK");page(page);search(search);var c=cases.detail(a,id,clock.today(),false);return page(cases.paymentChoices(a,c,search.strip(),page),page);}
     @Transactional(readOnly=true) public PaymentSource paymentSource(AppUserPrincipal a,UUID id,UUID posting,UUID contribution){staff(a,"LINK");var c=cases.detail(a,id,clock.today(),false);return cases.paymentSource(a,c,posting,contribution).orElseThrow(()->new IllegalArgumentException("coverage.error.payment"));}
     @Transactional(readOnly=true) public Payment correctionSource(AppUserPrincipal a,UUID id,UUID payment){staff(a,"REVERSE");return cases.payment(cases.detail(a,id,clock.today(),false),payment);}
-    @Transactional(readOnly=true) public CaseContext caseContext(AppUserPrincipal a,UUID id,boolean own,String action){if(own){if(action!=null)own(a,UserClaim.GROUP_COVERAGE_OWN_RESPOND);else own(a);}else staff(a,action);var c=cases.detail(a,id,clock.today(),own);return new CaseContext(c,cases.frozenPolicy(c),cases.noticeFacts(c,own),clock.today());}
-    @Transactional(readOnly=true) public Page<Case> list(AppUserPrincipal a,UUID cycle,int page,boolean own){return list(a,cycle,"newest",page,own);}
-    @Transactional(readOnly=true) public Page<Case> list(AppUserPrincipal a,UUID cycle,String sort,int page,boolean own){view(a,own);page(page);sort(sort,GroupCoverageRepository.CASE_SORT);if(!own)cases.product(a,cycle);return page(cases.cases(a,cycle,clock.today(),sort,page,own),page);}
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail detail(AppUserPrincipal a,UUID id,int eventPage,int paymentPage,boolean own){return detail(a,id,eventPage,paymentPage,"newest","newest",own);}
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail detail(AppUserPrincipal a,UUID id,int eventPage,int paymentPage,String eventSort,String paymentSort,boolean own){view(a,own);page(eventPage);page(paymentPage);sort(eventSort,GroupCoverageRepository.EVENT_SORT);sort(paymentSort,GroupCoverageRepository.PAYMENT_SORT);var c=cases.detail(a,id,clock.today(),own);var payments=cases.payments(c,paymentSort,paymentPage);if(own)payments=payments.stream().map(p->new Payment(p.id(),p.posting(),p.receipt(),p.reference(),p.date(),p.payer(),p.amount(),p.principal(),p.interest(),p.charges(),p.net(),p.reversedBy(),p.correctedBy(),"",p.linkedAt(),null,"",p.correctedAt())).toList();return new Detail(c,page(cases.events(c,eventSort,eventPage),eventPage),page(payments,paymentPage),!own,cases.frozenPolicy(c),cases.noticeFacts(c,own),clock.today());}
-    @Transactional(readOnly=true) public byte[] notice(AppUserPrincipal a,UUID id,boolean own){view(a,own);if(own)own(a,UserClaim.GROUP_COVERAGE_OWN_EXPORT);else staff(a,"EXPORT");var c=cases.detail(a,id,clock.today(),own);return exports.run(()->cases.notice(c));}
+    @Transactional(readOnly=true) public CaseContext caseContext(AppUserPrincipal a,UUID id,String action){staff(a,action);var c=cases.detail(a,id,clock.today(),false);return new CaseContext(c,cases.frozenPolicy(c),cases.noticeFacts(c,false),clock.today());}
+    @Transactional(readOnly=true) public Page<Case> list(AppUserPrincipal a,UUID cycle,int page){return list(a,cycle,"newest",page);}
+    @Transactional(readOnly=true) public Page<Case> list(AppUserPrincipal a,UUID cycle,String sort,int page){view(a);page(page);sort(sort,GroupCoverageRepository.CASE_SORT);cases.product(a,cycle);return page(cases.cases(a,cycle,clock.today(),sort,page,false),page);}
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail detail(AppUserPrincipal a,UUID id,int eventPage,int paymentPage){return detail(a,id,eventPage,paymentPage,"newest","newest");}
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30) public Detail detail(AppUserPrincipal a,UUID id,int eventPage,int paymentPage,String eventSort,String paymentSort){view(a);page(eventPage);page(paymentPage);sort(eventSort,GroupCoverageRepository.EVENT_SORT);sort(paymentSort,GroupCoverageRepository.PAYMENT_SORT);var c=cases.detail(a,id,clock.today(),false);var payments=cases.payments(c,paymentSort,paymentPage);return new Detail(c,page(cases.events(c,eventSort,eventPage),eventPage),page(payments,paymentPage),true,cases.frozenPolicy(c),cases.noticeFacts(c,false),clock.today());}
+    @Transactional(readOnly=true) public byte[] notice(AppUserPrincipal a,UUID id){view(a);staff(a,"EXPORT");var c=cases.detail(a,id,clock.today(),false);return exports.run(()->cases.notice(c));}
     @Transactional(propagation=Propagation.NOT_SUPPORTED) public UUID call(AppUserPrincipal a,UUID cycle,CallForm f,MultipartFile file){
         staff(a,"CREATE");check(f!=null&&f.getRequestKey()!=null&&f.getSourceId()!=null&&f.getPolicyId()!=null&&Set.of("RECIPROCAL","PERSONAL","JOINT","VOLUNTARY").contains(Objects.toString(f.getSourceKind(),"")),"request");money(f.getAmount());check(f.isNoticesVerified()&&Set.of("SW","BOTH").contains(Objects.toString(f.getNoticeLanguage(),"")),"notice");text(f.getBorrowerNoticeEvidence());text(f.getPersonNoticeEvidence());date(f.getBorrowerNoticeDate());date(f.getPersonNoticeDate());check(file!=null&&!file.isEmpty()&&file.getSize()<=GroupOrganizationDocumentService.MAX_BYTES,"documentPdf");check(uploads.tryAcquire(),"documentBusy");
         try{byte[] bytes;try{bytes=file.getBytes();}catch(IOException e){throw new IllegalArgumentException("coverage.error.documentPdf",e);}check(bytes.length>=5&&bytes.length<=GroupOrganizationDocumentService.MAX_BYTES&&new String(bytes,0,5,StandardCharsets.US_ASCII).equals("%PDF-"),"documentPdf");int pages=GroupAgreementDocumentValidation.pages(bytes);
@@ -94,16 +93,16 @@ public class GroupCoverageService {
             return new TransactionTemplate(transactions).execute(tx->{staff(a,"CREATE");cases.requestLock(a,f.getRequestKey());var retry=cases.retry(a,"lending_group_coverage_case",f.getRequestKey(),payload);if(retry.isPresent())return retry.get();var today=clock.today();var s=cases.source(a,cycle,f.getSourceId(),f.getSourceKind(),today,true);cases.policyLock(a,s.product());var p=cases.policy(a,s.product()).orElseThrow(()->new IllegalArgumentException("coverage.error.policy"));check(p.enabled()&&p.id().equals(f.getPolicyId()),"policy");check(s.known()&&s.arrears()!=null&&s.oldestDue()!=null&&Set.of("DISBURSED","PAR","DEFAULTED","WRITTEN_OFF").contains(s.status()),"ledger");check(f.getAmount().compareTo(s.arrears().subtract(cases.reserved(s,today)))<=0,"shortfall");check(f.getAmount().compareTo(s.cap().subtract(cases.received(s.loan(),s.id(),s.kind())))<=0,"cap");for(var served:List.of(f.getBorrowerNoticeDate(),f.getPersonNoticeDate()))check(!served.isBefore(s.oldestDue())&&!served.isAfter(today.minusDays(p.noticeDays())),"notice");var id=cases.record(a,s,p,f,payload,filename,checksum,pages,bytes,today,clock.now());audit(a,id,"COVERAGE_CASE_RECORDED",Map.of("loan",s.loan(),"client",s.client(),"kind",s.kind(),"amount",f.getAmount(),"policy",p.id(),"noticeSha256",checksum));return id;});
         }finally{uploads.release();}
     }
-    @Transactional public UUID respond(AppUserPrincipal a,UUID id,ResponseForm f){own(a,UserClaim.GROUP_COVERAGE_OWN_RESPOND);check(f!=null&&f.isConfirmed()&&Set.of("ACKNOWLEDGED","PROMISED","DISPUTED").contains(Objects.toString(f.getKind(),"")),"response");return event(a,id,f,true);}
-    @Transactional public UUID close(AppUserPrincipal a,UUID id,ResponseForm f){staff(a,"UPDATE");check(f!=null&&f.isConfirmed()&&Set.of("CANCELLED","CLOSED").contains(Objects.toString(f.getKind(),"")),"response");return event(a,id,f,false);}
-    private UUID event(AppUserPrincipal a,UUID id,ResponseForm f,boolean own){
-        check(f.getRequestKey()!=null&&f.getExpectedSequence()>=0,"request");if(f.getKind().equals("PROMISED")){money(f.getAmount());date(f.getPromiseOn());}else check(f.getAmount()==null&&f.getPromiseOn()==null,"response");if(!f.getKind().equals("ACKNOWLEDGED"))text(f.getReason());else check(f.getReason()!=null&&f.getReason().length()<=500&&f.getReason().chars().noneMatch(Character::isISOControl),"form");String hash=payload(id,f);var c=locked(a,id,own);var retry=cases.eventRetry(c,f.getRequestKey(),hash,a.getMemberId());if(retry.isPresent())return retry.get();check(c.sequence()==f.getExpectedSequence()&&!Set.of("CANCELLED","CLOSED").contains(c.state()),"changed");if(own)check(!clock.today().isAfter(c.expiresOn()),"expired");if(f.getKind().equals("PROMISED")){var p=cases.frozenPolicy(c);check(c.unpaid()!=null&&f.getAmount().compareTo(c.unpaid())<=0,"shortfall");check(!f.getPromiseOn().isBefore(clock.today())&&!f.getPromiseOn().isAfter(clock.today().plusDays(p.promiseDays()))&&!f.getPromiseOn().isAfter(c.expiresOn()),"promise");}var event=cases.event(a,c,f,hash,clock.now());audit(a,id,"COVERAGE_"+f.getKind(),Map.of("event",event,"sequence",c.sequence()+1));return event;
+
+    @Transactional public UUID close(AppUserPrincipal a,UUID id,ResponseForm f){staff(a,"UPDATE");check(f!=null&&f.isConfirmed()&&Set.of("CANCELLED","CLOSED").contains(Objects.toString(f.getKind(),"")),"response");return event(a,id,f);}
+    private UUID event(AppUserPrincipal a,UUID id,ResponseForm f){
+        check(f.getRequestKey()!=null&&f.getExpectedSequence()>=0,"request");if(f.getKind().equals("PROMISED")){money(f.getAmount());date(f.getPromiseOn());}else check(f.getAmount()==null&&f.getPromiseOn()==null,"response");if(!f.getKind().equals("ACKNOWLEDGED"))text(f.getReason());else check(f.getReason()!=null&&f.getReason().length()<=500&&f.getReason().chars().noneMatch(Character::isISOControl),"form");String hash=payload(id,f);var c=locked(a,id);var retry=cases.eventRetry(c,f.getRequestKey(),hash,a.getMemberId());if(retry.isPresent())return retry.get();check(c.sequence()==f.getExpectedSequence()&&!Set.of("CANCELLED","CLOSED").contains(c.state()),"changed");if(f.getKind().equals("PROMISED")){var p=cases.frozenPolicy(c);check(c.unpaid()!=null&&f.getAmount().compareTo(c.unpaid())<=0,"shortfall");check(!f.getPromiseOn().isBefore(clock.today())&&!f.getPromiseOn().isAfter(clock.today().plusDays(p.promiseDays()))&&!f.getPromiseOn().isAfter(c.expiresOn()),"promise");}var event=cases.event(a,c,f,hash,clock.now());audit(a,id,"COVERAGE_"+f.getKind(),Map.of("event",event,"sequence",c.sequence()+1));return event;
     }
-    private Case locked(AppUserPrincipal a,UUID id,boolean own){var c=cases.detail(a,id,clock.today(),own);cases.lock(a,c);return cases.detail(a,id,clock.today(),own);}
+    private Case locked(AppUserPrincipal a,UUID id){var c=cases.detail(a,id,clock.today(),false);cases.lock(a,c);return cases.detail(a,id,clock.today(),false);}
     @Transactional public UUID link(AppUserPrincipal a,UUID id,LinkForm f){
-        staff(a,"LINK");check(f!=null&&f.getRequestKey()!=null&&f.getPostingId()!=null&&f.isPayerVerified(),"payment");text(f.getPayerEvidence());String hash=payload(id,f);var c=locked(a,id,false);var retry=cases.paymentRetry(c,f.getRequestKey(),hash,a.getMemberId());if(retry.isPresent())return retry.get();var p=cases.paymentSource(a,c,f.getPostingId(),f.getContributionId()).orElseThrow(()->new IllegalArgumentException("coverage.error.payment"));check(p.payerId()==null||p.payerId().equals(c.client()),"payer");text(p.payer());check(!p.date().isBefore(c.callDate())&&!p.recordedAt().isBefore(c.recordedAt()),"payment");check(!cases.linked(p),"linked");check(p.amount().compareTo(c.cap().subtract(cases.received(c.loan(),c.source(),c.sourceKind())))<=0,"cap");var link=cases.link(a,c,p,f,hash,clock.now());audit(a,id,"COVERAGE_RECEIPT_LINKED",Map.of("link",link,"posting",p.posting(),"amount",p.amount()));return link;
+        staff(a,"LINK");check(f!=null&&f.getRequestKey()!=null&&f.getPostingId()!=null&&f.isPayerVerified(),"payment");text(f.getPayerEvidence());String hash=payload(id,f);var c=locked(a,id);var retry=cases.paymentRetry(c,f.getRequestKey(),hash,a.getMemberId());if(retry.isPresent())return retry.get();var p=cases.paymentSource(a,c,f.getPostingId(),f.getContributionId()).orElseThrow(()->new IllegalArgumentException("coverage.error.payment"));check(p.payerId()==null||p.payerId().equals(c.client()),"payer");text(p.payer());check(!p.date().isBefore(c.callDate())&&!p.recordedAt().isBefore(c.recordedAt()),"payment");check(!cases.linked(p),"linked");check(p.amount().compareTo(c.cap().subtract(cases.received(c.loan(),c.source(),c.sourceKind())))<=0,"cap");var link=cases.link(a,c,p,f,hash,clock.now());audit(a,id,"COVERAGE_RECEIPT_LINKED",Map.of("link",link,"posting",p.posting(),"amount",p.amount()));return link;
     }
-    @Transactional public UUID correct(AppUserPrincipal a,UUID id,UUID payment,UUID key,String reason){staff(a,"REVERSE");check(payment!=null&&key!=null,"request");text(reason);var c=locked(a,id,false);var context=cases.correction(c,payment).orElseThrow(()->new AccessDeniedException("Coverage link unavailable"));
+    @Transactional public UUID correct(AppUserPrincipal a,UUID id,UUID payment,UUID key,String reason){staff(a,"REVERSE");check(payment!=null&&key!=null,"request");text(reason);var c=locked(a,id);var context=cases.correction(c,payment).orElseThrow(()->new AccessDeniedException("Coverage link unavailable"));
         if(context.correction()!=null){if(!key.equals(context.requestKey())||!reason.strip().equals(context.reason())||!a.getMemberId().equals(context.correctionActor()))throw new IllegalArgumentException("group.error.retry");return context.correction();}
         check(!a.getMemberId().equals(context.actor()),"independent");var correction=cases.recordCorrection(a,payment,key,reason.strip(),clock.now());audit(a,id,"COVERAGE_LINK_CORRECTED",Map.of("link",payment,"correction",correction,"reason",reason.strip()));return correction;}
     private String payload(Object... values){return hash(json.writeValueAsString(Arrays.asList(values)).getBytes(StandardCharsets.UTF_8));}

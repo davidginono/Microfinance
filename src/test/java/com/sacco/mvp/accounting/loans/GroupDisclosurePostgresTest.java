@@ -29,29 +29,16 @@ class GroupDisclosurePostgresTest {
         assertThatThrownBy(()->g.cycles.submit(g.f.actor,id,f)).hasMessage("group.error.disclosureEvidence");
         assertThat(g.f.jdbc.queryForObject("select count(*) from loan_applications where sacco_id=?",Integer.class,g.f.institution)).isZero();
         declare(f,model);g.cycles.submit(g.f.actor,id,f);g.cycles.submit(g.f.actor,id,f);
-        var packet=g.consents.packet(g.client(g.f.client),id);var snap=packet.terms().groupDisclosure();assertThat(snap.policyId()).isEqualTo(g.policy);assertThat(snap.annualCostPercent()).isEqualByComparingTo("26.1234");
-        assertThat(g.f.jdbc.queryForObject("select lending_group_disclosure_valid(?,?::jsonb)",Boolean.class,g.policy,g.f.context.getBean(tools.jackson.databind.ObjectMapper.class).writeValueAsString(snap))).isTrue();
+        var facility=g.cycles.participants(g.f.actor,id).getFirst().loanId();var snap=g.f.jdbc.queryForObject("select financial_snapshot->'groupDisclosure' from loan_applications where id=?",String.class,facility);assertThat(snap).contains(g.policy.toString(),"26.1234");
+        assertThat(g.f.jdbc.queryForObject("select lending_group_disclosure_valid(?,?::jsonb)",Boolean.class,g.policy,snap)).isTrue();
         assertThat(g.f.jdbc.queryForObject("select lending_group_disclosure_valid(?,null)",Boolean.class,g.policy)).isFalse();
-        var facility=g.cycles.participants(g.f.actor,id).getFirst().loanId();
         assertThatThrownBy(()->g.f.jdbc.update("update loan_applications set financial_snapshot=financial_snapshot-'groupDisclosure' where id=?",facility)).isInstanceOf(DataAccessException.class);
         assertThatThrownBy(()->g.f.jdbc.update("update loan_applications set financial_snapshot=jsonb_set(financial_snapshot,'{groupDisclosure,annualCostPercent}','1'::jsonb) where id=?",facility)).isInstanceOf(DataAccessException.class);
         var revision=g.policy();revision.setModel(model);if(model==Model.SHARED)revision.setSharedLiability(SharedLiability.PROPORTIONAL);g.cycles.configure(g.f.actor,revision);
-        assertThat(g.consents.packet(g.client(g.f.client),id).terms().groupDisclosure()).isEqualTo(snap);
+        assertThat(g.f.jdbc.queryForObject("select financial_snapshot->'groupDisclosure' from loan_applications where id=?",String.class,facility)).isEqualTo(snap);
         assertThatThrownBy(()->g.f.jdbc.update("update lending_group_policy set release_rules=null where id=?",g.policy)).isInstanceOf(DataAccessException.class);
         assertThat(g.f.jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,g.f.institution)).isZero();
     }
     @Test void annualCostCeilingAndVerificationCannotBeBypassed(){var f=configured(Model.INDIVIDUAL);declare(f,Model.INDIVIDUAL);var id=g.cycles.create(g.f.actor,g.group,f);var d=f.getParticipants().getFirst().getDisclosure();d.setAnnualCostPercent(new BigDecimal("40.000001"));assertThatThrownBy(()->g.cycles.submit(g.f.actor,id,f)).hasMessage("group.error.disclosureLimit");d.setAnnualCostPercent(new BigDecimal("30"));d.setCostVerified(false);assertThatThrownBy(()->g.cycles.submit(g.f.actor,id,f)).hasMessage("group.error.disclosureCost");}
-    @Test void personalLanguageIsRequiredAndCannotBeForgedThroughDirectConsent(){var f=configured(Model.INDIVIDUAL);declare(f,Model.INDIVIDUAL);var id=g.cycles.create(g.f.actor,g.group,f);g.cycles.submit(g.f.actor,id,f);var a=g.client(g.f.client);
-        assertThat(g.consents.accept(a,id,true,"")).isEqualTo("group.error.disclosureLanguage");
-        var repo=g.f.context.getBean(com.sacco.mvp.grouplending.repository.GroupCycleRepository.class);var tx=new org.springframework.transaction.support.TransactionTemplate(g.f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
-        assertThatThrownBy(()->tx.executeWithoutResult(t->repo.consent(a,id,g.policy,"Synthetic personal signature",null,g.f.context.getBean(com.sacco.mvp.service.ApplicationClock.class).now()))).isInstanceOf(DataAccessException.class);
-        assertThat(g.consents.accept(a,id,true,"","SW")).isNull();assertThat(g.f.jdbc.queryForObject("select preferred_language from lending_group_consent_evidence where cycle_id=? and client_id=?",String.class,id,g.f.client)).isEqualTo("SW");
-    }
-    @Test void sharedFinalAcceptanceChecksTheActualDocumentLanguage()throws Exception{var f=configured(Model.SHARED);declare(f,Model.SHARED);var id=g.cycles.create(g.f.actor,g.group,f);g.cycles.submit(g.f.actor,id,f);var a=g.client(g.f.client);assertThat(g.consents.accept(a,id,true,"","SW")).isNull();
-        g.f.jdbc.update("insert into member_payment_details(member_id,destination_type,provider,account_holder_name,account_identifier,created_at,updated_at) values(?,'BANK_ACCOUNT','Synthetic bank','Synthetic holder','QA-ACCOUNT',now(),now())",g.f.client);
-        var svc=g.f.context.getBean(GroupSharedAgreementService.class);var document=new GroupOrganizationPostgresTest().documentForm();svc.record(g.f.actor,id,document,GroupOrganizationPostgresTest.documentFile());svc.exportClient(a,id,Locale.ENGLISH);var hash=svc.packet(a,id).row().hash();
-        assertThat(svc.confirm(a,id,hash,true,"","SW")).isEqualTo("group.error.disclosureLanguage");assertThat(svc.confirm(a,id,hash,true,"","EN")).isNull();
-        assertThat(g.f.jdbc.queryForObject("select preferred_language from lending_group_shared_payout where cycle_id=?",String.class,id)).isEqualTo("EN");
-        try(var pdf=org.apache.pdfbox.Loader.loadPDF(svc.exportClient(a,id,Locale.ENGLISH))){assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(pdf)).contains("26.1234%","Synthetic institution-approved method v1","My contract language: English");}
-    }
+
 }

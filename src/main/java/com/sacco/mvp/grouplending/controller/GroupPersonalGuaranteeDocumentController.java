@@ -16,8 +16,9 @@ public class GroupPersonalGuaranteeDocumentController {
     private final GroupPersonalGuaranteeService guarantees;
     private final GroupPersonalGuaranteePdf pdf;
     private final ReportExportLimiter limiter;
-    @GetMapping("/app/group-guarantees/{id}/evidence/{format:pdf|print}") @ResponseBody public ResponseEntity<byte[]> client(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable String format,Locale locale){return document(limiter.run(()->pdf.render(guarantees.evidence(a,null,id,true),locale)),format);}
-    @GetMapping("/finance/groups/cycles/{cycle}/personal-guarantees/{id}/evidence/{format:pdf|print}") @ResponseBody public ResponseEntity<byte[]> staff(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID cycle,@PathVariable UUID id,@PathVariable String format,Locale locale){return document(limiter.run(()->pdf.render(guarantees.evidence(a,cycle,id,false),locale)),format);}
+    private final GroupPaperService papers;
+
+    @GetMapping("/finance/groups/cycles/{cycle}/personal-guarantees/{id}/evidence/{format:pdf|print}") @ResponseBody public ResponseEntity<byte[]> staff(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID cycle,@PathVariable UUID id,@PathVariable String format,Locale locale){return document(limiter.run(()->papers.guaranteePaper(a,cycle,id).orElseGet(()->pdf.render(guarantees.evidence(a,cycle,id),locale))),format);}
     private ResponseEntity<byte[]> document(byte[] data,String format){return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF).header("X-Content-Type-Options","nosniff").header("Content-Disposition",(format.equals("print")?"inline":"attachment")+"; filename=signed-personal-guarantee.pdf").body(data);}
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST) public String invalid(Model m){m.addAttribute("groupError","group.error.personalGuaranteesClosed");return "groups/error";}
 }

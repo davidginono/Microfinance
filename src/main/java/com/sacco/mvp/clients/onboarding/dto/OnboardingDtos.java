@@ -11,9 +11,9 @@ public final class OnboardingDtos {
     public record ContactCheck(boolean valid, boolean exists) {}
     public record ProfileDraft(String profile,UUID actor,String institution,String branch,UUID requestKey) implements java.io.Serializable {}
     public record Client(UUID id, String number, String name, String phone, String email, String state,
-                         UUID revisionId, int sequence, LocalDate reviewDue, boolean portalEnabled) {
+                         UUID revisionId, int sequence, LocalDate reviewDue, boolean staffUser) {
         public Client(UUID id,String number,String name,String phone,String email,String state,UUID revisionId,int sequence,LocalDate reviewDue) {
-            this(id,number,name,phone,email,state,revisionId,sequence,reviewDue,true);
+            this(id,number,name,phone,email,state,revisionId,sequence,reviewDue,false);
         }
     }
     public record Revision(UUID id, UUID clientId, int sequence, String mode, Profile profile,
@@ -29,19 +29,9 @@ public final class OnboardingDtos {
             return "image/jpeg".equals(contentType) || "image/png".equals(contentType);
         }
     }
-    public record OwnStatus(String state, LocalDate reviewDue) {}
     public record Notice(UUID id, String version, String english, String kiswahili) {
         public static final UUID STANDARD_ID=UUID.fromString("59bf1107-d9c1-44ca-a91f-e4b266123d3c");
     }
-    public record OwnDocument(UUID id, String category, String name, LocalDate expiresOn,
-                              long sizeBytes, String contentType, OffsetDateTime recordedAt) {}
-    public record Feedback(String kind, String message, OffsetDateTime recordedAt) {}
-    public record OwnHistory(int sequence, String result, OffsetDateTime recordedAt) {}
-    public record OwnRevision(int sequence, ClientProfile profile, String noticeVersion, String noticeEnglish,
-                              String noticeKiswahili, boolean acknowledged, OffsetDateTime acknowledgedAt) {}
-    public record OwnWorkspace(Client client, OwnRevision revision, List<OwnDocument> documents,
-                               Feedback feedback, Page<OwnHistory> history, boolean historical,
-                               List<EvidenceRequirement> evidenceRequirements, LocalDate validationDate) {}
     public record EvidenceRequirement(String category, String status) {}
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)
     @Data public static class ClientProfile {
@@ -57,6 +47,7 @@ public final class OnboardingDtos {
         private java.math.BigDecimal dailySales, dailyExpenditure;
         private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
         private String bankName="", bankAccountName="", bankAccountNumber="";
+        private String employeeNumber;
         private String activity="", activityAddress="", sourceOfFunds="";
         @com.fasterxml.jackson.annotation.JsonIgnore
         public List<String> getIncomeActivities() {
@@ -79,13 +70,7 @@ public final class OnboardingDtos {
             return java.util.stream.Stream.of(businessName,businessType,businessTin,businessLicence,businessLocation,businessWard,businessCity).anyMatch(v->v!=null&&!v.isBlank()) || dailySales!=null || dailyExpenditure!=null ? Boolean.TRUE : null;
         }
     }
-    @Data public static class SelfForm {
-        private UUID requestKey=UUID.randomUUID(), noticeId;
-        private int expectedSequence;
-        private ClientProfile profile=new ClientProfile();
-        private String action="DRAFT";
-        private boolean noticeAcknowledged, declarationAccepted;
-    }
+
     @Data @lombok.EqualsAndHashCode(callSuper=true) public static class Profile extends ClientProfile {
         private String fullName="", clientNumber="";
         private String noticeVersion="", lawfulBasis="", consentReference="";

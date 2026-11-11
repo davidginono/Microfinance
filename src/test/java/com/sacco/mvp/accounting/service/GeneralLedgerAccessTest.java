@@ -57,8 +57,8 @@ class GeneralLedgerAccessTest {
     @BeforeEach void setup() {
         current = Member.builder().id(UUID.randomUUID()).memberNo("SYNTHETIC-STAFF")
             .saccoId("I1").stationId("B1").fullName("Synthetic accountant")
-            .position(Position.ACCOUNTANT).memberAccount(false).status(MemberStatus.ACTIVE).build();
-        actor = new AppUserPrincipal(current, Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW), true);
+            .position(Position.ACCOUNTANT).memberAccount(false).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
+        actor = new AppUserPrincipal(current,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         when(directory.find(current.getId())).thenReturn(Optional.of(current));
         lenient().when(institutions.findActiveSacco("I1")).thenReturn(Optional.of(
             RegisteredSacco.builder().saccoId("I1").active(true).build()));

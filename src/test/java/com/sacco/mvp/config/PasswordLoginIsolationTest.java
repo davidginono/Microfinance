@@ -39,10 +39,10 @@ import static org.mockito.Mockito.when;
 class PasswordLoginIsolationTest {
     @Test void provisionalClientCannotLoadPasswordCredentialsEvenWhenItsRecordIsFound() {
         var directory=mock(MemberDirectoryService.class);
-        var member=Member.builder().id(UUID.randomUUID()).position(Position.MEMBER).memberAccount(true).clientPortalEnabled(false).status(MemberStatus.ACTIVE).build();
-        when(directory.findClientLoginAccount("synthetic@example.invalid")).thenReturn(Optional.of(member));
+        var member=Member.builder().id(UUID.randomUUID()).position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build();
+        when(directory.findStaffLoginAccount("synthetic@example.invalid")).thenReturn(Optional.of(member));
         var users=new AppUserDetailsService(directory,mock(StationAccessService.class),mock(UserClaimService.class));
-        assertThatThrownBy(()->users.loadClientByEmailOrUsername("synthetic@example.invalid")).isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
+        assertThatThrownBy(()->users.loadStaffByEmailOrUsername("synthetic@example.invalid")).isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
     }
     @Configuration
     @EnableWebSecurity
@@ -74,16 +74,16 @@ class PasswordLoginIsolationTest {
                 .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
                 .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
                 .passwordHash(context.getBean(PasswordEncoder.class).encode("test-password")).build();
-            when(directory.findClientLoginAccount("DUAL.USER")).thenReturn(Optional.of(dualUser));
-            when(directory.findClientLoginAccount("DUAL@EXAMPLE.COM")).thenReturn(Optional.of(dualUser));
+            when(directory.findStaffLoginAccount("DUAL@EXAMPLE.COM")).thenReturn(Optional.of(dualUser));
             when(directory.findStaffLoginAccount("DUAL.USER")).thenReturn(Optional.of(dualUser));
             when(directory.findStaffLoginAccount("DUAL@EXAMPLE.COM")).thenReturn(Optional.of(dualUser));
+            when(directory.findStaffLoginAccount(org.mockito.ArgumentMatchers.anyString())).thenAnswer(i->{String value=i.getArgument(0);return value.equalsIgnoreCase("dual.user")||value.equalsIgnoreCase("dual@example.com")?Optional.of(dualUser):Optional.empty();});
             var filter = context.getBean(SecurityFilterChain.class).getFilters().stream()
                 .filter(UsernamePasswordAuthenticationFilter.class::isInstance).findFirst().orElseThrow();
             AuthenticationManager manager = (AuthenticationManager) ReflectionTestUtils.getField(filter, "authenticationManager");
 
-            assertThat(login(manager, "", "dual.user").isStaffSession()).isFalse();
-            assertThat(login(manager, "", "dual@example.com").isStaffSession()).isFalse();
+            assertThatThrownBy(() -> login(manager, "", "dual.user")).isInstanceOf(AuthenticationException.class);
+            assertThatThrownBy(() -> login(manager, "", "dual@example.com")).isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "", "MEM001")).isInstanceOf(AuthenticationException.class);
             assertThat(login(manager, "staff-password", "dual.user").isStaffSession()).isTrue();
             assertThat(login(manager, "staff-password", "dual@example.com").isStaffSession()).isTrue();

@@ -13,7 +13,81 @@ import java.util.*;
 
 @Repository @RequiredArgsConstructor
 public class LoanRecordingRepository {
+    public Map<com.sacco.mvp.domain.Position,List<UUID>> groupCandidates(AppUserPrincipal a,GroupLoan loan,String groups) {
+        var candidates=new LinkedHashMap<com.sacco.mvp.domain.Position,List<UUID>>();
+        jdbc.query("""
+            select g.value,m.id from jsonb_array_elements_text(?::jsonb) g cross join lateral(
+              select u.id from members u where u.sacco_id=? and u.station_id=? and u.status='ACTIVE'
+              and u.id is distinct from ?::uuid and u.id is distinct from ?::uuid and u.id is distinct from ?::uuid
+               and not loan_group_related(?::uuid,u.id)
+              and (u.staff_access_status='ACTIVE' or (u.staff_access_status='NONE' and coalesce(u.staff_no,'')='' and u.staff_access_assigned_at is null and u.staff_access_activated_at is null))
+              and (u.position=g.value or exists(select 1 from member_staff_roles r where r.member_id=u.id and r.role_name=g.value))
+              and exists(select 1 from member_access_claims c where c.member_id=u.id and c.claim_name='LOAN_RECORDING_VIEW')
+              and exists(select 1 from member_access_claims c where c.member_id=u.id and c.claim_name='LOAN_RECORDING_APPROVE')
+              and u.position<>'ADMIN' and not exists(select 1 from member_staff_roles r where r.member_id=u.id and r.role_name='ADMIN')
+              order by u.id limit 51) m
+            """,(org.springframework.jdbc.core.RowCallbackHandler) r->candidates.computeIfAbsent(com.sacco.mvp.domain.Position.valueOf(r.getString(1)),k->new ArrayList<>()).add(r.getObject(2,UUID.class)),
+            groups,a.getSaccoId(),a.getStationId(),a.getMemberId(),loan.client(),loan.recorder(),loan.id());
+        return candidates;
+    }
+    public int draftVersion(AppUserPrincipal a,UUID id){return jdbc.queryForObject("select coalesce(max(version),0) from client_application_command where application_id=? and sacco_id=? and station_id=?",Integer.class,id,a.getSaccoId(),a.getStationId());}
+    public GroupLoan groupLoan(AppUserPrincipal a,UUID id,boolean lock) {
+        return jdbc.query("""
+            select l.id,l.loan_product_setting_id,l.applicant_member_id,r.actor_id,l.status,
+            loan_group_terms(l),
+            coalesce(l.loan_id,l.application_number::text),b.full_name,l.amount,loan_group_related(l.id,?::uuid)
+            from loan_applications l left join accountant_loan_record r on r.loan_id=l.id
+            join loan_borrower_directory b on b.party_id=l.borrower_party_id and b.sacco_id=l.sacco_id
+            where l.id=? and l.sacco_id=? and l.station_id=?
+            """+(lock?" for update of l":""),(r,n)->new GroupLoan(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class),r.getString(5),r.getString(6),r.getString(7),r.getString(8),r.getBigDecimal(9),r.getBoolean(10)),
+            a.getMemberId(),id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Loan unavailable"));
+    }
+    public Optional<GroupRule> groupRule(AppUserPrincipal a,UUID product) {
+        return jdbc.query("select id,product_id,revision,steps::text from loan_group_rule where sacco_id=? and station_id=? and product_id=? order by revision desc limit 1",
+            (r,n)->new GroupRule(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getInt(3),r.getString(4)),a.getSaccoId(),a.getStationId(),product).stream().findFirst();
+    }
+    public void groupRule(AppUserPrincipal a,GroupRule rule,OffsetDateTime at) {
+        jdbc.update("insert into loan_group_rule(id,sacco_id,station_id,product_id,revision,steps,actor_id,recorded_at) values(?,?,?,?,?,?::jsonb,?,?)",
+            rule.id(),a.getSaccoId(),a.getStationId(),rule.product(),rule.revision(),rule.steps(),a.getMemberId(),at);
+    }
+    public void lockGroupRule(AppUserPrincipal a,UUID product) {
+        jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_GROUP_RULE/"+a.getSaccoId()+"/"+a.getStationId()+"/"+product);
+    }
+    public Optional<GroupRequest> groupRequest(AppUserPrincipal a,UUID loan) {
+        return jdbc.query("select id,loan_id,rule_id,maker_id,round,terms_hash,previous_status from loan_group_request where loan_id=? and sacco_id=? and station_id=? order by round desc limit 1",
+            (r,n)->new GroupRequest(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class),r.getInt(5),r.getString(6),r.getString(7)),loan,a.getSaccoId(),a.getStationId()).stream().findFirst();
+    }
+    public String groupSteps(AppUserPrincipal a,UUID rule) {
+        return jdbc.queryForObject("select steps::text from loan_group_rule where id=? and sacco_id=? and station_id=?",String.class,rule,a.getSaccoId(),a.getStationId());
+    }
+    public List<GroupDecision> groupDecisions(GroupRequest request) {
+        return jdbc.query("""
+            select d.id,d.step,d.actor_id,m.full_name,d.decision,d.reason,d.evidence,d.recorded_at
+            from loan_group_decision d join members m on m.id=d.actor_id where d.request_id=? order by d.recorded_at,d.id limit 101
+            """,(r,n)->new GroupDecision(r.getObject(1,UUID.class),r.getInt(2),r.getObject(3,UUID.class),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getObject(8,OffsetDateTime.class)),request.id());
+    }
+    public void groupRequest(AppUserPrincipal a,GroupRequest r,OffsetDateTime at) {
+        jdbc.update("insert into loan_group_request(id,loan_id,sacco_id,station_id,round,rule_id,terms_hash,previous_status,maker_id,recorded_at) values(?,?,?,?,?,?,?,?,?,?)",
+            r.id(),r.loan(),a.getSaccoId(),a.getStationId(),r.round(),r.rule(),r.termsHash(),r.previousStatus(),r.maker(),at);
+    }
+    public void groupDecision(GroupRequest r,GroupDecision d) {
+        jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,?,?,?,?,?,?)",
+            d.id(),r.id(),d.step(),d.actor(),d.decision(),d.reason(),d.evidence(),d.at());
+    }
+    public void groupStatus(AppUserPrincipal a,UUID loan,String status,OffsetDateTime at) {
+        jdbc.update("update loan_applications set status=?,updated_at=?,version=version+1 where id=? and sacco_id=? and station_id=?",status,at,loan,a.getSaccoId(),a.getStationId());
+    }
+    public boolean signedGroupApplication(AppUserPrincipal a,UUID loan){return Boolean.TRUE.equals(jdbc.queryForObject("""
+        select exists(select 1 from lending_group_org_agreement p join lending_group_authority h on h.id=p.authority_id
+          where p.loan_id=? and p.sacco_id=? and p.station_id=? and (select count(*) from lending_group_org_signature s where s.cycle_id=p.cycle_id)>=h.required_signatures)
+        or exists(select 1 from lending_group_cycle c where c.sacco_id=? and c.station_id=?
+          and (exists(select 1 from lending_group_participant x where x.cycle_id=c.id and x.loan_id=?)
+            or exists(select 1 from lending_group_shared_facility x where x.cycle_id=c.id and x.loan_id=?))
+          and exists(select 1 from lending_group_participant x where x.cycle_id=c.id)
+          and not exists(select 1 from lending_group_participant x where x.cycle_id=c.id and not exists(select 1 from lending_group_consent_evidence e where e.cycle_id=c.id and e.client_id=x.client_id)))
+        """,Boolean.class,loan,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),loan,loan));}
     public boolean personalGuaranteesReady(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select coalesce(lending_personal_guarantees_ready(id),false) from loan_applications where id=? and sacco_id=? and station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
+    public boolean recordedGuarantees(AppUserPrincipal a,UUID id,int required){return Boolean.TRUE.equals(jdbc.queryForObject("select count(distinct g.guarantor_member_id)>=? from guarantor_requests g join loan_applications l on l.id=g.loan_application_id where l.id=? and l.sacco_id=? and l.station_id=? and g.status='APPROVED'",Boolean.class,required,id,a.getSaccoId(),a.getStationId()));}
     public boolean sharedParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='JOINT_GROUP' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     public boolean organizationParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='ORGANIZATION' and g.legal_form='ORGANIZATION' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     private final JdbcTemplate jdbc;
@@ -35,8 +109,8 @@ public class LoanRecordingRepository {
           select a.id,a.sacco_id,a.station_id,coalesce(nullif(p.product_name,''),p.loan_type),
             coalesce(nullif(a.form_data->'recordingDetails'->>'applicationDate','')::date,a.created_at::date),a.amount
           from loan_applications a join members borrower on borrower.id=a.applicant_member_id
-          join loan_product_settings p on p.id=a.loan_product_setting_id and p.sacco_id=a.sacco_id
-          where borrower.client_portal_enabled=false and exists(select 1 from client_application_command c where c.application_id=a.id)
+          left join loan_product_settings p on p.id=a.loan_product_setting_id and p.sacco_id=a.sacco_id
+          where true
             and not exists(select 1 from accountant_loan_record recorded where recorded.loan_id=a.id)
         ) r join loan_applications a
         """);
@@ -45,7 +119,6 @@ public class LoanRecordingRepository {
         if(ids.size()>26)throw new IllegalArgumentException("recording.error.filter");
         var found=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
             select a.id from loan_applications a where a.id in(:ids) and a.sacco_id=:institution and a.station_id=:branch
-            and exists(select 1 from client_application_command c where c.application_id=a.id)
             and not exists(select 1 from accountant_loan_record r where r.loan_id=a.id)
             """,Map.of("ids",ids,"institution",actor.getSaccoId(),"branch",actor.getStationId()),(row,n)->row.getObject(1,UUID.class));
         return new HashSet<>(found);

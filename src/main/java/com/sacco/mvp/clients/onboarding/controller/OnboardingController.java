@@ -53,10 +53,8 @@ public class OnboardingController {
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model m) {
         context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));
         var c=(Client)m.getAttribute("client");
-        boolean staffSubmission=OnboardingService.isStaffSubmission(c,(Revision)m.getAttribute("revision"));
-        m.addAttribute("staffSubmission",staffSubmission);
-        if(!staffSubmission && a.getClaims().contains("CLIENT_ONBOARDING_REVIEW") && Set.of("SUBMITTED","VERIFY","EXPIRED","STALE").contains(c.state()) && !m.containsAttribute("reviewForm")) {
-            var f=new ReviewForm();f.setRevisionId(c.revisionId());f.setKind(c.state().equals("SUBMITTED")?"VERIFY":"REVOKE");f.setCheckedOn(service.today());m.addAttribute("reviewForm",f);
+        if(a.getClaims().contains("CLIENT_ONBOARDING_REVIEW") && Set.of("RECORDED","SUBMITTED","VERIFY","EXPIRED","STALE").contains(c.state()) && !m.containsAttribute("reviewForm")) {
+            var f=new ReviewForm();f.setRevisionId(c.revisionId());f.setKind(Set.of("SUBMITTED","RECORDED").contains(c.state())?"VERIFY":"REVOKE");f.setCheckedOn(service.today());m.addAttribute("reviewForm",f);
         }
         return "onboarding/details";
     }

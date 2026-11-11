@@ -29,7 +29,7 @@ class LoanAdjustmentMvcTest {
     @Autowired WebApplicationContext context;
     @Autowired LoanAdjustmentService service;
     MockMvc mvc;AppUserPrincipal actor;
-    @BeforeEach void setup(){reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("TEST").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+    @BeforeEach void setup(){reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("TEST").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     @Test void requestsRequireCsrfAndExplicitConfirmation()throws Exception{
         mvc.perform(post("/finance/loan-adjustments").with(user(actor))).andExpect(status().isForbidden());
         mvc.perform(post("/finance/loan-adjustments").with(user(actor)).with(csrf())).andExpect(status().isBadRequest());
@@ -49,7 +49,7 @@ class LoanAdjustmentMvcTest {
         verify(service).authorize(actor,"APPROVE");
     }
     @Test void clientSessionCannotAccessTheStaffWorkflow()throws Exception{
-        var client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("CLIENT").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("CLIENT").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
         mvc.perform(get("/finance/loan-adjustments").with(user(client))).andExpect(status().isForbidden());verifyNoInteractions(service);
     }
     @Configuration @EnableWebMvc static class Config {

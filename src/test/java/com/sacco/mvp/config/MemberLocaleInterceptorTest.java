@@ -31,7 +31,7 @@ class MemberLocaleInterceptorTest {
         var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
         request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);
         org.springframework.web.util.ServletRequestPathUtils.parseAndCache(request);
-        var registrations=new RegisteredInterceptors();new WebConfig(mock(AdminScopeInterceptor.class),new MemberLocaleInterceptor(settings,institutions)).addInterceptors(registrations);
+        var registrations=new RegisteredInterceptors();new WebConfig(new MemberLocaleInterceptor(settings,institutions)).addInterceptors(registrations);
         request.setParameter("lang","sw");registrations.apply(request,response);assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.of("sw"));
         request.setParameter("lang","en");registrations.apply(request,response);assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.ENGLISH);
         verifyNoInteractions(settings,institutions);
@@ -43,12 +43,12 @@ class MemberLocaleInterceptorTest {
         UUID id=UUID.randomUUID();var settings=mock(UserSettingsService.class);var institutions=mock(SaccoRegistryService.class);
         when(settings.languageOrDefault(id)).thenReturn("sw");
         var principal=new AppUserPrincipal(Member.builder().id(id).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT)
-            .status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Collections.emptySet(),true);
+            .status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Collections.emptySet());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,null,principal.getAuthorities()));
         var request=new MockHttpServletRequest("GET",path);var response=new MockHttpServletResponse();var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
         request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);
         org.springframework.web.util.ServletRequestPathUtils.parseAndCache(request);
-        var registrations=new RegisteredInterceptors();new WebConfig(mock(AdminScopeInterceptor.class),new MemberLocaleInterceptor(settings,institutions)).addInterceptors(registrations);
+        var registrations=new RegisteredInterceptors();new WebConfig(new MemberLocaleInterceptor(settings,institutions)).addInterceptors(registrations);
         registrations.apply(request,response);
         assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.of("sw"));verify(settings).languageOrDefault(id);verifyNoInteractions(institutions);
     }
@@ -71,7 +71,7 @@ class MemberLocaleInterceptorTest {
         SaccoRegistryService registry = mock(SaccoRegistryService.class);
         when(userSettings.languageOrDefault(memberId)).thenReturn("sw");
         MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, registry);
-        authenticateMember(memberId);
+        authenticateClientRecorder(memberId);
         MockHttpServletRequest first = new MockHttpServletRequest("GET", "/repayments/loans/123/receipts/456");
         interceptor.preHandle(first, new MockHttpServletResponse(), new Object());
         MockHttpServletRequest second = new MockHttpServletRequest("GET", "/repayments/loans/123");
@@ -86,7 +86,7 @@ class MemberLocaleInterceptorTest {
         UserSettingsService userSettings = mock(UserSettingsService.class);
         SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
         MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoRegistry);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/app/dashboard/external-account-status");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/finance/loan-records/choices");
         request.addHeader("Accept", "application/json");
 
         boolean allowed = interceptor.preHandle(request, new MockHttpServletResponse(), new Object());
@@ -102,11 +102,11 @@ class MemberLocaleInterceptorTest {
         SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
         when(userSettings.languageOrDefault(memberId)).thenReturn("sw");
         MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoRegistry);
-        authenticateMember(memberId);
-        MockHttpServletRequest firstRequest = new MockHttpServletRequest("GET", "/app/dashboard");
+        authenticateClientRecorder(memberId);
+        MockHttpServletRequest firstRequest = new MockHttpServletRequest("GET", "/staff/dashboard");
 
         interceptor.preHandle(firstRequest, new MockHttpServletResponse(), new Object());
-        MockHttpServletRequest secondRequest = new MockHttpServletRequest("GET", "/app/loan-applications");
+        MockHttpServletRequest secondRequest = new MockHttpServletRequest("GET", "/finance/loan-records");
         secondRequest.setSession(firstRequest.getSession());
         interceptor.preHandle(secondRequest, new MockHttpServletResponse(), new Object());
 
@@ -120,10 +120,10 @@ class MemberLocaleInterceptorTest {
         UserSettingsService userSettings = mock(UserSettingsService.class);
         SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
         MemberLocaleInterceptor interceptor = new MemberLocaleInterceptor(userSettings, saccoRegistry);
-        authenticateMember(memberId);
-        MockHttpServletRequest updateRequest = new MockHttpServletRequest("POST", "/app/settings/language");
+        authenticateClientRecorder(memberId);
+        MockHttpServletRequest updateRequest = new MockHttpServletRequest("POST", "/staff/settings/language");
         interceptor.cacheUserLocale(updateRequest, memberId, "sw");
-        MockHttpServletRequest nextRequest = new MockHttpServletRequest("GET", "/app/dashboard");
+        MockHttpServletRequest nextRequest = new MockHttpServletRequest("GET", "/staff/dashboard");
         nextRequest.setSession(updateRequest.getSession());
 
         interceptor.preHandle(nextRequest, new MockHttpServletResponse(), new Object());
@@ -165,21 +165,23 @@ class MemberLocaleInterceptorTest {
 
     private void authenticateStaff(UUID id,Position position) {
         Member member=Member.builder().id(id).saccoId("SACCO-1").stationId("B1").memberNo("STAFF-1")
-            .fullName("Synthetic staff").position(position).memberAccount(false).passwordHash("test-only").build();
-        AppUserPrincipal principal=new AppUserPrincipal(member,Collections.emptySet(),true);
+            .fullName("Synthetic staff").status(com.sacco.mvp.domain.MemberStatus.ACTIVE).position(position).memberAccount(false).passwordHash("test-only").build();
+        AppUserPrincipal principal=new AppUserPrincipal(member,Collections.emptySet());
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal,principal.getPassword(),principal.getAuthorities()));
     }
 
-    private void authenticateMember(UUID memberId) {
+    private void authenticateClientRecorder(UUID memberId) {
         Member member = Member.builder()
             .id(memberId)
             .saccoId("SACCO-1")
             .memberNo("MEM-1")
-            .fullName("Member")
-            .position(Position.MEMBER)
-            .memberAccount(true)
+            .fullName("Recorder")
+            .status(com.sacco.mvp.domain.MemberStatus.ACTIVE)
+            .stationId("B1")
+            .position(Position.ACCOUNTANT)
+            .memberAccount(false)
             .passwordHash("secret")
-            .build();
+            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
         AppUserPrincipal principal = new AppUserPrincipal(member, Collections.emptySet());
         SecurityContextHolder.getContext().setAuthentication(
             new UsernamePasswordAuthenticationToken(principal, principal.getPassword(), principal.getAuthorities()));

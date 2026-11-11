@@ -18,7 +18,7 @@ class AccountingActivityEditingTest {
     final AuditService audit=mock(AuditService.class);
     final AccountingCodeLibraryService service=new AccountingCodeLibraryService(repository,ledger,audit,mock(ApplicationClock.class));
     final UUID id=UUID.randomUUID();
-    final AppUserPrincipal actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("staff").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).build(),Set.of(),true);
+    final AppUserPrincipal actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("staff").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of());
     CodeForm form(String name){var form=new CodeForm();form.setCode("FORGED");form.setName(name);form.setDescription(" Updated description ");form.setNameSw("Untrusted translation");return form;}
 
     @Test void metadataSaveLocksTheScopedActivityAndPreservesItsIdentityAndStoredTranslation() {

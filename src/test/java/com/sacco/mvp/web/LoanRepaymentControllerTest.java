@@ -142,8 +142,9 @@ class LoanRepaymentControllerTest {
     }
 
     private AppUserPrincipal actor(boolean staff, UserClaim claim) {
-        return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
-            .memberNo("C001").position(Position.MANAGER).memberAccount(true).status(MemberStatus.ACTIVE).build(), Set.of(claim), staff);
+        return (staff ? new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
+            .memberNo("C001").position(Position.MANAGER).memberAccount(true).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(claim)) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
+            .memberNo("C001").position(Position.MANAGER).memberAccount(true).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(claim)));
     }
 
     @Configuration(proxyBeanMethods = false)

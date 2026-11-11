@@ -23,7 +23,7 @@ class GroupCollectionPostgresTest {
     @BeforeAll void start(){setup.start();f=setup.f;collections=f.context.getBean(GroupCollectionService.class);}
     @AfterAll void stop(){setup.stop();}
     @BeforeEach void fixture(){setup.setup();var form=setup.form();form.setTenureValue(3);cycle=setup.cycles.create(f.actor,setup.group,form);setup.cycles.submit(f.actor,cycle,form);
-        setup.consents.accept(setup.client(f.client),cycle,true,"");setup.consents.accept(setup.client(setup.second),cycle,true,"");
+        GroupPaperFixture.record(f,cycle,"TERMS",f.client);GroupPaperFixture.record(f,cycle,"TERMS",setup.second);
         var participants=setup.cycles.participants(f.actor,cycle);first=participants.stream().filter(p->p.clientId().equals(f.client)).findFirst().orElseThrow().loanId();second=participants.stream().filter(p->p.clientId().equals(setup.second)).findFirst().orElseThrow().loanId();
         for(var loan:List.of(first,second))f.service.disburse(f.actor,f.post(loan,"1000.00","D-GROUP-"+loan));
     }
@@ -55,7 +55,7 @@ class GroupCollectionPostgresTest {
     @Test void correctionIsCompleteIndependentAndRequiresNoCreateClaim(){
         var form=preview();var receipt=collections.post(f.actor,cycle,form);assertThatThrownBy(()->collections.reverse(f.actor,receipt.header().id(),UUID.randomUUID(),LoanRecordingPostgresTest.TODAY,"Synthetic correction")).hasMessage("group.error.correction");
         assertThatThrownBy(()->f.service.reverse(f.actor,receipt.rows().getFirst().postingId(),UUID.randomUUID(),LoanRecordingPostgresTest.TODAY,"Individual correction")).hasMessage("recording.error.receiptCorrection");
-        var operator=f.operator("B1");var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.ACCOUNTING_BUSINESS_CREATE);var corrector=new AppUserPrincipal(f.context.getBean(MemberDirectoryService.class).find(operator.getMemberId()).orElseThrow(),claims,true);
+        var operator=f.operator("B1");var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.ACCOUNTING_BUSINESS_CREATE);var corrector=new AppUserPrincipal(f.context.getBean(MemberDirectoryService.class).find(operator.getMemberId()).orElseThrow(),claims);
         var key=UUID.randomUUID();var correction=collections.reverse(corrector,receipt.header().id(),key,LoanRecordingPostgresTest.TODAY,"Synthetic returned cash");
         assertThat(correction.header().reversesId()).isEqualTo(receipt.header().id());assertThat(correction.group().contributions()).hasSize(3).allSatisfy(c->assertThat(c.reversesId()).isNotNull());
         assertThat(correction.group().reversesNumber()).isEqualTo(receipt.header().number());
@@ -67,7 +67,7 @@ class GroupCollectionPostgresTest {
         var form=form();form.getRows().getFirst().setPayerId(UUID.randomUUID());assertThatThrownBy(()->collections.preview(f.actor,cycle,form)).hasMessage("group.error.collectionPayer");
         var foreign=form();foreign.getRows().getFirst().setLoanId(UUID.randomUUID());assertThatThrownBy(()->collections.preview(f.actor,cycle,foreign)).hasMessage("group.error.collectionLoan");
         assertThat(journals()).isEqualTo(2);var saved=collections.post(f.actor,cycle,preview());assertThat(collections.find(f.operator("B2"),saved.header().id())).isEmpty();
-        var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.GROUP_LENDING_VIEW);var noGroup=new AppUserPrincipal(f.context.getBean(MemberDirectoryService.class).find(f.actor.getMemberId()).orElseThrow(),claims,true);
+        var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.GROUP_LENDING_VIEW);var noGroup=new AppUserPrincipal(f.context.getBean(MemberDirectoryService.class).find(f.actor.getMemberId()).orElseThrow(),claims);
         assertThat(f.receiptService().find(noGroup,saved.header().id())).isEmpty();assertThat(f.receiptService().list(noGroup,new Filter("",null,null,"","newest",0,25)).rows()).isEmpty();
     }
     @Test void auditFailureRollsBackAllLoansAndTheEnvelope(){

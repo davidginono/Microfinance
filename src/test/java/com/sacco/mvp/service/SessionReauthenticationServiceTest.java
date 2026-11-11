@@ -22,7 +22,7 @@ class SessionReauthenticationServiceTest {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         SessionReauthenticationService service = new SessionReauthenticationService(directory, passwordEncoder);
         Member member = member(MemberStatus.ACTIVE, "encoded-password");
-        AppUserPrincipal principal = new AppUserPrincipal(member, Set.of(), false);
+        AppUserPrincipal principal = com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of());
         when(directory.find(member.getId())).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("current-password", "encoded-password")).thenReturn(true);
 
@@ -35,7 +35,7 @@ class SessionReauthenticationServiceTest {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         SessionReauthenticationService service = new SessionReauthenticationService(directory, passwordEncoder);
         Member member = member(MemberStatus.ACTIVE, "encoded-password");
-        AppUserPrincipal principal = new AppUserPrincipal(member, Set.of(), false);
+        AppUserPrincipal principal = com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of());
         when(directory.find(member.getId())).thenReturn(Optional.of(member));
         when(passwordEncoder.matches("wrong-password", "encoded-password")).thenReturn(false);
 
@@ -48,7 +48,7 @@ class SessionReauthenticationServiceTest {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         SessionReauthenticationService service = new SessionReauthenticationService(directory, passwordEncoder);
         Member member = member(MemberStatus.INACTIVE, "encoded-password");
-        AppUserPrincipal principal = new AppUserPrincipal(member, Set.of(), false);
+        AppUserPrincipal principal = com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of());
         when(directory.find(member.getId())).thenReturn(Optional.of(member));
 
         assertThat(service.passwordMatches(principal, "current-password")).isFalse();
@@ -60,7 +60,7 @@ class SessionReauthenticationServiceTest {
         PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
         SessionReauthenticationService service = new SessionReauthenticationService(directory, passwordEncoder);
         Member member = member(MemberStatus.ACTIVE, "OTP_ONLY_LOGIN");
-        AppUserPrincipal principal = new AppUserPrincipal(member, Set.of(), false);
+        AppUserPrincipal principal = com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of());
         when(directory.find(member.getId())).thenReturn(Optional.of(member));
 
         assertThat(service.passwordMatches(principal, "OTP_ONLY_LOGIN")).isFalse();

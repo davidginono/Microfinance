@@ -36,9 +36,6 @@ public interface ManagerReviewRepository extends JpaRepository<ManagerReview, UU
                                  @Param("createdFrom") OffsetDateTime createdFrom,
                                  @Param("createdToExclusive") OffsetDateTime createdToExclusive);
 
-    List<ManagerReview> findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(UUID loanApplicationId,
-                                                                                  ApprovalWorkflowStage reviewStage);
-
     void deleteByLoanApplicationId(UUID loanApplicationId);
 
     List<ManagerReview> findByLoanApplicationIdInOrderByCreatedAtDesc(Collection<UUID> loanApplicationIds);

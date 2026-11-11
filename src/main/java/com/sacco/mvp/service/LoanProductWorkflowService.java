@@ -92,6 +92,7 @@ public class LoanProductWorkflowService {
         if (app == null) {
             return fallbackDefinition(null);
         }
+        if (app.getPolicySnapshot()!=null&&app.getPolicySnapshot().contains("GROUP_REVIEW_V1"))return fromPolicySnapshot(app.getPolicySnapshot());
         if (shouldResolveFromCurrentSettings(app.getStatus())) {
             return resolveFromCurrentSettings(app);
         }
@@ -148,6 +149,9 @@ public class LoanProductWorkflowService {
         }
         try {
             Map<String, Object> data = objectMapper.readValue(policySnapshot, new TypeReference<Map<String, Object>>() {});
+            if("GROUP_REVIEW_V1".equals(data.get("recordingWorkflowVersion")))return new WorkflowDefinition(
+                List.of(ApprovalWorkflowStage.DISBURSEMENT_OFFICER),ApprovalWorkflowStage.DISBURSEMENT_OFFICER,
+                false,1,false,2,false,3,false,4,false,5,0,0,false,6,true);
             Object approvalFlow = data.get("approvalFlow");
             if (!(approvalFlow instanceof List<?> rawStages) || rawStages.isEmpty()) {
                 return null;

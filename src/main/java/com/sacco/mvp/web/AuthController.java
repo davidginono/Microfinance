@@ -6,21 +6,15 @@ import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SaccoStation;
-import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.WorkspaceLanding;
 import com.sacco.mvp.service.EmailOtpService;
 import com.sacco.mvp.service.AuditService;
 import com.sacco.mvp.service.MemberDirectoryService;
-import com.sacco.mvp.service.MemberRegistrationService;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.UserClaimService;
-import com.sacco.mvp.web.form.MemberRegistrationForm;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
@@ -29,13 +23,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 import java.util.LinkedHashMap;
@@ -44,20 +35,18 @@ import java.util.Map;
 @Controller
 @RequiredArgsConstructor
 public class AuthController {
-    private final MemberRegistrationService memberRegistrationService;
+    private final com.sacco.mvp.service.SaccoRegistryService saccoRegistryService;
     private final EmailOtpService emailOtpService;
     private final MemberDirectoryService memberDirectoryService;
     private final UserClaimService userClaimService;
-    private final SaccoRegistryService saccoRegistryService;
     private final AdminScopeService adminScopeService;
-    private final ObjectMapper objectMapper;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
 
     @GetMapping("/")
     public String root(@org.springframework.security.core.annotation.AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal == null) {
-            return "landing";
+            return "redirect:/login";
         }
         return "redirect:" + WorkspaceLanding.authenticatedDefault(principal);
     }
@@ -74,125 +63,6 @@ public class AuthController {
         }
         model.addAttribute("systemAdminLogin", "/system-admin/login".equals(request.getRequestURI()));
         return "login";
-    }
-
-    @GetMapping("/register/member")
-    public String registerMember(Model model) {
-        if (!model.containsAttribute("registrationForm")) {
-            model.addAttribute("registrationForm", new MemberRegistrationForm());
-        }
-        populateRegistrationOptions(model);
-        return "register-member";
-    }
-
-    @GetMapping("/register/member/employee-number-availability")
-    @ResponseBody
-    public Map<String, Object> employeeNumberAvailability(@RequestParam(defaultValue = "") String employeeNumber,
-                                                           @RequestParam(defaultValue = "") String saccoId,
-                                                           @RequestParam(defaultValue = "") String stationId) {
-        return Map.of("available", memberRegistrationService.employeeNumberAvailable(employeeNumber, saccoId, stationId));
-    }
-
-    @GetMapping("/register/member/username-availability")
-    @ResponseBody
-    public ResponseEntity<Map<String, Boolean>> usernameAvailability(@RequestParam(defaultValue = "") String username) {
-        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
-            .body(Map.of("available", memberRegistrationService.usernameAvailable(username)));
-    }
-
-    @PostMapping("/register/member/request-otp")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> requestMemberRegistrationOtp(@Valid @ModelAttribute("registrationForm") MemberRegistrationForm form,
-                                                                            BindingResult bindingResult) {
-        if (bindingResult.hasErrors()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", bindingResult.getAllErrors().getFirst().getDefaultMessage()
-            ));
-        }
-        String passwordError = passwordValidationMessage(form.getPassword(), form.getConfirmPassword());
-        if (passwordError != null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", passwordError
-            ));
-        }
-
-        try {
-            memberRegistrationService.requireUsernameAvailable(form.getUsername());
-            MemberRegistrationService.VerifiedExternalMember verified = memberRegistrationService.verifyExternalMember(form);
-            java.util.UUID activationClientId = memberRegistrationService.validatePublicRegistration(form, verified);
-            var delivery = emailOtpService.issueOtp(
-                verified.email(),
-                EmailOtpPurpose.REGISTRATION,
-                activationClientId,
-                "Your registration code",
-                "Use the OTP code below to complete your client registration.",
-                verified.saccoId(),
-                verified.stationId(),
-                form.getPhone()
-            );
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("valid", true);
-            response.put("fullName", verified.fullName());
-            response.put("saccoId", verified.saccoId());
-            response.put("stationId", verified.stationId());
-            response.put("message", deliveryMessage(delivery, "We sent an OTP code using the station delivery policy."));
-            auditIdentityEvent(null, "OTP_REQUEST", "OTP request", "MEMBER", "Client registration",
-                verified.saccoId(), verified.stationId(), Map.of("purpose", EmailOtpPurpose.REGISTRATION.name()));
-            return ResponseEntity.ok(response);
-        } catch (IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", ex.getMessage()
-            ));
-        }
-    }
-
-    @PostMapping("/register/member")
-    public String registerMemberSubmit(@Valid @ModelAttribute("registrationForm") MemberRegistrationForm form,
-                                       BindingResult bindingResult,
-                                       Model model,
-                                       RedirectAttributes ra) {
-        if (bindingResult.hasErrors()) {
-            populateRegistrationOptions(model);
-            return "register-member";
-        }
-        String passwordError = passwordValidationMessage(form.getPassword(), form.getConfirmPassword());
-        if (passwordError != null) {
-            bindingResult.rejectValue("password", "registration.password.invalid", passwordError);
-            populateRegistrationOptions(model);
-            return "register-member";
-        }
-
-        try {
-            if (form.getOtpCode() == null || form.getOtpCode().isBlank()) {
-                bindingResult.rejectValue("otpCode", "registration.otp.required", "Enter the OTP code that was sent to you.");
-                populateRegistrationOptions(model);
-                return "register-member";
-            }
-            memberRegistrationService.requireUsernameAvailable(form.getUsername());
-            var verified = memberRegistrationService.verifyExternalMember(form);
-            java.util.UUID activationClientId = memberRegistrationService.validatePublicRegistration(form, verified);
-            if (activationClientId == null) emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, form.getOtpCode());
-            else emailOtpService.consumeOtp(form.getEmail(), EmailOtpPurpose.REGISTRATION, activationClientId, form.getOtpCode());
-            Member registered = activationClientId == null ? memberRegistrationService.register(form)
-                : memberRegistrationService.register(form, activationClientId);
-            if (activationClientId == null) auditIdentityEvent(registered.getId(), "REGISTRATION", "Registration", "MEMBER", "Member " + registered.getMemberNo(),
-                registered.getSaccoId(), registered.getStationId(), Map.of("memberNo", registered.getMemberNo()));
-            ra.addFlashAttribute("assignedClientNumber", registered.getMemberNo());
-            ra.addFlashAttribute("assignedUsername", registered.getUsername());
-            ra.addFlashAttribute("message", "Registration completed successfully. Sign in with your email or username.");
-            return "redirect:/login";
-        } catch (MemberRegistrationService.UsernameTakenException ex) {
-            bindingResult.rejectValue("username", "registration.username.taken", ex.getMessage());
-            populateRegistrationOptions(model);
-            return "register-member";
-        } catch (IllegalStateException ex) {
-            bindingResult.reject("registration.failed", ex.getMessage());
-            populateRegistrationOptions(model);
-            return "register-member";
-        }
     }
 
     @PostMapping("/login/password-reset/request-otp")
@@ -281,95 +151,6 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/login/member/request-otp")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> requestMemberLoginOtp(@RequestParam String email) {
-        String normalizedEmail = normalizeEmail(email);
-        if (normalizedEmail.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your email address."));
-        }
-
-        Member matchedAccount = memberDirectoryService.findByEmail(normalizedEmail)
-            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(Member::isClientPortalEnabled)
-            .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
-            .orElse(null);
-        if (matchedAccount != null && !matchedAccount.isMemberAccess()) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", "You are not registered as a member. Sign in through Staff instead."
-            ));
-        }
-        Member member = matchedAccount != null && matchedAccount.isMemberAccess() ? matchedAccount : null;
-        if (member == null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", "No member account was found for that email address. Please register yourself first."
-            ));
-        }
-        String accessBlockedMessage = suspendedAccessMessage(member);
-        if (accessBlockedMessage != null) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", accessBlockedMessage
-            ));
-        }
-
-        try {
-            var delivery = emailOtpService.issueOtp(
-                normalizedEmail,
-                EmailOtpPurpose.LOGIN,
-                member.getId(),
-                "Your sign-in code",
-                "Use this OTP code to sign in to Microfinance."
-            );
-            auditIdentityEvent(member.getId(), "OTP_REQUEST", "OTP request", "MEMBER", "Member " + member.getMemberNo(),
-                member.getSaccoId(), member.getStationId(), Map.of("purpose", EmailOtpPurpose.LOGIN.name(), "memberNo", member.getMemberNo()));
-            return ResponseEntity.ok(Map.of(
-                "valid", true,
-                "message", deliveryMessage(delivery, "We sent a sign-in code using the station delivery policy.")
-            ));
-        } catch (IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", ex.getMessage()));
-        }
-    }
-
-    @PostMapping("/login/member/verify-otp")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> verifyMemberLoginOtp(@RequestParam String email,
-                                                                    @RequestParam String otpCode,
-                                                                    HttpServletRequest request) {
-        String normalizedEmail = normalizeEmail(email);
-        if (normalizedEmail.isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "message", "Enter your email address."));
-        }
-
-        try {
-            Member member = memberDirectoryService.findByEmail(normalizedEmail)
-                .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-                .filter(Member::isClientPortalEnabled)
-                .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
-                .orElseThrow(() -> new IllegalStateException("No member account was found for that email address. Please register yourself first."));
-            if (!member.isMemberAccess()) {
-                throw new IllegalStateException("You are not registered as a member. Sign in through Staff instead.");
-            }
-            ensureSaccoAccessAllowed(member);
-            emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.LOGIN, otpCode);
-            signInMember(member, request);
-            auditIdentityEvent(member.getId(), "LOGIN", "Login", "MEMBER", "Member " + member.getMemberNo(),
-                member.getSaccoId(), member.getStationId(), Map.of("method", "OTP", "memberNo", member.getMemberNo()));
-            return ResponseEntity.ok(Map.of(
-                "valid", true,
-                "redirectUrl", WorkspaceLanding.memberDashboardAfterLogin()
-            ));
-        } catch (IllegalStateException ex) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "valid", false,
-                "message", ex.getMessage()
-            ));
-        }
-    }
-
     @PostMapping("/login/staff/request-otp")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> requestStaffLoginOtp(@RequestParam String email) {
@@ -444,11 +225,7 @@ public class AuthController {
                 .orElseThrow(() -> new IllegalStateException("No active staff account matches that email address."));
             ensureSaccoAccessAllowed(user);
             emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.STAFF_LOGIN, otpCode);
-            signInPrincipal(new AppUserPrincipal(
-                user,
-                userClaimService.effectiveClaims(user.getId(), user.getActiveStaffRolesResolved(), user.isMemberAccess()),
-                true
-            ), request);
+            signInPrincipal(new AppUserPrincipal(user,userClaimService.effectiveClaims(user.getId(), user.getActiveStaffRolesResolved(), user.isMemberAccess())), request);
             auditIdentityEvent(user.getId(), "LOGIN", "Login", "STAFF", "Staff " + displayStaffNo(user),
                 user.getSaccoId(), user.getStationId(), Map.of("method", "OTP", "staffNo", displayStaffNo(user)));
             return ResponseEntity.ok(Map.of(
@@ -461,16 +238,6 @@ public class AuthController {
                 "message", ex.getMessage()
             ));
         }
-    }
-
-    private void signInMember(Member member, HttpServletRequest request) {
-        ensureSaccoAccessAllowed(member);
-        AppUserPrincipal principal = new AppUserPrincipal(
-            member,
-            userClaimService.clientSessionClaims(member.getId()),
-            false
-        );
-        signInPrincipal(principal, request);
     }
 
     private String deliveryMessage(com.sacco.mvp.service.StationOtpDeliveryService.DeliveryReceipt delivery,
@@ -588,14 +355,7 @@ public class AuthController {
                 .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
                 .orElseThrow(() -> new IllegalStateException("No active staff account was found for that email or username."));
         }
-        Member member = memberDirectoryService.findClientLoginAccount(normalizedUsername)
-            .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> !existing.getActiveStaffRolesResolved().contains(Position.ADMIN))
-            .orElseThrow(() -> new IllegalStateException("No active client account was found for that email or username."));
-        if (!member.isMemberAccess() || !member.isClientPortalEnabled()) {
-            throw new IllegalStateException("No active client account was found for that email or username.");
-        }
-        return member;
+        throw new IllegalStateException("Use Staff or System Admin password recovery.");
     }
 
     private String displayLoginNumber(Member member, String accountType) {
@@ -609,13 +369,4 @@ public class AuthController {
         return member.getStaffNo();
     }
 
-    private void populateRegistrationOptions(Model model) {
-        java.util.List<SaccoRegistryService.RegisteredSaccoView> options = saccoRegistryService.listRegisteredSaccos();
-        model.addAttribute("registrationSaccos", options);
-        try {
-            model.addAttribute("registrationSaccosJson", objectMapper.writeValueAsString(options));
-        } catch (JacksonException ex) {
-            model.addAttribute("registrationSaccosJson", "[]");
-        }
-    }
 }

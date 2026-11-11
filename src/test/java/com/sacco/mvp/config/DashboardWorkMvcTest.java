@@ -27,15 +27,15 @@ class DashboardWorkMvcTest {
     @Autowired DashboardWorkService work;
     MockMvc mvc;
     @BeforeEach void setup(){reset(work);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
-    AppUserPrincipal actor(String branch,UserClaim... claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims)),true);}
+    AppUserPrincipal actor(String branch,UserClaim... claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims)));}
     @Test void endpointIgnoresForgedScopeAndDoesNotCacheFinancialSummaries()throws Exception{
-        var a=actor("B1",UserClaim.ACCOUNTANT_QUEUE_VIEW);when(work.read(a,3,new BigDecimal("400000"))).thenReturn(new DashboardWorkService.Work(List.of(),"2026-10-22T09:42:00+03:00"));
+        var a=actor("B1",UserClaim.LOAN_RECORDING_VIEW);when(work.read(a,3,new BigDecimal("400000"))).thenReturn(new DashboardWorkService.Work(List.of(),"2026-10-22T09:42:00+03:00"));
         mvc.perform(get("/api/dashboard/work").with(user(a)).param("stationId","OTHER").param("saccoId","OTHER").param("days","3").param("amount","400000").accept("application/json"))
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.infolets").isArray());
         verify(work).read(a,3,new BigDecimal("400000"));
     }
     @Test void missingClaimsOrBranchCannotReachTheReadService()throws Exception{
-        for(var a:List.of(actor("B1"),actor(null,UserClaim.ACCOUNTANT_QUEUE_VIEW)))mvc.perform(get("/api/dashboard/work").with(user(a)).accept("application/json")).andExpect(status().isForbidden());
+        for(var a:List.of(actor("B1"),actor(null,UserClaim.LOAN_RECORDING_VIEW)))mvc.perform(get("/api/dashboard/work").with(user(a)).accept("application/json")).andExpect(status().isForbidden());
         verifyNoInteractions(work);
     }
     @Configuration @EnableWebMvc static class Config {

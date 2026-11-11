@@ -1,10 +1,10 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
-<c:choose><c:when test="${applicationWorkspace}"><%@ include file="application-register.jspf" %></c:when><c:otherwise>
+
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
 <div class="accounting-workspace" data-voucher-register data-base="<c:url value='${base}' />"><div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="recording.register.${kind}" /></h1></div>
-<section data-resource-table="accounting-loans-register-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar voucher-toolbar"><h2 class="erp-panel-title"><spring:message code="voucher.records" /></h2><div class="accounting-actions">
+<section data-resource-table="accounting-loans-register-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar voucher-toolbar"><h2 class="erp-panel-title"><spring:message code="${kind=='LOAN'?'admin.dashboard.applications':'voucher.records'}" /></h2><div class="accounting-actions">
 <c:if test="${kind=='LOAN'}"><sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><button class="app-btn btn-neutral" data-table-command data-selection-action="topup" disabled><spring:message code="recording.topUp.create" /></button></sec:authorize></c:if>
 <button class="app-btn btn-neutral" data-table-command data-selection-action="details" disabled><spring:message code="common.view" /></button>
 <sec:authorize access="@access.has(principal,'LOAN_RECORDING_EXPORT')"><button class="app-btn btn-neutral" data-table-command data-selection-action="pdf" disabled><spring:message code="voucher.pdf" /></button><button class="app-btn btn-neutral" data-table-command data-selection-action="print" disabled><spring:message code="voucher.print" /></button></sec:authorize>
@@ -17,5 +17,3 @@
 <c:if test="${empty records.rows}"><tr><td colspan="8"><spring:message code="voucher.noMatches" /></td></tr></c:if></tbody></table></div>
 <div data-table-pagination data-page="${records.page}" data-table-for="accounting-loans-register-1" class="voucher-pagination"><spring:message code="voucher.page" /> ${records.page+1}<div class="accounting-actions"><c:forEach items="${[-1,1]}" var="step"><c:url value="${base}" var="pageUrl"><c:param name="page" value="${records.page+step}" /><c:param name="search" value="${filter.search}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="state" value="${filter.status}" /><c:param name="productId" value="${filter.productId}" /><c:param name="sort" value="${filter.sort}" /></c:url><c:choose><c:when test="${step==-1?records.page>0:records.hasNext}"><a data-page-direction="${step==-1?'previous':'next'}" class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="${step==-1?'common.previous':'common.next'}" /></a></c:when><c:otherwise><button data-page-direction="${step==-1?'previous':'next'}" class="app-btn btn-neutral" disabled><spring:message code="${step==-1?'common.previous':'common.next'}" /></button></c:otherwise></c:choose></c:forEach></div></div></section></div>
 <script src="<c:url value='/js/accounting-vouchers.js' />" defer></script><script src="<c:url value='/js/loan-recording.js' />" defer></script><%@ include file="../../fragments/footer.jspf" %>
-
-</c:otherwise></c:choose>

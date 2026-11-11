@@ -23,7 +23,7 @@ class GroupOrganizationFundingPostgresTest {
     final LoanRecordingPostgresTest f=o.f;
     @BeforeAll void start(){p.start();}
     @AfterAll void stop(){p.stop();}
-    @BeforeEach void fixture(){p.fixture();p.ready();assertThat(p.service.confirm(s.signer,s.cycle,s.hash,true,"")).isNull();
+    @BeforeEach void fixture(){p.fixture();p.ready();p.confirm();
         f.context.getBean(MemberDirectoryService.class).find(f.actor.getMemberId()).orElseThrow().setSignatureText("Synthetic lender signature");
         f.jdbc.update("update members set signature_text='Synthetic lender signature' where id=?",f.actor.getMemberId());}
     com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm funding(){var form=f.post(s.loan,"1000.00","ORG-FUND-"+UUID.randomUUID());form.setOrganizationPacketHash(s.hash);form.setOrganizationAccepted(true);form.setEvidence("Synthetic signed agreement and verified organization payout");return form;}
@@ -127,15 +127,7 @@ class GroupOrganizationFundingPostgresTest {
         assertThatThrownBy(()->f.receiptService().preview(f.actor,form)).hasMessage("voucher.error.text");form.setLoanPayer("Synthetic actual payer");form.setClientId(f.client);
         assertThatThrownBy(()->f.receiptService().post(f.actor,form)).hasMessage("recording.error.client");assertThat(o.count("accountant_loan_receipt")).isZero();assertThat(f.service.detail(f.actor,s.loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
     }
-    @Test void deductedChargesConserveGrossPrincipalAndOnlyTheAuthorizedNetCash(){
-        p.withdraw();f.chargePolicy("DEDUCT");o.authority=o.authorities.record(f.actor,o.group,o.authorityForm());
-        var form=o.form();form.getOrganization().setInsurancePremium(new BigDecimal("10.00"));form.getOrganization().setInsuranceEvidence("Synthetic insurer premium checked");
-        s.cycle=o.create(form);s.loan=o.service.submit(f.actor,s.cycle,form);s.hash=s.service.packet(s.signer,s.cycle,0).hash();s.openDocument(s.signer,s.cycle);p.ready();
-        assertThat(p.service.confirm(s.signer,s.cycle,s.hash,true,"")).isNull();var funded=f.service.disburse(f.actor,funding());
-        assertThat(f.jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,funded.journalId(),f.cash)).isEqualByComparingTo("970.00");
-        assertThat(f.service.detail(f.actor,s.loan).loan().principal()).isEqualByComparingTo("1000.00");assertThat(f.service.detail(f.actor,s.loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
-        assertThat(f.jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where sacco_id=?",BigDecimal.class,f.institution)).isZero();
-    }
+
     @Test void fundingAndWithdrawalRaceHasExactlyOneWinner()throws Exception{
         var form=funding();try(var workers=Executors.newFixedThreadPool(2)){var gate=new CountDownLatch(1);
             var fund=workers.submit(()->{gate.await();try{f.service.disburse(f.actor,form);return true;}catch(RuntimeException closed){return false;}});

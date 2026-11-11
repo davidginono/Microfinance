@@ -36,7 +36,7 @@ class ChartOfAccountsMvcTest {
         reset(ledger);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         var member=Member.builder().id(UUID.randomUUID()).memberNo("COA-TEST").saccoId("I1").stationId("B1")
             .fullName("Accountant").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
-        accountant=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE),true);
+        accountant=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE));
         lenient().when(ledger.chartParents(any(),anyBoolean(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(ledger.chartParent(any(),eq(parent),anyBoolean())).thenReturn(new Account(parent,"121000","Equipment","ASSET","DEBIT","HEADING","OTHER",UUID.randomUUID(),true));
     }
@@ -61,7 +61,7 @@ class ChartOfAccountsMvcTest {
             .andExpect(model().attribute("setupReturnTo","/finance/accounts?type=ASSET"));
         verify(ledger,never()).provisionChartDefaults(any());
         var reader=new AppUserPrincipal(Member.builder().id(accountant.getMemberId()).memberNo("READER").saccoId("I1").stationId("B1")
-            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         mvc.perform(post("/finance/accounts/defaults").with(user(reader)).param("returnTo","/finance/accounts"))
             .andExpect(status().isForbidden());
         mvc.perform(post("/finance/accounts/defaults").with(user(reader)).with(csrf()).param("returnTo","/finance/accounts?type=ASSET"))
@@ -93,7 +93,7 @@ class ChartOfAccountsMvcTest {
             .andExpect(status().isBadRequest()).andExpect(header().doesNotExist("Location"));
         clearInvocations(ledger);
         var noView=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).memberNo("NO-COA-VIEW").saccoId("I1").stationId("B1")
-            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTANT_QUEUE_VIEW),true);
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTANT_QUEUE_VIEW));
         mvc.perform(get("/finance/accounts/children").param("parentId",parent.toString()).with(user(noView)))
             .andExpect(status().isForbidden());
         verifyNoInteractions(ledger);
@@ -132,12 +132,12 @@ class ChartOfAccountsMvcTest {
         mvc.perform(post("/finance/accounts/initialize").with(user(accountant)).with(csrf())).andExpect(status().isNotFound());
         verify(ledger,never()).initializeChart(any());
         var member=Member.builder().id(UUID.randomUUID()).memberNo("CLIENT").saccoId("I1").stationId("B1").fullName("Client").status(MemberStatus.ACTIVE).build();
-        var client=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),false);
+        var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         mvc.perform(get("/finance/accounts").with(user(client))).andExpect(status().isForbidden());
     }
     @Test void readOnlyAccountantCannotOpenOrSubmitCreationForms() throws Exception {
         var reader=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).memberNo("READER").saccoId("I1").stationId("B1")
-            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         mvc.perform(get("/finance/accounts/groups/new").with(user(reader))).andExpect(status().isForbidden());
         mvc.perform(post("/finance/accounts/groups").with(user(reader)).with(csrf())).andExpect(status().isForbidden());
     }
@@ -146,7 +146,7 @@ class ChartOfAccountsMvcTest {
         when(ledger.chartPath(any(),eq(parent))).thenReturn(List.of(root));
         when(ledger.chart(any(),any(),eq(1),eq(30),eq("code"),eq("asc"))).thenReturn(new Page<>(List.of(),1,false));
         var reader=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).memberNo("READER").saccoId("I1").stationId("B1")
-            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW),true);
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),Set.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         mvc.perform(get("/finance/accounts").param("parentId",parent.toString()).param("search","assets").param("state","ACTIVE").param("page","1").with(user(reader)))
             .andExpect(status().isOk()).andExpect(view().name("accounting/accounts"))
             .andExpect(model().attribute("selectedGroup",root)).andExpect(model().attribute("groupPath",List.of(root)))

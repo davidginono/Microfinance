@@ -1,7 +1,6 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.config.SecurityConfig;
-import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
@@ -130,26 +129,6 @@ class AdminControllerUserAccessSecurityTest {
         verify(productAccounts).choices("SACCO-01","INTEREST","Maendeleo",0,null);
         mockMvc.perform(get("/admin/settings-controls/loan-product-accounts/INTEREST").with(authentication(authenticationFor(principal(Set.of(UserClaim.LOAN_PRODUCTS_VIEW)))))).andExpect(status().isForbidden());
         Mockito.verifyNoMoreInteractions(productAccounts);
-    }
-
-    @Test
-    void enableClientAccessUsesAuthenticatedActorAndRequiresUpdateAndCsrf() throws Exception {
-        UUID id = UUID.randomUUID();
-        var actor = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));
-        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
-        when(adminService.enableClientAccess(actor, id)).thenReturn("CL-00000042");
-        mockMvc.perform(post("/admin/users/{id}/enable-client-access", id).with(authentication(authenticationFor(actor))).with(csrf())
-                .param("saccoId", "FOREIGN").param("stationId", "FOREIGN"))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/admin/users/" + id + "/edit"))
-            .andExpect(flash().attribute("message", org.hamcrest.Matchers.containsString("CL-00000042")));
-        verify(adminService).enableClientAccess(actor, id);
-        Mockito.clearInvocations(adminService);
-        mockMvc.perform(post("/admin/users/{id}/enable-client-access", id).with(authentication(authenticationFor(actor))))
-            .andExpect(status().isForbidden());
-        mockMvc.perform(post("/admin/users/{id}/enable-client-access", id)
-                .with(authentication(authenticationFor(principal(Set.of(UserClaim.USER_ACCESS_VIEW))))).with(csrf()))
-            .andExpect(status().isForbidden());
-        Mockito.verifyNoInteractions(adminService);
     }
 
     @Test
@@ -570,14 +549,7 @@ class AdminControllerUserAccessSecurityTest {
         LoanProductSetting createdProduct = LoanProductSetting.builder().id(productId).build();
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
-        when(adminService.createLoanProductTenure(
-            "SACCO-01", principal.getMemberId(), null, "School Fees Booster", "Created product", 5,
-            new BigDecimal("0"), new BigDecimal("500000"), 2, new BigDecimal("3.000000"), false,
-            new BigDecimal("15000"), new BigDecimal("0.015000"), new BigDecimal("0.000000"),
-            new BigDecimal("0.100000"), InterestMethod.FLAT_RATE, 1, 12, true, false, true, false,
-            ApprovalWorkflowStage.MANAGER, 1, 2, false, null, null, false, null, null, false, null,
-            null, null, null, false, null, false, false, false, false, null, LoanProductStatus.ACTIVE, 2, "MONTHS", null, null
-        )).thenReturn(createdProduct);
+        when(adminService.createLoanProductTenure("SACCO-01",principal.getMemberId(),null,"School Fees Booster","Created product",5,new BigDecimal("0"),new BigDecimal("500000"),2,new BigDecimal("3.000000"),false,new BigDecimal("15000"),new BigDecimal("0.015000"),new BigDecimal("0.000000"),new BigDecimal("0.100000"),InterestMethod.FLAT_RATE,1,12,true,false,false,false,false,false,null,LoanProductStatus.ACTIVE,2,"MONTHS",null,null)).thenReturn(createdProduct);
 
         mockMvc.perform(post("/admin/settings-controls/loan-products")
                 .param("modalKey", "create-product")
@@ -613,6 +585,7 @@ class AdminControllerUserAccessSecurityTest {
         AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
 
+        org.mockito.Mockito.doThrow(new IllegalStateException("Minimum amount is invalid.")).when(adminService).createLoanProductTenure(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
         mockMvc.perform(post("/admin/settings-controls/loan-products")
                 .param("modalKey", "create-product")
                 .param("productName", "School Fees Booster")
@@ -627,9 +600,6 @@ class AdminControllerUserAccessSecurityTest {
                 .param("annualInterestPercent", "10")
                 .param("minRepaymentMonths", "1")
                 .param("maxRepaymentMonths", "12")
-                .param("managerReviewRequired", "true")
-                .param("managerPriority", "0")
-                .param("accountantReviewRequired", "false")
                 .param("disbursementOfficerRequired", "false")
                 .param("disbursementProofRequired", "false")
                 .with(csrf())
@@ -638,8 +608,8 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(redirectedUrl("/admin/settings-controls?section=loan&modal=create-product"))
             .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productName", List.of("School Fees Booster"))))
             .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productDescription", List.of("Submitted text should remain visible"))))
-            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("committeeReviewRequired", List.of("false"))))
-            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("accountantReviewRequired", List.of("false"))));
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("applicantAttachmentRequired", List.of("false"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("disbursementProofRequired", List.of("false"))));
     }
 
     @Test
@@ -675,6 +645,7 @@ class AdminControllerUserAccessSecurityTest {
         AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_UPDATE));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
 
+        org.mockito.Mockito.doThrow(new IllegalStateException("Minimum amount is invalid.")).when(adminService).updateLoanProductTenure(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
         mockMvc.perform(post("/admin/settings-controls/{id}", productId)
                 .param("modalKey", "product-" + productId)
                 .param("productName", "Emergency Loan")
@@ -689,9 +660,6 @@ class AdminControllerUserAccessSecurityTest {
                 .param("annualInterestPercent", "12")
                 .param("minRepaymentMonths", "1")
                 .param("maxRepaymentMonths", "6")
-                .param("managerReviewRequired", "true")
-                .param("managerPriority", "0")
-                .param("accountantReviewRequired", "false")
                 .param("disbursementOfficerRequired", "false")
                 .param("disbursementProofRequired", "false")
                 .with(csrf())
@@ -700,8 +668,8 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(redirectedUrl("/admin/settings-controls/loan-products/" + productId + "/edit"))
             .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productName", List.of("Emergency Loan"))))
             .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("productDescription", List.of("Edited text should remain visible"))))
-            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("committeeReviewRequired", List.of("false"))))
-            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("accountantReviewRequired", List.of("false"))));
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("applicantAttachmentRequired", List.of("false"))))
+            .andExpect(flash().attribute("loanProductFormDraft", org.hamcrest.Matchers.hasEntry("disbursementProofRequired", List.of("false"))));
     }
 
     @Test
@@ -866,7 +834,7 @@ class AdminControllerUserAccessSecurityTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, claims, true);
+        return new AppUserPrincipal(member,claims);
     }
 
     private StationSmsAccount smsAccount() {
@@ -899,7 +867,7 @@ class AdminControllerUserAccessSecurityTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, claims, true);
+        return new AppUserPrincipal(member,claims);
     }
 
     private PlatformSessionSettings platformSessionSettings(int timeoutMinutes) {
@@ -1005,12 +973,7 @@ class AdminControllerUserAccessSecurityTest {
         AuthzService authzService(LoanApplicationRepository loanApplicationRepository,
                                   GuarantorRequestRepository guarantorRequestRepository,
                                   BoardReviewRepository boardReviewRepository) {
-            return new AuthzService(
-                loanApplicationRepository,
-                guarantorRequestRepository,
-                boardReviewRepository,
-                accessControlService()
-            );
+            return new AuthzService(loanApplicationRepository,accessControlService());
         }
 
         @Bean("access")

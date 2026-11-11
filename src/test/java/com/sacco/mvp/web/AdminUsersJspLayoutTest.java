@@ -95,13 +95,13 @@ class AdminUsersJspLayoutTest {
     void loanProductWorkflowScriptIsSharedBetweenAdminPages() throws Exception {
         String settingsJsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/settings-controls.jsp"));
         String productEditJsp = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/loan-product-edit.jsp"));
-        String sharedScript = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/loan-product-workflow-script.jspf"));
+        String sharedScript = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/fragments/loan-product-editor-script.jspf"));
 
-        assertThat(settingsJsp).contains("../fragments/loan-product-workflow-script.jspf");
-        assertThat(productEditJsp).contains("../fragments/loan-product-workflow-script.jspf");
+        assertThat(settingsJsp).contains("../fragments/loan-product-editor-script.jspf");
+        assertThat(productEditJsp).contains("../fragments/loan-product-editor-script.jspf");
         assertThat(settingsJsp).doesNotContain("function validateBeforeSubmit()");
         assertThat(productEditJsp).doesNotContain("function validateBeforeSubmit()");
-        assertThat(sharedScript).contains("function validateBeforeSubmit()");
+        assertThat(sharedScript).contains("applyServerFieldErrors", "restoreLoanProductFormDraft");
         assertThat(sharedScript).contains("data-required-attachments-list");
         assertThat(sharedScript).contains("data-required-attachment-add");
     }

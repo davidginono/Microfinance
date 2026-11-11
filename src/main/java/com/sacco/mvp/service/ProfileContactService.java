@@ -51,9 +51,9 @@ public class ProfileContactService {
     }
 
     private Member owned(AppUserPrincipal actor,boolean lock) {
-        if(actor==null)throw new AccessDeniedException("Profile unavailable");
+        if(actor==null||!actor.isStaffSession())throw new AccessDeniedException("Profile unavailable");
         Member member=(lock?members.findForSignatureRegistration(actor.getMemberId()):members.findById(actor.getMemberId())).orElseThrow(()->new AccessDeniedException("Profile unavailable"));
-        if(!actor.getMemberId().equals(member.getId()) || member.getStatus()!=MemberStatus.ACTIVE || !Objects.equals(actor.getSaccoId(),member.getSaccoId()) || !Objects.equals(actor.getStationId(),member.getStationId()))throw new AccessDeniedException("Profile unavailable");
+        if(!actor.getMemberId().equals(member.getId()) || member.getStatus()!=MemberStatus.ACTIVE || !member.isStaffAccessActive() || !Objects.equals(actor.getSaccoId(),member.getSaccoId()) || !Objects.equals(actor.getStationId(),member.getStationId()))throw new AccessDeniedException("Profile unavailable");
         return member;
     }
     private void confirm(Member member,String password) {

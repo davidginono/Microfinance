@@ -26,22 +26,30 @@ import static org.mockito.Mockito.when;
 class AdminScopeServiceTest {
 
     @Test
-    void currentScopeUsesLiveDatabaseAssignmentInsteadOfStalePrincipalAndSessionStation() {
+    void staffUseTheirAssignedScopeWithoutAnInstitutionSelectionPermission() {
+        var request=new MockHttpServletRequest();request.getSession().setAttribute("adminSelectedStationId","AR419");
+        var members=mock(MemberRepository.class);var registry=mock(SaccoRegistryService.class);
+        var member=member(UUID.randomUUID(),"AR704");member.setPosition(Position.ACCOUNTANT);member.setStaffRoles(Set.of(Position.ACCOUNTANT));
+        var principal=new AppUserPrincipal(member,Set.of());
+        when(members.findById(member.getId())).thenReturn(Optional.of(member));
+        when(registry.findRegisteredSaccoView("1001")).thenReturn(Optional.of(saccoView("AR704")));
+        var service=service(request,registry,members);var scope=service.currentScope(principal);
+        assertThat(scope.getSaccoId()).isEqualTo("1001");assertThat(scope.getStationId()).isEqualTo("AR704");
+        assertThat(service.currentScope(principal)).isSameAs(scope);verify(members).findById(member.getId());
+    }
+
+    @Test
+    void currentScopeRejectsAStalePrincipalAfterTheLiveAssignmentChanges() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.getSession().setAttribute("adminSelectedStationId", "AR419");
         MemberRepository members = mock(MemberRepository.class);
         SaccoRegistryService registry = mock(SaccoRegistryService.class);
         AppUserPrincipal principal = principal("AR419");
         when(members.findById(principal.getMemberId())).thenReturn(Optional.of(member(principal.getMemberId(), "AR704")));
-        when(registry.findRegisteredSaccoView("1001")).thenReturn(Optional.of(saccoView("AR704")));
         AdminScopeService service = service(request, registry, members);
 
-        AdminScopeService.AdminScopeView scope = service.currentScope(principal);
-
-        assertThat(scope.getSaccoId()).isEqualTo("1001");
-        assertThat(scope.getStationId()).isEqualTo("AR704");
-        assertThat(request.getSession().getAttribute("adminSelectedStationId")).isEqualTo("AR704");
-        assertThat(service.currentStationId(principal)).isEqualTo("AR704");
+        assertThatThrownBy(()->service.currentScope(principal)).isInstanceOf(IllegalStateException.class).hasMessageContaining("Sign out");
+        assertThat(request.getSession().getAttribute("adminSelectedStationId")).isEqualTo("AR419");
         verify(members).findById(principal.getMemberId());
     }
 
@@ -50,7 +58,7 @@ class AdminScopeServiceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         MemberRepository members = mock(MemberRepository.class);
         SaccoRegistryService registry = mock(SaccoRegistryService.class);
-        AppUserPrincipal principal = principal("AR419");
+        AppUserPrincipal principal = principal("AR704");
         when(members.findById(principal.getMemberId())).thenReturn(Optional.of(member(principal.getMemberId(), "AR704")));
         when(registry.findRegisteredSaccoView("1001")).thenReturn(Optional.of(saccoView("AR419")));
         AdminScopeService service = service(request, registry, members);
@@ -59,21 +67,6 @@ class AdminScopeServiceTest {
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("assigned station is not active")
             .hasMessageContaining("platform administrator");
-    }
-
-    @Test
-    void updateScopeRejectsAStationDifferentFromTheLiveAssignment() {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        MemberRepository members = mock(MemberRepository.class);
-        SaccoRegistryService registry = mock(SaccoRegistryService.class);
-        AppUserPrincipal principal = principal("AR419");
-        when(members.findById(principal.getMemberId())).thenReturn(Optional.of(member(principal.getMemberId(), "AR704")));
-        AdminScopeService service = service(request, registry, members);
-
-        assertThatThrownBy(() -> service.updateScope(principal, "1001", "AR419"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("locked")
-            .hasMessageContaining("assigned to your account");
     }
 
     private AdminScopeService service(MockHttpServletRequest request,
@@ -85,7 +78,7 @@ class AdminScopeServiceTest {
 
     private AppUserPrincipal principal(String stationId) {
         Member member = member(UUID.randomUUID(), stationId);
-        return new AppUserPrincipal(member, Set.of(), true);
+        return new AppUserPrincipal(member,Set.of());
     }
 
     private Member member(UUID id, String stationId) {

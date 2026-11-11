@@ -188,7 +188,7 @@ public class StaffMfaService {
         boolean staffLogin = isStaffSessionLogin(pendingLoginType(session));
         Member member = memberRepository.findById(memberId)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
+            .filter(Member::isStaffAccessActive)
             .orElse(null);
         if (member == null || stillRequiresLoginMfa(member)) {
             return null;
@@ -249,18 +249,12 @@ public class StaffMfaService {
     private Member activePendingMember(UUID memberId, boolean staffLogin) {
         return memberRepository.findById(memberId)
             .filter(existing -> existing.getStatus() == MemberStatus.ACTIVE)
-            .filter(existing -> staffLogin ? existing.isStaffAccessActive() : existing.isMemberAccess())
+            .filter(Member::isStaffAccessActive)
             .orElseThrow(() -> new IllegalStateException("Your account is no longer active. Contact the administrator."));
     }
 
     private AppUserPrincipal principalFor(Member member, boolean staffLogin) {
-        return new AppUserPrincipal(
-            member,
-            staffLogin
-                ? userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())
-                : userClaimService.clientSessionClaims(member.getId()),
-            staffLogin
-        );
+        return new AppUserPrincipal(member,userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()));
     }
 
     private boolean stillRequiresLoginMfa(Member member) {

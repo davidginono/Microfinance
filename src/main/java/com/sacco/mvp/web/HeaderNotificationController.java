@@ -53,37 +53,6 @@ public class HeaderNotificationController {
             + "highlight=" + view.id() + "#notification-" + view.id();
     }
 
-    private String notificationTargetUrl(AppUserPrincipal principal) {
-        if (principal.isPlatformIdentity()) {
-            return "/admin/incidents";
-        }
-        if (principal.isWorkspaceAdminScope()) {
-            return "/admin/notifications";
-        }
-        if (access.canAccessManagerArea(principal)) {
-            return "/manager/notifications";
-        }
-        if (access.canAccessAccountantArea(principal)) {
-            return "/accountant/notifications";
-        }
-        if (access.canAccessDisbursementArea(principal)) {
-            return "/disbursement/notifications";
-        }
-        if (access.canAccessChairpersonArea(principal)) {
-            return "/chairperson/notifications";
-        }
-        if (access.canAccessCreditCommitteeArea(principal)) {
-            return "/credit-committee/notifications";
-        }
-        if (access.canAccessBoardArea(principal)) {
-            return "/board/notifications";
-        }
-        if (access.canAccessLoanOfficerArea(principal)) {
-            return "/loan-officer/notifications";
-        }
-        return "/app/notifications";
-    }
-
     private String panelSubtitle(AppUserPrincipal principal) {
         if (principal.isPlatformIdentity()) {
             return "Latest SACCO support incidents requiring platform attention";
@@ -122,4 +91,6 @@ public class HeaderNotificationController {
         String href
     ) {
     }
+    private String notificationTargetUrl(AppUserPrincipal p){return p.isPlatformIdentity()?"/admin/incidents":p.isWorkspaceAdminScope()?"/admin/notifications":"/staff/notifications";}
+
 }

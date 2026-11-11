@@ -27,14 +27,14 @@ public class OnboardingRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from client_onboarding_document where id=? and client_id=? and sacco_id=? and station_id=? and category in('PROFILE_PHOTO','SPOUSE_PHOTO'))",Boolean.class,id,client,a.getSaccoId(),a.getStationId()));
     }
     private static final String CLIENT_SELECT="""
-        select m.id,m.member_no,m.full_name,m.phone,m.email,m.client_portal_enabled,c.id revision_id,coalesce((select max(sequence) from client_onboarding_revision r where r.client_id=m.id),0) sequence,c.review_due,
+        select m.id,m.member_no,m.full_name,m.phone,m.email,(m.position<>'MEMBER' or exists(select 1 from member_staff_roles sr where sr.member_id=m.id)) staff_user,c.id revision_id,coalesce((select max(sequence) from client_onboarding_revision r where r.client_id=m.id),0) sequence,c.review_due,
           case when c.state='VERIFY' and (m.full_name is distinct from c.profile->>'fullName' or m.phone is distinct from c.profile->>'phone' or m.email is distinct from c.profile->>'email') then 'STALE' when c.state='VERIFY' and ((c.profile->>'identityExpiresOn')::date<? or (c.profile->>'retentionReviewOn')::date<?
             or exists(select 1 from client_onboarding_document_link x join client_onboarding_document d on d.id=x.document_id where x.revision_id=c.id and d.expires_on<?))
             then 'EXPIRED' else coalesce(c.state,'NOT_STARTED') end state
         from members m left join lateral(select * from client_onboarding_current where client_id=m.id limit 1) c on c.sacco_id=m.sacco_id and c.station_id=m.station_id
         where m.sacco_id=? and m.station_id=? and (m.is_member or (m.is_member is null and m.position='MEMBER'))
         """;
-    private final RowMapper<Client> clientMapper=(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getString("phone"),r.getString("email"),r.getString("state"),r.getObject("revision_id",UUID.class),r.getInt("sequence"),r.getObject("review_due",LocalDate.class),r.getBoolean("client_portal_enabled"));
+    private final RowMapper<Client> clientMapper=(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getString("phone"),r.getString("email"),r.getString("state"),r.getObject("revision_id",UUID.class),r.getInt("sequence"),r.getObject("review_due",LocalDate.class),r.getBoolean("staff_user"));
     public List<Client> clients(AppUserPrincipal a,String search,String state,int page,String order,LocalDate day) {
         return jdbc.query("select * from ("+CLIENT_SELECT+" and (m.member_no ilike ? escape '!' or m.full_name ilike ? escape '!')) q where (?='' or state=?) order by "+order+",id limit 26 offset ?",
             clientMapper,day,day,day,a.getSaccoId(),a.getStationId(),pattern(search),pattern(search),state,state,page*25);
@@ -180,9 +180,6 @@ public class OnboardingRepository {
         return jdbc.queryForObject("select * from client_onboarding_data_notice()",
             (r,n)->new Notice(r.getObject("id",UUID.class),r.getString("version"),r.getString("english"),r.getString("kiswahili")));
     }
-    public Feedback feedback(AppUserPrincipal a,UUID client,UUID revision) {
-        return jdbc.query("select d.kind,d.client_message,d.recorded_at from client_onboarding_decision d join client_onboarding_revision r on r.id=d.revision_id where d.client_id=? and d.sacco_id=? and d.station_id=? and (?::uuid is null or d.revision_id=?) order by r.sequence desc,d.recorded_at desc,(d.kind='REVOKE') desc,d.id desc limit 1",
-            (r,n)->new Feedback(r.getString(1),r.getString(2),r.getObject(3,OffsetDateTime.class)),client,a.getSaccoId(),a.getStationId(),revision,revision).stream().findFirst().filter(f->!f.message().isBlank()).orElse(null);
-    }
+
     private static String pattern(String s) {return "%"+s.replace("!","!!").replace("%","!%").replace("_","!_")+"%";}
 }

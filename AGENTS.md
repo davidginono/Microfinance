@@ -6,7 +6,7 @@ This file gives coding agents project-specific guidance for working in `Microfin
 
 - Project: `Microfinance Loan Management System`
 - Target: credit-policy-backed, non-deposit-taking microfinance in Tanzania Mainland.
-- Start with individual business lending; salary, group, and agricultural lending are separate product capabilities, not assumed existing features.
+- This is a staff-only accounting package with staff-recorded client details, loan applications and group loans. Borrowers have no login or workspace. The cutover and current approval flow are described in `docs/staff-only-accounting.md`.
 - The conversion backlog and implementation gates live in `docs/microfinance-gap-checklist.md`.
 - The accounting package and institution-specific report customization goal, dependency order, and acceptance gates live in `docs/accounting-report-builder-checklist.md`. Read it before accounting or report-builder work; checklist creation is not implementation completion.
 - Stack:
@@ -55,16 +55,13 @@ Default local URL:
 
 ## Key Application Areas
 
-- Client pages:
-  - `src/main/webapp/WEB-INF/jsp/app`
+- Staff client and loan records:
+  - `src/main/webapp/WEB-INF/jsp/onboarding`
+  - `src/main/webapp/WEB-INF/jsp/accounting/loans`
 - Admin pages:
   - `src/main/webapp/WEB-INF/jsp/admin`
-- Manager pages:
-  - `src/main/webapp/WEB-INF/jsp/manager`
-- Board pages:
-  - `src/main/webapp/WEB-INF/jsp/board`
-- Chairperson pages:
-  - `src/main/webapp/WEB-INF/jsp/chairperson`
+- Group lending:
+  - `src/main/webapp/WEB-INF/jsp/groups`
 - Shared layout fragments:
   - `src/main/webapp/WEB-INF/jsp/fragments`
 
@@ -75,15 +72,13 @@ Default local URL:
   - `src/main/java/com/sacco/mvp/security/AppUserDetailsService.java`
   - `src/main/java/com/sacco/mvp/security/AppUserPrincipal.java`
   - `src/main/java/com/sacco/mvp/security/AuthzService.java`
-- Main client workflow:
-  - `src/main/java/com/sacco/mvp/web/AppController.java`
-  - `src/main/java/com/sacco/mvp/service/LoanWorkflowService.java`
-- Manager workflow:
-  - `src/main/java/com/sacco/mvp/web/ManagerController.java`
-  - `src/main/java/com/sacco/mvp/service/ManagerService.java`
-- Board workflow:
-  - `src/main/java/com/sacco/mvp/web/BoardController.java`
-  - `src/main/java/com/sacco/mvp/service/BoardService.java`
+- Loan recording and approval:
+  - `src/main/java/com/sacco/mvp/accounting/loans/service/LoanRecordingService.java`
+  - `src/main/java/com/sacco/mvp/accounting/loans/service/LoanGroupApprovalService.java`
+- Staff client recording:
+  - `src/main/java/com/sacco/mvp/clients/onboarding/service/OnboardingService.java`
+- Group signed papers:
+  - `src/main/java/com/sacco/mvp/grouplending/service/GroupPaperService.java`
 - Admin:
   - `src/main/java/com/sacco/mvp/web/AdminController.java`
   - `src/main/java/com/sacco/mvp/service/AdminService.java`
@@ -91,15 +86,8 @@ Default local URL:
 ## Workflow Notes
 
 - Loan workflow logic is sensitive. Do not change statuses or transitions casually.
-- Current loan flow includes:
-  - draft
-  - sent to guarantors
-  - all guarantors approved
-  - review by manager
-  - review by board
-  - approval / rejection paths
-- Guarantor and board rules are business-critical.
-- Board review quorum and guarantor approval logic must remain consistent with service-layer rules.
+- New applications use draft → recorded → configured user-group review → ready for disbursement / rejected. Personal group guarantees retain their explicit signed-evidence gate before review. Old status identifiers and decisions remain historical compatibility data.
+- Preserve historical board decisions and guarantor liability evidence. New approvals use configured staff groups and distinct-person counts; do not restore the retired board, manager or borrower workspaces.
 - Keep disbursement, repayment, arrears, default, restructuring, and settlement distinct. Do not mark a loan paid merely because its final due date passed or a top-up was approved.
 - Monetary mutations need transactional consistency, idempotency, auditability, and concurrency protection. Corrections to posted financial records must preserve history rather than overwrite or delete it.
 
@@ -123,7 +111,19 @@ Default local URL:
   - `AuthzService`
 - Do not weaken route or ownership checks without explicit instruction.
 - Institution and branch scope must be enforced on the server for reads, writes, exports, receipts, and document downloads. Do not trust hidden form fields or UI filters as access control.
-- Clients see their own records; guarantors receive only the information needed to understand and approve their liability.
+- Clients and guarantors have no system session. Authorized staff record and access their evidence within institution and branch scope.
+
+## Staff-only accounting mandate (2026-11-11)
+
+- Assignable groups are Super Administrator, Loan Officer, General Manager, Finance Manager, Chief Accountant, ICT Manager, Credit Officer, Accounts Clerk, Customer Care and Accounts Clerk 2. Super Administrator uses the separate platform login. Group assignment and explicit operation claims are separate; never grant new financial or approval claims during migration.
+- Clients remain scoped business records, including staff who also borrow. Do not create borrower credentials, registration, activation, acknowledgement, settings, application or guarantor self-service routes. Retired sessions must fail closed. `MEMBER`, old status/role identifiers and the constrained-false portal column exist only where stored data or frozen evidence requires compatibility.
+- Staff use their current assigned institution and branch directly. There is no institution-selection page or branch-switching action. Ignore old selection-session values and reject a stale principal after its live assignment changes.
+- New loan approval plans are versioned by institution, branch and product. Freeze the plan and assessed terms on submission; check current staff permissions and group membership at each decision. Exclude the recorder, submitter, borrower, shared borrowers and authorized company representatives. One person may decide only once per review round.
+- Keep new group lending available through staff recording. Record actual signed PDFs, named signers, dates, references and language through `GroupPaperService`. Never fabricate online openings, client OTPs or digital signatures. Preserve historical digital evidence and the separate organization authority, liability, payout and personal-guarantee safeguards.
+- Profile recording does not establish verification. Independent evidence checks and configured KYC gates remain mandatory. Employee numbers are recorded by authorized staff without granting client login access.
+- Approval moves no money. Funding remains a separate authorized accounting transaction. Payment corrections may restore an already-funded loan's active status without creating a fresh loan approval or rewriting its contract.
+- `V154__staff_only_accounting.sql` and `V155__staff_recorded_group_papers.sql` preserve client identities and financial/audit history. Apply deployment migrations with a verified backup; use isolated temporary databases for migration tests. See `docs/staff-only-accounting.md`.
+- Deploy this removal from a clean build (`mvn clean verify`), so compiled copies of deleted controllers cannot survive in the package. Do not clean the output of an application that is currently running from that directory.
 
 ## Spring Boot Backend Skill
 
@@ -186,15 +186,15 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 - Shared shell styling lives primarily in:
   - `src/main/webapp/WEB-INF/jsp/fragments/header.jspf`
   - `src/main/webapp/WEB-INF/jsp/fragments/sidebar.jspf`
-- Treat the sidebar as the only global navigation for staff and client workspaces.
+- Treat the sidebar as the only global navigation for staff workspaces.
 - Do not add duplicate navigation actions inside page bodies for destinations that already exist in the sidebar.
 - Keep dashboard routes focused on summary cards and high-level KPIs. Do not place registry tables, cross-workspace listings, or alternate route launchers on dashboards unless explicitly requested.
 - Keep portfolio views and registry views separate when both exist:
   - `Institutions` should remain a focused portfolio/workspace view
   - `Institution Registry` should be its own sidebar destination and view
-- Keep visual changes consistent with the current ERP-style staff/client layout. Rebranding does not authorize a framework migration or a wholesale visual redesign.
-- Portal registration, Complete Profile and Staff Client Profile must use the shared `onboarding/profile-editor.jspf`, `profile-fields.jspf` and `profile-actions.jspf` with `client-profile-wizard.js`. Make field, example, layout and action changes in those shared sources so all profile forms stay synchronized. Preserve context-specific ownership, identity edit permissions, consent, document access and OTP gates. Keep Save draft available in editable profile flows except staff provisional-client creation, which has no draft action, endpoint or session persistence. Portal pre-account drafts remain bounded server-session data, while existing clients use the audited profile draft flow. Never store profile values in browser storage.
-- Staff with the scoped client onboarding claims create or save provisional profiles directly. The final staff save records the profile with optional attachments and no review submission. It does not imply independent verification, unlock portal access or satisfy configured lending KYC gates. Client-submitted profiles retain their separate review workflow.
+- Keep visual changes consistent with the current ERP-style staff layout. Rebranding does not authorize a framework migration or a wholesale visual redesign.
+- Staff client forms use the shared `onboarding/profile-editor.jspf`, `profile-fields.jspf` and `profile-actions.jspf` with `client-profile-wizard.js`. Keep identity edit permissions, consent and document access scoped. Existing profiles use audited drafts; new client creation has no draft endpoint or session persistence. Never store profile values in browser storage.
+- Staff with the scoped client onboarding claims create or save provisional profiles directly. The final staff save records the profile with optional attachments and no review submission. It does not imply independent verification or satisfy configured lending KYC gates. Earlier client-submitted revisions remain history; staff append new recorded revisions and independent checks.
 - Keep panel-header and toolbar action buttons compact by default. Do not stretch actions such as Restore Default Permissions to full width unless a specific mobile form flow explicitly calls for it.
 - Workspace table values align with their column headings at the left leading edge, especially Debit/Credit and amounts; do not right-align amounts across wide columns. Retain tabular numerals, precision and contained horizontal scrolling. Standalone PDF/print financial layouts are separate.
 - Resource table IDs/codes link directly to their existing authorized details destination using the shared blue `resource-table-id-link` style. These native navigation links do not require checkbox selection; selection still controls toolbar commands. Keep missing or unauthorized destinations as plain text and preserve the no-row-action-button rule. See the project table skill.
@@ -228,12 +228,7 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 - Reuse existing services and controller flows instead of duplicating logic.
 - Avoid changing database structure unless explicitly required.
 - Avoid changing seeded business rules unless explicitly requested.
-- Keep labels and UI wording aligned with existing domain terminology:
-  - `Loan ID`
-  - `Awaiting Guarantors`
-  - `All Guarantors Approved`
-  - `On Review By Manager`
-  - `On Review By Board`
+- Use `Loan ID` and the current recorded/submitted/ready/rejected labels for new loans. Older manager, board and guarantor status labels describe historical records only.
 - The institution is the tenant boundary; branch scope is the default workspace boundary for branch-bound roles:
   - filter workflows, registries, reports, client lists, incidents, and loan listings by institution and the selected branch
   - `LoanApplication.stationId` is the first-class branch reference for loan workflow, reporting, archive, queue, and loan-document visibility paths; prefer it over rebuilding scope from the applicant record
@@ -244,19 +239,18 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 After workflow or UI changes, validate as applicable:
 
-- Client:
-  - `/app/dashboard`
-  - `/app/loan-products`
-  - `/app/loan-applications`
-  - `/app/guarantee-requests`
+- Staff records:
+  - `/finance/clients/onboarding`
+  - `/finance/loan-records`
+  - `/finance/loan-records/rules`
+  - record-specific group review and signed-paper routes
 - Admin:
   - `/admin/dashboard`
   - `/admin/users`
   - `/admin/settings-controls`
-- Manager:
-  - `/manager/loan-applications`
-- Board:
-  - `/board/assigned`
+- Group approvals:
+  - ordered distinct-person decisions, frozen revisions, rejection and resubmission
+  - retired borrower sessions denied and removed routes absent
 - Accountant and disbursement:
   - validate the affected queues and record-specific actions when those areas change
 
@@ -273,7 +267,7 @@ Also check:
 ## Practical Guidance For Agents
 
 - If the user asks about authentication, answer in terms of session-based Spring Security unless the code has been changed.
-- If the user asks about a workflow status, inspect `LoanWorkflowService` first.
+- For current approval statuses, inspect `LoanGroupApprovalService` and `LoanRecordingService`. `LoanWorkflowService` retains staff draft handling only.
 - If the user asks about a page layout issue, inspect shared fragments before editing individual JSPs.
 - If a modal is visually broken, check whether it is trapped inside the page shell instead of being attached to `document.body`.
 - For repayment or balance work, start with `LoanRepaymentLedgerService` and `docs/repayment-ledger-increment.md`, then inspect `RepaymentScheduleService`, `LoanPaymentSummarySyncService`, `LoanPresentationService`, and `LoanAnalyticsService`. Refresh recalculates projections; it does not receive money.

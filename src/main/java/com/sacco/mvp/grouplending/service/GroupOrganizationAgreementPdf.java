@@ -11,10 +11,12 @@ import org.springframework.context.MessageSource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import java.io.*;
-import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import com.sacco.mvp.grouplending.dto.GroupOrganizationAgreementDtos.Snapshot;
+import com.sacco.mvp.service.*;
+import com.sacco.mvp.domain.RepaymentFrequency;
 
 /** Pure bounded rendering; never called inside an accounting or signing transaction. */
 @Component @RequiredArgsConstructor
@@ -44,11 +46,11 @@ public class GroupOrganizationAgreementPdf {
                 if(f.recordedCharges().terms().isEmpty())page.text(label("group.noCharges",locale));page.section(label("prepayment.title",locale));page.text(label("prepayment.mandatory",locale));var terms=f.prepaymentTerms();if(terms!=null){page.text(label("prepayment.schedule."+terms.get("schedule"),locale));page.text(label("prepayment.partial."+terms.get("partialInterest"),locale));page.text(label("prepayment.basis."+terms.get("dayBasis"),locale));}
                 page.section(label("orgAgreement.schedule",locale));page.text(label("orgAgreement.projection",locale));if("DAYS".equals(f.tenureUnit()))page.text(label("orgAgreement.dayDates",locale));
                 page.columns(List.of(label("orgAgreement.payment",locale),label("orgAgreement.dueDate",locale),label("group.principal",locale),label("orgDocument.interest",locale),label("group.chargeAmount",locale)),new float[]{.10f,.19f,.23f,.24f,.24f},new boolean[]{false,false,true,true,true});
-                for(var row:GroupOrganizationAgreementService.schedule(s))page.row(List.of(Integer.toString(row.number()),row.date()==null?"-":row.date().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),number.format(row.principal()),number.format(row.interest()),number.format(row.amount())),false);
+                for(var row:schedule(s))page.row(List.of(Integer.toString(row.number()),row.date()==null?"-":row.date().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),number.format(row.principal()),number.format(row.interest()),number.format(row.amount())),false);
                 page.endTable();page.section(label("orgDocument.signatures",locale));page.text(label("orgAgreement.signatures",locale)+": "+data.row().signedCount()+" / "+s.authority().requiredSignatures());
                 if(includeSignatures&&data.signatures().isEmpty())page.text(label("group.notSigned",locale));
                 if(!includeSignatures){page.text(label("orgDocument.physical",locale));for(int i=0;i<s.authority().requiredSignatures();i++)page.text(label("orgDocument.paperLine",locale));}
-                if(includeSignatures)for(var signature:data.signatures())page.text((signature.lender()?label("orgFunding.lender",locale)+": ":"")+signature.name()+" ("+signature.number()+") - "+signature.at().format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm xxx"))+" - "+label(signature.otpRequired()?"orgDocument.signatureOtp":"orgDocument.signature",locale)+(signature.preferredLanguage()==null?"":" / "+label("groupDisclosure.preferredLanguage",locale)+": "+label("orgDocument.language."+signature.preferredLanguage(),locale)));
+                if(includeSignatures)for(var signature:data.signatures())page.text((signature.lender()?label("orgFunding.lender",locale)+": ":"")+signature.name()+" ("+signature.number()+") - "+signature.at().format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm xxx"))+" - "+label(signature.paper()?"group.paper.title":signature.otpRequired()?"orgDocument.signatureOtp":"orgDocument.signature",locale)+(signature.preferredLanguage()==null?"":" / "+label("groupDisclosure.preferredLanguage",locale)+": "+label("orgDocument.language."+signature.preferredLanguage(),locale)));
                 page.section(label("orgDocument.evidence",locale));page.text(label("orgDocument.packetHash",locale)+": "+data.row().hash());page.text(label("orgDocument.fileHash",locale)+": "+d.sha256());page.text(label("orgDocument.appended",locale));
             }
             new PDFMergerUtility().appendDocument(pdf,original);pdf.getDocumentInformation().setTitle(label("orgAgreement.title",locale));pdf.save(out);return out.toByteArray();
@@ -57,4 +59,23 @@ public class GroupOrganizationAgreementPdf {
     private static String contacts(String phone,String email){return phone+(phone.isEmpty()||email.isEmpty()?"":" / ")+email;}
     private void field(AccountingPdfDocument page,String key,String value,Locale locale)throws IOException{page.row(List.of(label(key,locale),Objects.toString(value,"-")),false);}
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
+    private static List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow> schedule(Snapshot snapshot){
+        var f=snapshot.financial();check(f!=null && LoanAmortizationCalculator.VERSION.equals(f.calculationVersion()) && f.interestRate()!=null
+            && f.interestMethod()!=null && f.repaymentFrequency()!=null && f.tenureUnit()!=null && f.tenureValue()!=null
+            && f.interestAmount()!=null && f.recordedCharges()!=null && f.recordedTotalPayable()!=null,"terms");
+        var values=new LinkedHashMap<String,Object>();values.put("calculationVersion",f.calculationVersion());values.put("interestRate",f.interestRate());values.put("interestMethod",f.interestMethod());
+        values.put("repaymentFrequency",f.repaymentFrequency());values.put("tenureUnit",f.tenureUnit());values.put("tenureValue",f.tenureValue());
+        var calculation=LoanAmortizationCalculator.estimate(snapshot.loan().principal(),snapshot.loan().tenorMonths(),values);
+        var tenure=LoanTenure.fromSnapshot(values,snapshot.loan().tenorMonths());var frequency=RepaymentFrequency.valueOf(f.repaymentFrequency());
+        var schedule=new ArrayList<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow>();var balance=calculation.totalRepayment();
+        for(var r:calculation.rows()){
+            var ending=balance.subtract(r.amount());
+            var date=tenure.unit().equals("DAYS")?(r.number()==1?snapshot.loan().firstPaymentDate():null)
+                :tenure.dueDate(null,snapshot.loan().firstPaymentDate(),frequency,r.number(),calculation.rows().size());
+            schedule.add(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(r.number(),date,r.principal(),r.interest(),r.amount(),balance,ending));
+            balance=ending;
+        }
+        return List.copyOf(schedule);
+    }
+    private static void check(boolean value,String key){if(!value)throw new IllegalArgumentException("group.error."+key);}
 }

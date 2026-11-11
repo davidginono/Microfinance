@@ -22,10 +22,16 @@ class ProfileContactServiceTest {
     Member member;AppUserPrincipal actor;
     final OffsetDateTime now=OffsetDateTime.parse("2026-10-22T11:00:00+03:00");
     @BeforeEach void setup(){
-        member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("C1").fullName("Test User").position(Position.MEMBER).status(MemberStatus.ACTIVE).email("old@example.test").phone("255712345678").passwordHash("hash").build();
-        actor=new AppUserPrincipal(member,Set.of(),false);
+        member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("C1").fullName("Test User").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).email("old@example.test").phone("255712345678").passwordHash("hash").build();
+        actor=new AppUserPrincipal(member,Set.of());
         when(members.findForSignatureRegistration(member.getId())).thenReturn(Optional.of(member));when(members.findById(member.getId())).thenReturn(Optional.of(member));
         when(passwords.matches("correct","hash")).thenReturn(true);when(clock.now()).thenReturn(now);
+    }
+    @Test void retiredBorrowerSessionsCannotChangeContactsOrRequestCodes(){
+        var retired=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of());
+        assertThatThrownBy(()->service.update(retired,"new@example.test",null,"correct")).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.requestPhoneOtp(retired,"correct")).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(otp,audit);verify(members,never()).save(any());
     }
     @Test void normalizedOwnContactsAreAuditedAndChangingThePhoneClearsItsProof(){
         member.setPhoneVerifiedAt(now.minusDays(1));service.update(actor," NEW@EXAMPLE.TEST ","0712345679","correct");

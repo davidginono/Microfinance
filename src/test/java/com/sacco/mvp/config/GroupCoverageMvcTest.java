@@ -8,7 +8,6 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.*;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -30,7 +29,7 @@ class GroupCoverageMvcTest {
  @Autowired WebApplicationContext context;@Autowired GroupCoverageService service;@Autowired GroupCoveragePdf pdf;
  MockMvc mvc;AppUserPrincipal staff,client;UUID id=UUID.randomUUID(),cycle=UUID.randomUUID();
  @BeforeEach void setup(){reset(service,pdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();staff=actor(true);client=actor(false);}
- AppUserPrincipal actor(boolean staff){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(staff?Position.ACCOUNTANT:Position.MEMBER).memberAccount(!staff).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),staff);}
+ AppUserPrincipal actor(boolean staff){return (staff ? new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(staff?Position.ACCOUNTANT:Position.MEMBER).memberAccount(!staff).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class)) : MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(staff?Position.ACCOUNTANT:Position.MEMBER).memberAccount(!staff).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class)));}
  Detail detail(boolean staff){var date=LocalDate.of(2026,10,27);var amount=new BigDecimal("100.00");return new Detail(new Case(id,cycle,UUID.randomUUID(),UUID.randomUUID(),"PERSONAL",client.getMemberId(),"CLIENT-1","Named <Person>","Organization <Borrower>","LN-1",UUID.randomUUID(),date,date.plusDays(30),date.minusDays(15),amount,amount,amount,amount,amount,BigDecimal.ZERO,"CALLED",3,"Accepted terms","BOTH","HASH",1,date.atStartOfDay().atOffset(ZoneOffset.UTC)),new Page<>(List.of(),0,false),new Page<>(List.of(),0,false),staff,new Policy(UUID.randomUUID(),1,14,30,7,"Policy",true),new NoticeFacts(date,date,"","","notice.pdf"),date);}
  String staffPath(){return "/finance/groups/coverage/"+id;}String ownPath(){return "/app/group-coverage/"+id;}
  @Test void allCoverageMutationsRequireCsrf()throws Exception{
@@ -40,19 +39,11 @@ class GroupCoverageMvcTest {
   UUID posting=UUID.randomUUID(),contribution=UUID.randomUUID(),key=UUID.randomUUID();mvc.perform(post(staffPath()+"/link").with(user(staff)).with(csrf()).param("requestKey",key.toString()).param("postingId",posting.toString()).param("contributionId",contribution.toString()).param("payerEvidence","Verified retained payer evidence").param("payerVerified","true").param("amount","99999").param("clientId",UUID.randomUUID().toString()).param("cycle",UUID.randomUUID().toString())).andExpect(redirectedUrl(staffPath()));
   verify(service).link(eq(staff),eq(id),argThat(x->x.getPostingId().equals(posting)&&x.getContributionId().equals(contribution)&&x.getRequestKey().equals(key)&&x.isPayerVerified()));
  }
- @Test void ownResponseRetainsTextKeyAndOriginalSequenceAfterFailure()throws Exception{
-  when(service.caseContext(client,id,true,"RESPOND")).thenReturn(new CaseContext(detail(false).header(),detail(false).policy(),detail(false).notice(),detail(false).today()));when(service.actions(client,true)).thenReturn(Set.of("RESPOND"));when(service.respond(eq(client),eq(id),any())).thenThrow(new IllegalArgumentException("coverage.error.promise"));UUID key=UUID.randomUUID();
-  var result=mvc.perform(post(ownPath()+"/respond").with(user(client)).with(csrf()).param("requestKey",key.toString()).param("expectedSequence","2").param("kind","PROMISED").param("amount","12.34").param("promiseOn","2026-11-02").param("reason","Keep my explanation <safe>").param("confirmed","true")).andExpect(view().name("groups/coverage-form")).andExpect(model().attributeHasErrors("coverageResponseForm")).andReturn();
-  var form=(ResponseForm)result.getModelAndView().getModel().get("coverageResponseForm");assertThat(form.getRequestKey()).isEqualTo(key);assertThat(form.getExpectedSequence()).isEqualTo(2);assertThat(form.getReason()).isEqualTo("Keep my explanation <safe>");assertThat(form.getAmount()).isEqualByComparingTo("12.34");
- }
+
  @Test void staffCannotSubmitPromiseFieldsThroughClosureBinder()throws Exception{
   mvc.perform(post(staffPath()+"/close").with(user(staff)).with(csrf()).param("kind","CLOSED").param("expectedSequence","3").param("reason","Close supported case").param("amount","1.00").param("promiseOn","2027-01-01").param("confirmed","true")).andExpect(redirectedUrl(staffPath()));verify(service).close(eq(staff),eq(id),argThat(x->x.getAmount()==null&&x.getPromiseOn()==null&&x.getKind().equals("CLOSED")));
  }
- @Test void ownershipDenialAndScopedDocumentsUseDistinctServiceModes()throws Exception{
-  when(service.detail(client,id,0,0,"newest","newest",true)).thenThrow(new AccessDeniedException("Unavailable"));mvc.perform(get(ownPath()).with(user(client))).andExpect(status().isForbidden());
-  var own=detail(false);when(service.document(client,id,true)).thenReturn(own);when(pdf.render(eq(own),any())).thenReturn("%PDF-test".getBytes());mvc.perform(get(ownPath()+"/pdf").with(user(client))).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(content().contentType("application/pdf"));verify(service).document(client,id,true);
-  when(service.notice(staff,id,false)).thenReturn("%PDF-notice".getBytes());mvc.perform(get(staffPath()+"/notice").with(user(staff))).andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options","nosniff"));verify(service).notice(staff,id,false);
- }
+
  @Test void originalLinkerFailureRedirectsWithTheSameReasonAndKey()throws Exception{
   UUID payment=UUID.randomUUID(),key=UUID.randomUUID();when(service.correct(staff,id,payment,key,"Retain correction reason")).thenThrow(new IllegalArgumentException("coverage.error.independent"));
   mvc.perform(post(staffPath()+"/correct").with(user(staff)).with(csrf()).param("payment",payment.toString()).param("requestKey",key.toString()).param("reason","Retain correction reason")).andExpect(redirectedUrl(staffPath())).andExpect(flash().attribute("coverageError","coverage.error.independent")).andExpect(flash().attribute("correctionReason","Retain correction reason")).andExpect(flash().attribute("correctionKey",key));

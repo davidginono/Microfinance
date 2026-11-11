@@ -66,47 +66,22 @@ public class NotificationViewService {
             .toList();
     }
 
-    public boolean isVisibleToPrincipal(Notification notification, AppUserPrincipal principal) {
-        return notification != null
-            && !isObsoleteRepaymentSyncNotification(notification)
-            && isVisibleToPrincipal(notification.getType(), principal);
+    public boolean isVisibleToPrincipal(Notification notification,AppUserPrincipal principal) {
+        return notification!=null&&!isObsoleteRepaymentSyncNotification(notification)&&isVisibleToPrincipal(notification.getType(),principal);
     }
-
     public boolean isObsoleteRepaymentSyncNotification(Notification notification) {
-        return notification != null
-            && isObsoleteRepaymentSyncNotification(notification.getPayload());
+        return notification!=null&&isObsoleteRepaymentSyncNotification(notification.getPayload());
     }
-
     public boolean isObsoleteRepaymentSyncNotification(String payloadJson) {
-        Map<String, Object> details = toMap(parse(payloadJson).get("details"));
-        return "SYNC".equalsIgnoreCase(stringValue(details.get("source")));
+        return "SYNC".equalsIgnoreCase(stringValue(toMap(parse(payloadJson).get("details")).get("source")));
     }
-
-    public boolean isVisibleToPrincipal(String type, AppUserPrincipal principal) {
-        if (principal == null) {
-            return false;
-        }
-        if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
-            return true;
-        }
-        if (isMemberSidePrincipal(principal)) {
-            return !"SYSTEM_ALERT".equals(type) && !"SUPPORT_MESSAGE".equals(type);
-        }
+    public boolean isVisibleToPrincipal(String type,AppUserPrincipal principal) {
+        if(principal==null||!principal.isStaffSession())return false;
+        if(principal.isPlatformIdentity()||principal.isWorkspaceAdminScope())return true;
+        if("SUPPORT_MESSAGE".equals(type))return access.has(principal,com.sacco.mvp.domain.UserClaim.SUPPORT_VIEW);
+        if("SYSTEM_ALERT".equals(type))return access.hasAny(principal,com.sacco.mvp.domain.UserClaim.OUTBOX_VIEW,com.sacco.mvp.domain.UserClaim.WORKSPACE_SETTINGS_VIEW);
         return true;
     }
-
-    public boolean isMemberSidePrincipal(AppUserPrincipal principal) {
-        return principal != null
-            && (access.canAccessMemberArea(principal)
-                || access.canAccessManagerArea(principal)
-                || access.canAccessAccountantArea(principal)
-                || access.canAccessDisbursementArea(principal)
-                || access.canAccessBoardArea(principal)
-                || access.canAccessChairpersonArea(principal)
-                || access.canAccessCreditCommitteeArea(principal)
-                || access.canAccessLoanOfficerArea(principal));
-    }
-
     public NotificationView toView(Notification notification) {
         return toView(notification, memberLabelsFor(notification == null ? List.of() : List.of(notification)));
     }

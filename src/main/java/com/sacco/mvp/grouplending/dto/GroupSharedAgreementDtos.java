@@ -21,5 +21,4 @@ public final class GroupSharedAgreementDtos {
     }
     public record PublicShare(String name,String number,java.math.BigDecimal principal) {}
     public record Export(Packet packet,List<PublicShare> parties,List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow> schedule,byte[] original) {}
-    public record Challenge(UUID id,String hash,String packetHash,OffsetDateTime issued,OffsetDateTime expires,OffsetDateTime delivered,OffsetDateTime consumed,int attempts) {}
 }

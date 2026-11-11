@@ -84,7 +84,7 @@ public class AccessControlService {
 
     public boolean isWorkspaceAdminScope(AppUserPrincipal principal) {
         return principal != null
-            && principal.hasMetadataRole(Position.MINOR_ADMIN)
+            && (principal.hasMetadataRole(Position.MINOR_ADMIN) || principal.hasMetadataRole(Position.ICT_MANAGER))
             && !isPlatformIdentity(principal);
     }
 
@@ -101,7 +101,8 @@ public class AccessControlService {
     }
 
     public boolean canAccessAdminArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && isAdminScope(principal) && hasAny(principal,
+        return isStaffSession(principal) && (isPlatformIdentity(principal)
+            || principal.getSaccoId()!=null&&!principal.getSaccoId().isBlank()&&principal.getStationId()!=null&&!principal.getStationId().isBlank()) && hasAny(principal,
             UserClaim.ADMIN_DASHBOARD_VIEW,
             UserClaim.USER_ACCESS_VIEW,
             UserClaim.WORKSPACE_SETTINGS_VIEW,
@@ -132,81 +133,13 @@ public class AccessControlService {
             UserClaim.NOTIFICATIONS_UPDATE);
     }
 
-    public boolean canAccessMemberArea(AppUserPrincipal principal) {
-        return principal != null
-            && principal.isMemberAccess()
-            && !principal.isStaffSession()
-            && hasAny(principal,
-                UserClaim.GROUP_COVERAGE_OWN_VIEW,
-                UserClaim.MEMBER_SETTINGS_VIEW,
-                UserClaim.MEMBER_SETTINGS_UPDATE,
-                UserClaim.PAYMENT_DETAILS_VIEW,
-                UserClaim.PAYMENT_DETAILS_UPDATE,
-                UserClaim.MEMBER_LOANS_VIEW,
-                UserClaim.MEMBER_LOANS_CREATE,
-                UserClaim.MEMBER_LOANS_UPDATE,
-                UserClaim.MEMBER_LOANS_ASSIGN,
-                UserClaim.MEMBER_LOANS_DELETE,
-                UserClaim.GUARANTOR_REQUESTS_VIEW,
-                UserClaim.GUARANTOR_REQUESTS_UPDATE,
-                UserClaim.GUARANTOR_REQUESTS_APPROVE,
-                UserClaim.GUARANTOR_REQUESTS_REJECT,
-                UserClaim.LOAN_DOCUMENTS_VIEW,
-                UserClaim.LOAN_DOCUMENTS_EXPORT,
-                UserClaim.LOAN_REPORTS_VIEW,
-                UserClaim.LOAN_REPORTS_EXPORT,
-                UserClaim.NOTIFICATIONS_VIEW,
-                UserClaim.NOTIFICATIONS_UPDATE,
-                UserClaim.SUPPORT_VIEW,
-                UserClaim.SUPPORT_CREATE,
-                UserClaim.SUPPORT_UPDATE);
-    }
-
-    public boolean canAccessLoanOfficerArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.LOAN_OFFICER_QUEUE_VIEW);
-    }
-
     public boolean staffDashboardAccess(AppUserPrincipal principal) {
         return isStaffSession(principal) && notPlatformIdentity(principal)
             && principal.getSaccoId()!=null && !principal.getSaccoId().isBlank()
             && principal.getStationId()!=null && !principal.getStationId().isBlank()
-            && (canViewAnyReviewQueue(principal) || hasAny(principal, UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
+            && (has(principal,UserClaim.LOAN_RECORDING_VIEW) || has(principal,UserClaim.DISBURSEMENT_QUEUE_VIEW) || hasAny(principal, UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
                 UserClaim.ACCOUNTING_BUSINESS_CREATE, UserClaim.ACCOUNTING_JOURNALS_CREATE)
                 || (isWorkspaceAdminScope(principal) && has(principal, UserClaim.ADMIN_DASHBOARD_VIEW)));
-    }
-
-    public boolean canAccessManagerArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.MANAGER_QUEUE_VIEW);
-    }
-
-    public boolean canAccessAccountantArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.ACCOUNTANT_QUEUE_VIEW);
-    }
-
-    public boolean canAccessBoardArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.BOARD_QUEUE_VIEW);
-    }
-
-    public boolean canAccessChairpersonArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.CHAIRPERSON_QUEUE_VIEW);
-    }
-
-    public boolean canViewProcessedLoans(AppUserPrincipal principal) {
-        return hasScopedStaffClaim(principal, UserClaim.PROCESSED_LOANS_VIEW);
-    }
-
-    public boolean canViewSaccoConfigurations(AppUserPrincipal principal) {
-        return hasScopedStaffClaim(principal, UserClaim.SACCO_CONFIGURATIONS_VIEW);
-    }
-
-    public boolean canAccessChairpersonOffice(AppUserPrincipal principal) {
-        return canAccessChairpersonArea(principal)
-            || canViewProcessedLoans(principal)
-            || canViewSaccoConfigurations(principal);
-    }
-
-    public boolean canAccessCreditCommitteeArea(AppUserPrincipal principal) {
-        return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW);
     }
 
     public boolean canAccessDisbursementArea(AppUserPrincipal principal) {
@@ -219,28 +152,8 @@ public class AccessControlService {
         return isStaffSession(principal) && notPlatformIdentity(principal) && has(principal, UserClaim.STAFF_ANALYTICS_VIEW);
     }
 
-    public boolean canViewAnyReviewQueue(AppUserPrincipal principal) {
-        return hasAny(principal,
-            UserClaim.LOAN_OFFICER_QUEUE_VIEW,
-            UserClaim.MANAGER_QUEUE_VIEW,
-            UserClaim.ACCOUNTANT_QUEUE_VIEW,
-            UserClaim.BOARD_QUEUE_VIEW,
-            UserClaim.CHAIRPERSON_QUEUE_VIEW,
-            UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW,
-            UserClaim.DISBURSEMENT_QUEUE_VIEW);
-    }
-
     private boolean isStaffSession(AppUserPrincipal principal) {
         return principal != null && principal.isStaffSession();
     }
 
-    private boolean hasScopedStaffClaim(AppUserPrincipal principal, UserClaim claim) {
-        return isStaffSession(principal)
-            && notPlatformIdentity(principal)
-            && has(principal, claim)
-            && principal.getSaccoId() != null
-            && !principal.getSaccoId().isBlank()
-            && principal.getStationId() != null
-            && !principal.getStationId().isBlank();
-    }
 }

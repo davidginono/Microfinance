@@ -355,7 +355,7 @@ public class GeneralLedgerService {
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public ProductAccountVersions provisionLoanProductAccounts(String institution,UUID creator,UUID product,String productName) {
         var member=directory.find(creator).orElseThrow(()->new AccessDeniedException("Product creator unavailable"));
-        var actor=new AppUserPrincipal(member,userClaims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()),true);
+        var actor=new AppUserPrincipal(member,userClaims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()));
         require(Objects.equals(institution,actor.getSaccoId()),"account");requireActor(actor,"LOAN_PRODUCTS_CREATE");
         books.lockAccounts(institution);initializeChartDefaults(actor);
         String name=trim(productName);
@@ -462,7 +462,6 @@ public class GeneralLedgerService {
         requireScope(actor);if(!access.has(actor,claim))throw new AccessDeniedException("Accounting permission required");
         var current=directory.find(actor.getMemberId()).orElseThrow(()->new AccessDeniedException("Accounting access unavailable"));
         if(!current.isStaffAccessActive() || current.getStatus()!=MemberStatus.ACTIVE || current.getActiveStaffRolesResolved().contains(Position.ADMIN)
-            || (claim.startsWith("LOAN_RECORDING_") && !current.getActiveStaffRolesResolved().contains(Position.ACCOUNTANT))
             || !Objects.equals(current.getSaccoId(),actor.getSaccoId()) || !Objects.equals(current.getStationId(),actor.getStationId())
             || institutions.findActiveSacco(actor.getSaccoId()).isEmpty()
             || institutions.findStation(actor.getSaccoId(),actor.getStationId()).filter(SaccoStation::isActive)

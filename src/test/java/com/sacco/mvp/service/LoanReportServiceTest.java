@@ -1,8 +1,6 @@
 package com.sacco.mvp.service;
 
 import tools.jackson.databind.json.JsonMapper;
-import com.sacco.mvp.domain.BoardDecision;
-import com.sacco.mvp.domain.BoardReview;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanStatus;
@@ -32,7 +30,6 @@ import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,66 +59,7 @@ class LoanReportServiceTest {
 
     @BeforeEach
     void setUp() {
-        loanReportService = new LoanReportService(
-            loanApplicationRepository,
-            loanProductSettingRepository,
-            memberRepository,
-            guarantorRequestRepository,
-            boardReviewRepository,
-            managerReviewRepository,
-            JsonMapper.builder().findAndAddModules().build(),
-            loanAnalyticsService,
-            registeredSaccoRepository,
-            saccoStationRepository,
-            new ApplicationClock("Africa/Nairobi"),
-            saccoLogoStorageService
-        );
-    }
-
-    @Test
-    void memberLoanReportCommitteeDecisionContainsOnlyBoardMemberDecisions() {
-        UUID applicantId = UUID.randomUUID();
-        UUID loanId = UUID.randomUUID();
-        UUID boardMemberId = UUID.randomUUID();
-        Member applicant = Member.builder()
-            .id(applicantId)
-            .fullName("Applicant Name")
-            .memberNo("MEM-100")
-            .build();
-        Member boardMember = Member.builder()
-            .id(boardMemberId)
-            .fullName("Board Member Name")
-            .memberNo("BOARD-10")
-            .build();
-        LoanApplication loan = LoanApplication.builder()
-            .id(loanId)
-            .applicantMemberId(applicantId)
-            .applicationNumber(10040L)
-            .loanId("LN-10040")
-            .loanType(LoanType.CUSTOMIZED_LOAN)
-            .amount(new BigDecimal("500000.00"))
-            .status(LoanStatus.AWAITING_BOARD)
-            .financialSnapshot("{}")
-            .build();
-        BoardReview boardReview = BoardReview.builder()
-            .id(UUID.randomUUID())
-            .loanApplicationId(loanId)
-            .boardMemberId(boardMemberId)
-            .decision(BoardDecision.APPROVED)
-            .build();
-
-        when(memberRepository.findById(applicantId)).thenReturn(Optional.of(applicant));
-        when(loanApplicationRepository.findByApplicantMemberIdOrderByCreatedAtDesc(applicantId)).thenReturn(List.of(loan));
-        when(guarantorRequestRepository.findByLoanApplicationIdIn(any())).thenReturn(List.of());
-        when(boardReviewRepository.findByLoanApplicationIdIn(any())).thenReturn(List.of(boardReview));
-        when(memberRepository.findAllById(any())).thenReturn(List.of(boardMember));
-
-        LoanReportService.MemberLoanReport report = loanReportService.memberReport(applicantId);
-
-        assertThat(report.details().getFirst().approvalDecisionSummaryLabel())
-            .isEqualTo("Board Member Name: Approved")
-            .doesNotContain("Applicant Name");
-        verifyNoInteractions(managerReviewRepository);
+        loanReportService = new LoanReportService(loanApplicationRepository, loanProductSettingRepository, memberRepository, boardReviewRepository, managerReviewRepository, JsonMapper.builder().findAndAddModules().build(), loanAnalyticsService, registeredSaccoRepository, saccoStationRepository, new ApplicationClock("Africa/Nairobi"), saccoLogoStorageService);
     }
 
     @Test
@@ -235,7 +173,7 @@ class LoanReportServiceTest {
             .staffRoles(Set.of(com.sacco.mvp.domain.Position.MANAGER))
             .memberAccount(false)
             .passwordHash("secret")
-            .build();
+            .status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
         var principal = new com.sacco.mvp.security.AppUserPrincipal(manager, Set.of());
         LoanApplication olderActiveLoan = LoanApplication.builder()
             .id(loanId)
@@ -308,7 +246,7 @@ class LoanReportServiceTest {
             .staffRoles(Set.of(com.sacco.mvp.domain.Position.MANAGER))
             .memberAccount(false)
             .passwordHash("secret")
-            .build();
+            .status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
         var principal = new com.sacco.mvp.security.AppUserPrincipal(manager, Set.of());
         LoanApplication activeLoan = LoanApplication.builder()
             .id(loanId)
@@ -364,124 +302,6 @@ class LoanReportServiceTest {
         assertThat(financialRow.totalInterestUnpaid()).isEqualByComparingTo("70000.00");
         assertThat(financialRow.totalLoanAmountPaid()).isEqualByComparingTo("0.00");
         assertThat(financialRow.totalLoanAmountUnpaid()).isEqualByComparingTo("700000.00");
-    }
-
-    @Test
-    void memberActiveLoanDetailsUseFilteredTransactionInterestAndOutstandingInterest() {
-        UUID memberId = UUID.randomUUID();
-        UUID loanId = UUID.randomUUID();
-        UUID productId = UUID.randomUUID();
-        LoanApplication loan = LoanApplication.builder()
-            .id(loanId)
-            .saccoId("IAA")
-            .applicantMemberId(memberId)
-            .loanType(LoanType.LOAN_ADVANCE)
-            .loanProductSettingId(productId)
-            .loanId("LN-1001")
-            .amount(new BigDecimal("800000.00"))
-            .status(LoanStatus.DISBURSED)
-            .createdAt(OffsetDateTime.parse("2026-06-17T10:00:00Z"))
-            .financialSnapshot("""
-                {"interestAmount":28000.00}
-                """)
-            .build();
-
-        when(loanApplicationRepository.findMemberReportRowsByStatuses(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(reportRow(loan)));
-        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
-            .thenReturn(List.of(product(productId, LoanType.LOAN_ADVANCE, "Loan Advance (Mkopo wa Chapchap)")));
-
-        List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
-            memberId, LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 30), null);
-
-        assertThat(rows).hasSize(1);
-        assertThat(rows.getFirst().loanId()).isEqualTo("LN-1001");
-        assertThat(rows.getFirst().loanProduct()).isEqualTo("Loan Advance (Mkopo wa Chapchap)");
-        assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("28,000");
-        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("828,000");
-        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("0");
-        assertThat(rows.getFirst().interestPaid()).isEqualTo("0");
-        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("28,000");
-    }
-
-    @Test
-    void memberActiveLoanDetailsPreferSyncedPaymentSummaryOutstandingBalance() {
-        UUID memberId = UUID.randomUUID();
-        UUID loanId = UUID.randomUUID();
-        UUID productId = UUID.randomUUID();
-        LoanApplication loan = LoanApplication.builder()
-            .id(loanId)
-            .saccoId("IAA")
-            .applicantMemberId(memberId)
-            .loanType(LoanType.CUSTOMIZED_LOAN)
-            .loanProductSettingId(productId)
-            .loanId("1001")
-            .amount(new BigDecimal("500000.00"))
-            .status(LoanStatus.DISBURSED)
-            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
-            .financialSnapshot("""
-                {
-                  "interestAmount":25000.00,
-                  "principalPlusInterest":525000.00,
-                  "paymentSummaryTotalOutstanding":445000.00,
-                  "paymentSummaryOutstandingPrincipal":425000.00,
-                  "paymentSummaryOutstandingInterest":20000.00,
-                  "paymentSummaryTotalPrincipalPaid":75000.00,
-                  "paymentSummaryTotalInterestPaid":5000.00
-                }
-                """)
-            .build();
-
-        when(loanApplicationRepository.findMemberReportRowsByStatuses(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(reportRow(loan)));
-        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
-            .thenReturn(List.of(product(productId, LoanType.CUSTOMIZED_LOAN, "Personal Loan")));
-
-        List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
-            memberId, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31), null);
-
-        assertThat(rows).hasSize(1);
-        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("445,000");
-        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("75,000");
-        assertThat(rows.getFirst().interestPaid()).isEqualTo("5,000");
-        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("20,000");
-    }
-
-    @Test
-    void memberActiveLoanDetailsUseSnapshotAndSummaryWhenTransactionsAreMissing() {
-        UUID memberId = UUID.randomUUID();
-        UUID loanId = UUID.randomUUID();
-        UUID productId = UUID.randomUUID();
-        LoanApplication loan = LoanApplication.builder()
-            .id(loanId)
-            .saccoId("IAA")
-            .applicantMemberId(memberId)
-            .loanType(LoanType.EDUCATION_LOAN)
-            .loanProductSettingId(productId)
-            .loanId("10706")
-            .amount(new BigDecimal("700000.00"))
-            .status(LoanStatus.DISBURSED)
-            .createdAt(OffsetDateTime.parse("2026-07-08T10:00:00Z"))
-            .financialSnapshot("""
-                {"interestAmount":70000.00}
-                """)
-            .build();
-
-        when(loanApplicationRepository.findMemberReportRowsByStatuses(any(), any(), any(), any(), any(), any()))
-            .thenReturn(List.of(reportRow(loan)));
-        when(loanProductSettingRepository.findBySaccoIdAndActiveTrue("IAA"))
-            .thenReturn(List.of(product(productId, LoanType.EDUCATION_LOAN, "Education Loan (Mkopo wa Elimu)")));
-
-        List<LoanReportService.ActiveLoanDetailRow> rows = loanReportService.memberActiveLoanDetails(
-            memberId, LocalDate.of(2025, 7, 13), LocalDate.of(2026, 7, 13), null);
-
-        assertThat(rows).hasSize(1);
-        assertThat(rows.getFirst().loanAmount()).isEqualTo("700,000");
-        assertThat(rows.getFirst().outstandingBalance()).isEqualTo("770,000");
-        assertThat(rows.getFirst().requiredInterestAmount()).isEqualTo("70,000");
-        assertThat(rows.getFirst().paidLoanAmount()).isEqualTo("0");
-        assertThat(rows.getFirst().interestPaid()).isEqualTo("0");
-        assertThat(rows.getFirst().interestNotYetPaid()).isEqualTo("70,000");
     }
 
     @Test

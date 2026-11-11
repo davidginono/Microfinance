@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -49,13 +48,6 @@ public class UserClaimService {
     }
 
     /** Keep existing client defaults while admitting only explicitly assigned own-coverage powers. */
-    public Set<UserClaim> clientSessionClaims(UUID memberId) {
-        var claims=EnumSet.copyOf(defaultClaims(List.of(),true));
-        effectiveClaims(memberId,List.of(),true).stream()
-            .filter(claim->claim.getFeature()==com.sacco.mvp.domain.AccessFeature.GROUP_COVERAGE_OWN)
-            .forEach(claims::add);
-        return Collections.unmodifiableSet(claims);
-    }
 
     /**
      * Batched form of {@link #effectiveClaims(UUID, Collection, boolean)}: resolves a whole
@@ -108,14 +100,6 @@ public class UserClaimService {
     }
 
     /** Enabling client access must not expand role-default staff permissions or rewrite explicit assignments. */
-    @Transactional
-    public void preserveStaffClaimsForClientAccess(UUID memberId, Collection<Position> staffRoles) {
-        if (memberAccessClaimRepository.existsByIdMemberId(memberId)) return;
-        var prefs = userSettingsRepository.findById(memberId)
-            .map(UserSettings::getNotificationPrefs).map(this::parsePrefs).orElse(Map.of());
-        if (prefs.containsKey("claims")) return;
-        updateClaims(memberId, new ArrayList<>(defaultClaims(staffRoles, false)));
-    }
 
     @Transactional
     public void updateClaims(UUID memberId, List<UserClaim> claims) {

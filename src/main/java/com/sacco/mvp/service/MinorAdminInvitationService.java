@@ -82,7 +82,7 @@ public class MinorAdminInvitationService {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
-        if (member.getStatus() != MemberStatus.INVITED) {
+        if (!claimable(member)) {
             throw new IllegalStateException("This account has already been activated.");
         }
         return new ClaimContext(invitation, member);
@@ -110,7 +110,7 @@ public class MinorAdminInvitationService {
         MinorAdminInvitation invitation = requirePendingInvitation(rawToken);
         Member member = memberRepository.findById(invitation.getMemberId())
             .orElseThrow(() -> new IllegalStateException("This invitation is no longer valid."));
-        if (member.getStatus() != MemberStatus.INVITED) {
+        if (!claimable(member)) {
             throw new IllegalStateException("This account has already been activated.");
         }
         if (password == null || password.length() < 8) {
@@ -128,8 +128,10 @@ public class MinorAdminInvitationService {
         }
         member.setPhoneVerifiedAt(now);
         member.setPasswordHash(passwordEncoder.encode(password));
-        member.setSignatureText(normalizedSignature);
-        member.setSignatureRegisteredAt(now);
+        if (member.getSignatureText() == null || member.getSignatureText().isBlank()) {
+            member.setSignatureText(normalizedSignature);
+            member.setSignatureRegisteredAt(now);
+        }
         memberRepository.save(member);
 
         invitation.setClaimedAt(now);
@@ -207,14 +209,19 @@ public class MinorAdminInvitationService {
         if (invitation == null || invitation.getMemberId() == null) {
             return;
         }
-        memberRepository.findById(invitation.getMemberId())
-            .filter(member -> member.getStatus() == MemberStatus.INVITED)
-            .ifPresent(member -> {
-                invitationRepository.delete(invitation);
-                memberRepository.delete(member);
-                log.info("Removed expired unclaimed staff invitation memberId={} staffNo={} expiredAt={} cleanupAt={}",
-                    member.getId(), member.getStaffNo(), invitation.getExpiresAt(), now);
-            });
+        invitation.setRevokedAt(now);
+        invitationRepository.save(invitation);
+        memberRepository.findById(invitation.getMemberId()).filter(this::claimable).ifPresent(member -> {
+            if (!member.isMemberAccess()) member.setStatus(MemberStatus.INACTIVE);
+            member.setStaffAccessStatus(StaffAccessStatus.NONE);
+            member.setStaffAccessActivatedAt(null);
+            memberRepository.save(member);
+        });
+    }
+
+    private boolean claimable(Member member) {
+        return !member.getStaffRolesResolved().isEmpty() && (member.getStatus() == MemberStatus.INVITED
+            || member.isMemberAccess() && member.getStatus() == MemberStatus.ACTIVE && "OTP_ONLY_LOGIN".equals(member.getPasswordHash()));
     }
 
     private void sendInviteEmail(Member member, String rawToken, int ttlHours) {
@@ -232,7 +239,7 @@ public class MinorAdminInvitationService {
     }
 
     public String invitationRoleLabel(Member member) {
-        String roles = Position.normalizeStaffRoles(member.getStaffRolesResolved()).stream()
+        String roles = Position.normalizeStaffRoles(member.getStaffRolesResolved()).stream().map(Position::userGroup).distinct()
             .map(role -> messages.getMessage("admin.role." + role.name(), null, role.getDisplayName(), LocaleContextHolder.getLocale()))
             .collect(java.util.stream.Collectors.joining(", "));
         return roles.isBlank() ? messages.getMessage("staffInvitation.staffRole", null, LocaleContextHolder.getLocale()) : roles;

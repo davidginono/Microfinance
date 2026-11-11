@@ -29,10 +29,10 @@ class GroupLendingMvcTest {
     @Autowired WebApplicationContext context;@Autowired GroupLendingService groups;
     MockMvc mvc;AppUserPrincipal actor;final UUID id=UUID.randomUUID();
     @BeforeEach void setup(){reset(groups);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+        actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     @Test void csrfAndStaffSessionAreRequired()throws Exception{
         mvc.perform(post("/finance/groups").with(user(actor))).andExpect(status().isForbidden());
-        var client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of(),false);
+        var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of());
         mvc.perform(get("/finance/groups").with(user(client))).andExpect(status().isForbidden());verifyNoInteractions(groups);
     }
     @Test void creationBindsOnlyGroupFieldsAndDerivesScopeFromActor()throws Exception{

@@ -23,26 +23,18 @@ public class AppUserPrincipal implements UserDetails {
     private final String email;
     private final Position position;
     private final Set<Position> staffRoles;
-    private final Set<Position> grantedPositions;
     private final boolean memberAccess;
     private final boolean staffSession;
-    private final boolean provisionalPortal;
     private final boolean platformSetupRequired;
     private final String memberNo;
     private final String username;
     private final String staffNo;
     private final String password;
-    private final Collection<? extends GrantedAuthority> authorities;
     private final Set<String> claims;
 
     public AppUserPrincipal(Member member, Set<UserClaim> claims) {
-        this(member, claims, member.isStaffAccessActive());
-    }
-
-    public AppUserPrincipal(Member member, Set<UserClaim> claims, boolean staffSession) {this(member,claims,staffSession,false);}
-    public static AppUserPrincipal forClientPortal(Member member){return new AppUserPrincipal(member,Set.of(),false,true);}
-    private AppUserPrincipal(Member member,Set<UserClaim> claims,boolean staffSession,boolean provisionalPortal) {
-        this.provisionalPortal=provisionalPortal;
+        if(member==null||!member.isStaffAccessActive()||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE)
+            throw new IllegalArgumentException("Active staff identity required");
         this.memberId = member.getId();
         this.saccoId = member.getSaccoId();
         this.stationId = member.getStationId();
@@ -52,30 +44,14 @@ public class AppUserPrincipal implements UserDetails {
         this.memberNo = member.getMemberNo();
         this.staffNo = member.getStaffNo();
         this.memberAccess = member.isMemberAccess();
-        this.staffSession = staffSession || (!this.memberAccess && member.isStaffAccessActive());
-        Set<Position> sessionStaffRoles = this.staffSession
-            ? member.getActiveStaffRolesResolved()
-            : java.util.Collections.emptySet();
-        this.staffRoles = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(sessionStaffRoles));
-        this.position = Position.primaryRole(this.staffRoles, this.memberAccess);
-        this.grantedPositions = resolveGrantedPositions(this.staffRoles, this.memberAccess);
-        this.username = this.staffSession
-            ? (hasText(member.getStaffNo()) ? member.getStaffNo() : member.getMemberNo())
-            : (hasText(member.getUsername()) ? member.getUsername()
-                : (hasText(member.getEmail()) ? member.getEmail() : member.getMemberNo()));
+        this.staffSession = true;
+        this.staffRoles = java.util.Collections.unmodifiableSet(new LinkedHashSet<>(member.getActiveStaffRolesResolved()));
+        this.position = Position.primaryRole(this.staffRoles, false);
+        this.username = hasText(member.getStaffNo()) ? member.getStaffNo() : member.getMemberNo();
         this.password = member.getPasswordHash();
-        this.authorities = java.util.Collections.emptyList();
         this.claims = claims == null || claims.isEmpty()
             ? java.util.Collections.emptySet()
             : claims.stream().filter(UserClaim::isAvailable).map(UserClaim::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
-    }
-
-    private Set<Position> resolveGrantedPositions(Set<Position> staffRoles, boolean memberAccess) {
-        LinkedHashSet<Position> granted = new LinkedHashSet<>(Position.normalizeStaffRoles(staffRoles));
-        if (memberAccess) {
-            granted.add(Position.MEMBER);
-        }
-        return java.util.Collections.unmodifiableSet(granted);
     }
 
     private boolean hasText(String value) {
@@ -83,12 +59,12 @@ public class AppUserPrincipal implements UserDetails {
     }
 
     public boolean hasMetadataRole(Position role) {
-        return role != null && grantedPositions != null && grantedPositions.contains(role);
+        return role != null && getStaffRoles().contains(role);
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return authorities == null ? java.util.Collections.emptyList() : authorities;
+        return java.util.Collections.emptyList();
     }
 
     public Set<String> getClaims() {
@@ -96,7 +72,7 @@ public class AppUserPrincipal implements UserDetails {
     }
 
     public Set<Position> getGrantedPositions() {
-        return grantedPositions == null ? java.util.Collections.emptySet() : grantedPositions;
+        return getStaffRoles();
     }
 
     public Set<Position> getStaffRoles() {
@@ -108,7 +84,7 @@ public class AppUserPrincipal implements UserDetails {
     }
 
     public boolean isWorkspaceAdminScope() {
-        return hasMetadataRole(Position.MINOR_ADMIN) && !isPlatformIdentity();
+        return (hasMetadataRole(Position.MINOR_ADMIN) || hasMetadataRole(Position.ICT_MANAGER)) && !isPlatformIdentity();
     }
 
     @Override

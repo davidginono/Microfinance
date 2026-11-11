@@ -142,7 +142,7 @@ public class LoanRecordingEvidenceService {
     }
 
     @Transactional
-    public UUID saveApplication(AppUserPrincipal actor,RecordForm form,List<MultipartFile> files,boolean submit) {
+    public UUID saveApplication(AppUserPrincipal actor,RecordForm form,List<MultipartFile> files) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         check("CONFIGURED".equals(form.getLoanMode()) && form.getTopUpSourceLoanId()==null,"details");
         records.lockRequest(actor,form.getRequestKey());
@@ -159,7 +159,7 @@ public class LoanRecordingEvidenceService {
             }
         }
         var draft=application(form);
-        draft.setCommand(submit?"SUBMIT":"DRAFT");
+        draft.setCommand("DRAFT");
         draft.setRecordingDraft(form);
         if(draft.getDocumentNames().isEmpty())for(var file:files) {
             draft.getDocumentNames().add(Objects.toString(file.getOriginalFilename(),"Document"));

@@ -52,7 +52,7 @@ public class ReceiptBatchWorkerService {
     private AppUserPrincipal actor(Batch b){
         var member=members.find(b.owner()).orElseThrow(()->new AccessDeniedException("Batch owner unavailable"));
         if(!Objects.equals(member.getSaccoId(),b.institution()) || !Objects.equals(member.getStationId(),b.branch()))throw new AccessDeniedException("Batch scope changed");
-        return new AppUserPrincipal(member,claims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()),true);
+        return new AppUserPrincipal(member,claims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()));
     }
     public static String safeError(RuntimeException e){String key=e.getMessage();return key!=null && key.length()<=120 && key.matches("(?:batch|voucher|recording|repayment|charges|prepayment)\\.error\\.[A-Za-z0-9]+")?key:"batch.error.failed";}
 }

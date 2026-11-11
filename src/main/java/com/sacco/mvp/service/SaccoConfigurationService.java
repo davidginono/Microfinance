@@ -18,6 +18,20 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class SaccoConfigurationService {
+    @Transactional
+    public java.util.UUID customRecordingProduct(String institution) {
+        loanProductSettingRepository.lockCustomRecording(institution);
+        return loanProductSettingRepository.findBySaccoIdAndCustomRecordingConfigurationTrue(institution).map(LoanProductSetting::getId).orElseGet(()->{
+            var now=java.time.OffsetDateTime.now();var id=java.util.UUID.randomUUID();
+            return loanProductSettingRepository.save(LoanProductSetting.builder().id(id).saccoId(institution).loanType(LoanType.CUSTOMIZED_LOAN)
+                .customRecordingConfiguration(true).productCode("CUSTOM-"+id.toString().substring(0,8)).productName("Custom loan")
+                .guarantorsRequired(0).applicationFee(java.math.BigDecimal.ZERO).insuranceRate(java.math.BigDecimal.ZERO).processingFeeRate(java.math.BigDecimal.ZERO)
+                .interestRate(java.math.BigDecimal.ZERO).interestMethod(com.sacco.mvp.domain.InterestMethod.FLAT_RATE).repaymentFrequency(com.sacco.mvp.domain.RepaymentFrequency.MONTHLY)
+                .managerReviewRequired(false).loanOfficerReviewRequired(false).chairpersonReviewRequired(false).boardReviewRequired(false).committeeReviewRequired(false).accountantReviewRequired(false)
+                .disbursementOfficerRequired(true).disbursementProofRequired(true).applicantAttachmentRequired(true)
+                .productStatus(com.sacco.mvp.domain.LoanProductStatus.ACTIVE).active(true).formSchema("{}").createdAt(now).updatedAt(now).build()).getId();
+        });
+    }
     private static final BigDecimal DEFAULT_MINIMUM_AMOUNT = BigDecimal.ZERO.setScale(2);
     private static final BigDecimal DEFAULT_RATIO = new BigDecimal("0.3333");
     private static final BigDecimal DEFAULT_APPLICATION_FEE = new BigDecimal("15000.00");

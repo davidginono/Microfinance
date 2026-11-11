@@ -47,7 +47,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.data.domain.PageImpl;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -136,6 +135,10 @@ class AdminServiceTest {
             .status(scenario.equals("active") ? MemberStatus.ACTIVE : MemberStatus.INACTIVE)
             .passwordHash(scenario.equals("accepted") ? "encoded-password" : "OTP_ONLY_LOGIN").build();
         when(memberRepository.findForStaffInvitation(id, "SACCO-01", "ST-1")).thenReturn(Optional.of(member));
+        if(scenario.equals("client")) {
+            adminService.resendStaffInvitation("SACCO-01","ST-1",UUID.randomUUID(),Set.of(Position.MINOR_ADMIN),id);
+            assertThat(issuedInvitationCount.get()).isEqualTo(1);assertThat(member.isMemberAccess()).isTrue();return;
+        }
         assertThatThrownBy(() -> adminService.resendStaffInvitation("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN), id))
             .isInstanceOf(IllegalStateException.class);
         assertThat(issuedInvitationCount.get()).isZero();
@@ -153,37 +156,6 @@ class AdminServiceTest {
             id, List.of(Position.MANAGER), MemberStatus.ACTIVE, List.of()))
             .isInstanceOf(IllegalStateException.class).hasMessage("admin.users.invite.activationRequired");
         verify(memberRepository, never()).save(any());
-    }
-
-    @Test void userRoleEditingCannotTurnAProvisionalClientIntoASystemUser() {
-        UUID id=UUID.randomUUID();var provisional=Member.builder().id(id).saccoId("I1").stationId("B1").position(Position.MEMBER)
-            .memberAccount(true).clientPortalEnabled(false).status(MemberStatus.ACTIVE).build();
-        when(memberRepository.findById(id)).thenReturn(Optional.of(provisional));
-        assertThatThrownBy(()->adminService.updateUser("I1","B1",UUID.randomUUID(),Set.of(Position.MINOR_ADMIN),id,List.of(Position.MANAGER),MemberStatus.ACTIVE,List.of()))
-            .hasMessage("This client has no portal account.");
-        verify(memberRepository,never()).save(any());verifyNoInteractions(memberAccessClaimRepository,userSettingsRepository);
-    }
-    @Test void customisedWorkflowRequiresAnEligibleInstitutionTeller(){
-        var form=new com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm();
-        assertThatThrownBy(()->adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form)).hasMessage("recording.error.customTellers");
-        form.setDisbursementOfficerIds(List.of(UUID.randomUUID()));
-        assertThatThrownBy(()->adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form)).isInstanceOf(IllegalArgumentException.class);
-        verify(loanProductSettingRepository,never()).save(any());
-    }
-    @Test void customisedWorkflowStoresReviewStagesAndNamedTellersSeparatelyFromPricedProducts(){
-        var teller=Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").stationId("B1").fullName("Teller").position(Position.DISBURSEMENT_OFFICER).staffRoles(new LinkedHashSet<>(List.of(Position.DISBURSEMENT_OFFICER))).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
-        var reviewer=Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").stationId("B1").fullName("Accountant").position(Position.ACCOUNTANT).staffRoles(new LinkedHashSet<>(List.of(Position.ACCOUNTANT))).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
-        stubActiveRoleDirectory("SACCO-01",List.of(teller,reviewer));
-        when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(i->i.getArgument(0));
-        var form=new com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm();form.setDisbursementOfficerIds(List.of(teller.getId()));
-        adminService.configureCustomisedLoanWorkflow("SACCO-01",UUID.randomUUID(),form);
-        verify(loanProductSettingRepository).saveAndFlush(argThat(p->p.isCustomRecordingConfiguration() && p.isAccountantReviewRequired() && !p.isAvailableForApplications()
-            && p.getRepaymentFrequency()==com.sacco.mvp.domain.RepaymentFrequency.MONTHLY
-            && Boolean.TRUE.equals(p.getAffordabilityCheckRequired())
-            && p.getMaxRepaymentToDisposableIncomeRatio().compareTo(new BigDecimal("0.4000"))==0
-            && Boolean.FALSE.equals(p.getCollateralRequired())
-            && p.getMinCollateralCoverageRatio().compareTo(BigDecimal.ZERO)==0));
-        verify(loanProductBoardReviewerRepository).save(argThat(r->r.getReviewStage()==ApprovalWorkflowStage.DISBURSEMENT_OFFICER && teller.getId().equals(r.getBoardMemberId()) && "SACCO-01".equals(r.getSaccoId())));
     }
 
     @Mock private MemberRepository memberRepository;
@@ -323,7 +295,6 @@ class AdminServiceTest {
         when(adminIncidentRepository.findTop50BySaccoIdAndCreatedAtAfterOrderByCreatedAtDesc(eq("SACCO-1"), any()))
             .thenReturn(List.of());
         when(memberRepository.countByStatusForScope("SACCO-1", "ST-1")).thenReturn(List.of());
-        when(loanApplicationRepository.countByStatusForScope("SACCO-1", "ST-1")).thenReturn(List.of());
         when(stationSmsAccountRepository.findBySaccoIdAndStationId("SACCO-1", "ST-1")).thenReturn(Optional.of(account));
 
         AdminService.AdminDashboard dashboard = adminService.dashboard("SACCO-1", "ST-1", UUID.randomUUID());
@@ -427,11 +398,11 @@ class AdminServiceTest {
 
         assertThat(view.getAccountId()).isEqualTo(accountId);
         assertThat(view.getStaffMemberNumber()).isEqualTo("10002");
-        assertThat(view.getRoleSummary()).isEqualTo("Manager");
+        assertThat(view.getRoleSummary()).isEqualTo("General Manager");
     }
 
     @Test
-    void addedRoleRequiresAcknowledgementAndStatusUpdatesAfterConfirmation() {
+    void activeStaffGroupChangesKeepStaffAccessWithoutBorrowerAcknowledgement() {
         UUID id = UUID.randomUUID();
         OffsetDateTime previous = OffsetDateTime.now().minusDays(2);
         Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
@@ -440,26 +411,16 @@ class AdminServiceTest {
             .staffNo("12345").staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
             .staffAccessAssignedAt(previous).staffAccessActivatedAt(previous).build();
         when(memberRepository.findById(id)).thenReturn(Optional.of(member));
-        when(memberRepository.findUserAccessByScope("SACCO-01", "ST-1", id)).thenReturn(Optional.of(member));
         when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(userSettingsRepository.existsById(id)).thenReturn(true);
 
-        AdminService.UserUpdateResult result = adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
-            Set.of(Position.MINOR_ADMIN), id, List.of(Position.MANAGER, Position.CHAIRPERSON), MemberStatus.ACTIVE);
+        adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
+            Set.of(Position.MINOR_ADMIN), id, List.of(Position.MANAGER, Position.FINANCE_MANAGER), MemberStatus.ACTIVE);
 
-        assertThat(result.isStaffAccessPending()).isTrue();
-        assertThat(member.getStaffAccessAssignedAt()).isAfter(previous);
-        assertThat(member.getStaffAccessActivatedAt()).isNull();
-        assertThat(member.getActiveStaffRolesResolved()).isEmpty();
-        assertThat(adminService.userAccess("SACCO-01", "ST-1", id).getAcknowledgementStatus())
-            .isEqualTo("Pending Acknowledgement");
-        verify(notificationRepository).save(any(Notification.class));
+        assertThat(member.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.ACTIVE);
+        assertThat(member.getActiveStaffRolesResolved()).contains(Position.MANAGER,Position.FINANCE_MANAGER);
+        assertThat(issuedInvitationCount.get()).isZero();
 
-        new StaffAccessService(memberRepository).acknowledgeStaffAccess(id);
-
-        assertThat(member.getActiveStaffRolesResolved()).contains(Position.MANAGER, Position.CHAIRPERSON);
-        assertThat(adminService.userAccess("SACCO-01", "ST-1", id).getAcknowledgementStatus())
-            .isEqualTo("Acknowledged");
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -475,11 +436,10 @@ class AdminServiceTest {
         when(memberRepository.findById(id)).thenReturn(Optional.of(member));
         when(userSettingsRepository.existsById(id)).thenReturn(true);
 
-        AdminService.UserUpdateResult result = adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
+        adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(),
             Set.of(Position.MINOR_ADMIN), id,
             removeRole ? List.of(Position.MANAGER) : List.of(Position.MANAGER, Position.BOARD), MemberStatus.ACTIVE);
 
-        assertThat(result.isStaffAccessPending()).isFalse();
         assertThat(member.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.ACTIVE);
         assertThat(member.getStaffAccessActivatedAt()).isEqualTo(acknowledgedAt);
         verify(notificationRepository, never()).save(any(Notification.class));
@@ -524,8 +484,8 @@ class AdminServiceTest {
 
         assertThat(row.getAccountId()).isEqualTo(accountId);
         assertThat(row.getLoginId()).isEqualTo("dual@example.com");
-        assertThat(row.getMembershipLabel()).isEqualTo("Staff And Member");
-        assertThat(row.getRoleSummary()).isEqualTo("Manager");
+        assertThat(row.getMembershipLabel()).isEqualTo("Staff with client record");
+        assertThat(row.getRoleSummary()).isEqualTo("General Manager");
         assertThat(row.getPhone()).isEqualTo("255700000001");
     }
 
@@ -586,38 +546,6 @@ class AdminServiceTest {
             .toList();
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(value = StaffAccessStatus.class,
-        names = {"ACTIVE", "PENDING_ACKNOWLEDGEMENT", "NONE"})
-    void existingMemberCanReturnToMemberOnlyWithoutRetainingStaffClaims(StaffAccessStatus accessStatus) {
-        UUID id = UUID.randomUUID();
-        Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
-            .memberNo("MEMBER-1").memberAccount(true).position(Position.CHAIRPERSON)
-            .staffRoles(new LinkedHashSet<>(List.of(Position.CHAIRPERSON)))
-            .staffNo("12345").staffAccessStatus(accessStatus).status(MemberStatus.ACTIVE)
-            .staffAccessAssignedAt(OffsetDateTime.now().minusDays(1))
-            .staffAccessActivatedAt(OffsetDateTime.now().minusHours(1)).build();
-        when(memberRepository.findById(id)).thenReturn(Optional.of(member));
-        when(userSettingsRepository.existsById(id)).thenReturn(true);
-
-        adminService.updateUser("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN),
-            id, null, MemberStatus.ACTIVE, List.of(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
-
-        assertThat(member.getPosition()).isEqualTo(Position.MEMBER);
-        assertThat(member.getStaffRolesResolved()).isEmpty();
-        assertThat(member.isMemberAccess()).isTrue();
-        assertThat(member.getMemberNo()).isEqualTo("MEMBER-1");
-        assertThat(member.getStationId()).isEqualTo("ST-1");
-        assertThat(member.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.NONE);
-        assertThat(member.getStaffAccessAssignedAt()).isNull();
-        assertThat(member.getStaffAccessActivatedAt()).isNull();
-        verify(memberAccessClaimRepository).deleteByMemberId(id);
-        verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
-        for (UserClaim claim : UserClaim.defaultClaims(List.of(), true)) {
-            verify(memberAccessClaimRepository).save(claimNamed(claim));
-        }
-    }
-
     @Test
     void staffOnlyAccountCannotBecomeMemberByClearingRoles() {
         UUID id = UUID.randomUUID();
@@ -639,7 +567,7 @@ class AdminServiceTest {
         when(memberRepository.findById(id)).thenReturn(Optional.of(member));
         assertThatThrownBy(() -> adminService.updateUser("SACCO-01", "ST-1", id,
             Set.of(Position.MINOR_ADMIN), id, List.of(), MemberStatus.ACTIVE, null))
-            .hasMessage("You cannot remove your own admin workspace access.");
+            .hasMessage("Select at least one staff role for the user.");
         verify(memberRepository, never()).save(any());
     }
 
@@ -648,31 +576,7 @@ class AdminServiceTest {
     }
 
     private LoanProductSetting createProductWithStage(ApprovalWorkflowStage stage, List<UUID> reviewers, Integer maximumActiveLoans) {
-        return adminService.createLoanProduct("SACCO-01", UUID.randomUUID(), "ELIGIBILITY", "Eligibility Loan",
-            "Workflow eligibility", 1, new BigDecimal("100"), new BigDecimal("1000"), 0,
-            BigDecimal.ONE, false, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            InterestMethod.FLAT_RATE, 1, 12, maximumActiveLoans != null, false,
-            stage == ApprovalWorkflowStage.MANAGER, stage == ApprovalWorkflowStage.LOAN_OFFICER,
-            ApprovalWorkflowStage.MANAGER, 1, 2,
-            stage == ApprovalWorkflowStage.CHAIRPERSON, 3, List.of(),
-            stage == ApprovalWorkflowStage.BOARD, 4, reviewers,
-            stage == ApprovalWorkflowStage.CREDIT_COMMITTEE, 5, 1, 1,
-            reviewers,
-            stage == ApprovalWorkflowStage.ACCOUNTANT, 6, true, true, false, false,
-            BigDecimal.ZERO, LoanProductStatus.ACTIVE, maximumActiveLoans);
-    }
-
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(value = ApprovalWorkflowStage.class,
-        names = {"MANAGER", "LOAN_OFFICER", "CHAIRPERSON", "BOARD", "CREDIT_COMMITTEE", "ACCOUNTANT"})
-    void enabledWorkflowStageRejectsMissingApprover(ApprovalWorkflowStage stage) {
-        Member teller = Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Teller")
-            .position(Position.DISBURSEMENT_OFFICER).status(MemberStatus.ACTIVE)
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).build();
-        stubActiveRoleDirectory("SACCO-01", List.of(teller));
-        assertThatThrownBy(() -> createProductWithStage(stage, List.of()))
-            .isInstanceOf(IllegalStateException.class);
-        verify(loanProductSettingRepository, never()).save(any());
+        return adminService.createLoanProduct("SACCO-01",UUID.randomUUID(),"ELIGIBILITY","Eligibility Loan","Workflow eligibility",1,new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,maximumActiveLoans != null,false,true,true,false,false,BigDecimal.ZERO,LoanProductStatus.ACTIVE,maximumActiveLoans);
     }
 
     @org.junit.jupiter.params.ParameterizedTest
@@ -715,15 +619,6 @@ class AdminServiceTest {
     }
 
     @Test
-    void loanOfficerAssignmentPermissionAloneDoesNotQualifyForReview() {
-        when(memberRepository.countActiveMembersWithAnyClaimInStation(
-            "SACCO-01", null, List.of(UserClaim.LOAN_OFFICER_QUEUE_APPROVE.name()))).thenReturn(0L);
-        assertThat(adminService.activeLoanOfficerCount("SACCO-01")).isZero();
-        verify(memberRepository).countActiveMembersWithAnyClaimInStation(
-            "SACCO-01", null, List.of(UserClaim.LOAN_OFFICER_QUEUE_APPROVE.name()));
-    }
-
-    @Test
     void platformSupportIncidentsExcludeSystemAlerts() {
         AdminIncident supportIncident = AdminIncident.builder()
             .id(UUID.randomUUID())
@@ -754,61 +649,6 @@ class AdminServiceTest {
         List<AdminIncident> incidents = adminService.platformSupportIncidents(null, null, null, null);
 
         assertThat(incidents).containsExactly(supportIncident);
-    }
-
-    @Test
-    void submitSupportNotifiesOnlyMinorAdminsInMembersStation() {
-        UUID memberId = UUID.randomUUID();
-        UUID sameStationAdminId = UUID.randomUUID();
-        UUID otherStationAdminId = UUID.randomUUID();
-        Member member = Member.builder()
-            .id(memberId)
-            .saccoId("SACCO-01")
-            .stationId("AR704")
-            .memberNo("MEM001")
-            .fullName("Member One")
-            .status(MemberStatus.ACTIVE)
-            .build();
-        Member sameStationAdmin = Member.builder()
-            .id(sameStationAdminId)
-            .saccoId("SACCO-01")
-            .stationId("AR704")
-            .memberNo("MIN001")
-            .fullName("Same Station Admin")
-            .position(Position.MINOR_ADMIN)
-            .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
-            .status(MemberStatus.ACTIVE)
-            .build();
-        Member otherStationAdmin = Member.builder()
-            .id(otherStationAdminId)
-            .saccoId("SACCO-01")
-            .stationId("BR001")
-            .memberNo("MIN002")
-            .fullName("Other Station Admin")
-            .position(Position.MINOR_ADMIN)
-            .staffRoles(new LinkedHashSet<>(List.of(Position.MINOR_ADMIN)))
-            .status(MemberStatus.ACTIVE)
-            .build();
-        AtomicReference<AdminIncident> savedIncident = new AtomicReference<>();
-
-        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
-        stubActiveRoleDirectory("SACCO-01", List.of(sameStationAdmin, otherStationAdmin));
-        when(adminIncidentRepository.save(any(AdminIncident.class))).thenAnswer(invocation -> {
-            AdminIncident incident = invocation.getArgument(0);
-            savedIncident.set(incident);
-            return incident;
-        });
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        adminService.submitSupport("SACCO-01", memberId, "Help", "I need support");
-
-        verify(notificationRepository).save(argThat(notification ->
-            sameStationAdminId.equals(notification.getRecipientMemberId())
-                && "SUPPORT_MESSAGE".equals(notification.getType())
-        ));
-        verify(notificationRepository, never()).save(argThat(notification ->
-            otherStationAdminId.equals(notification.getRecipientMemberId())
-        ));
     }
 
     @Test
@@ -881,27 +721,6 @@ class AdminServiceTest {
     }
 
     @Test
-    void createUserRejectsSecondMinorAdminForSameSaccoStation() {
-        when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN)).thenReturn(true);
-
-        assertThatThrownBy(() -> adminService.createUser(
-            "SACCO-01",
-            "ST-1",
-            UUID.randomUUID(),
-            Set.of(Position.ADMIN),
-            "SACCOS Admin",
-            "minor@example.com",
-            null,
-            List.of(Position.MINOR_ADMIN)
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
-
-        verify(memberRepository).existsBySaccoIdAndStationIdIgnoreCaseAndPosition("SACCO-01", "ST-1", Position.MINOR_ADMIN);
-        verify(memberRepository, never()).save(any(Member.class));
-    }
-
-    @Test
     void createUserRejectsEmailAlreadyUsedByAnyAccount() {
         when(memberRepository.existsByEmailIgnoreCase("existing@example.com")).thenReturn(true);
 
@@ -921,41 +740,6 @@ class AdminServiceTest {
         verify(memberRepository).existsByEmailIgnoreCase("existing@example.com");
         verify(memberRepository, never()).save(any(Member.class));
         assertThat(issuedInvitationCount.get()).isZero();
-    }
-
-    @Test
-    void updateUserRejectsAssigningMinorAdminWhenAnotherAccountAlreadyExistsForStation() {
-        UUID accountId = UUID.randomUUID();
-        Member member = Member.builder()
-            .id(accountId)
-            .saccoId("SACCO-01")
-            .stationId("ST-1")
-            .memberNo("STAFF001")
-            .fullName("Staff User")
-            .email("staff@example.com")
-            .position(Position.MANAGER)
-            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
-            .memberAccount(false)
-            .status(MemberStatus.ACTIVE)
-            .createdAt(OffsetDateTime.now())
-            .build();
-
-        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
-        when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot("SACCO-01", "ST-1", Position.MINOR_ADMIN, accountId)).thenReturn(true);
-
-        assertThatThrownBy(() -> adminService.updateUser(
-            "SACCO-01",
-            "ST-1",
-            UUID.randomUUID(),
-            Set.of(Position.ADMIN),
-            accountId,
-            List.of(Position.MINOR_ADMIN),
-            MemberStatus.ACTIVE
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Each SACCO station can only have one SACCOS Admin account. Update the existing one instead.");
-
-        verify(memberRepository, never()).save(any(Member.class));
     }
 
     @Test
@@ -1012,18 +796,18 @@ class AdminServiceTest {
         );
 
         verify(memberRepository).save(argThat(saved ->
-            saved.getStaffRolesResolved().containsAll(staffRoles)
+            saved.getStaffRolesResolved().containsAll(staffRoles.stream().map(Position::userGroup).toList())
                 && saved.getPosition() == Position.MINOR_ADMIN
         ));
         verify(memberAccessClaimRepository).deleteByMemberId(accountId);
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.WORKSPACE_SETTINGS_CONFIGURE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.BOARD_QUEUE_APPROVE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_OFFICER_QUEUE_ASSIGN));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.ACCOUNTANT_QUEUE_APPROVE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.DISBURSEMENT_QUEUE_DISBURSE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.BOARD_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.CREDIT_COMMITTEE_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_OFFICER_QUEUE_ASSIGN));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.ACCOUNTANT_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.DISBURSEMENT_QUEUE_DISBURSE));
     }
 
     @Test
@@ -1099,48 +883,13 @@ class AdminServiceTest {
             accountId,
             List.of(Position.MANAGER),
             MemberStatus.ACTIVE,
-            List.of(UserClaim.MEMBER_LOANS_VIEW, UserClaim.GUARANTOR_REQUESTS_VIEW, UserClaim.MANAGER_QUEUE_APPROVE)
+            List.of(UserClaim.MEMBER_LOANS_VIEW, UserClaim.GUARANTOR_REQUESTS_VIEW, UserClaim.LOAN_RECORDING_APPROVE)
         );
 
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_VIEW));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.MANAGER_QUEUE_VIEW));
         verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.MEMBER_LOANS_VIEW));
         verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.GUARANTOR_REQUESTS_VIEW));
-    }
-
-    @Test
-    void updateUserRejectsStaffRoleWithoutItsQueueViewClaim() {
-        UUID accountId = UUID.randomUUID();
-        Member member = Member.builder()
-            .id(accountId)
-            .saccoId("SACCO-01")
-            .stationId("ST-1")
-            .memberNo("MGR002")
-            .fullName("Manager User")
-            .email("manager@example.com")
-            .status(MemberStatus.ACTIVE)
-            .position(Position.MANAGER)
-            .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
-            .memberAccount(false)
-            .createdAt(OffsetDateTime.now().minusDays(1))
-            .build();
-        when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
-
-        assertThatThrownBy(() -> adminService.updateUser(
-            "SACCO-01",
-            "ST-1",
-            UUID.randomUUID(),
-            Set.of(Position.MINOR_ADMIN),
-            accountId,
-            List.of(Position.MANAGER),
-            MemberStatus.ACTIVE,
-            List.of(UserClaim.NOTIFICATIONS_VIEW)
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Manager access requires Manager Queue - View. Select that permission or use Restore Default Permissions.");
-
-        verify(memberRepository, never()).save(any(Member.class));
-        verifyNoInteractions(memberAccessClaimRepository);
     }
 
     @Test
@@ -1519,13 +1268,13 @@ class AdminServiceTest {
             accountId,
             List.of(Position.LOAN_OFFICER),
             MemberStatus.INVITED,
-            List.of(UserClaim.LOAN_OFFICER_QUEUE_APPROVE)
+            List.of(UserClaim.LOAN_RECORDING_APPROVE)
         );
 
         assertThat(member.getStatus()).isEqualTo(MemberStatus.INVITED);
         assertThat(member.getStaffRolesResolved()).contains(Position.LOAN_OFFICER);
         verify(memberRepository).save(member);
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_OFFICER_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
     }
 
     private MemberAccessClaim claimNamed(UserClaim claim) {
@@ -1787,7 +1536,7 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
         verify(memberAccessClaimRepository).deleteByMemberId(lastInvitedMember.get().getId());
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_DOCUMENTS_VIEW));
     }
 
@@ -1853,12 +1602,12 @@ class AdminServiceTest {
         assertThat(member.getStaffRolesResolved()).containsExactly(Position.MANAGER);
         assertThat(member.isMemberAccess()).isTrue();
         assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
-        assertThat(member.getStaffAccessStatus()).isEqualTo(com.sacco.mvp.domain.StaffAccessStatus.PENDING_ACKNOWLEDGEMENT);
-        org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isZero();
+        assertThat(member.getStaffAccessStatus()).isEqualTo(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE);
+        org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
 
         verify(memberRepository).save(any(Member.class));
-        verify(notificationRepository).save(any(Notification.class));
-        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
+        verify(notificationRepository,never()).save(any(Notification.class));
+        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
     }
 
     @Test
@@ -1982,7 +1731,7 @@ class AdminServiceTest {
         assertThat(currentAdmin.getStaffRoles()).isEmpty();
         assertThat(currentAdmin.getStaffAccessStatus()).isEqualTo(StaffAccessStatus.NONE);
         assertThat(replacement.getStatus()).isEqualTo(MemberStatus.INVITED);
-        assertThat(replacement.getStaffRolesResolved()).containsExactly(Position.MINOR_ADMIN);
+        assertThat(replacement.getStaffRolesResolved()).containsExactlyInAnyOrder(Position.MINOR_ADMIN,Position.ICT_MANAGER);
         assertThat(replacement.getStationId()).isEqualTo("ST-1");
         assertThat(replacement.getEmail()).isEqualTo("replacement@example.com");
         assertThat(issuedInvitationCount.get()).isEqualTo(1);
@@ -2044,279 +1793,15 @@ class AdminServiceTest {
                 .build()
         ));
 
-        adminService.updateLoanProduct(
-            "SACCO-01",
-            adminId,
-            productId,
-            "DEV_GROWTH",
-            "Growth Loan",
-            "Updated",
-            displayOrder,
-            new BigDecimal("250000.00"),
-            new BigDecimal("2500000.00"),
-            1,
-            new BigDecimal("0.4000"),
-            new BigDecimal("0.0200"),
-            new BigDecimal("0.1200"),
-            InterestMethod.REDUCING_BALANCE,
-            6,
-            24,
-            true,
-            true,
-            true,
-            false,
-            ApprovalWorkflowStage.MANAGER,
-            false,
-            3,
-            null,
-            null,
-            true,
-            4,
-            LoanProductStatus.ACTIVE
-        );
+        adminService.updateLoanProduct("SACCO-01",adminId,productId,"DEV_GROWTH","Growth Loan","Updated",displayOrder,
+            new BigDecimal("250000.00"),new BigDecimal("2500000.00"),1,new BigDecimal("0.4000"),false,
+            BigDecimal.ZERO,new BigDecimal("0.0200"),BigDecimal.ZERO,new BigDecimal("0.1200"),InterestMethod.REDUCING_BALANCE,
+            6,24,true,true,true,false,true,false,BigDecimal.ZERO,LoanProductStatus.ACTIVE,null);
 
         verify(loanProductSettingRepository).save(product);
         assertThat(product.getProductCode()).isEqualTo("DEV_GROWTH");
         assertThat(product.getProductName()).isEqualTo("Growth Loan");
         assertThat(product.getDisplayOrder()).isEqualTo(displayOrder == null ? 4 : displayOrder);
-    }
-
-    @Test
-    void updateLoanProductPersistsCustomWorkflowPriorityOrder() {
-        UUID productId = UUID.randomUUID();
-        UUID adminId = UUID.randomUUID();
-        LoanProductSetting product = LoanProductSetting.builder()
-            .id(productId)
-            .saccoId("SACCO-01")
-            .loanType(LoanType.DEVELOPMENT_LOAN)
-            .productCode("DEV_LOAN")
-            .productName("Development Loan")
-            .displayOrder(4)
-            .minimumAmount(new BigDecimal("100000.00"))
-            .maximumAmount(new BigDecimal("1000000.00"))
-            .guarantorsRequired(2)
-            .maxLoanSavingsRatio(new BigDecimal("0.3333"))
-            .insuranceRate(new BigDecimal("0.0150"))
-            .interestRate(new BigDecimal("0.1000"))
-            .interestMethod(InterestMethod.FLAT_RATE)
-            .minRepaymentMonths(3)
-            .maxRepaymentMonths(12)
-            .allowApplicationWithActiveLoan(false)
-            .freshFinancialDataRequired(false)
-            .managerReviewRequired(true)
-            .managerPriority(1)
-            .loanOfficerReviewRequired(true)
-            .loanOfficerPriority(2)
-            .workflowStartStage(ApprovalWorkflowStage.MANAGER)
-            .committeeReviewRequired(true)
-            .committeePriority(3)
-            .committeeMinimumVotes(1)
-            .committeeApprovalThreshold(1)
-            .accountantReviewRequired(true)
-            .accountantPriority(4)
-            .disbursementOfficerRequired(true)
-            .productStatus(LoanProductStatus.ACTIVE)
-            .active(true)
-            .createdAt(OffsetDateTime.now().minusDays(2))
-            .updatedAt(OffsetDateTime.now().minusDays(1))
-            .build();
-        when(loanProductSettingRepository.findById(productId)).thenReturn(Optional.of(product));
-        when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(loanProductSettingRepository.existsBySaccoIdAndProductCodeIgnoreCaseAndIdNot("SACCO-01", "DEV_LOAN", productId)).thenReturn(false);
-        UUID boardReviewerId = UUID.randomUUID();
-        UUID creditCommitteeReviewerId = UUID.randomUUID();
-        stubActiveRoleDirectory("SACCO-01", List.of(
-            Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Workflow Approver")
-                .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.ACCOUNTANT)))
-                .status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),
-            Member.builder()
-                .id(UUID.randomUUID())
-                .saccoId("SACCO-01")
-                .memberNo("LO-1")
-                .fullName("Loan Officer")
-                .status(MemberStatus.ACTIVE)
-                .position(Position.LOAN_OFFICER)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.LOAN_OFFICER)))
-                .build(),
-            Member.builder()
-                .id(boardReviewerId)
-                .saccoId("SACCO-01")
-                .memberNo("BOARD-1")
-                .fullName("Board Reviewer")
-                .status(MemberStatus.ACTIVE)
-                .position(Position.BOARD)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.BOARD)))
-                .build(),
-            Member.builder()
-                .id(creditCommitteeReviewerId)
-                .saccoId("SACCO-01")
-                .memberNo("CC-1")
-                .fullName("Credit Committee Reviewer")
-                .status(MemberStatus.ACTIVE)
-                .position(Position.CREDIT_COMMITTEE)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.CREDIT_COMMITTEE)))
-                .build(),
-            Member.builder()
-                .id(UUID.randomUUID())
-                .saccoId("SACCO-01")
-                .memberNo("ACC-1")
-                .fullName("Accountant")
-                .status(MemberStatus.ACTIVE)
-                .position(Position.ACCOUNTANT)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.ACCOUNTANT)))
-                .build(),
-            Member.builder()
-                .id(UUID.randomUUID())
-                .saccoId("SACCO-01")
-                .memberNo("DISB-1")
-                .fullName("Disbursement Officer")
-                .status(MemberStatus.ACTIVE)
-                .position(Position.DISBURSEMENT_OFFICER)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.DISBURSEMENT_OFFICER)))
-                .build()
-        ));
-
-        adminService.updateLoanProduct(
-            "SACCO-01",
-            adminId,
-            productId,
-            "DEV_LOAN",
-            "Development Loan",
-            "Updated",
-            4,
-            new BigDecimal("100000.00"),
-            new BigDecimal("1000000.00"),
-            2,
-            new BigDecimal("0.3333"),
-            true,
-            new BigDecimal("15000.00"),
-            new BigDecimal("0.0150"),
-            BigDecimal.ZERO,
-            new BigDecimal("0.1000"),
-            InterestMethod.FLAT_RATE,
-            3,
-            12,
-            false,
-            false,
-            true,
-            true,
-            ApprovalWorkflowStage.LOAN_OFFICER,
-            4,
-            3,
-            false,
-            3,
-            List.of(),
-            true,
-            5,
-            List.of(boardReviewerId),
-            true,
-            1,
-            1,
-            1,
-            List.of(creditCommitteeReviewerId),
-            true,
-            2,
-            true,
-            true,
-            false,
-            false,
-            BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,
-            null
-        );
-
-        assertThat(product.getManagerPriority()).isEqualTo(4);
-        assertThat(product.getLoanOfficerPriority()).isEqualTo(3);
-        assertThat(product.getCommitteePriority()).isEqualTo(1);
-        assertThat(product.getAccountantPriority()).isEqualTo(2);
-        assertThat(product.getWorkflowStartStage()).isEqualTo(ApprovalWorkflowStage.LOAN_OFFICER);
-        InOrder reviewerReplacement = inOrder(loanProductBoardReviewerRepository);
-        reviewerReplacement.verify(loanProductBoardReviewerRepository)
-            .deleteByLoanProductSettingIdAndReviewStage(productId, ApprovalWorkflowStage.BOARD);
-        reviewerReplacement.verify(loanProductBoardReviewerRepository).flush();
-        reviewerReplacement.verify(loanProductBoardReviewerRepository).save(any());
-        reviewerReplacement.verify(loanProductBoardReviewerRepository)
-            .deleteByLoanProductSettingIdAndReviewStage(productId, ApprovalWorkflowStage.CREDIT_COMMITTEE);
-        reviewerReplacement.verify(loanProductBoardReviewerRepository).flush();
-        reviewerReplacement.verify(loanProductBoardReviewerRepository).save(any());
-    }
-
-    @Test
-    void createCustomizedLoanProductCompactsDuplicateManagerAndLoanOfficerPriorities() {
-        stubActiveRoleDirectory("SACCO-01", List.of(
-            Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01").fullName("Workflow Approver")
-                .position(Position.MANAGER).staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.ACCOUNTANT)))
-                .status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),
-            Member.builder()
-                .id(UUID.randomUUID())
-                .saccoId("SACCO-01")
-                .memberNo("LO-1")
-                .fullName("Loan Officer")
-                .position(Position.LOAN_OFFICER)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.LOAN_OFFICER)))
-                .status(MemberStatus.ACTIVE)
-                .build(),
-            Member.builder()
-                .id(UUID.randomUUID())
-                .saccoId("SACCO-01")
-                .memberNo("DISB-1")
-                .fullName("Disbursement Officer")
-                .position(Position.DISBURSEMENT_OFFICER)
-                .staffRoles(new LinkedHashSet<>(List.of(Position.DISBURSEMENT_OFFICER)))
-                .status(MemberStatus.ACTIVE)
-                .build()
-        ));
-
-        AtomicReference<LoanProductSetting> savedProduct = new AtomicReference<>();
-        when(loanProductSettingRepository.save(any(LoanProductSetting.class))).thenAnswer(invocation -> {
-            LoanProductSetting product = invocation.getArgument(0);
-            savedProduct.set(product);
-            return product;
-        });
-
-        adminService.createCustomizedLoanProduct(
-            "SACCO-01",
-            UUID.randomUUID(),
-            "CUSTOM_PRIORITY",
-            "Custom Priority Loan",
-            "Priority validation",
-            5,
-            new BigDecimal("100000.00"),
-            new BigDecimal("500000.00"),
-            1,
-            new BigDecimal("0.3333"),
-            new BigDecimal("15000.00"),
-            new BigDecimal("0.0100"),
-            BigDecimal.ZERO,
-            new BigDecimal("0.1000"),
-            InterestMethod.FLAT_RATE,
-            1,
-            12,
-            false,
-            false,
-            true,
-            true,
-            ApprovalWorkflowStage.MANAGER,
-            1,
-            1,
-            false,
-            3,
-            null,
-            null,
-            true,
-            4,
-            true,
-            false,
-            BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE
-        );
-
-        LoanProductSetting product = savedProduct.get();
-        assertThat(product).isNotNull();
-        assertThat(product.getManagerPriority()).isEqualTo(1);
-        assertThat(product.getLoanOfficerPriority()).isEqualTo(2);
-        assertThat(product.getWorkflowStartStage()).isEqualTo(ApprovalWorkflowStage.MANAGER);
-        verify(loanProductSettingRepository).save(any(LoanProductSetting.class));
     }
 
     @Test

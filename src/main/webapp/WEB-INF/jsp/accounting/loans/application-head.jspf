@@ -4,7 +4,7 @@
 <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
-<c:choose><c:when test="${portalWorkspace}"><%@ include file="../../portal/head.jspf" %></c:when><c:otherwise><%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %></c:otherwise></c:choose>
+<%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css'/>"/>
 <link rel="stylesheet" href="<c:url value='/css/client-onboarding.css'/>"/>
 <link rel="stylesheet" href="<c:url value='/css/client-applications.css'/>"/>

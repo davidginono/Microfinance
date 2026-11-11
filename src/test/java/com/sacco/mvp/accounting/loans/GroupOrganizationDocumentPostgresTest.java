@@ -12,7 +12,6 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.context.annotation.*;
-import org.springframework.dao.DataAccessException;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.support.*;
@@ -33,7 +32,7 @@ class GroupOrganizationDocumentPostgresTest {
     @AfterAll void stop(){s.stop();}
     @BeforeEach void fixture(){o.fixture();reset(o.f.context.getBean(StationOtpSettingsService.class));}
     UUID bare(com.sacco.mvp.grouplending.dto.GroupCycleDtos.CycleForm form){return o.cycles.create(o.f.actor,o.group,form);}
-    UUID loan(){var f=o.form();s.cycle=o.create(f);var loan=o.service.submit(o.f.actor,s.cycle,f);s.signer=s.client(o.f.client);s.hash=s.service.packet(s.signer,s.cycle,0).hash();return loan;}
+    UUID loan(){var f=o.form();s.cycle=o.create(f);var loan=o.service.submit(o.f.actor,s.cycle,f);s.signer=s.client(o.f.client);s.hash=s.packetHash(s.cycle);return loan;}
     Document latest(UUID cycle){return o.f.context.getBean(GroupOrganizationDocumentRepository.class).latest(o.f.actor,cycle).orElseThrow();}
     @Test void originationCannotFreezeAnIncompleteAgreement(){var form=o.form();var cycle=bare(form);assertThatThrownBy(()->o.service.submit(o.f.actor,cycle,form)).hasMessage("group.error.documentRequired");assertThat(o.count("loan_applications")).isZero();}
     @Test void recordingKeepsDraftEditsAndExactApprovedBytes()throws Exception{
@@ -100,33 +99,11 @@ class GroupOrganizationDocumentPostgresTest {
         var form=o.form();var cycle=bare(form);doThrow(new IllegalStateException("Synthetic document audit failure")).when(o.f.context.getBean(AuditService.class)).logEvent(eq("GROUP_LENDING"),eq(cycle),eq("ORGANIZATION_DOCUMENT_RECORDED"),any(),any(),any(),any(),any(),any(),any(),any());
         assertThatThrownBy(()->documents.record(o.f.actor,cycle,form,o.documentForm(),GroupOrganizationPostgresTest.documentFile())).hasMessage("Synthetic document audit failure");assertThat(o.count("lending_group_org_terms")).isZero();assertThat(o.cycles.detail(o.f.actor,cycle).version()).isZero();
     }
-    @Test void submittedAgreementAndPdfAreImmutable(){
-        loan();var doc=latest(s.cycle);assertThat(s.service.packet(s.signer,s.cycle,0).snapshot().document().id()).isEqualTo(doc.id());
-        assertThatThrownBy(()->o.f.jdbc.update("update lending_group_org_terms set reference='changed' where id=?",doc.id())).isInstanceOf(DataAccessException.class);assertThatThrownBy(()->o.f.jdbc.update("delete from lending_group_org_terms where id=?",doc.id())).isInstanceOf(DataAccessException.class);
-        var form=o.service.workspace(o.f.actor,s.cycle,null).form();var next=o.documentForm();next.setExpectedDocumentId(doc.id());assertThatThrownBy(()->documents.record(o.f.actor,s.cycle,form,next,GroupOrganizationPostgresTest.documentFile())).hasMessage("group.error.changed");
-    }
-    @Test void aSignatoryMustOpenTheExactFullPacketBeforeCodeOrSignature(){
-        loan();assertThat(s.service.sign(s.signer,s.cycle,s.hash,true,"")).isEqualTo("group.error.documentOpen");when(o.f.context.getBean(StationOtpSettingsService.class).requiresApprovalOtp(any(),anyString(),anyString())).thenReturn(true);
-        assertThatThrownBy(()->s.service.prepareCode(s.signer,s.cycle,s.hash)).hasMessage("group.error.documentOpen");assertThat(o.count("lending_group_org_challenge")).isZero();
-        exports.client(s.signer,s.cycle,Locale.ENGLISH);assertThat(s.service.packet(s.signer,s.cycle,0).documentOpened()).isTrue();assertThat(o.count("lending_group_org_document_access")).isEqualTo(1);
-    }
-    @Test void failedRenderingAndFailedAccessAuditCannotSatisfySigning(){
-        loan();var limiter=o.f.context.getBean(ReportExportLimiter.class);assertThat(limiter.tryAcquire()).isTrue();try{assertThatThrownBy(()->exports.client(s.signer,s.cycle,Locale.ENGLISH)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);}finally{limiter.release();}
-        assertThat(o.count("lending_group_org_document_access")).isZero();doThrow(new IllegalStateException("Synthetic access audit failure")).when(o.f.context.getBean(AuditService.class)).logEvent(eq("GROUP_LENDING"),eq(s.cycle),eq("ORGANIZATION_DOCUMENT_REQUESTED"),any(),any(),any(),any(),any(),any(),any(),any());
-        assertThatThrownBy(()->exports.client(s.signer,s.cycle,Locale.ENGLISH)).hasMessage("Synthetic access audit failure");assertThat(o.count("lending_group_org_document_access")).isZero();assertThat(s.service.sign(s.signer,s.cycle,s.hash,true,"")).isEqualTo("group.error.documentOpen");
-    }
-    @Test void fullPdfContainsFrozenTermsContactsAndRealSignatureEvidenceInBothLanguages()throws Exception{
-        var loan=loan();exports.client(s.signer,s.cycle,Locale.ENGLISH);assertThat(s.service.sign(s.signer,s.cycle,s.hash,true,"")).isNull();
-        for(var locale:List.of(Locale.ENGLISH,Locale.of("sw"))){byte[] bytes=exports.client(s.signer,s.cycle,locale);var file=Path.of("target/group-org-full-agreement-"+locale.getLanguage()+".pdf");Files.write(file,bytes);
-            try(var pdf=Loader.loadPDF(bytes)){var text=new PDFTextStripper().getText(pdf);assertThat(pdf.getNumberOfPages()).isGreaterThan(1);assertThat(text).contains("SYNTHETIC APPROVED TERMS - AUTOMATED TEST ONLY","1,000.00","20.00","complaints@example.invalid",s.hash).doesNotContain("Synthetic verified organization income");for(int p=0;p<pdf.getNumberOfPages();p++)javax.imageio.ImageIO.write(new org.apache.pdfbox.rendering.PDFRenderer(pdf).renderImageWithDPI(p,105),"png",Path.of("target/group-org-full-agreement-"+locale.getLanguage()+"-"+p+".png").toFile());}
-        }
-        assertThat(exports.staffLoan(o.f.actor,loan,Locale.ENGLISH)).isPresent();try(var physical=Loader.loadPDF(exports.staffLoan(o.f.actor,loan,Locale.ENGLISH,false).orElseThrow())){assertThat(new PDFTextStripper().getText(physical)).contains("Physical signature copy");}
-        assertThat(o.count("loan_ledgers")).isZero();assertThat(s.service.packet(s.signer,s.cycle,0).hash()).isEqualTo(s.hash);
-    }
+
     @Test void scopeAndFreshExportClaimsProtectAllPdfReaders(){
         var loan=loan();var doc=latest(s.cycle);assertThatThrownBy(()->documents.original(o.f.operator("B2"),s.cycle,doc.id())).isInstanceOf(AccessDeniedException.class);assertThatThrownBy(()->exports.staffLoan(o.f.operator("B2"),loan,Locale.ENGLISH)).isInstanceOf(AccessDeniedException.class);
         var allowed=EnumSet.allOf(UserClaim.class);allowed.remove(UserClaim.LOAN_DOCUMENTS_EXPORT);when(o.f.context.getBean(UserClaimService.class).effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(allowed);
-        assertThatThrownBy(()->exports.client(s.signer,s.cycle,Locale.ENGLISH)).isInstanceOf(AccessDeniedException.class);assertThatThrownBy(()->exports.staffLoan(o.f.actor,loan,Locale.ENGLISH)).isInstanceOf(AccessDeniedException.class);assertThat(o.count("lending_group_org_document_access")).isZero();
+        assertThatThrownBy(()->exports.staffLoan(o.f.actor,loan,Locale.ENGLISH)).isInstanceOf(AccessDeniedException.class);assertThat(o.count("lending_group_org_document_access")).isZero();
     }
     @Test void existingStaffPrintRouteUsesTheOrganizationDocumentInsteadOfAPersonalApplicant()throws Exception{
         var loan=loan();var controller=new com.sacco.mvp.web.LoanDocumentController(o.f.context.getBean(MemberDirectoryService.class),o.f.context.getBean(SaccoRegistryService.class),mock(LoanPresentationService.class),mock(LoanAttachmentService.class),mock(LoanReportService.class),mock(MemberProfileImageService.class),mock(SaccoLogoStorageService.class),o.f.context.getBean(AuditService.class),new AccessControlService(),mock(AdminScopeService.class),mock(SmsUsageManagementService.class),exports);
@@ -144,7 +121,7 @@ class GroupOrganizationDocumentPostgresTest {
         when(o.f.context.getBean(UserClaimService.class).effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(allowed);
         assertThatThrownBy(()->documents.original(o.f.actor,s.cycle,doc.id())).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->exports.staffLoan(o.f.actor,loan,Locale.ENGLISH)).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(()->exports.client(s.signer,s.cycle,Locale.ENGLISH)).isInstanceOf(AccessDeniedException.class);
+
         assertThat(o.count("lending_group_org_document_access")).isZero();
     }
     @Configuration(proxyBeanMethods=false) @Import(GroupOrganizationAgreementPostgresTest.Config.class) static class Config {

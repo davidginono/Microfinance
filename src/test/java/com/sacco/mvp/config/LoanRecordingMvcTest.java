@@ -29,20 +29,20 @@ class LoanRecordingMvcTest {
     @Autowired LoanRecordingService service;
     @Autowired com.sacco.mvp.clients.applications.service.ClientApplicationService applications;
     MockMvc mvc;AppUserPrincipal actor;
-    @BeforeEach void setup(){reset(service,applications);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+    @BeforeEach void setup(){reset(service,applications);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     @Test void legacyStaffPagesRedirectToTheAccountantWorkspaceForBothClaimSets() throws Exception {
-        var onboardingOnly=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.CLIENT_ONBOARDING_VIEW,UserClaim.CLIENT_ONBOARDING_UPDATE),true);
+        var onboardingOnly=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.CLIENT_ONBOARDING_VIEW,UserClaim.CLIENT_ONBOARDING_UPDATE));
         var client=UUID.randomUUID();var application=UUID.randomUUID();
         for(var staff:List.of(actor,onboardingOnly))for(var root:List.of("/finance/client-applications","/finance/loan-records/applications")){
-            mvc.perform(get(root).with(user(staff))).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records"));
-            mvc.perform(get(root+"/new").param("clientId",client.toString()).with(user(staff))).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/new?clientId="+client));
+            mvc.perform(get(root).with(user(staff))).andExpect(root.contains("client-applications")?status().isNotFound():status().isBadRequest());
+            mvc.perform(get(root+"/new").param("clientId",client.toString()).with(user(staff))).andExpect(status().isBadRequest());
             mvc.perform(get(root+"/"+application+"/edit").with(user(staff))).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/new?applicationId="+application));
         }
         verify(applications,never()).form(any(),any(),any());
         verify(applications,times(2)).details(actor,application);verify(applications,times(2)).details(onboardingOnly,application);
     }
     @Test void accountantRoutesRejectMissingClaimsInsteadOfOpeningAnotherForm() throws Exception {
-        var restricted=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.CLIENT_ONBOARDING_VIEW,UserClaim.CLIENT_ONBOARDING_UPDATE),true);
+        var restricted=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.CLIENT_ONBOARDING_VIEW,UserClaim.CLIENT_ONBOARDING_UPDATE));
         doThrow(new org.springframework.security.access.AccessDeniedException("Missing loan recording permission")).when(service).authorize(restricted,"CREATE");
         when(service.list(eq(restricted),any())).thenThrow(new org.springframework.security.access.AccessDeniedException("Missing loan recording permission"));
         mvc.perform(get("/finance/loan-records/new").with(user(restricted))).andExpect(status().isForbidden());
@@ -52,25 +52,11 @@ class LoanRecordingMvcTest {
     @Test void cachedStaffFormCannotWriteThroughTheRetiredSaveEndpoint() throws Exception {
         for(var root:List.of("/finance/client-applications","/finance/loan-records/applications")){
             mvc.perform(multipart(root+"/save").with(user(actor))).andExpect(status().isForbidden());
-            mvc.perform(multipart(root+"/save").with(user(actor)).with(csrf())).andExpect(status().isGone());
+            mvc.perform(multipart(root+"/save").with(user(actor)).with(csrf())).andExpect(status().isMethodNotAllowed());
         }
         verify(applications,never()).save(any(),any(),any());
     }
-    @Test void clientPortalKeepsItsOwnScopedBorrowerForm() {
-        var client=UUID.randomUUID();var member=Member.builder().id(client).saccoId("I1").stationId("B1").memberAccount(true).status(MemberStatus.ACTIVE).build();
-        var owner=new AppUserPrincipal(member,Set.of(UserClaim.MEMBER_LOANS_CREATE),false);
-        var session=new com.sacco.mvp.clients.portal.dto.ClientPortalDtos.Session(client,"I1","B1","synthetic",true,java.time.OffsetDateTime.now().plusMinutes(5));
-        var portal=context.getBean(com.sacco.mvp.clients.portal.service.ClientPortalService.class);
-        when(portal.actor(session,true)).thenReturn(owner);
-        var form=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Form();form.setClientId(client);when(applications.form(owner,null,null)).thenReturn(form);
-        var request=new org.springframework.mock.web.MockHttpServletRequest();request.setServletPath("/client-portal/workspace/applications/new");
-        var auth=new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(session,"",List.of());
-        var model=new org.springframework.ui.ExtendedModelMap();
-        var view=context.getBean(com.sacco.mvp.clients.applications.controller.ClientApplicationController.class).create(auth,request,null,model);
-        org.assertj.core.api.Assertions.assertThat(view).isEqualTo("accounting/loans/borrower-form");
-        org.assertj.core.api.Assertions.assertThat(model.get("portalWorkspace")).isEqualTo(true);
-        verify(applications).form(owner,null,null);
-    }
+
     @Test void quoteRequiresCsrfAndDoesNotAcceptAFirstDueDateOrRequestedPrincipal() throws Exception {
         when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",new BigDecimal("0.12"),"FLAT_RATE","MONTHLY",new BigDecimal("176.67"),new BigDecimal("60.00"),List.of(),"MONTHS",6));
         mvc.perform(post("/finance/loan-recording/quote").with(user(actor))).andExpect(status().isForbidden());
@@ -153,8 +139,9 @@ class LoanRecordingMvcTest {
     @Test void historicalRecordedApplicationsRequireCsrfAndSubmitThroughScopedService() throws Exception {
         var id=UUID.randomUUID();
         mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor))).andExpect(status().isForbidden());
-        mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf())).andExpect(redirectedUrl("/finance/loan-records/"+id));
-        verify(service).submitRecordedApplication(actor,id);
+        var key=UUID.randomUUID();
+        mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf()).param("requestKey",key.toString())).andExpect(redirectedUrl("/finance/loan-records/"+id+"/review"));
+        verify(context.getBean(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class)).submit(actor,id,key);
     }
     @Test void topUpPreviewIsScopedUncacheableAndPreservesDecimalStrings() throws Exception {
         var source=UUID.randomUUID();var date=java.time.LocalDate.of(2026,10,8);
@@ -179,9 +166,10 @@ class LoanRecordingMvcTest {
     @Test void chargePolicyUsesTheAdminProductRouteAndSessionScope() throws Exception {
         var product=UUID.randomUUID();var charges=context.getBean(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);reset(charges);
         var admin=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MINOR_ADMIN)
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE),true);
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
         var path="/admin/settings-controls/loan-products/"+product+"/charge-accounts";
         mvc.perform(post(path).with(user(admin))).andExpect(status().isForbidden());
+        doThrow(new org.springframework.security.access.AccessDeniedException("Missing explicit permission")).when(charges).savePolicy(eq(actor),any());
         mvc.perform(post(path).with(user(actor)).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(post(path).with(user(admin)).with(csrf()).param("productId",UUID.randomUUID().toString()).param("effectiveFrom","2026-09-01").param("enabled","true").param("managementTiming","DEDUCT").param("insuranceTiming","SEPARATE").param("saccoId","FOREIGN"))
             .andExpect(redirectedUrl(path));verify(charges).savePolicy(eq(admin),argThat(f->f.getProductId().equals(product) && f.getEffectiveFrom().equals(java.time.LocalDate.of(2026,9,1)) && f.getManagementTiming()==com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT));
@@ -191,9 +179,10 @@ class LoanRecordingMvcTest {
         @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService charges(){return mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}
         @Bean com.sacco.mvp.accounting.charges.controller.LoanChargeController chargeController(com.sacco.mvp.accounting.charges.service.LoanChargeService charges){return new com.sacco.mvp.accounting.charges.controller.LoanChargeController(charges,mock(ApplicationClock.class));}
         @Bean com.sacco.mvp.clients.applications.service.ClientApplicationService applications(){return mock(com.sacco.mvp.clients.applications.service.ClientApplicationService.class);}
-        @Bean com.sacco.mvp.clients.portal.service.ClientPortalService portal(){return mock(com.sacco.mvp.clients.portal.service.ClientPortalService.class);}
-        @Bean com.sacco.mvp.clients.applications.controller.ClientApplicationController applicationController(com.sacco.mvp.clients.applications.service.ClientApplicationService applications,com.sacco.mvp.clients.portal.service.ClientPortalService portal){return new com.sacco.mvp.clients.applications.controller.ClientApplicationController(applications,portal,new org.springframework.context.support.StaticMessageSource());}
+
+        @Bean com.sacco.mvp.clients.applications.controller.ClientApplicationController historyController(com.sacco.mvp.clients.applications.service.ClientApplicationService applications){return new com.sacco.mvp.clients.applications.controller.ClientApplicationController(applications,new org.springframework.context.support.StaticMessageSource());}
         @Bean LoanRecordingService service(){return mock(LoanRecordingService.class);}
-        @Bean LoanRecordingController controller(LoanRecordingService service){return new LoanRecordingController(service,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));}
+        @Bean com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals(){return mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class);}
+        @Bean LoanRecordingController controller(LoanRecordingService service,com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals){return new LoanRecordingController(service,approvals,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));}
     }
 }

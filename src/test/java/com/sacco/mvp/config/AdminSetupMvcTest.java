@@ -30,7 +30,7 @@ class AdminSetupMvcTest {
     @BeforeEach void setup() {
         reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         root=new AppUserPrincipal(Member.builder().id(AdminSetupService.BOOTSTRAP_ID).memberNo("ADM001").position(Position.ADMIN)
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).platformSetupRequired(true).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE),true);
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).platformSetupRequired(true).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
         doCallRealMethod().when(service).authorize(any());
     }
     @Test void pendingAdministratorCannotBypassSetupWithAnotherPageOrWrite()throws Exception {
@@ -43,7 +43,7 @@ class AdminSetupMvcTest {
     }
     @Test void pendingAdministratorCanOpenSetupAndOtherRoleCannot()throws Exception {
         mvc.perform(get("/system-admin/setup").servletPath("/system-admin/setup").with(user(root))).andExpect(view().name("auth/admin-setup"));
-        var staff=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).position(Position.ACCOUNTANT).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE),true);
+        var staff=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).position(Position.ACCOUNTANT).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));
         mvc.perform(get("/system-admin/setup").with(user(staff))).andExpect(status().isForbidden());
     }
     @Test void failedSetupPreservesContactValuesButClearsEveryPassword()throws Exception {

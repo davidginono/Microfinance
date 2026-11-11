@@ -33,13 +33,6 @@ class UserClaimServiceTest {
 
     private UserClaimService userClaimService;
 
-    @Test void clientSessionsUseOnlyExplicitOwnCoverageGrantsAndNeverStaffPrivileges(){
-        UUID id=UUID.randomUUID();when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(accessClaim(id,"GROUP_COVERAGE_OWN_VIEW"),accessClaim(id,"GROUP_COVERAGE_OWN_RESPOND"),accessClaim(id,"GROUP_COVERAGE_LINK"),accessClaim(id,"LOAN_RECORDING_POST")));
-        assertThat(userClaimService.clientSessionClaims(id)).contains(UserClaim.GROUP_COVERAGE_OWN_VIEW,UserClaim.GROUP_COVERAGE_OWN_RESPOND,UserClaim.MEMBER_LOANS_VIEW).doesNotContain(UserClaim.GROUP_COVERAGE_OWN_EXPORT,UserClaim.GROUP_COVERAGE_LINK,UserClaim.LOAN_RECORDING_POST);
-        when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(accessClaim(id,"MEMBER_LOANS_VIEW")));
-        assertThat(userClaimService.clientSessionClaims(id)).noneMatch(c->c.name().startsWith("GROUP_COVERAGE"));
-    }
-
     @Test
     void retiredStructuredAndLegacyJsonGrantsCannotRestoreRoleDefaults() {
         UUID member = UUID.randomUUID();
@@ -97,18 +90,14 @@ class UserClaimServiceTest {
 
     @BeforeEach
     void setUp() {
-        userClaimService = new UserClaimService(
-            memberAccessClaimRepository,
-            userSettingsRepository,
-            new ObjectMapper()
-        );
+        userClaimService = new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper());
     }
 
     @Test
     void structuredClaimsTakePrecedenceOverLegacyJsonFallback() {
         UUID memberId = UUID.randomUUID();
         when(memberAccessClaimRepository.findByIdMemberId(memberId))
-            .thenReturn(List.of(accessClaim(memberId, UserClaim.MANAGER_QUEUE_APPROVE.name())));
+            .thenReturn(List.of(accessClaim(memberId, UserClaim.LOAN_RECORDING_APPROVE.name())));
 
         Set<UserClaim> claims = userClaimService.effectiveClaims(
             memberId,
@@ -116,7 +105,7 @@ class UserClaimServiceTest {
             false
         );
 
-        assertThat(claims).containsExactly(UserClaim.MANAGER_QUEUE_APPROVE);
+        assertThat(claims).containsExactly(UserClaim.LOAN_RECORDING_APPROVE);
         verifyNoInteractions(userSettingsRepository);
     }
 
@@ -165,9 +154,6 @@ class UserClaimServiceTest {
         Set<UserClaim> claims = userClaimService.effectiveClaims(memberId, List.of(), false);
 
         assertThat(claims).contains(
-            UserClaim.MANAGER_QUEUE_VIEW,
-            UserClaim.MANAGER_QUEUE_APPROVE,
-            UserClaim.MANAGER_QUEUE_REJECT,
             UserClaim.DISBURSEMENT_QUEUE_VIEW,
             UserClaim.DISBURSEMENT_QUEUE_DISBURSE
         );
@@ -175,25 +161,12 @@ class UserClaimServiceTest {
 
     @Test
     void memberLegacyDefaultsIncludeReportsDocumentsAndGranularMutationClaims() {
-        UUID memberId = UUID.randomUUID();
-        when(memberAccessClaimRepository.findByIdMemberId(memberId)).thenReturn(List.of());
-        when(userSettingsRepository.findById(memberId)).thenReturn(Optional.empty());
-
-        Set<UserClaim> claims = userClaimService.effectiveClaims(memberId, List.of(), true);
-
-        assertThat(claims).contains(
-            UserClaim.MEMBER_SETTINGS_VIEW,
-            UserClaim.MEMBER_SETTINGS_UPDATE,
-            UserClaim.PAYMENT_DETAILS_VIEW,
-            UserClaim.PAYMENT_DETAILS_UPDATE,
-            UserClaim.MEMBER_LOANS_VIEW,
-            UserClaim.MEMBER_LOANS_ASSIGN,
-            UserClaim.MEMBER_LOANS_DELETE,
-            UserClaim.GUARANTOR_REQUESTS_UPDATE,
-            UserClaim.LOAN_DOCUMENTS_EXPORT,
-            UserClaim.LOAN_REPORTS_VIEW,
-            UserClaim.LOAN_REPORTS_EXPORT
-        );
+        UUID id=UUID.randomUUID();
+        when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of());
+        when(userSettingsRepository.findById(id)).thenReturn(Optional.empty());
+        assertThat(userClaimService.effectiveClaims(id,List.of(),true)).isEmpty();
+        assertThat(UserClaim.fromStoredName("APPLY_LOANS")).isEmpty();
+        assertThat(UserClaim.fromStoredName("APPROVE_GUARANTOR_REQUESTS")).isEmpty();
     }
 
     @Test
@@ -203,10 +176,7 @@ class UserClaimServiceTest {
             true
         );
 
-        assertThat(claims).contains(
-            UserClaim.MEMBER_LOANS_VIEW,
-            UserClaim.GUARANTOR_REQUESTS_APPROVE,
-            UserClaim.MANAGER_QUEUE_APPROVE,
+        assertThat(claims).doesNotContain(UserClaim.LOAN_RECORDING_APPROVE,UserClaim.MEMBER_LOANS_VIEW,UserClaim.GUARANTOR_REQUESTS_APPROVE).contains(
             UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
             UserClaim.LOAN_DOCUMENTS_VIEW,
             UserClaim.NOTIFICATIONS_UPDATE

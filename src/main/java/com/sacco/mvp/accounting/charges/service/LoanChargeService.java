@@ -156,7 +156,7 @@ public class LoanChargeService {
     }
     private Term term(String kind,String basis,BigDecimal value,BigDecimal total,Policy p,boolean insurance,String evidence){return new Term(UUID.randomUUID(),kind,basis,value,total,p==null?Timing.SEPARATE:insurance?p.insuranceTiming():p.managementTiming(),p==null?null:p.receivableAccountId(),p==null?null:insurance?p.insuranceAccountId():p.managementAccountId(),evidence,insurance && p!=null?p.insurer():"",insurance && p!=null?p.insurerVerification():"");}
     @Transactional(propagation=Propagation.MANDATORY) public void freeze(AppUserPrincipal a,UUID loan,Plan plan){repository.freeze(a,loan,plan,clock.now());}
-    private LoanChargeRepository.Loan readable(AppUserPrincipal a,UUID loan,boolean lock){var l=repository.loan(a,loan,lock);if(!a.isStaffSession() && !a.getMemberId().equals(l.client()))throw new org.springframework.security.access.AccessDeniedException("Loan unavailable");return l;}
+    private LoanChargeRepository.Loan readable(AppUserPrincipal a,UUID loan,boolean lock){if(a==null||!a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Loan unavailable");return repository.loan(a,loan,lock);}
     @Transactional(readOnly=true) public Plan quotedTerms(AppUserPrincipal actor,UUID loan){
         readable(actor,loan,false);return displayPlan(actor,loan);
     }
@@ -166,9 +166,6 @@ public class LoanChargeService {
     @Transactional(readOnly=true) public Plan frozen(AppUserPrincipal a,UUID loan){readable(a,loan,false);return repository.frozen(loan);}
     @Transactional(readOnly=true) public Balance balance(AppUserPrincipal a,UUID loan,LocalDate date){readable(a,loan,false);return repository.balance(loan,date);}
     @Transactional(readOnly=true) public Summary summary(AppUserPrincipal a,UUID loan,int page){var identity=readable(a,loan,false);require(page>=0 && page<=10000,"input");var history=repository.history(loan,page);var assessment=repository.fundingAssessments(loan).stream().findFirst().orElse(null);return new Summary(displayPlan(a,loan),repository.balance(loan,clock.today()),history.stream().limit(25).toList(),page,history.size()>25,assessment==null?null:assessment.journalId(),assessment==null?null:assessment.actorId(),identity.number(),identity.institution(),identity.branch());}
-    private void client(AppUserPrincipal a){if(a==null || a.isStaffSession() || !a.getClaims().contains("MEMBER_LOANS_VIEW"))throw new org.springframework.security.access.AccessDeniedException("Loan unavailable");}
-    @Transactional(readOnly=true) public Summary clientSummary(AppUserPrincipal a,UUID loan,int page){client(a);return summary(a,loan,page);}
-    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public Summary clientExport(AppUserPrincipal a,UUID loan){client(a);var identity=readable(a,loan,false);var history=repository.exportHistory(loan);require(history.size()<=500,"exportLimit");return new Summary(displayPlan(a,loan),repository.balance(loan,clock.today()),history,0,false,null,null,identity.number(),identity.institution(),identity.branch());}
     @Transactional public UUID assess(AppUserPrincipal a,UUID loan,AssessmentForm f){accounting.requireActor(a,"LOAN_RECORDING_POST");return assessment(a,loan,f);}
     private UUID assessment(AppUserPrincipal a,UUID loan,AssessmentForm f){
         require(f!=null && f.getRequestKey()!=null && f.getDate()!=null && !f.getDate().isAfter(clock.today()),"date");text(f.getEvidence(),true);text(f.getReason(),false);

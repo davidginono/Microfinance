@@ -26,5 +26,4 @@ public final class GroupPersonalGuaranteeDtos {
     public record Workspace(Source source,GroupLendingDtos.Page<Offer> offers,Form form,Person selected,boolean ready) {}
     public record Packet(Offer offer,Source source,DocumentForm document,boolean opened,boolean otpRequired,boolean signatureReady,boolean open) {}
     public record Evidence(Packet packet,byte[] terms) {}
-    public record Delivery(UUID id,UUID offer,UUID loan,UUID client,String institution,String branch,String email,String phone,String code,int ttlMinutes) {}
 }

@@ -37,10 +37,10 @@ class ReceiptBatchMvcTest {
     @Autowired WebApplicationContext context;
     @Autowired ReceiptBatchService batches;
     MockMvc mvc;AppUserPrincipal actor;UUID batch=UUID.randomUUID(),item=UUID.randomUUID();
-    @BeforeEach void setup(){reset(batches);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("TEST").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);}
+    @BeforeEach void setup(){reset(batches);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("TEST").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class));}
     @Test void mutationsRequireCsrfAndClientSessionsCannotAccessWorkspace()throws Exception{
         mvc.perform(put("/finance/batches/receipts/"+batch+"/items/"+item).with(user(actor)).contentType("application/json").content("{\"expectedVersion\":0,\"form\":{}}" )).andExpect(status().isForbidden());
-        var client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of(),false);
+        var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of());
         mvc.perform(get("/finance/batches/receipts").with(user(client))).andExpect(status().isForbidden());verifyNoInteractions(batches);
     }
     @Test void jsonMoneyKeepsExactDecimalInputAndScopeComesFromPrincipal()throws Exception{

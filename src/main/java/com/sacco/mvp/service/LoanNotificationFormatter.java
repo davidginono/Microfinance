@@ -59,8 +59,8 @@ public class LoanNotificationFormatter {
         if("CLIENT_PROFILE_VERIFIED".equals(event.getEventType())){
             String number=detailText(payload,"clientNumber");
             return content("Client profile verified / Wasifu umehakikiwa","Client profile verified",
-                "Your profile is verified. Request a fresh access code to apply for a loan. / Wasifu umehakikiwa. Omba msimbo mpya wa kuingia kuomba mkopo.",
-                Map.of("Client number / Namba ya mteja",number),absoluteUrl("/client-portal"));
+                "Your recorded profile is verified. Contact the branch for help. / Taarifa zako zimehakikiwa. Wasiliana na tawi kwa msaada.",
+                Map.of("Client number / Namba ya mteja",number),"");
         }
         if ("GUARANTOR_REQUEST".equals(event.getAggregateType())) {
             return guarantorRequestContent(event, payload, fallback);
@@ -100,7 +100,7 @@ public class LoanNotificationFormatter {
         UUID actorId = uuid(payloadText(payload, "actorId"));
         String guarantor = memberLabel(actorId, "Guarantor");
         Map<String, String> rows = baseLoanRows(app);
-        String url = absoluteUrl("/app/loan-applications/" + app.getId());
+        String url = "";
 
         if ("GUARANTOR_REQUEST_ASSIGNED".equals(eventType)) {
             rows.put("Applicant", memberLabel(app.getApplicantMemberId(), "Applicant"));
@@ -109,7 +109,7 @@ public class LoanNotificationFormatter {
                 "New Guarantor Request",
                 "You have a new guarantor request waiting for your decision.",
                 rows,
-                absoluteUrl("/app/guarantee-requests")
+                ""
             );
         }
         if ("GUARANTOR_REQUEST_APPROVED".equals(eventType)) {
@@ -150,7 +150,7 @@ public class LoanNotificationFormatter {
         String eventType = event.getEventType();
         UUID actorId = uuid(payloadText(payload, "actorId"));
         Map<String, String> rows = baseLoanRows(app);
-        String loanUrl = absoluteUrl("/app/loan-applications/" + app.getId());
+        String loanUrl = "";
 
         if ("GUARANTOR_UNDO_REQUESTED".equals(eventType)) {
             rows.put("Guarantor", memberLabel(actorId, "Guarantor"));
@@ -169,7 +169,7 @@ public class LoanNotificationFormatter {
                 "Guarantor Removal Approved",
                 "The applicant approved your request to be removed from this loan.",
                 rows,
-                absoluteUrl("/app/guarantee-requests")
+                ""
             );
         }
         if ("GUARANTOR_UNDO_REJECTED".equals(eventType)) {
@@ -179,7 +179,7 @@ public class LoanNotificationFormatter {
                 "Guarantor Removal Declined",
                 "The applicant kept you on this loan as an active guarantor.",
                 rows,
-                absoluteUrl("/app/guarantee-requests")
+                ""
             );
         }
         if ("MANAGER_REVERSAL_REQUESTED".equals(eventType)) {
@@ -243,7 +243,7 @@ public class LoanNotificationFormatter {
         if (!reason.isBlank()) {
             rows.put("Reason", reason);
         }
-        String url = absoluteUrl(applicant!=null&&!applicant.isClientPortalEnabled()?"/client-portal":"/app/loan-applications/" + app.getId());
+        String url = "";
         return content(subject, title, summary, rows, url);
     }
 
@@ -261,7 +261,7 @@ public class LoanNotificationFormatter {
         StringBuilder builder = new StringBuilder();
         builder.append(title).append("\n\n").append(summary);
         rows.forEach((label, value) -> builder.append("\n").append(label).append(": ").append(value));
-        builder.append("\nView Loan Details: ").append(url);
+        if(!url.isBlank())builder.append("\nView Loan Details: ").append(url);
         return builder.toString();
     }
 
@@ -282,11 +282,11 @@ public class LoanNotificationFormatter {
                 <h1 style="margin:0 0 12px 0;color:#1f5f66;font-size:22px;line-height:1.25;font-weight:700;">%s</h1>
                 <p style="margin:0 0 18px 0;color:#374151;font-size:14px;line-height:1.45;">%s</p>
                 <div style="border:1px solid #d7e0e5;background:#f8fbfc;border-radius:6px;padding:16px 18px;margin:0 0 18px 0;">%s</div>
-                <a href="%s" style="display:inline-block;background:#1f5f66;color:#ffffff;text-decoration:none;border-radius:5px;padding:11px 16px;font-size:13px;font-weight:700;">View Loan Details</a>
+                 %s
               </div>
             </body>
             </html>
-            """.formatted(escape(title), escape(summary), details, escape(url));
+            """.formatted(escape(title), escape(summary), details,url.isBlank()?"":"<a href=\""+escape(url)+"\">View Loan Details</a>");
     }
 
     private boolean isApplicantStatusEvent(String eventType) {
@@ -317,7 +317,7 @@ public class LoanNotificationFormatter {
     }
 
     private String staffDetailPath(ApprovalWorkflowStage stage, LoanApplication app) {
-        return "/loan-notifications/" + app.getId() + "/open";
+        return "/finance/loan-records/" + app.getId();
     }
 
     private String reason(JsonNode payload) {

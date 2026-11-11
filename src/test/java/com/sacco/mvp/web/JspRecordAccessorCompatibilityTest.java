@@ -3,7 +3,6 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.MemberStatus;
-import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.SaccoAccessStatus;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.service.AdminService;
@@ -64,9 +63,7 @@ class JspRecordAccessorCompatibilityTest {
     void jakartaElResolvesPopulatedStaffArchiveRows() {
         var loan = com.sacco.mvp.domain.LoanApplication.builder().id(UUID.randomUUID()).build();
         var review = com.sacco.mvp.domain.ManagerReview.builder().id(UUID.randomUUID()).build();
-        for (Object row : List.of(new AccountantController.ArchiveEntry(review, loan),
-                new DisbursementController.ArchiveEntry(review, loan),
-                new ManagerController.ArchiveEntry(review, loan, "Ready for Disbursement"))) {
+        for (Object row : List.of(new DisbursementController.ArchiveEntry(review, loan))) {
             assertElProperty("entry", row, "loan", loan);
             assertElProperty("entry", row, "review", review);
         }
@@ -144,7 +141,6 @@ class JspRecordAccessorCompatibilityTest {
 
         AdminService.AdminDashboard adminDashboard = new AdminService.AdminDashboard(
             memberCounts(),
-            Map.of(),
             Map.of(),
             List.of(),
             List.of(),

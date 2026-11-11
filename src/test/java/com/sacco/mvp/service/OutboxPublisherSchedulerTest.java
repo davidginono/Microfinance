@@ -234,6 +234,7 @@ class OutboxPublisherSchedulerTest {
             "MANAGER"
         );
         verify(emailService, times(1)).sendNotificationEmail(
+            eq("SACCO-1"),
             eq(managerId),
             eq("Loan application review required"),
             argThat(text -> text != null

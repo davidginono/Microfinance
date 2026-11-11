@@ -201,7 +201,7 @@ public class LoanRepaymentLedgerService {
         LoanRepaymentTransaction latest = transactions.latestUnreversed(loanId, PageRequest.of(0, 1)).stream()
             .filter(t->t.getKind()==LoanRepaymentTransaction.Kind.PAYMENT)
             .findFirst().orElse(null);
-        List<JournalRow> entries = !actor.isStaffSession() ? List.of() : journal.findByLoanApplicationIdOrderByPostedAtDescId(loanId,
+        List<JournalRow> entries = journal.findByLoanApplicationIdOrderByPostedAtDescId(loanId,
             PageRequest.of(0, 30)).stream().map(e -> new JournalRow(e.getVoucherId(), e.getEffectiveDate(),
                 e.getAccountCode(), e.getDebit(), e.getCredit())).toList();
         PageRequest scheduleRequest = PageRequest.of(Math.max(0, Math.min(schedulePage, 10000)), 25);
@@ -213,7 +213,7 @@ public class LoanRepaymentLedgerService {
             cancelled?ZERO:ledger.getPrincipal().subtract(ledger.getPrincipalPaid()), ledger.getPrincipalPaid(), ledger.getInterestPaid(),
             totals.duePrincipal(), totals.dueInterest(), totals.futureInterest(), totals.oldestOverdue(),
             schedule, history, latest == null ? null : latest.getId(),
-            actor.isStaffSession() ? entries : List.of(),financialState,
+            entries,financialState,
             latest == null ? null : receipt(latest,ledger.getLoanId(),null));
     }
 
@@ -429,12 +429,10 @@ public class LoanRepaymentLedgerService {
     private LoanLedger readableLedger(UUID id, AppUserPrincipal actor) {
         if (actor == null) throw new AccessDeniedException("Forbidden");
         LoanLedger l = ledgers.findById(id).orElseThrow(() -> new AccessDeniedException("Forbidden"));
-        boolean owner = !actor.isStaffSession() && actor.isMemberAccess()
-            && access.has(actor, UserClaim.MEMBER_LOANS_VIEW) && actor.getMemberId().equals(l.getApplicantMemberId());
         boolean staff = actor.isStaffSession() && (access.has(actor, UserClaim.LOAN_REPAYMENTS_VIEW)
             || (access.has(actor, UserClaim.LOAN_RECORDING_VIEW) && accountingGuard.recordedLoan(id)))
             && l.getStationId().equals(actor.getStationId());
-        if (!l.getSaccoId().equals(actor.getSaccoId()) || (!owner && !staff)) throw new AccessDeniedException("Forbidden");
+        if (!l.getSaccoId().equals(actor.getSaccoId()) || !staff) throw new AccessDeniedException("Forbidden");
         return l;
     }
 

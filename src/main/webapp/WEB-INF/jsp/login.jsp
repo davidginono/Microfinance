@@ -19,12 +19,10 @@
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
 </head>
 <body class="auth-shell aws-auth-shell auth-login-page public-access min-h-screen font-sans text-slate-900 antialiased">
-<c:set var="activeLoginTab" value="${systemAdminLogin ? 'system-admin' : (param.tab eq 'staff' ? 'staff' : 'member')}" />
 <nav class="auth-language" aria-label="<spring:message code='portal.language' />">
     <c:forEach items="${['en','sw']}" var="loginLanguage">
         <c:url value="${systemAdminLogin ? '/system-admin/login' : '/login'}" var="loginLanguageUrl">
             <c:param name="lang" value="${loginLanguage}" />
-            <c:if test="${not systemAdminLogin}"><c:param name="tab" value="${activeLoginTab}" /></c:if>
         </c:url>
         <a href="${loginLanguageUrl}" lang="${loginLanguage}" hreflang="${loginLanguage}" data-login-language ${pageContext.response.locale.language eq loginLanguage ? 'aria-current="true"' : ''}>${loginLanguage eq 'sw' ? 'Kiswahili' : 'English'}</a>
     </c:forEach>
@@ -34,33 +32,7 @@
         <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <div class="auth-frame public-access-card">
         <%@ include file="fragments/public-access-brand.jspf" %>
-        <h1 class="${systemAdminLogin ? 'auth-heading mb-6' : 'sr-only'}"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'home.login'}" /></h1>
-        <c:if test="${not systemAdminLogin}">
-        <div class="mb-5">
-            <div class="auth-tabs mb-5" role="tablist" aria-label="<spring:message code='login.chooseType' />">
-                <button type="button"
-                        id="memberLoginTab"
-                        class="auth-tab ${activeLoginTab eq 'member' ? 'is-active' : ''}"
-                        role="tab"
-                        aria-controls="memberLoginPanel"
-                        aria-selected="${activeLoginTab eq 'member'}"
-                        data-login-tab-toggle="member"
-                        data-active="${activeLoginTab eq 'member'}">
-                    <spring:message code="login.clients" />
-                </button>
-                <button type="button"
-                        id="staffLoginTab"
-                        class="auth-tab ${activeLoginTab eq 'staff' ? 'is-active' : ''}"
-                        role="tab"
-                        aria-controls="staffLoginPanel"
-                        aria-selected="${activeLoginTab eq 'staff'}"
-                        data-login-tab-toggle="staff"
-                        data-active="${activeLoginTab eq 'staff'}">
-                    <spring:message code="login.staff" />
-                </button>
-            </div>
-        </div>
-        </c:if>
+        <h1 class="auth-heading mb-6"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'login.staff'}" /></h1>
         <div class="pb-1">
 
                     <spring:message code="login.invalidCredentials" var="loginInvalidCredentials" />
@@ -95,7 +67,6 @@
 
                     <c:choose>
                     <c:when test="${systemAdminLogin}">
-                    <button type="button" hidden data-login-tab-toggle="system-admin" data-active="true" aria-hidden="true"></button>
                     <div data-login-tab="system-admin" class="space-y-5">
                         <div class="space-y-4">
                             <div>
@@ -132,38 +103,7 @@
                     </c:when>
                     <c:otherwise>
 
-                    <div id="memberLoginPanel" role="tabpanel" aria-labelledby="memberLoginTab" data-login-tab="member" class="${activeLoginTab eq 'member' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'member'}">hidden</c:if>>
-                        <div class="space-y-4">
-                            <div>
-                                <p class="auth-mode-title"><spring:message code="login.clientPassword" /></p>
-                            </div>
-                            <form action="/login" method="post" class="space-y-4" data-login-password-form>
-                                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-                                <div>
-                                    <label for="clientLoginIdentifier" class="mb-2 block auth-section-label"><spring:message code="login.username" /></label>
-                                    <input id="clientLoginIdentifier" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="254" required class="auth-input w-full px-4 py-3.5 text-slate-900" />
-                                </div>
-                                <div>
-                                    <label class="mb-2 block auth-section-label"><spring:message code="login.password" /></label>
-                                    <div class="auth-password-control"><input id="memberLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="memberLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
-                                </div>
-                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                    <span class="text-slate-500"><spring:message code="login.passwordHelp" /></span>
-                                    <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="member"><spring:message code="login.forgotPassword" /></a>
-                                </div>
-                                <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
-                                    <span data-login-submit-label><spring:message code="home.login" /></span>
-                                    <span class="hidden items-center gap-2" data-login-submit-loading>
-                                        <span class="auth-submit-spinner" aria-hidden="true"></span>
-                                        <span><spring:message code="login.signingIn" /></span>
-                                    </span>
-                                </button>
-                            </form>
-                        </div>
-
-                    </div>
-
-                    <div id="staffLoginPanel" role="tabpanel" aria-labelledby="staffLoginTab" data-login-tab="staff" class="${activeLoginTab eq 'staff' ? '' : 'hidden '}space-y-5" <c:if test="${activeLoginTab ne 'staff'}">hidden</c:if>>
+                    <div id="staffLoginPanel" data-login-tab="staff" class="space-y-5">
                         <div class="space-y-4">
                             <div>
                                 <p class="auth-mode-title"><spring:message code="login.staffPassword" /></p>
@@ -196,11 +136,6 @@
                     </div>
 
                     <div class="auth-login-meta mt-8 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">
-                        <div class="auth-access-choices">
-                            <a href="<c:url value='/register/member'/>" class="auth-signup-link"><spring:message code="home.createAccount" /></a>
-                            <span><spring:message code="login.or" /></span>
-                            <a class="auth-signup-link" href="<c:url value='/client-portal'/>"><spring:message code="home.openPortal"/></a>
-                        </div>
                         <div class="mt-3">
                             <a href="/system-admin/login" class="auth-text-link"><spring:message code="home.systemAdmin" /></a>
                         </div>
@@ -223,7 +158,7 @@
         <form id="forgotPasswordForm" class="space-y-4 px-5 py-5">
             <input type="hidden" id="forgotPasswordCsrfName" value="${_csrf.parameterName}" />
             <input type="hidden" id="forgotPasswordCsrfToken" value="${_csrf.token}" />
-            <input type="hidden" id="forgotPasswordAccountType" value="member" />
+            <input type="hidden" id="forgotPasswordAccountType" value="staff" />
             <div id="forgotPasswordError" class="hidden border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"></div>
             <div id="forgotPasswordSuccess" class="hidden border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700"></div>
             <div>
@@ -520,413 +455,6 @@
             window.history.replaceState(window.history.state, '', cleanUrl);
         }
 
-        const toggles = document.querySelectorAll('[data-login-tab-toggle]');
-        const tabs = document.querySelectorAll('[data-login-tab]');
-        if (!toggles.length || !tabs.length) {
-            return;
-        }
-        const tabValues = {};
-        const fieldNames = ['username', 'password'];
-        function panelFor(key) {
-            return Array.from(tabs).find((panel) => panel.getAttribute('data-login-tab') === key);
-        }
-        function activeKey() {
-            const activeToggle = Array.from(toggles).find((button) => button.dataset.active === 'true');
-            return activeToggle ? activeToggle.getAttribute('data-login-tab-toggle') : null;
-        }
-        function fieldsFor(key) {
-            const panel = panelFor(key);
-            if (!panel) {
-                return {};
-            }
-            return fieldNames.reduce((fields, name) => {
-                fields[name] = panel.querySelector('input[name="' + name + '"]');
-                return fields;
-            }, {});
-        }
-        function captureValues(key) {
-            const fields = fieldsFor(key);
-            tabValues[key] = fieldNames.reduce((values, name) => {
-                values[name] = fields[name] ? fields[name].value : '';
-                return values;
-            }, {});
-        }
-        function applyValues(key, fallbackValues) {
-            const fields = fieldsFor(key);
-            const values = tabValues[key] || fallbackValues || {};
-            fieldNames.forEach((name) => {
-                if (fields[name] && !fields[name].value && values[name]) {
-                    fields[name].value = values[name];
-                }
-            });
-            captureValues(key);
-        }
-        tabs.forEach((panel) => {
-            const key = panel.getAttribute('data-login-tab');
-            fieldNames.forEach((name) => {
-                const field = panel.querySelector('input[name="' + name + '"]');
-                field?.addEventListener('input', () => captureValues(key));
-            });
-            captureValues(key);
-        });
-        function activate(key) {
-            const previousKey = activeKey();
-            if (previousKey) {
-                captureValues(previousKey);
-            }
-            const previousValues = previousKey ? tabValues[previousKey] : null;
-            toggles.forEach((button) => {
-                const active = button.getAttribute('data-login-tab-toggle') === key;
-                button.dataset.active = String(active);
-                button.classList.toggle('is-active', active);
-                button.setAttribute('aria-selected', String(active));
-                button.tabIndex = active ? 0 : -1;
-            });
-            tabs.forEach((panel) => {
-                const active = panel.getAttribute('data-login-tab') === key;
-                panel.classList.toggle('hidden', !active);
-                panel.hidden = !active;
-            });
-            applyValues(key, previousValues);
-            const nextUrl = new URL(window.location.href);
-            nextUrl.searchParams.set('tab', key);
-            window.history.replaceState(window.history.state, '', nextUrl);
-            if (key !== 'system-admin') document.querySelectorAll('[data-login-language]').forEach(link => {
-                const languageUrl = new URL(link.href);
-                languageUrl.searchParams.set('tab', key);
-                link.href = languageUrl.toString();
-            });
-        }
-        toggles.forEach((button) => {
-            button.addEventListener('click', () => activate(button.getAttribute('data-login-tab-toggle')));
-            button.addEventListener('keydown', (event) => {
-                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
-                    return;
-                }
-                event.preventDefault();
-                const next = event.key === 'ArrowRight' ? button.nextElementSibling : button.previousElementSibling;
-                if (next && next.matches('[data-login-tab-toggle]')) {
-                    activate(next.getAttribute('data-login-tab-toggle'));
-                    next.focus();
-                }
-            });
-        });
-    })();
-
-    (() => {
-        function setOtpButtonLoading(button, loading, idleLabel, loadingLabel) {
-            if (!button) {
-                return;
-            }
-            const spinner = button.querySelector('.otp-button-spinner');
-            const label = button.querySelector('.otp-button-label');
-            if (spinner) {
-                spinner.classList.toggle('hidden', !loading);
-            }
-            if (label) {
-                label.textContent = loading ? loadingLabel : idleLabel;
-            }
-            button.disabled = loading;
-        }
-
-        function bindOtpLiveStatus(config) {
-            const otpInput = config.otpInput;
-            const verifyButton = config.verifyButton;
-            const status = config.status;
-            const spinner = status?.querySelector('[data-otp-spinner]');
-            const tick = status?.querySelector('[data-otp-tick]');
-            const text = status?.querySelector('[data-otp-text]');
-            let otpRequested = false;
-            let lastReady = false;
-            let verificationComplete = false;
-            let verificationTimer = null;
-
-            function clearVerification() {
-                if (verificationTimer) {
-                    window.clearTimeout(verificationTimer);
-                    verificationTimer = null;
-                }
-            }
-
-            function setStatus(mode) {
-                if (!status || !spinner || !tick || !text) {
-                    return;
-                }
-                if (mode === 'hidden') {
-                    status.classList.add('hidden');
-                    status.classList.remove('flex', 'border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
-                    status.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
-                    spinner.classList.remove('hidden');
-                    tick.classList.add('hidden');
-                    text.textContent = 'Checking code...';
-                    return;
-                }
-                status.classList.remove('hidden');
-                status.classList.add('flex');
-                if (mode === 'ready') {
-                    status.classList.remove('border-slate-200', 'bg-slate-50', 'text-slate-600');
-                    status.classList.add('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
-                    spinner.classList.add('hidden');
-                    tick.classList.remove('hidden');
-                    tick.classList.remove('otp-checkmark-pop');
-                    void tick.offsetWidth;
-                    tick.classList.add('otp-checkmark-pop');
-                    text.textContent = 'Verified';
-                } else {
-                    status.classList.remove('border-emerald-200', 'bg-emerald-50', 'text-emerald-700');
-                    status.classList.add('border-slate-200', 'bg-slate-50', 'text-slate-600');
-                    spinner.classList.remove('hidden');
-                    tick.classList.add('hidden');
-                    text.textContent = 'Checking code...';
-                }
-            }
-
-            function sync() {
-                if (!otpInput || !verifyButton) {
-                    return;
-                }
-                otpInput.value = (otpInput.value || '').replace(/\D/g, '').slice(0, 6);
-                const ready = /^\d{6}$/.test(otpInput.value);
-                verifyButton.disabled = !otpRequested || !ready;
-                if (!otpRequested || !otpInput.value) {
-                    clearVerification();
-                    verificationComplete = false;
-                    lastReady = false;
-                    setStatus('hidden');
-                    return;
-                }
-                if (ready && !verificationComplete) {
-                    if (!verificationTimer) {
-                        verificationTimer = window.setTimeout(() => {
-                            verificationTimer = null;
-                            verificationComplete = true;
-                            sync();
-                        }, 240);
-                    }
-                    setStatus('typing');
-                    if (text) {
-                        text.textContent = 'Verifying code...';
-                    }
-                    return;
-                }
-                if (ready && !lastReady && config.proceedButton && !config.proceedButton.disabled) {
-                    try {
-                        config.proceedButton.focus({ preventScroll: true });
-                    } catch (ignored) {
-                        config.proceedButton.focus();
-                    }
-                }
-                if (!ready) {
-                    clearVerification();
-                    verificationComplete = false;
-                }
-                lastReady = ready;
-                setStatus(ready ? 'ready' : 'typing');
-                if (ready && text) {
-                    text.textContent = 'Verified';
-                }
-            }
-
-            otpInput?.addEventListener('input', sync);
-            sync();
-
-            return {
-                markRequested() {
-                    otpRequested = true;
-                    verificationComplete = false;
-                    sync();
-                },
-                reset() {
-                    otpRequested = false;
-                    clearVerification();
-                    verificationComplete = false;
-                    sync();
-                }
-            };
-        }
-
-        function bindOtpSignIn(options) {
-            const form = document.getElementById(options.formId);
-            const emailInput = document.getElementById(options.emailId);
-            const otpInput = document.getElementById(options.otpId);
-            const otpBlock = document.getElementById(options.otpBlockId);
-            const requestButton = document.getElementById(options.requestButtonId);
-            const verifyButton = document.getElementById(options.verifyButtonId);
-            const errorBox = document.getElementById(options.errorBoxId);
-            const successBox = document.getElementById(options.successBoxId);
-            const csrfName = document.getElementById(options.csrfNameId)?.value;
-            const csrfToken = document.getElementById(options.csrfTokenId)?.value;
-            const status = document.getElementById(options.statusId);
-            if (!form || !emailInput || !otpInput || !otpBlock || !requestButton || !verifyButton || !csrfName || !csrfToken) {
-                return;
-            }
-
-            const otpUi = bindOtpLiveStatus({
-                otpInput,
-                verifyButton,
-                status
-            });
-            let verifying = false;
-            let lastAutoSubmittedOtp = '';
-
-            const setError = (message) => {
-                successBox.classList.add('hidden');
-                successBox.textContent = '';
-                errorBox.classList.add('hidden');
-                errorBox.textContent = '';
-                window.showToast?.('error', message);
-            };
-
-            const setSuccess = (message) => {
-                errorBox.classList.add('hidden');
-                errorBox.textContent = '';
-                successBox.classList.add('hidden');
-                successBox.textContent = '';
-                window.showToast?.('success', message);
-            };
-
-            requestButton.addEventListener('click', async () => {
-                if (!emailInput.reportValidity()) {
-                    return;
-                }
-
-                setOtpButtonLoading(requestButton, true, options.requestIdleLabel, 'Sending...');
-                verifyButton.disabled = true;
-                lastAutoSubmittedOtp = '';
-                otpUi.reset();
-                try {
-                    const body = new URLSearchParams();
-                    body.set('email', emailInput.value);
-                    body.set(csrfName, csrfToken);
-                    const response = await fetch(options.requestUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'Accept': 'application/json'
-                        },
-                        body
-                    });
-                    const payload = await response.json().catch(() => ({}));
-                    if (!response.ok || payload.valid !== true) {
-                        setError(payload.message || 'Unable to send the sign-in code right now.');
-                        return;
-                    }
-                    otpBlock.classList.remove('hidden');
-                    otpUi.markRequested();
-                    otpInput.focus();
-                    setSuccess(payload.message || 'We sent a sign-in code to your email.');
-                } catch (error) {
-                    setError('Unable to send the sign-in code right now.');
-                } finally {
-                    setOtpButtonLoading(requestButton, false, options.requestIdleLabel, 'Sending...');
-                }
-            });
-
-            verifyButton.addEventListener('click', async () => {
-                if (verifying) {
-                    return;
-                }
-                if (!emailInput.reportValidity()) {
-                    return;
-                }
-                if (!otpInput.value.trim()) {
-                    otpInput.reportValidity();
-                    otpInput.focus();
-                    setError('Enter the OTP code sent to your email.');
-                    return;
-                }
-
-                setOtpButtonLoading(requestButton, true, options.requestIdleLabel, 'Sending...');
-                verifyButton.disabled = true;
-                verifying = true;
-                try {
-                    const body = new URLSearchParams();
-                    body.set('email', emailInput.value);
-                    body.set('otpCode', otpInput.value);
-                    body.set(csrfName, csrfToken);
-                    const response = await fetch(options.verifyUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                            'Accept': 'application/json'
-                        },
-                        body
-                    });
-                    const payload = await response.json().catch(() => ({}));
-                    if (!response.ok || payload.valid !== true) {
-                        setError(payload.message || 'Unable to verify the sign-in code.');
-                        return;
-                    }
-                    window.location.href = payload.redirectUrl || options.defaultRedirectUrl;
-                } catch (error) {
-                    setError('Unable to verify the sign-in code right now.');
-                } finally {
-                    verifying = false;
-                    setOtpButtonLoading(requestButton, false, options.requestIdleLabel, 'Sending...');
-                    otpUi.markRequested();
-                }
-            });
-
-            if (options.autoSubmitOnReady) {
-                otpInput.addEventListener('input', () => {
-                    const normalized = (otpInput.value || '').replace(/\D/g, '').slice(0, 6);
-                    if (!/^\d{6}$/.test(normalized)) {
-                        lastAutoSubmittedOtp = '';
-                        return;
-                    }
-                    if (normalized === lastAutoSubmittedOtp) {
-                        return;
-                    }
-                    lastAutoSubmittedOtp = normalized;
-                    window.setTimeout(() => {
-                        if (!verifying && !verifyButton.disabled && otpInput.value === normalized) {
-                            verifyButton.click();
-                        }
-                    }, 120);
-                });
-            }
-        }
-
-        bindOtpSignIn({
-            formId: 'memberLoginForm',
-            emailId: 'memberLoginEmail',
-            otpId: 'memberLoginOtpCode',
-            otpBlockId: 'memberOtpBlock',
-            requestButtonId: 'memberRequestOtpButton',
-            verifyButtonId: 'memberVerifyOtpButton',
-            errorBoxId: 'memberLoginError',
-            successBoxId: 'memberLoginSuccess',
-            csrfNameId: 'memberLoginCsrfName',
-            csrfTokenId: 'memberLoginCsrfToken',
-            statusId: 'memberOtpLiveStatus',
-            proceedButton: document.getElementById('memberVerifyOtpButton'),
-            autoSubmitOnReady: true,
-            requestIdleLabel: 'Send Sign-In Code',
-            requestUrl: '/login/member/request-otp',
-            verifyUrl: '/login/member/verify-otp',
-            defaultRedirectUrl: '/app/dashboard'
-        });
-
-        bindOtpSignIn({
-            formId: 'staffLoginForm',
-            emailId: 'staffLoginEmail',
-            otpId: 'staffLoginOtpCode',
-            otpBlockId: 'staffOtpBlock',
-            requestButtonId: 'staffRequestOtpButton',
-            verifyButtonId: 'staffVerifyOtpButton',
-            errorBoxId: 'staffLoginError',
-            successBoxId: 'staffLoginSuccess',
-            csrfNameId: 'staffLoginCsrfName',
-            csrfTokenId: 'staffLoginCsrfToken',
-            statusId: 'staffOtpLiveStatus',
-            proceedButton: document.getElementById('staffVerifyOtpButton'),
-            autoSubmitOnReady: true,
-            requestIdleLabel: 'Send Sign-In Code',
-            requestUrl: '/login/staff/request-otp',
-            verifyUrl: '/login/staff/verify-otp',
-            defaultRedirectUrl: '/login'
-        });
-
         function bindForgotPassword() {
             const modal = document.getElementById('forgotPasswordModal');
             const accountTypeInput = document.getElementById('forgotPasswordAccountType');
@@ -973,7 +501,7 @@
             const open = (accountType) => {
                 accountTypeInput.value = accountType === 'system-admin'
                     ? 'system-admin'
-                    : (accountType === 'staff' ? 'staff' : 'member');
+                    : 'staff';
                 const loginUsername = document.querySelector(
                     '[data-login-tab="' + accountTypeInput.value + '"] input[name="username"]'
                 )?.value;

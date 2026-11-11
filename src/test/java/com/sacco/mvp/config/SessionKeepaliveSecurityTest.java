@@ -52,8 +52,8 @@ class SessionKeepaliveSecurityTest {
         when(settings.policy()).thenReturn(new com.sacco.mvp.service.SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         Member member = Member.builder().id(UUID.randomUUID()).memberNo("SESSION-TEST")
-            .memberAccount(true).status(MemberStatus.ACTIVE).passwordHash(encoder.encode("current-password")).build();
-        principal = new AppUserPrincipal(member, Set.of(), false);
+            .position(com.sacco.mvp.domain.Position.ACCOUNTANT).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).memberAccount(false).status(MemberStatus.ACTIVE).passwordHash(encoder.encode("current-password")).build();
+        principal = new AppUserPrincipal(member,Set.of());
         when(directory.find(member.getId())).thenReturn(Optional.of(member));
         var page = mvc.perform(get("/session/test-token").with(user(principal))).andReturn();
         session = (MockHttpSession) page.getRequest().getSession(false);

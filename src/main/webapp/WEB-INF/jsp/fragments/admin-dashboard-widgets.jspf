@@ -4,8 +4,6 @@
   <div class="erp-panel-body"><dl class="dashboard-facts">
    <div><dt><spring:message code="admin.dashboard.members" /></dt><dd><c:out value="${dashboard.totalMembers}" /></dd></div>
    <div><dt><spring:message code="admin.dashboard.applications" /></dt><dd><c:out value="${dashboard.totalApplications}" /></dd></div>
-   <div><dt><spring:message code="dashboard.metric.managerReview" /></dt><dd><c:out value="${dashboard.onReviewByManagerCount}" /></dd></div>
-   <div><dt><spring:message code="dashboard.metric.awaitingBoard" /></dt><dd><c:out value="${dashboard.awaitingBoardCount}" /></dd></div>
   </dl></div>
  </section>
  <section class="erp-panel" data-dashboard-widget="clients" data-widget-width="1" data-widget-height="480">

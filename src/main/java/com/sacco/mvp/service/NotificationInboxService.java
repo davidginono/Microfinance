@@ -31,16 +31,17 @@ public class NotificationInboxService {
     private final AccessControlService access;
 
     public long unreadCount(AppUserPrincipal principal) {
-        if (principal == null) {
+        if (principal == null || !principal.isStaffSession()) {
             return 0;
         }
         if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
             return notificationRepository.countUnreadExcludingRepaymentSync(principal.getMemberId());
         }
-        if (notificationViewService.isMemberSidePrincipal(principal)) {
+        var hiddenTypes=MEMBER_SIDE_HIDDEN_TYPES.stream().filter(type->!notificationViewService.isVisibleToPrincipal(type,principal)).toList();
+        if (!hiddenTypes.isEmpty()) {
             return notificationRepository.countUnreadExcludingRepaymentSyncAndTypeNotIn(
                 principal.getMemberId(),
-                MEMBER_SIDE_HIDDEN_TYPES
+                hiddenTypes
             );
         }
         return notificationRepository.countUnreadExcludingRepaymentSync(principal.getMemberId());
@@ -166,10 +167,10 @@ public class NotificationInboxService {
         if (notification.getType() != null && notification.getType().startsWith("GUARANTOR_UNDO_")) {
             return "GUARANTOR_UNDO_REQUESTED".equals(notification.getType())
                 ? memberLoanTarget(applicationId, defaultTarget)
-                : "/app/guarantee-requests";
+                : defaultTarget;
         }
         if ("GUARANTOR_REQUEST_ASSIGNED".equals(notification.getType())) {
-            return "/app/guarantee-requests";
+            return defaultTarget;
         }
         if ("GUARANTOR_REQUEST_APPROVED".equals(notification.getType())
             || "GUARANTOR_REQUEST_REJECTED".equals(notification.getType())) {
@@ -181,42 +182,14 @@ public class NotificationInboxService {
             && !incidentId.isBlank()) {
             return "/admin/incidents/" + incidentId;
         }
-        if (!applicationId.isBlank()) {
-            if (principal.isPlatformIdentity() || principal.isWorkspaceAdminScope()) {
-                return defaultTarget;
-            }
-            if (access.canAccessManagerArea(principal)) {
-                return "/manager/loan-applications/" + applicationId;
-            }
-            if (access.canAccessAccountantArea(principal)) {
-                return "/accountant/loan-applications/" + applicationId;
-            }
-            if (access.canAccessDisbursementArea(principal)) {
-                return "/disbursement/loan-applications/" + applicationId;
-            }
-            if (access.canAccessChairpersonArea(principal)) {
-                return "/chairperson/loan-applications/" + applicationId;
-            }
-            if (access.canAccessCreditCommitteeArea(principal)) {
-                return "/credit-committee/loan-applications/" + applicationId;
-            }
-            if (access.canAccessBoardArea(principal)) {
-                return "/board/loan-applications/" + applicationId;
-            }
-            if (access.canAccessLoanOfficerArea(principal)) {
-                return "/loan-officer/loan-applications/" + applicationId;
-            }
-            if (access.canAccessMemberArea(principal)) {
-                return "/app/loan-applications/" + applicationId;
-            }
-        }
+        if (!applicationId.isBlank() && principal.isStaffSession() && access.has(principal,"LOAN_RECORDING_VIEW"))return "/finance/loan-records/"+applicationId+"/review";
         return defaultTarget;
     }
 
     private String memberLoanTarget(String applicationId, String defaultTarget) {
         return applicationId == null || applicationId.isBlank()
             ? defaultTarget
-            : "/app/loan-applications/" + applicationId;
+            : "/finance/loan-records/" + applicationId + "/review";
     }
 
     private String resolveApplicationId(Map<String, Object> details, UUID recipientMemberId) {

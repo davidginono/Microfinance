@@ -16,7 +16,6 @@ import java.util.*;
 
 @Service @RequiredArgsConstructor
 public class GroupOrganizationAgreementExportService {
-    private final GroupOrganizationAgreementService signing;
     private final GroupOrganizationAgreementRepository agreements;
     private final GroupOrganizationDocumentRepository documents;
     private final GroupOrganizationAgreementPdf pdf;
@@ -26,11 +25,7 @@ public class GroupOrganizationAgreementExportService {
     private final ApplicationClock clock;
     private final AuditService audit;
     private final ReportExportLimiter limiter;
-    @Transactional(propagation=Propagation.NOT_SUPPORTED)
-    public byte[] client(AppUserPrincipal actor,UUID cycle,Locale locale){
-        return limiter.run(()->{var data=signing.exportData(actor,cycle);byte[] result=pdf.render(data,locale);
-            signing.documentPrepared(actor,cycle,data.row().snapshot().document().id(),data.row().hash());return result;});
-    }
+
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public Optional<byte[]> staffLoan(AppUserPrincipal actor,UUID loan,Locale locale){return staffLoan(actor,loan,locale,true);}
     @Transactional(propagation=Propagation.NOT_SUPPORTED)

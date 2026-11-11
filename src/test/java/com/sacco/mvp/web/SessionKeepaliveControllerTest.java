@@ -104,6 +104,6 @@ class SessionKeepaliveControllerTest {
             .status(MemberStatus.ACTIVE)
             .passwordHash("encoded-password")
             .build();
-        return new AppUserPrincipal(member, Set.of(), false);
+        return com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of());
     }
 }

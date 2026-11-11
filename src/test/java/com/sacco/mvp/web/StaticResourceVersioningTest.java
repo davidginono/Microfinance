@@ -1,6 +1,5 @@
 package com.sacco.mvp.web;
 
-import com.sacco.mvp.config.AdminScopeInterceptor;
 import com.sacco.mvp.config.MemberLocaleInterceptor;
 import com.sacco.mvp.config.WebConfig;
 import jakarta.servlet.http.HttpServletResponse;
@@ -48,7 +47,6 @@ class StaticResourceVersioningTest {
 
     @Configuration(proxyBeanMethods = false)
     static class TestConfig {
-        @Bean AdminScopeInterceptor adminScopeInterceptor() { return mock(AdminScopeInterceptor.class); }
         @Bean MemberLocaleInterceptor memberLocaleInterceptor() { return mock(MemberLocaleInterceptor.class); }
     }
 

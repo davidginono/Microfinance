@@ -189,9 +189,9 @@ class AppUsageAnalyticsServiceTest {
         member.setSaccoId(saccoId);
         member.setStationId(stationId);
         member.setMemberAccount(role == Position.MEMBER);
-        member.setPosition(role);
+        member.setPosition(role);member.setStatus(com.sacco.mvp.domain.MemberStatus.ACTIVE);member.setStaffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE);
         member.setStaffRoles(new LinkedHashSet<>(role == Position.MEMBER ? Set.of() : Set.of(role)));
-        return new AppUserPrincipal(member, Set.of());
+        return role==Position.MEMBER ? com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of()) : new AppUserPrincipal(member, Set.of());
     }
 
     private AppUsageEventRepository.CountRow row(String label, long total) {

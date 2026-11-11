@@ -69,7 +69,7 @@ class LoanPrepaymentPostgresTest {
     }
     @Test void concurrentWaiverRetriesPostOneConcessionAndViewPermissionCannotWaive()throws Exception{
         var loan=loan(InterestMethod.FLAT_RATE);var key=UUID.randomUUID();
-        var viewOnly=new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(f.actor.getMemberId()).saccoId(f.institution).stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_RECORDING_VIEW),true);
+        var viewOnly=new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(f.actor.getMemberId()).saccoId(f.institution).stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_RECORDING_VIEW));
         assertThatThrownBy(()->f.ledger.waiveInterest(loan,viewOnly,key,LoanRecordingPostgresTest.TODAY,m("5.00"),"No waiver claim",null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){
             var start=new java.util.concurrent.CountDownLatch(1);java.util.concurrent.Callable<UUID> command=()->{start.await();return f.ledger.waiveInterest(loan,f.actor,key,LoanRecordingPostgresTest.TODAY,m("5.00"),"Approved concurrent concession",null);};

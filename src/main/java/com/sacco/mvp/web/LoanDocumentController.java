@@ -3,7 +3,6 @@ package com.sacco.mvp.web;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.domain.GuarantorRequest;
 import com.sacco.mvp.domain.GuarantorRequestStatus;
-import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
@@ -210,40 +209,6 @@ public class LoanDocumentController {
         return "documents/attachment-view";
     }
 
-    @GetMapping("/documents/reports/member-loans.pdf")
-    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'LOAN_REPORTS_EXPORT')")
-    public ResponseEntity<byte[]> downloadMemberLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                                                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                                                           @RequestParam(required = false) UUID loanProductId,
-                                                           @RequestParam(required = false) LoanType loanType) {
-        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType, loanProductId);
-        byte[] pdf = loanReportService.buildMemberAnalyticsPdf(report);
-        auditReportExport(principal, "member-loan-report", "PDF", report.fromDate(), report.toDate());
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=member-loan-report-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
-            .body(pdf);
-    }
-
-    @GetMapping("/documents/reports/member-loans.xlsx")
-    @PreAuthorize("@access.canAccessMemberArea(principal) and @access.has(principal, 'LOAN_REPORTS_EXPORT')")
-    public ResponseEntity<byte[]> downloadMemberLoanReportExcel(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                                                                @RequestParam(required = false) UUID loanProductId,
-                                                                @RequestParam(required = false) LoanType loanType) {
-        LoanReportService.AnalyticsExportReport report = loanReportService.memberAnalyticsExportReport(principal, fromDate, toDate, loanType, loanProductId);
-        byte[] workbook = loanReportService.buildMemberAnalyticsExcel(report);
-        auditReportExport(principal, "member-loan-report", "XLSX", report.fromDate(), report.toDate());
-        return ResponseEntity.ok()
-            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=member-loan-report-" + report.fromDate() + "-to-" + report.toDate() + ".xlsx")
-            .body(workbook);
-    }
-
     @GetMapping("/documents/reports/staff-loan-analytics.pdf")
     @PreAuthorize("@authz.staffAnalyticsAccess(principal) and @access.has(principal, 'STAFF_ANALYTICS_EXPORT')")
     public ResponseEntity<byte[]> downloadStaffLoanAnalyticsPdf(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -378,77 +343,6 @@ public class LoanDocumentController {
         }
     }
 
-    @GetMapping("/documents/reports/manager-loans.pdf")
-    @PreAuthorize("@access.canAccessManagerArea(principal) and @access.has(principal, 'MANAGER_QUEUE_EXPORT')")
-    public ResponseEntity<byte[]> downloadManagerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                                                            @RequestParam(required = false) String decisionFilter) {
-        LoanReportService.ManagerWorkflowReport report = loanReportService.managerWorkflowReport(
-            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate, decisionFilter);
-        byte[] pdf = loanReportService.buildManagerWorkflowPdf(report);
-        auditReportExport(principal, "manager-reviewed-loans", "PDF", report.fromDate(), report.toDate());
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=manager-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
-            .body(pdf);
-    }
-
-    @GetMapping("/documents/reports/board-loans.pdf")
-    @PreAuthorize("(@access.canAccessBoardArea(principal) and @access.has(principal, 'BOARD_QUEUE_EXPORT')) or (@access.canAccessChairpersonArea(principal) and @access.has(principal, 'CHAIRPERSON_QUEUE_EXPORT')) or (@access.canAccessCreditCommitteeArea(principal) and @access.has(principal, 'CREDIT_COMMITTEE_QUEUE_EXPORT'))")
-    public ResponseEntity<byte[]> downloadBoardLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                                                          @RequestParam(required = false) String decisionFilter) {
-        LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
-            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
-            boardReportStage(principal),
-            fromDate, toDate, decisionFilter);
-        byte[] pdf = loanReportService.buildBoardWorkflowPdf(report);
-        auditReportExport(principal, "board-reviewed-loans", "PDF", report.fromDate(), report.toDate());
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=board-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
-            .body(pdf);
-    }
-
-    @GetMapping("/documents/reports/loan-officer-loans.pdf")
-    @PreAuthorize("@access.canAccessLoanOfficerArea(principal) and @access.has(principal, 'LOAN_OFFICER_QUEUE_EXPORT')")
-    public ResponseEntity<byte[]> downloadLoanOfficerLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                                                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                                                                @RequestParam(required = false) String decisionFilter) {
-        LoanReportService.BoardWorkflowReport report = loanReportService.boardWorkflowReport(
-            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(),
-            ApprovalWorkflowStage.LOAN_OFFICER, fromDate, toDate, decisionFilter);
-        byte[] pdf = loanReportService.buildLoanOfficerWorkflowPdf(report);
-        auditReportExport(principal, "loan-officer-reviewed-loans", "PDF", report.fromDate(), report.toDate());
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=loan-officer-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
-            .body(pdf);
-    }
-
-    @GetMapping("/documents/reports/accountant-loans.pdf")
-    @PreAuthorize("@access.canAccessAccountantArea(principal) and @access.has(principal, 'ACCOUNTANT_QUEUE_EXPORT')")
-    public ResponseEntity<byte[]> downloadAccountantLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
-                                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
-                                                               @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-                                                               @RequestParam(required = false) String decisionFilter) {
-        LoanReportService.AccountantLoanReport report = loanReportService.accountantReport(
-            principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), fromDate, toDate, decisionFilter);
-        byte[] pdf = loanReportService.buildAccountantPdf(report);
-        auditReportExport(principal, "accountant-reviewed-loans", "PDF", report.fromDate(), report.toDate());
-        return ResponseEntity.ok()
-            .contentType(MediaType.APPLICATION_PDF)
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=accountant-reviewed-loans-" + report.fromDate() + "-to-" + report.toDate() + ".pdf")
-            .body(pdf);
-    }
-
     @GetMapping("/documents/reports/disbursement-loans.pdf")
     @PreAuthorize("@access.canAccessDisbursementArea(principal) and @access.has(principal, 'DISBURSEMENT_QUEUE_EXPORT')")
     public ResponseEntity<byte[]> downloadDisbursementLoanReport(@AuthenticationPrincipal AppUserPrincipal principal,
@@ -560,16 +454,6 @@ public class LoanDocumentController {
     }
 
     private record SmsUsageScope(String saccoId, String stationId) {
-    }
-
-    private ApprovalWorkflowStage boardReportStage(AppUserPrincipal principal) {
-        if (access.canAccessChairpersonArea(principal)) {
-            return ApprovalWorkflowStage.CHAIRPERSON;
-        }
-        if (access.canAccessBoardArea(principal)) {
-            return ApprovalWorkflowStage.BOARD;
-        }
-        return ApprovalWorkflowStage.CREDIT_COMMITTEE;
     }
 
     private void auditLoanDocument(LoanApplication app,

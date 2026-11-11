@@ -34,7 +34,7 @@ class VoucherMvcTest {
  MockMvc mvc;AppUserPrincipal actor;UUID id=UUID.randomUUID();
  @BeforeEach void setup(){
   reset(service,pdf,receipts,loanPdf,gate,workflows,workflowPosting,documents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-  var m=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class),true);
+  var m=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class));
   lenient().when(service.selectedAccounts(any(),any(),any())).thenReturn(Map.of());
  }
  @Test void multipleRowsBindAndTenantAndPostedTotalsAreNotAccepted()throws Exception{
@@ -93,7 +93,7 @@ class VoucherMvcTest {
  @Test void retiredReportGrantsCannotOpenVoucherRoutesAndRevokedCreateCannotPost()throws Exception{
   var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC")
    .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
-  var retired=new AppUserPrincipal(member,Set.of(UserClaim.REPORT_RUN,UserClaim.FINANCIAL_REPORTS_FINALIZE),true);
+  var retired=new AppUserPrincipal(member,Set.of(UserClaim.REPORT_RUN,UserClaim.FINANCIAL_REPORTS_FINALIZE));
   var repository=mock(com.sacco.mvp.accounting.repository.VoucherRepository.class);
   var directory=mock(com.sacco.mvp.service.MemberDirectoryService.class);
   var ledger=new GeneralLedgerService(mock(com.sacco.mvp.accounting.repository.GeneralLedgerRepository.class),
@@ -104,7 +104,7 @@ class VoucherMvcTest {
   org.springframework.test.util.ReflectionTestUtils.setField(controller,"vouchers",realService);
   try{
    mvc.perform(get("/finance/vouchers/journals").with(user(retired))).andExpect(status().isForbidden());
-   var readOnly=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW),true);
+   var readOnly=new AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW));
    mvc.perform(post("/finance/vouchers/journals").with(user(readOnly)).with(csrf())).andExpect(status().isForbidden());
    verifyNoInteractions(repository,directory,receipts,gate,workflows,workflowPosting);
   }finally{org.springframework.test.util.ReflectionTestUtils.setField(controller,"vouchers",service);}
@@ -121,7 +121,7 @@ class VoucherMvcTest {
   mvc.perform(post("/finance/vouchers/receipts").with(user(actor))).andExpect(status().isForbidden());
   mvc.perform(get("/documents/reports/loans.xlsx").with(user(actor))).andExpect(status().isForbidden());
   mvc.perform(get("/documents/reports/loans.csv").with(user(actor))).andExpect(status().isForbidden());
-  var client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of(),false);
+  var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of());
   mvc.perform(get("/finance/vouchers/receipts").with(user(client))).andExpect(status().isForbidden());
   mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("rows[999].amount","1.01")).andExpect(status().isBadRequest());verify(service,never()).post(any(),any(),any());
  }

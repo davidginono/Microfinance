@@ -36,7 +36,7 @@ class AdminSetupPostgresTest {
         jdbc.update("update members set platform_setup_required=true,password_hash='!BOOTSTRAP_REQUIRED',email=null,phone=null where id=?",AdminSetupService.BOOTSTRAP_ID);
     }
     AppUserPrincipal actor() {return new AppUserPrincipal(Member.builder().id(AdminSetupService.BOOTSTRAP_ID).memberNo("ADM001").position(Position.ADMIN)
-        .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).platformSetupRequired(true).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE),true);}
+        .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).platformSetupRequired(true).build(),Set.of(UserClaim.PLATFORM_SETTINGS_UPDATE));}
     AdminSetupForm form() {var f=new AdminSetupForm();f.setFullName("Synthetic Test Administrator");f.setEmail("admin@example.invalid");f.setPhone("255712345678");f.setCurrentPassword(temporary);f.setPassword("NewPermanentSecret!");f.setConfirmPassword(f.getPassword());return f;}
     String hash() {return jdbc.queryForObject("select password_hash from members where id=?",String.class,AdminSetupService.BOOTSTRAP_ID);}
     @Test void freshMigrationsHaveOneBlockedPlatformAdminAndNoTenants() {

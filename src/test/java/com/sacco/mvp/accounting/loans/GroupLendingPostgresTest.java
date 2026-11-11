@@ -67,7 +67,7 @@ class GroupLendingPostgresTest {
     @Test void currentClaimsAndActiveGroupAreRequired(){
         UUID group=groups.create(fixture.actor,form());var member=fixture.context.getBean(MemberDirectoryService.class).find(fixture.actor.getMemberId()).orElseThrow();
         var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.GROUP_LENDING_UPDATE);
-        var denied=new AppUserPrincipal(member,permissions,true);
+        var denied=new AppUserPrincipal(member,permissions);
         assertThatThrownBy(()->groups.addMember(denied,group,member())).isInstanceOf(AccessDeniedException.class);
         when(fixture.context.getBean(UserClaimService.class).effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(permissions);
         assertThatThrownBy(()->groups.addMember(fixture.actor,group,member())).isInstanceOf(AccessDeniedException.class);

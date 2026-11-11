@@ -11,7 +11,7 @@
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/>
 
     <c:choose><c:when test="${formKind=='create' or formKind=='profile'}">
-<c:set var="identityReadOnly" value="${not empty client and client.portalEnabled}"/><c:set var="profileValues" value="${formKind=='create'?createForm.profile:profileForm.profile}"/>
+<c:set var="identityReadOnly" value="${not empty client and client.staffUser}"/><c:set var="profileValues" value="${formKind=='create'?createForm.profile:profileForm.profile}"/>
 <c:set var="groupLookup" value="/finance/clients/onboarding/groups"/>
 <c:if test="${formKind=='profile'}"><form:hidden path="expectedSequence"/><c:set var="groupLookup" value="/finance/clients/onboarding/groups?clientId=${client.id}"/></c:if>
 <c:set var="profileDocuments" value="${documents}"/><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_DOCUMENTS')" var="canReadProfileDocuments"/>

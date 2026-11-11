@@ -33,7 +33,7 @@ class ReconciliationMvcTest {
     @BeforeEach void setup() {
         reset(service,pdf);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("TEST")
-            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
+            .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
     }
     Result result(Parameters p) {return new Result(p,"Institution","Branch",List.of(),List.of(),0,false);}
     @Test void initialSettingsDoNotRunTheComparison()throws Exception {
@@ -88,7 +88,7 @@ class ReconciliationMvcTest {
         verify(service,times(2)).report(eq(actor),any(),eq(true));
     }
     @Test void clientAndAnonymousSessionsCannotUseTheReport()throws Exception {
-        var client=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("CLIENT").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("CLIENT").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
         mvc.perform(get(URL).with(user(client))).andExpect(status().isForbidden());mvc.perform(get(URL)).andExpect(status().is3xxRedirection());verifyNoInteractions(service);
     }
     @Test void noFinancialWriteOrSpreadsheetEndpointIsAdded()throws Exception {

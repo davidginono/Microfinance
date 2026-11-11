@@ -228,8 +228,7 @@ class LoanRepaymentLedgerPostgresTest {
         jdbc.update("INSERT INTO members(id, sacco_id, station_id, member_no, full_name, status, position, created_at, is_member, password_hash) "
             + "VALUES (?, 'I-PG', ?, ?, 'Test Operator', 'ACTIVE', 'MANAGER', now(), true, 'not-a-login-password')", id, branch, id.toString());
         return new AppUserPrincipal(Member.builder().id(id).saccoId("I-PG").stationId(branch).memberNo(id.toString())
-            .fullName("Test Operator").memberAccount(true).position(Position.MANAGER).status(MemberStatus.ACTIVE).build(),
-            Set.of(UserClaim.LOAN_REPAYMENTS_VIEW, UserClaim.LOAN_REPAYMENTS_CREATE, UserClaim.LOAN_REPAYMENTS_REVERSE), true);
+            .fullName("Test Operator").memberAccount(true).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.LOAN_REPAYMENTS_VIEW, UserClaim.LOAN_REPAYMENTS_CREATE, UserClaim.LOAN_REPAYMENTS_REVERSE));
     }
 
     private LoanRepaymentLedgerService.PaymentCommand command(String amount, String reference, UUID key) {

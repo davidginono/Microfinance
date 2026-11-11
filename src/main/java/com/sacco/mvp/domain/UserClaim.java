@@ -127,6 +127,8 @@ public enum UserClaim {
     LOAN_REPAYMENTS_VIEW(AccessFeature.LOAN_REPAYMENTS, AccessAction.VIEW),
     LOAN_INTEREST_WAIVE(AccessFeature.LOAN_REPAYMENTS, AccessAction.WAIVE),
     LOAN_RECORDING_VIEW(AccessFeature.LOAN_RECORDING, AccessAction.VIEW),
+    LOAN_RECORDING_APPROVE(AccessFeature.LOAN_RECORDING, AccessAction.APPROVE),
+    LOAN_RECORDING_REJECT(AccessFeature.LOAN_RECORDING, AccessAction.REJECT),
     LOAN_RECORDING_CREATE(AccessFeature.LOAN_RECORDING, AccessAction.CREATE),
     LOAN_RECORDING_DISBURSE(AccessFeature.LOAN_RECORDING, AccessAction.DISBURSE),
     LOAN_RECORDING_POST(AccessFeature.LOAN_RECORDING, AccessAction.ADD),
@@ -278,7 +280,7 @@ public enum UserClaim {
     public boolean isAvailable() {
         if (this == ACCOUNTING_RECONCILIATION_VIEW) return true;
         return switch (feature) {
-            case ACCOUNTING_OPENINGS, ACCOUNTING_PERIODS, ACCOUNTING_POLICIES, ACCOUNTING_CASH_FLOW,
+            case PROCESSED_LOANS, SACCO_CONFIGURATIONS, MANAGER_QUEUE, LOAN_OFFICER_QUEUE, ACCOUNTANT_QUEUE, CHAIRPERSON_QUEUE, BOARD_QUEUE, CREDIT_COMMITTEE_QUEUE, MEMBER_LOANS, GUARANTOR_REQUESTS, MEMBER_SETTINGS, PAYMENT_DETAILS, GROUP_COVERAGE_OWN, ACCOUNTING_OPENINGS, ACCOUNTING_PERIODS, ACCOUNTING_POLICIES, ACCOUNTING_CASH_FLOW,
                  ACCOUNTING_RECONCILIATION, ACCOUNTING_CLOSING, FINANCIAL_STATEMENTS, REGULATORY_STATEMENTS,
                  ACCOUNTING_RELEASE, ACCOUNTING_COMPLIANCE_RELEASE, ACCOUNTING_STAFF_ACCEPTANCE,
                  REPORT_BUILDER, REPORT_EXECUTION, ACCESS_MATRIX -> false;
@@ -340,16 +342,6 @@ public enum UserClaim {
     public static Set<UserClaim> legacyClaims(String legacyClaimName) {
         EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
         switch (legacyClaimName) {
-            case "APPLY_LOANS" -> addAll(claims,
-                MEMBER_SETTINGS_VIEW, MEMBER_SETTINGS_UPDATE,
-                PAYMENT_DETAILS_VIEW, PAYMENT_DETAILS_UPDATE,
-                MEMBER_LOANS_VIEW, MEMBER_LOANS_CREATE, MEMBER_LOANS_UPDATE, MEMBER_LOANS_ASSIGN, MEMBER_LOANS_DELETE,
-                LOAN_DOCUMENTS_VIEW, LOAN_DOCUMENTS_EXPORT,
-                LOAN_REPORTS_VIEW, LOAN_REPORTS_EXPORT,
-                NOTIFICATIONS_VIEW, NOTIFICATIONS_UPDATE, SUPPORT_VIEW, SUPPORT_CREATE);
-            case "APPROVE_GUARANTOR_REQUESTS" -> addAll(claims,
-                GUARANTOR_REQUESTS_VIEW, GUARANTOR_REQUESTS_UPDATE, GUARANTOR_REQUESTS_APPROVE, GUARANTOR_REQUESTS_REJECT,
-                NOTIFICATIONS_VIEW, NOTIFICATIONS_UPDATE, SUPPORT_VIEW, SUPPORT_CREATE);
             case "REVIEW_MANAGER_QUEUE" -> addReviewClaims(claims,
                 MANAGER_QUEUE_VIEW, MANAGER_QUEUE_APPROVE, MANAGER_QUEUE_REJECT, MANAGER_QUEUE_EXPORT);
             case "REVIEW_ACCOUNTANT_QUEUE" -> addReviewClaims(claims,
@@ -391,10 +383,6 @@ public enum UserClaim {
 
     public static Set<UserClaim> defaultClaims(Collection<Position> staffRoles, boolean memberAccess) {
         EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
-        if (memberAccess) {
-            claims.addAll(legacyClaims("APPLY_LOANS"));
-            claims.addAll(legacyClaims("APPROVE_GUARANTOR_REQUESTS"));
-        }
         for (Position position : Position.normalizeStaffRoles(staffRoles)) {
             switch (position) {
                 case MEMBER -> {
@@ -418,6 +406,7 @@ public enum UserClaim {
                 case CREDIT_COMMITTEE -> claims.addAll(legacyClaims("REVIEW_CREDIT_COMMITTEE_QUEUE"));
                 case MINOR_ADMIN -> claims.addAll(workspaceAdminDefaults());
                 case ADMIN -> claims.addAll(platformAdminDefaults());
+                default -> { }
             }
         }
         claims.removeIf(claim -> !claim.isAvailable());
@@ -446,16 +435,8 @@ public enum UserClaim {
         if (position == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(switch (position) {
-            case LOAN_OFFICER -> LOAN_OFFICER_QUEUE_VIEW;
-            case MANAGER -> MANAGER_QUEUE_VIEW;
-            case ACCOUNTANT -> ACCOUNTANT_QUEUE_VIEW;
-            case DISBURSEMENT_OFFICER -> DISBURSEMENT_QUEUE_VIEW;
-            case CHAIRPERSON -> CHAIRPERSON_QUEUE_VIEW;
-            case BOARD -> BOARD_QUEUE_VIEW;
-            case CREDIT_COMMITTEE -> CREDIT_COMMITTEE_QUEUE_VIEW;
-            case MEMBER, MINOR_ADMIN, ADMIN -> null;
-        });
+        return position == Position.DISBURSEMENT_OFFICER
+            ? Optional.of(DISBURSEMENT_QUEUE_VIEW) : Optional.empty();
     }
 
     public static Set<UserClaim> administratorRecoveryClaims() {

@@ -14,12 +14,9 @@ import java.util.Locale;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
-    private final AdminScopeInterceptor adminScopeInterceptor;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
 
-    public WebConfig(AdminScopeInterceptor adminScopeInterceptor,
-                     MemberLocaleInterceptor memberLocaleInterceptor) {
-        this.adminScopeInterceptor = adminScopeInterceptor;
+    public WebConfig(MemberLocaleInterceptor memberLocaleInterceptor) {
         this.memberLocaleInterceptor = memberLocaleInterceptor;
     }
 
@@ -45,15 +42,12 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        var portalLocale=new org.springframework.web.servlet.i18n.LocaleChangeInterceptor();
-        portalLocale.setParamName("lang");portalLocale.setHttpMethods("GET");
-        registry.addInterceptor(portalLocale).addPathPatterns("/","/login","/system-admin/login","/client-portal","/client-portal/**");
+        var loginLocale=new org.springframework.web.servlet.i18n.LocaleChangeInterceptor();
+        loginLocale.setParamName("lang");loginLocale.setHttpMethods("GET");
+        registry.addInterceptor(loginLocale).addPathPatterns("/","/login","/system-admin/login");
         registry.addInterceptor(memberLocaleInterceptor)
-            .addPathPatterns("/app/**", "/admin/**", "/staff/**", "/manager/**", "/board/**",
-                "/loan-officer/**", "/accountant/**", "/disbursement/**", "/repayments", "/repayments/**",
+            .addPathPatterns("/admin/**", "/staff/**",
+                "/disbursement/**", "/repayments", "/repayments/**",
                 "/finance/payroll", "/finance/payroll/**", "/finance/groups", "/finance/groups/**");
-        registry.addInterceptor(adminScopeInterceptor)
-            .addPathPatterns("/admin/**")
-            .excludePathPatterns("/admin/scope", "/admin/scope/select");
     }
 }

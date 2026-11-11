@@ -392,7 +392,6 @@ public class DisbursementController {
         model.addAttribute("approveActionLabel", "Approve");
         model.addAttribute("rejectActionLabel", "Reject");
         model.addAttribute("showReviewDecisionForm", false);
-        model.addAttribute("showManagerReversalRequests", false);
         boolean recordedApplication=loanRecordingService.recordedForStaff(principal,app.getId());
         model.addAttribute("recordedLoanApplication",recordedApplication);
         if(!model.containsAttribute("disbursementRequestKey"))model.addAttribute("disbursementRequestKey",UUID.randomUUID());

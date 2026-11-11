@@ -31,7 +31,7 @@ public class VoucherAutomaticPostingService {
             var actor=tx.execute(status->{
                 var member=members.find(request.owner()).orElseThrow(()->new IllegalArgumentException("approval.error.assignment"));
                 VoucherApprovalGate.require(Objects.equals(member.getSaccoId(),request.institution()) && Objects.equals(member.getStationId(),request.branch()),"assignment");
-                return new AppUserPrincipal(member,claims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()),true);
+                return new AppUserPrincipal(member,claims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()));
             });
             posting.postAutomatically(actor,id,request.version());
         }catch(RuntimeException failure){tx.executeWithoutResult(status->repository.automaticFailed(id,request.version(),VoucherWorkflowService.safeError(failure),clock.now()));}

@@ -8,7 +8,6 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.security.AppUserDetailsService;
 import com.sacco.mvp.security.AppUsageTrackingFilter;
 import com.sacco.mvp.security.AuthzService;
-import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.security.SaccoAccessFilter;
 import com.sacco.mvp.security.SessionTimeoutPolicyFilter;
 import com.sacco.mvp.security.WorkspaceLanding;
@@ -76,10 +75,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
-                                                   com.sacco.mvp.clients.onboarding.service.OnboardingService onboardingService,
                                                    MemberDirectoryService memberDirectoryService,
                                                    StationAccessService stationAccessService,
-                                                   AdminScopeService adminScopeService,
                                                    SaccoAccessFilter saccoAccessFilter,
                                                    AuthzService authzService,
                                                    AccessControlService accessControlService,
@@ -95,13 +92,11 @@ public class SecurityConfig {
             .authenticationProvider(authenticationProvider(userDetailsService, passwordEncoder))
             .authorizeHttpRequests(auth -> {
                 auth.dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/", "/login", "/system-admin/login", "/login/mfa/**", "/login/staff/**", "/login/member/**", "/login/password-reset/**", "/register/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
+                .requestMatchers("/", "/login", "/system-admin/login", "/login/mfa/**", "/login/staff/**", "/login/password-reset/**", "/auth/claim/**", "/css/**", "/js/**", "/images/**", "/fonts/**", "/error", "/error/**", "/actuator/health", "/actuator/health/**").permitAll();
                 if (publicActuatorMetrics) {
                     auth.requestMatchers("/actuator/metrics", "/actuator/metrics/**").permitAll();
                 }
                 auth
-                .requestMatchers("/client-portal/workspace/**").access((authentication,context)->new AuthorizationDecision(authentication.get().getPrincipal() instanceof com.sacco.mvp.clients.portal.dto.ClientPortalDtos.Session))
-                .requestMatchers("/client-portal", "/client-portal/register", "/client-portal/register/draft", "/client-portal/choices", "/client-portal/request-code", "/client-portal/verify").permitAll()
                 .requestMatchers("/documents/reports/*.xlsx", "/documents/reports/*.csv").denyAll()
                 .requestMatchers("/finance/**", "/reports/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
@@ -115,51 +110,13 @@ public class SecurityConfig {
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && accessControlService.canAccessAdminArea(appUser));
                 })
-                .requestMatchers("/loan-officer/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessLoanOfficerArea(appUser));
-                })
-                .requestMatchers("/manager/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessManagerArea(appUser));
-                })
-                .requestMatchers("/accountant/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessAccountantArea(appUser));
-                })
+
                 .requestMatchers("/disbursement/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
                         && accessControlService.canAccessDisbursementArea(appUser));
                 })
-                .requestMatchers("/chairperson/processed-loans", "/chairperson/processed-loans/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canViewProcessedLoans(appUser));
-                })
-                .requestMatchers("/chairperson/configurations", "/chairperson/configurations/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canViewSaccoConfigurations(appUser));
-                })
-                .requestMatchers("/chairperson/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessChairpersonArea(appUser));
-                })
-                .requestMatchers("/credit-committee/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessCreditCommitteeArea(appUser));
-                })
-                .requestMatchers("/board/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessBoardArea(appUser));
-                })
+
                 .requestMatchers("/staff/dashboard").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
@@ -168,19 +125,9 @@ public class SecurityConfig {
                 .requestMatchers("/staff/**").access((authentication, context) -> {
                     Object principal = authentication.get().getPrincipal();
                     return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && authzService.staffAnalyticsAccess(appUser));
+                        && appUser.isStaffSession());
                 })
-                .requestMatchers("/app/onboarding", "/app/onboarding/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && appUser.isMemberAccess() && !appUser.isStaffSession());
-                })
-                .requestMatchers("/app/**").access((authentication, context) -> {
-                    Object principal = authentication.get().getPrincipal();
-                    return new AuthorizationDecision(principal instanceof AppUserPrincipal appUser
-                        && accessControlService.canAccessMemberArea(appUser));
-                })
-                .anyRequest().authenticated();
+                .anyRequest().access((authentication,context)->new AuthorizationDecision(authentication.get().getPrincipal() instanceof AppUserPrincipal p && p.isStaffSession()));
             })
             .formLogin(form -> form
                 .loginPage("/login")
@@ -198,7 +145,7 @@ public class SecurityConfig {
                             ? memberDirectoryService.findPlatformAdminLoginAccount(normalizedUsername)
                             : staffPasswordLogin
                                 ? memberDirectoryService.findStaffLoginAccount(normalizedUsername)
-                                : memberDirectoryService.findClientLoginAccount(normalizedUsername);
+                                : java.util.Optional.empty();
                         auditMember = matchedMember.orElse(null);
                         message = matchedMember
                             .map(member -> {
@@ -223,16 +170,10 @@ public class SecurityConfig {
                                     return "Invalid System Admin ID or password.";
                                 }
                                 if (staffPasswordLogin) {
-                                    if (member.isStaffAccessPendingAcknowledgement()) {
-                                        return "Staff access is pending acknowledgement. Sign in through Members to activate it.";
-                                    }
                                     if (!member.isStaffAccessActive()) {
-                                        return "This account has no staff access. Sign in through Members instead.";
+                                        return "This account has no active staff access.";
                                     }
                                     return "Invalid email, username or password.";
-                                }
-                                if (!member.isMemberAccess()) {
-                                    return "You are not registered as a member. Sign in through Staff instead.";
                                 }
                                 return "Invalid email, username or password.";
                             })
@@ -270,7 +211,7 @@ public class SecurityConfig {
                         principal, staffPasswordLogin, isSuperAdmin, isMinorAdmin, stationOtpSettingsService);
                     if (requireLoginMfa) {
                         if (principal != null) {
-                            String landing = savedTarget == null ? landingFor(principal, staffSessionLogin) : savedTarget;
+                            String landing = savedTarget == null ? WorkspaceLanding.authenticatedDefault(principal) : savedTarget;
                             try {
                                 staffMfaService.startChallenge(principal, landing, loginType, request);
                             } catch (IllegalStateException ex) {
@@ -284,7 +225,6 @@ public class SecurityConfig {
                             }
                             clearAuthenticationContext(request);
                             if (isSuperAdmin) {
-                                adminScopeService.clearScope();
                             }
                             response.sendRedirect("/login/mfa");
                             return;
@@ -293,16 +233,11 @@ public class SecurityConfig {
 
                     if (savedTarget != null) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                        response.sendRedirect(savedTargetAfterLogin(principal, savedTarget));
+                        response.sendRedirect(savedTarget);
                         return;
                     }
-                    if (!staffPasswordLogin && principal != null && principal.isMemberAccess()) {
-                        auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                        response.sendRedirect(WorkspaceLanding.memberDashboardAfterLogin());
-                        return;
-                    }
+
                     if (isSuperAdmin) {
-                        adminScopeService.clearScope();
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
                         response.sendRedirect(WorkspaceLanding.staffDashboard(principal));
                         return;
@@ -313,7 +248,7 @@ public class SecurityConfig {
                         return;
                     }
                     auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                    response.sendRedirect(WorkspaceLanding.memberDashboardAfterLogin());
+                    response.sendRedirect(WorkspaceLanding.authenticatedDefault(principal));
                 })
                 .permitAll())
             .logout(logout -> logout
@@ -326,10 +261,8 @@ public class SecurityConfig {
                 }))
             .exceptionHandling(ex -> ex.accessDeniedHandler(loginAwareAccessDeniedHandler()))
             .csrf(Customizer.withDefaults())
-            .addFilterBefore(new com.sacco.mvp.clients.portal.security.ClientPortalIsolationFilter(), AuthorizationFilter.class)
             .addFilterBefore(new com.sacco.mvp.security.PlatformSetupFilter(), AuthorizationFilter.class)
             .addFilterBefore(saccoAccessFilter, AuthorizationFilter.class)
-            .addFilterAfter(new com.sacco.mvp.security.ClientOnboardingFilter(onboardingService), AuthorizationFilter.class)
             .addFilterAfter(new SessionTimeoutPolicyFilter(platformSessionSettingsService), AuthorizationFilter.class)
             .addFilterAfter(new AppUsageTrackingFilter(appUsageAnalyticsService), AuthorizationFilter.class);
 
@@ -348,7 +281,7 @@ public class SecurityConfig {
 
                     var ssoMember = memberDirectoryService.findByEmail(email)
                         .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-                        .filter(member -> (member.isMemberAccess() && member.isClientPortalEnabled()) || member.isStaffAccessActive())
+                        .filter(Member::isStaffAccessActive)
                         .orElse(null);
                     if (ssoMember == null) {
                         auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "No active SACCO account is linked to that Google email.");
@@ -363,7 +296,6 @@ public class SecurityConfig {
                         response.sendRedirect("/system-admin/login?error");
                         return;
                     }
-                    boolean ssoStaffSession = !ssoMember.isMemberAccess();
                     if (!ssoMember.getActiveStaffRolesResolved().contains(com.sacco.mvp.domain.Position.ADMIN)
                         && ssoMember.getSaccoId() != null
                         && !ssoMember.getSaccoId().isBlank()
@@ -383,10 +315,7 @@ public class SecurityConfig {
 
                     AppUserPrincipal principal = new AppUserPrincipal(
                         ssoMember,
-                        ssoStaffSession
-                            ? userClaimService.effectiveClaims(ssoMember.getId(), ssoMember.getActiveStaffRolesResolved(), ssoMember.isMemberAccess())
-                            : userClaimService.clientSessionClaims(ssoMember.getId()),
-                        ssoStaffSession
+                        userClaimService.effectiveClaims(ssoMember.getId(), ssoMember.getActiveStaffRolesResolved(), ssoMember.isMemberAccess())
                     );
 
                     UsernamePasswordAuthenticationToken localAuth =
@@ -397,16 +326,15 @@ public class SecurityConfig {
                     request.getSession(true).setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
 
                     if (principal.isPlatformIdentity()) {
-                        adminScopeService.clearScope();
                     }
                     String savedTarget = savedRequestTarget(request);
                     if (savedTarget != null) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
-                        response.sendRedirect(savedTargetAfterLogin(principal, savedTarget));
+                        response.sendRedirect(savedTarget);
                         return;
                     }
                     auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
-                    response.sendRedirect(authenticatedLandingAfterLogin(principal));
+                    response.sendRedirect(WorkspaceLanding.authenticatedDefault(principal));
                 })
                 .failureHandler((request, response, exception) -> {
                     auditLogin(auditService, null, null, AuditEventStatus.FAIL, "Google SSO", "Google sign-in could not be completed.");
@@ -454,7 +382,7 @@ public class SecurityConfig {
             if ("staff-password".equals(loginType)) {
                 return userDetailsService.loadStaffByEmailOrUsername(normalizedUsername);
             }
-            return userDetailsService.loadClientByEmailOrUsername(normalizedUsername);
+            throw new org.springframework.security.authentication.BadCredentialsException("Use Staff or System Admin sign in.");
         };
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider(loginUserDetailsService) {
             @Override
@@ -476,12 +404,9 @@ public class SecurityConfig {
                         throw new AuthenticationServiceException("Use the separate System Admin login.");
                     }
                     if (principal.getStaffRoles() == null || principal.getStaffRoles().isEmpty()) {
-                        throw new AuthenticationServiceException("This account has no staff access. Sign in through Members instead.");
+                        throw new AuthenticationServiceException("This account has no active staff access.");
                     }
                     return;
-                }
-                if (!principal.isMemberAccess()) {
-                    throw new AuthenticationServiceException("This account is staff-only. Sign in through Staff instead.");
                 }
             }
 
@@ -564,52 +489,6 @@ public class SecurityConfig {
         return !(staffPasswordLogin && isMinorAdmin && localDevMinorAdminPasswordLoginEnabled)
             && stationOtpSettingsService.requiresLoginMfa(
                 principal.getMemberId(), principal.getSaccoId(), principal.getStationId(), isSuperAdmin);
-    }
-
-    private String landingFor(AppUserPrincipal principal, boolean staffPasswordLogin) {
-        if (!staffPasswordLogin && principal.isMemberAccess()) {
-            return WorkspaceLanding.memberDashboardAfterLogin();
-        }
-        if (staffPasswordLogin || !principal.getStaffRoles().isEmpty()) {
-            return WorkspaceLanding.staffDashboard(principal);
-        }
-        return WorkspaceLanding.memberDashboardAfterLogin();
-    }
-
-    private String authenticatedLandingAfterLogin(AppUserPrincipal principal) {
-        if (principal != null && principal.isMemberAccess() && !principal.isStaffSession()) {
-            return WorkspaceLanding.memberDashboardAfterLogin();
-        }
-        return WorkspaceLanding.authenticatedDefault(principal);
-    }
-
-    private String savedTargetAfterLogin(AppUserPrincipal principal, String savedTarget) {
-        if (principal == null || !principal.isMemberAccess() || principal.isStaffSession() || !isMemberDashboardTarget(savedTarget)) {
-            return savedTarget;
-        }
-        if (savedTarget.contains("progressive=true")) {
-            return savedTarget;
-        }
-        int fragmentIndex = savedTarget.indexOf('#');
-        String baseTarget = fragmentIndex >= 0 ? savedTarget.substring(0, fragmentIndex) : savedTarget;
-        String fragment = fragmentIndex >= 0 ? savedTarget.substring(fragmentIndex) : "";
-        return baseTarget + (baseTarget.contains("?") ? "&" : "?") + "progressive=true" + fragment;
-    }
-
-    private boolean isMemberDashboardTarget(String target) {
-        if (target == null || target.isBlank()) {
-            return false;
-        }
-        try {
-            return "/app/dashboard".equals(java.net.URI.create(target).getPath());
-        } catch (IllegalArgumentException ex) {
-            int queryIndex = target.indexOf('?');
-            int fragmentIndex = target.indexOf('#');
-            int endIndex = queryIndex >= 0 && fragmentIndex >= 0
-                ? Math.min(queryIndex, fragmentIndex)
-                : Math.max(queryIndex, fragmentIndex);
-            return "/app/dashboard".equals(endIndex >= 0 ? target.substring(0, endIndex) : target);
-        }
     }
 
     private void clearAuthenticationContext(HttpServletRequest request) {

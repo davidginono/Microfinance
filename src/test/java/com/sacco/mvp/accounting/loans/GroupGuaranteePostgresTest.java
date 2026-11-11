@@ -7,7 +7,6 @@ import com.sacco.mvp.service.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
@@ -49,44 +48,13 @@ class GroupGuaranteePostgresTest {
         assertThat(f.context.getBean(GroupCycleRepository.class).exposures(f.actor,List.of(f.client)).get(f.client).missingHistory()).isEqualTo(2);
         assertThat(f.jdbc.queryForObject("select count(*) from lending_group_participant where cycle_id=?",Integer.class,cycle)).isZero();
     }
-    @Test void payingOnesOwnLoanDoesNotReleaseAPeersGuaranteeOrTheActiveCycle(){
-        var cycle=setup.submitted();setup.consents.accept(setup.client(f.client),cycle,true,"");setup.consents.accept(setup.client(setup.second),cycle,true,"");var participants=setup.cycles.participants(f.actor,cycle);
-        for(var p:participants)f.service.disburse(f.actor,f.post(p.loanId(),"1000.00","D-CAPACITY-"+p.loanId()));
-        var own=participants.stream().filter(p->p.clientId().equals(f.client)).findFirst().orElseThrow().loanId();var peer=participants.stream().filter(p->p.clientId().equals(setup.second)).findFirst().orElseThrow().loanId();
-        f.service.repay(f.actor,f.post(own,"1020.00","OWN-SETTLEMENT"));var repository=f.context.getBean(GroupCycleRepository.class);
-        assertThat(repository.exposures(f.actor,List.of(f.client)).get(f.client).activeCycles()).isEqualTo(1);assertThat(requests().countActiveGuarantees(f.client,f.institution,"B1")).isEqualTo(1);
-        f.service.repay(f.actor,f.post(peer,"1020.00","PEER-SETTLEMENT"));assertThat(repository.exposures(f.actor,List.of(f.client)).get(f.client).activeCycles()).isZero();assertThat(requests().countActiveGuarantees(f.client,f.institution,"B1")).isZero();
-    }
-    @Test void groupSubmissionAndOrdinaryApprovalCannotBothReserveTheFinalSlot()throws Exception{
-        limit(1);UUID ordinary=loan(borrower(),"AWAITING_GUARANTORS","{\"interestAmount\":20}",new BigDecimal("1020.00"));UUID request=promise(ordinary,f.client,"PENDING");
-        var form=setup.form();var cycle=setup.cycles.create(f.actor,setup.group,form);var start=new CountDownLatch(1);
-        try(var workers=Executors.newFixedThreadPool(2)){
-            var group=workers.submit(()->{start.await();try{setup.cycles.submit(f.actor,cycle,form);return true;}catch(IllegalArgumentException expected){return false;}});
-            var individual=workers.submit(()->{start.await();try{f.context.getBean(LoanWorkflowService.class).approveGuarantorRequest(request,f.client,"Synthetic personal signature",OffsetDateTime.now());return true;}catch(IllegalArgumentException expected){return false;}});
-            start.countDown();assertThat(List.of(group.get(60,TimeUnit.SECONDS),individual.get(60,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
-        }
-        assertThat(requests().countActiveGuarantees(f.client,f.institution,"B1")).isEqualTo(1);
-    }
-    @Test void ordinaryApprovalsAlsoSerializeWhenOnlyOneSlotRemains()throws Exception{
-        limit(1);UUID borrower=borrower();var ids=new ArrayList<UUID>();for(int n=0;n<2;n++)ids.add(promise(loan(borrower,"AWAITING_GUARANTORS","{\"interestAmount\":20}",new BigDecimal("1020.00")),f.client,"PENDING"));
-        var start=new CountDownLatch(1);try(var workers=Executors.newFixedThreadPool(2)){
-            var tasks=ids.stream().map(id->workers.submit(()->{start.await();try{f.context.getBean(LoanWorkflowService.class).approveGuarantorRequest(id,f.client,"Synthetic personal signature",OffsetDateTime.now());return true;}catch(IllegalArgumentException expected){return false;}})).toList();start.countDown();assertThat(List.of(tasks.getFirst().get(60,TimeUnit.SECONDS),tasks.getLast().get(60,TimeUnit.SECONDS))).containsExactlyInAnyOrder(true,false);
-        }assertThat(requests().countActiveGuarantees(f.client,f.institution,"B1")).isEqualTo(1);
-    }
+
     @Test void aPendingTopupDoesNotReleaseAnExistingPromise(){
         UUID source=f.topUpSource();promise(source,setup.second,"APPROVED");assertThat(requests().countActiveGuarantees(setup.second,f.institution,"B1")).isEqualTo(1);
         f.recordTopUp(source);assertThat(requests().countActiveGuarantees(setup.second,f.institution,"B1")).isEqualTo(1);
         assertThat(f.service.detail(f.actor,source).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
     }
-    @Test void staleProfileAndClosedLoansCannotAcceptARequest(){
-        UUID app=loan(borrower(),"AWAITING_GUARANTORS","{\"interestAmount\":20}",new BigDecimal("1020.00"));UUID request=promise(app,f.client,"PENDING");
-        f.jdbc.update("update members set status='INACTIVE' where id=?",f.client);
-        assertThatThrownBy(()->f.context.getBean(LoanWorkflowService.class).approveGuarantorRequest(request,f.client)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-        assertThat(requests().findById(request).orElseThrow().getStatus()).isEqualTo(GuarantorRequestStatus.PENDING);
-        f.jdbc.update("update members set status='ACTIVE' where id=?",f.client);UUID rejected=loan(borrower(),"MANAGER_REJECTED","{\"interestAmount\":20}",new BigDecimal("1020.00"));UUID closed=promise(rejected,f.client,"PENDING");
-        assertThatThrownBy(()->f.context.getBean(LoanWorkflowService.class).approveGuarantorRequest(closed,f.client)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-        assertThat(requests().findById(closed).orElseThrow().getStatus()).isEqualTo(GuarantorRequestStatus.PENDING);
-    }
+
     @Test void capacityLocksRequireTheCurrentInstitutionAndBranch(){
         var tx=new org.springframework.transaction.support.TransactionTemplate(f.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));
         Boolean foreign=tx.execute(status->requests().lockGuarantorCapacity(f.client,"FOREIGN","B1"));Boolean branch=tx.execute(status->requests().lockGuarantorCapacity(f.client,f.institution,"B2"));Boolean own=tx.execute(status->requests().lockGuarantorCapacity(f.client,f.institution,"B1"));

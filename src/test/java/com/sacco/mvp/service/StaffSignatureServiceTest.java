@@ -31,7 +31,7 @@ class StaffSignatureServiceTest {
             .position(Position.MANAGER).staffRoles(Set.of(Position.MANAGER)).staffNo("TEST")
             .status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE)
             .fullName("Test Manager").passwordHash("encoded").build();
-        actor = new AppUserPrincipal(member, EnumSet.allOf(UserClaim.class), true);
+        actor = new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class));
         when(repository.findForSignatureRegistration(member.getId())).thenReturn(Optional.of(member));
     }
 
@@ -73,7 +73,7 @@ class StaffSignatureServiceTest {
 
     @Test void rejectsClientSessionsEvenIfTheStoredAccountLaterGainsStaffAccess() {
         var client = Member.builder().id(member.getId()).saccoId("I1").stationId("B1").position(Position.MEMBER).status(MemberStatus.ACTIVE).build();
-        var clientActor = new AppUserPrincipal(client, EnumSet.noneOf(UserClaim.class), true);
+        var clientActor = com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(client,EnumSet.noneOf(UserClaim.class));
         assertThatThrownBy(() -> service.register(clientActor, "Amina Juma", "password", true)).isInstanceOf(AccessDeniedException.class);
         verify(repository, never()).save(any()); verifyNoInteractions(encoder, audit);
     }

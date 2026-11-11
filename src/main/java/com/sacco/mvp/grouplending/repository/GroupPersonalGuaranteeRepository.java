@@ -2,7 +2,6 @@ package com.sacco.mvp.grouplending.repository;
 
 import com.sacco.mvp.grouplending.dto.GroupPersonalGuaranteeDtos.*;
 import com.sacco.mvp.grouplending.dto.GroupLendingDtos.Choice;
-import com.sacco.mvp.grouplending.dto.GroupConsentDtos.Challenge;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.*;
@@ -39,7 +38,7 @@ public class GroupPersonalGuaranteeRepository {
     private static final Map<String,String> STAFF_SORT=Map.of("code","code","guarantor","row(g.client_number,g.client_name)","cap","g.amount_cap","state","state","date","d.decided_at");
     private static final Map<String,String> CLIENT_SORT=Map.of("code","code","loan","loan_number","borrower","b.full_name","cap","g.amount_cap","state","state");
     public List<Offer> staff(AppUserPrincipal a,UUID cycle,LocalDate date,int page){return jdbc.query("select "+COLUMNS+OFFER_FROM+"and g.cycle_id=? order by "+com.sacco.mvp.support.ResourceTableSort.order("personal-guarantees",STAFF_SORT,"g.id","g.recorded_at desc,g.id desc")+" limit 26 offset ?",OFFER,date,a.getSaccoId(),a.getStationId(),cycle,page*25);}
-    public List<Offer> client(AppUserPrincipal a,LocalDate date,int page){return jdbc.query("select "+COLUMNS+OFFER_FROM+"and g.client_id=? order by "+com.sacco.mvp.support.ResourceTableSort.order("my-group-guarantees",CLIENT_SORT,"g.id","g.recorded_at desc,g.id desc")+" limit 26 offset ?",OFFER,date,a.getSaccoId(),a.getStationId(),a.getMemberId(),page*25);}
+
     public Offer offer(AppUserPrincipal a,UUID id,LocalDate date,boolean own){return jdbc.query("select "+COLUMNS+OFFER_FROM+"and g.id=?"+(own?" and g.client_id=?":""),OFFER,own?new Object[]{date,a.getSaccoId(),a.getStationId(),id,a.getMemberId()}:new Object[]{date,a.getSaccoId(),a.getStationId(),id}).stream().findFirst().orElseThrow(()->new AccessDeniedException("Personal guarantee unavailable"));}
     public List<Choice> choices(AppUserPrincipal a,UUID cycle,String search,int page){return jdbc.query("select id,member_no||' - '||full_name from members m where sacco_id=? and station_id=? and is_member and status='ACTIVE' and strpos(lower(member_no||' '||full_name),?)>0 and not exists(select 1 from lending_group_shared_allocation s where s.cycle_id=? and s.client_id=m.id) order by member_no,id limit 26 offset ?",(r,n)->new Choice(r.getObject(1,UUID.class),r.getString(2)),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),cycle,page*25);}
     public Optional<Person> person(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no,full_name from members where id=? and sacco_id=? and station_id=? and is_member and status='ACTIVE'",(r,n)->new Person(id,r.getString(2),r.getString(3)),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
@@ -55,12 +54,7 @@ public class GroupPersonalGuaranteeRepository {
     public boolean ready(UUID loan){return Boolean.TRUE.equals(jdbc.queryForObject("select lending_personal_guarantees_ready(?)",Boolean.class,loan));}
     public boolean offBranch(AppUserPrincipal a,UUID client){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_personal_commitment where client_id=? and sacco_id=? and station_id<>?)",Boolean.class,client,a.getSaccoId(),a.getStationId()));}
     public byte[] body(AppUserPrincipal a,UUID id){return jdbc.queryForObject("select body from lending_group_personal_guarantee where id=? and sacco_id=? and station_id=?",byte[].class,id,a.getSaccoId(),a.getStationId());}
-    public boolean opened(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from lending_group_personal_opened where offer_id=? and client_id=?)",Boolean.class,id,a.getMemberId()));}
-    public void opened(AppUserPrincipal a,Offer o,OffsetDateTime at){jdbc.update("insert into lending_group_personal_opened(offer_id,client_id,packet_hash,opened_at) values(?,?,?,?) on conflict do nothing",o.id(),a.getMemberId(),o.hash(),at);}
+
     public void decide(AppUserPrincipal a,Offer o,String decision,String reason,String signature,UUID challenge,OffsetDateTime at){jdbc.update("insert into lending_group_personal_decision(offer_id,client_id,decision,reason,actor_id,packet_hash,signature_text,decided_at,otp_required,challenge_id) values(?,?,?,?,?,?,?,?,?,?)",o.id(),o.client(),decision,reason,a.getMemberId(),o.hash(),signature,at,challenge!=null,challenge);}
-    public List<Challenge> challenges(Offer o){return jdbc.query("select id,code_hash,issued_at,expires_at,delivered_at,consumed_at,attempts from lending_group_personal_challenge where offer_id=? order by issued_at desc,id desc limit 4 for update",(r,n)->new Challenge(r.getObject(1,UUID.class),r.getString(2),r.getObject(3,OffsetDateTime.class),r.getObject(4,OffsetDateTime.class),r.getObject(5,OffsetDateTime.class),r.getObject(6,OffsetDateTime.class),r.getInt(7)),o.id());}
-    public void challenge(AppUserPrincipal a,Offer o,UUID id,String hash,OffsetDateTime at,OffsetDateTime expires){jdbc.update("insert into lending_group_personal_challenge(id,offer_id,client_id,sacco_id,station_id,packet_hash,code_hash,issued_at,expires_at) values(?,?,?,?,?,?,?,?,?)",id,o.id(),a.getMemberId(),a.getSaccoId(),a.getStationId(),o.hash(),hash,at,expires);}
-    public void attempted(UUID id){jdbc.update("update lending_group_personal_challenge set attempts=attempts+1 where id=? and attempts<5",id);}
-    public void consumed(UUID id,OffsetDateTime at){jdbc.update("update lending_group_personal_challenge set consumed_at=? where id=? and consumed_at is null",at,id);}
-    public void delivered(UUID id,OffsetDateTime at){jdbc.update("update lending_group_personal_challenge set delivered_at=? where id=? and delivered_at is null and consumed_at is null",at,id);}
+
 }

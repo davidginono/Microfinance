@@ -1,6 +1,5 @@
 package com.sacco.mvp.web;
 
-import tools.jackson.databind.ObjectMapper;
 import com.sacco.mvp.domain.Member;
 import com.sacco.mvp.domain.MemberStatus;
 import com.sacco.mvp.domain.Position;
@@ -8,7 +7,6 @@ import com.sacco.mvp.domain.PlatformSupportContactSettings;
 import com.sacco.mvp.domain.StaffAccessStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
-import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.service.SaccoRegistryService;
@@ -33,11 +31,10 @@ class CurrentUserModelAdviceTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Accept", "application/json");
         AdminScopeService scopes = mock(AdminScopeService.class);
-        MemberDirectoryService members = mock(MemberDirectoryService.class);
         SaccoRegistryService saccoRegistry = mock(SaccoRegistryService.class);
         SaccoLogoStorageService logos = mock(SaccoLogoStorageService.class);
         PlatformSupportContactSettingsService supportContacts = mock(PlatformSupportContactSettingsService.class);
-        CurrentUserModelAdvice advice = advice(request, scopes, members, saccoRegistry, logos, supportContacts);
+        CurrentUserModelAdvice advice = advice(request, scopes, saccoRegistry, logos, supportContacts);
         AppUserPrincipal principal = memberPrincipal();
 
         assertThat(advice.adminScope(principal)).isNull();
@@ -46,7 +43,7 @@ class CurrentUserModelAdviceTest {
         assertThat(advice.activeSaccoLogoUrl(principal)).isNull();
         assertThat(advice.platformSupportContact(principal)).isNull();
 
-        verifyNoInteractions(scopes, members, saccoRegistry, logos, supportContacts);
+        verifyNoInteractions(scopes, saccoRegistry, logos, supportContacts);
     }
 
     @Test
@@ -63,7 +60,6 @@ class CurrentUserModelAdviceTest {
         CurrentUserModelAdvice advice = advice(
             request,
             mock(AdminScopeService.class),
-            mock(MemberDirectoryService.class),
             mock(SaccoRegistryService.class),
             mock(SaccoLogoStorageService.class),
             supportContacts
@@ -82,7 +78,6 @@ class CurrentUserModelAdviceTest {
         CurrentUserModelAdvice advice = advice(
             request,
             mock(AdminScopeService.class),
-            mock(MemberDirectoryService.class),
             mock(SaccoRegistryService.class),
             mock(SaccoLogoStorageService.class),
             supportContacts
@@ -94,37 +89,14 @@ class CurrentUserModelAdviceTest {
 
     private CurrentUserModelAdvice advice(MockHttpServletRequest request,
                                           AdminScopeService scopes,
-                                          MemberDirectoryService members,
                                           SaccoRegistryService saccoRegistry,
                                           SaccoLogoStorageService logos,
                                           PlatformSupportContactSettingsService supportContacts) {
         ObjectFactory<HttpServletRequest> requestFactory = () -> request;
-        return new CurrentUserModelAdvice(
-            scopes,
-            members,
-            saccoRegistry,
-            logos,
-            supportContacts,
-            new ObjectMapper(),
-            requestFactory
-        );
+        return new CurrentUserModelAdvice(scopes,saccoRegistry,logos,supportContacts,requestFactory);
     }
 
-    private AppUserPrincipal memberPrincipal() {
-        Member member = Member.builder()
-            .id(UUID.randomUUID())
-            .saccoId("SACCO-1")
-            .stationId("ST01")
-            .memberNo("MEM-1")
-            .fullName("Member One")
-            .email("member@example.com")
-            .memberAccount(true)
-            .position(Position.MEMBER)
-            .status(MemberStatus.ACTIVE)
-            .passwordHash("hash")
-            .build();
-        return new AppUserPrincipal(member, Collections.emptySet());
-    }
+    private AppUserPrincipal memberPrincipal() {return staffPrincipal(Position.ACCOUNTANT);}
 
     private AppUserPrincipal staffPrincipal(Position role) {
         Member member = Member.builder()
@@ -142,6 +114,6 @@ class CurrentUserModelAdviceTest {
             .status(MemberStatus.ACTIVE)
             .passwordHash("hash")
             .build();
-        return new AppUserPrincipal(member, Collections.emptySet(), true);
+        return new AppUserPrincipal(member,Collections.emptySet());
     }
 }

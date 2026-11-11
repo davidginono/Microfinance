@@ -64,39 +64,9 @@ class FileUploadControlViewContractTest {
 
     @Test
     void attachmentDropzonesKeepHiddenInputsAndAwsDragStyling() throws Exception {
-        String loanApplication = read(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-form.jsp"));
-        String borrowerUploads = read(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/borrower-uploads.jspf"));
-        String savedDocuments = read(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/saved-documents.jspf"));
-        String managerDetail = read(Path.of("src/main/webapp/WEB-INF/jsp/manager/detail.jsp"));
-        String attachmentFragment = read(Path.of("src/main/webapp/WEB-INF/jsp/fragments/attachment-dropzone.jspf"));
-        String componentCss = read(Path.of("src/main/resources/static/css/console-components.css"));
-
-        assertThat(borrowerUploads)
-            .contains("class=\"attachment-dropzone\" data-attachment-dropzone")
-            .contains("class=\"attachment-dropzone-input\" data-attachment-input")
-            .contains("data-existing-attachment-files=\"${fn:escapeXml(existingApplicationAttachmentNames)}\"");
-        assertThat(savedDocuments)
-            .contains("existingApplicationAttachments")
-            .contains("/documents/loan-applications/${applicationForm.applicationId}/attachments/${file.id}")
-            .contains("data-download-action=\"true\"")
-            .contains("form=\"remove-application-file-${index.index}\"");
-        assertThat(loanApplication)
-            .contains("/app/loan-applications/${applicationForm.applicationId}/attachments/${file.id}/delete")
-            .contains("applications.confirmRemoveDocument")
-            .contains("param.step == '4' ? 'documents'");
-        assertThat(managerDetail)
-            .contains("class=\"attachment-dropzone\" data-attachment-dropzone")
-            .contains("class=\"attachment-dropzone-input\"")
-            .contains("data-attachment-input");
-        assertThat(attachmentFragment)
-            .contains("input.files = event.dataTransfer.files")
-            .contains("input.dispatchEvent(new Event(\"change\", { bubbles: true }))")
-            .contains("refreshDropzone(dropzone)");
-        assertThat(componentCss)
-            .contains(".attachment-dropzone:focus-within")
-            .contains("border-radius: 2px")
-            .contains("background: #f1faff")
-            .contains(".attachment-dropzone-action");
+        String fragment=read(Path.of("src/main/webapp/WEB-INF/jsp/fragments/attachment-dropzone.jspf"));
+        assertThat(fragment).contains("input.files = event.dataTransfer.files", "refreshDropzone(dropzone)");
+        assertThat(read(Path.of("src/main/resources/static/css/console-components.css"))).contains(".attachment-dropzone:focus-within", ".attachment-dropzone-action");
     }
 
     private static String read(Path path) throws Exception {

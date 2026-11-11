@@ -69,7 +69,7 @@ class AccountingCodeLibraryPostgresTest {
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,'Synthetic library',true,now(),now())",institution);
         var member=Member.builder().id(UUID.randomUUID()).saccoId(institution).stationId("B1").memberNo(UUID.randomUUID().toString()).fullName("Synthetic accountant").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
         jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,staff_access_status,created_at,is_member,password_hash) values(?,?,'B1',?,'Synthetic accountant','ACTIVE','ACCOUNTANT','ACTIVE',now(),false,'test-only')",member.getId(),institution,member.getMemberNo());
-        actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);when(directory.find(member.getId())).thenReturn(Optional.of(member));
+        actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class));when(directory.find(member.getId())).thenReturn(Optional.of(member));
         when(claims.effectiveClaims(any(),anyCollection(),anyBoolean())).thenReturn(EnumSet.allOf(UserClaim.class));
         when(institutions.findActiveSacco(institution)).thenReturn(Optional.of(RegisteredSacco.builder().saccoId(institution).active(true).build()));
         when(institutions.findStation(institution,"B1")).thenReturn(Optional.of(SaccoStation.builder().saccoId(institution).stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));

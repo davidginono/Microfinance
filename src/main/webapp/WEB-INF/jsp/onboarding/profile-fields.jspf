@@ -63,6 +63,7 @@
 
 <section class="erp-resource-section" data-profile-section="finances"><h2><spring:message code="kyc.section.bank"/></h2>
 <div class="kyc-profile-grid">
+<label class="kyc-field"><span><spring:message code="payroll.employeeNumber.optional"/></span><form:input path="profile.employeeNumber" type="text" cssClass="aws-control" maxlength="50"/><form:errors path="profile.employeeNumber" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.bankName"/></span><form:input path="profile.bankName" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.bankName" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.bankAccountName"/></span><form:input path="profile.bankAccountName" type="text" cssClass="aws-control"  maxlength="255"/><form:errors path="profile.bankAccountName" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.bankAccountNumber"/></span><form:input path="profile.bankAccountNumber" type="text" cssClass="aws-control"  maxlength="80"/><form:errors path="profile.bankAccountNumber" cssClass="field-error"/></label>

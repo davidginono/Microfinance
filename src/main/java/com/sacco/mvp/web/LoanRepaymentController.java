@@ -42,7 +42,7 @@ public class LoanRepaymentController {
     }
 
     @GetMapping("/loans/{id}")
-    @PreAuthorize("@access.hasAny(principal, 'LOAN_REPAYMENTS_VIEW', 'MEMBER_LOANS_VIEW')")
+    @PreAuthorize("@access.has(principal, 'LOAN_REPAYMENTS_VIEW')")
     public String loan(@PathVariable UUID id, @AuthenticationPrincipal AppUserPrincipal actor,
                        @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "0") int schedulePage, Model model) {
         LoanRepaymentForm form = new LoanRepaymentForm();
@@ -92,7 +92,7 @@ public class LoanRepaymentController {
     }
 
     @GetMapping("/loans/{id}/receipts/{receiptId}")
-    @PreAuthorize("@access.hasAny(principal, 'LOAN_REPAYMENTS_VIEW', 'MEMBER_LOANS_VIEW')")
+    @PreAuthorize("@access.has(principal, 'LOAN_REPAYMENTS_VIEW')")
     public String receipt(@PathVariable UUID id, @PathVariable UUID receiptId,
                           @AuthenticationPrincipal AppUserPrincipal actor, Model model) {
         model.addAttribute("receipt", ledger.receipt(id, receiptId, actor));
@@ -100,7 +100,7 @@ public class LoanRepaymentController {
     }
 
     @GetMapping({"/loans/{id}/receipts/{receiptId}/pdf","/loans/{id}/receipts/{receiptId}/print"})
-    @PreAuthorize("@access.hasAny(principal, 'LOAN_REPAYMENTS_VIEW', 'MEMBER_LOANS_VIEW')")
+    @PreAuthorize("@access.has(principal, 'LOAN_REPAYMENTS_VIEW')")
     public ResponseEntity<byte[]> receiptExport(@PathVariable UUID id,@PathVariable UUID receiptId,
         @AuthenticationPrincipal AppUserPrincipal actor,Locale locale,jakarta.servlet.http.HttpServletRequest request){
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)

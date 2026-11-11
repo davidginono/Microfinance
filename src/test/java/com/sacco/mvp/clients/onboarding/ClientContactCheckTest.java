@@ -16,10 +16,10 @@ import static org.mockito.Mockito.*;
 class ClientContactCheckTest {
     final MemberRepository members=mock(MemberRepository.class);
     final GeneralLedgerService access=mock(GeneralLedgerService.class);
-    final MemberRegistrationService registration=new MemberRegistrationService(members,null,null,null,null,null,null,null);
-    final OnboardingService service=new OnboardingService(mock(OnboardingRepository.class),access,registration,null,null,null,null,null,null,null);
+    final MemberRegistrationService registration=new MemberRegistrationService(null,members,null,null,null);
+    final OnboardingService service=new OnboardingService(mock(OnboardingRepository.class), access, registration, null, null, null, null, null);
     final AppUserPrincipal actor=actor(EnumSet.allOf(UserClaim.class));
-    AppUserPrincipal actor(Set<UserClaim> claims) {return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),claims,true);}
+    AppUserPrincipal actor(Set<UserClaim> claims) {return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),claims);}
 
     @Test void normalizationUsesExistingContactKeysAndReturnsOnlyPresence() {
         when(members.existsByPhone("255712345678")).thenReturn(true);
@@ -38,15 +38,13 @@ class ClientContactCheckTest {
         verifyNoInteractions(members);
     }
     @Test void editExcludesOnlyTheAuthorizedProvisionalClient() {
-        UUID id=UUID.randomUUID();when(members.findByIdAndSaccoIdAndStationIdIgnoreCase(id,"I1","B1")).thenReturn(Optional.of(Member.builder().id(id).position(Position.MEMBER).memberAccount(true).clientPortalEnabled(false).build()));
+        UUID id=UUID.randomUUID();when(members.findByIdAndSaccoIdAndStationIdIgnoreCase(id,"I1","B1")).thenReturn(Optional.of(Member.builder().id(id).position(Position.MEMBER).memberAccount(true).build()));
         assertThat(service.checkContact(actor,id,"phone","0712345678").exists()).isFalse();
         verify(members).existsByPhoneAndIdNot("255712345678",id);verify(access).requireActor(actor,"CLIENT_ONBOARDING_UPDATE");
         verify(members,never()).existsByPhone(anyString());
     }
     @Test void foreignOrPortalEnabledExclusionsAndMissingClaimsCannotProbeContacts() {
         UUID id=UUID.randomUUID();when(members.findByIdAndSaccoIdAndStationIdIgnoreCase(id,"I1","B1")).thenReturn(Optional.empty());
-        assertThatThrownBy(()->service.checkContact(actor,id,"phone","0712345678")).isInstanceOf(AccessDeniedException.class);
-        when(members.findByIdAndSaccoIdAndStationIdIgnoreCase(id,"I1","B1")).thenReturn(Optional.of(Member.builder().id(id).clientPortalEnabled(true).build()));
         assertThatThrownBy(()->service.checkContact(actor,id,"phone","0712345678")).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->service.checkContact(actor(Set.of(UserClaim.CLIENT_ONBOARDING_VIEW)),null,"phone","0712345678")).isInstanceOf(AccessDeniedException.class);
         verify(members,never()).existsByPhone(anyString());verify(members,never()).existsByPhoneAndIdNot(anyString(),any());

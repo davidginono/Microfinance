@@ -24,15 +24,11 @@ public class StaffDashboardService {
     public Dashboard read(AppUserPrincipal actor) {
         if(!access.staffDashboardAccess(actor))throw new AccessDeniedException("Staff dashboard unavailable");
         var roles=new ArrayList<Role>();
-        var portfolio=access.canViewAnyReviewQueue(actor)||access.canAccessDisbursementArea(actor)
+        var portfolio=access.has(actor,UserClaim.LOAN_RECORDING_VIEW)||access.canAccessDisbursementArea(actor)
             ?managers.dashboardSummary(actor.getSaccoId(),actor.getStationId()):null;
         if(portfolio!=null){
-            if(access.canAccessManagerArea(actor))add(roles,portfolio,"manager","role.manager",LoanStatus.READY_FOR_MANAGER,LoanStatus.MANAGER_ACCEPTED,LoanStatus.MANAGER_REJECTED);
-            if(access.canAccessLoanOfficerArea(actor))add(roles,portfolio,"loan-officer","role.loanOfficer",LoanStatus.AWAITING_LOAN_OFFICER,LoanStatus.LOAN_OFFICER_APPROVED,LoanStatus.LOAN_OFFICER_REJECTED);
-            if(access.canAccessChairpersonArea(actor))add(roles,portfolio,"chairperson","role.chairperson",LoanStatus.AWAITING_CHAIRPERSON,LoanStatus.CHAIRPERSON_APPROVED,LoanStatus.CHAIRPERSON_REJECTED);
-            if(access.canAccessBoardArea(actor))add(roles,portfolio,"board","role.boardMember",LoanStatus.AWAITING_BOARD,LoanStatus.BOARD_APPROVED,LoanStatus.BOARD_REJECTED);
-            if(access.canAccessCreditCommitteeArea(actor))add(roles,portfolio,"credit-committee","role.committee",LoanStatus.AWAITING_CREDIT_COMMITTEE,LoanStatus.CREDIT_COMMITTEE_APPROVED,LoanStatus.CREDIT_COMMITTEE_REJECTED);
-            if(access.canAccessAccountantArea(actor))add(roles,portfolio,"accountant","role.accountant",LoanStatus.AWAITING_ACCOUNTANT,LoanStatus.ACCOUNTANT_APPROVED,LoanStatus.ACCOUNTANT_REJECTED);
+            if(access.has(actor,UserClaim.LOAN_RECORDING_VIEW))add(roles,portfolio,"loans","menu.loanRecords",LoanStatus.SUBMITTED,LoanStatus.RECORDED,LoanStatus.READY_FOR_DISBURSEMENT,LoanStatus.REJECTED);
+
             if(access.canAccessDisbursementArea(actor))add(roles,portfolio,"disbursement","role.disbursementOfficer",LoanStatus.READY_FOR_DISBURSEMENT,LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.PAID,LoanStatus.DEFAULTED);
         }
         var administration=access.isWorkspaceAdminScope(actor)&&access.has(actor,UserClaim.ADMIN_DASHBOARD_VIEW)

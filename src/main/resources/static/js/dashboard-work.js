@@ -30,7 +30,7 @@
                 const name=node('span','',label(group.labelKey)),track=node('span','dashboard-infolet-track'),bar=node('span','dashboard-infolet-fill'),count=node('strong','',format(group.count));
                 bar.style.width=(group.count/max*100)+'%';track.append(bar);link.append(name,track,count);e.breakdown.append(link);
             }
-            e.criteria.textContent=e.minimumDays||Number(e.minimumAmount)?l('minimumDays')+': '+e.minimumDays+(data.id==='guarantees'?'':' · '+l('minimumAmount')+': '+format(e.minimumAmount)):l('all');
+            e.criteria.textContent=e.minimumDays||Number(e.minimumAmount)?l('minimumDays')+': '+e.minimumDays+' · '+l('minimumAmount')+': '+format(e.minimumAmount):l('all');
         }
         function create(data){
             const widget=node('article','dashboard-infolet'),inner=node('div','dashboard-infolet-inner'),front=node('div','dashboard-infolet-front'),back=node('form','dashboard-infolet-back');
@@ -42,7 +42,6 @@
             const backHeader=node('header'),backTitle=node('h3','',l('filters')),cancel=button(l('back'),'dashboard-infolet-command');backHeader.append(backTitle,cancel);
             const fields=node('div','dashboard-infolet-fields'),daysLabel=node('label','',l('minimumDays')),days=node('input'),amountLabel=node('label','',l('minimumAmount')),minimum=node('input');
             days.type=minimum.type='number';minimum.dataset.amountInput='true';days.min=minimum.min='0';days.max='3650';minimum.max='9999999999999999.99';days.step='1';minimum.step='0.01';days.value=minimum.value='0';days.required=minimum.required=true;
-            if(data.id==='guarantees'){amountLabel.hidden=true;minimum.disabled=true;}
             daysLabel.append(days);amountLabel.append(minimum);fields.append(daysLabel,amountLabel);const footer=node('footer'),reset=button(l('reset')),apply=button(l('apply'),'app-btn btn-launch');apply.type='submit';footer.append(reset,apply);back.append(backHeader,fields,footer);inner.append(front,back);widget.append(inner);canvas.append(widget);
             const e={widget,front,back,title,link,open,amount,age,breakdown,filter,days,minimum,criteria,minimumDays:0,minimumAmount:0,version:0,request:null};entries.set(data.id,e);update(e,data);
             expand.addEventListener('click',()=>{

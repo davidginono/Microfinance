@@ -23,22 +23,7 @@ public class AppUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return loadClientByEmailOrUsername(username);
-    }
-
-    public UserDetails loadClientByEmailOrUsername(String username) throws UsernameNotFoundException {
-        return memberDirectoryService.findClientLoginAccount(username)
-            .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
-            .filter(Member::isMemberAccess)
-            .filter(Member::isClientPortalEnabled)
-            .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))
-            .map(member -> ensureStationAllowed(member, false))
-            .map(member -> new AppUserPrincipal(
-                member,
-                userClaimService.clientSessionClaims(member.getId()),
-                false
-            ))
-            .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
+        return loadStaffByEmailOrUsername(username);
     }
 
     public UserDetails loadStaffByEmailOrUsername(String login) throws UsernameNotFoundException {
@@ -46,12 +31,8 @@ public class AppUserDetailsService implements UserDetailsService {
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
             .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))
-            .map(member -> ensureStationAllowed(member, true))
-            .map(member -> new AppUserPrincipal(
-                member,
-                userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()),
-                true
-            ))
+            .map(this::ensureStationAllowed)
+            .map(member -> new AppUserPrincipal(member,userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())))
             .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
     }
 
@@ -60,18 +41,12 @@ public class AppUserDetailsService implements UserDetailsService {
             .filter(member -> member.getStatus() == MemberStatus.ACTIVE)
             .filter(Member::isStaffAccessActive)
             .filter(member -> member.getActiveStaffRolesResolved().contains(Position.ADMIN))
-            .map(member -> new AppUserPrincipal(
-                member,
-                userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess()),
-                true
-            ))
+            .map(member -> new AppUserPrincipal(member,userClaimService.effectiveClaims(member.getId(), member.getActiveStaffRolesResolved(), member.isMemberAccess())))
             .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
     }
 
-    private Member ensureStationAllowed(Member member, boolean staffLogin) {
-        boolean adminBypass = staffLogin && member.getActiveStaffRolesResolved().contains(Position.ADMIN);
-        if (!adminBypass
-            && member.getSaccoId() != null
+    private Member ensureStationAllowed(Member member) {
+        if (member.getSaccoId() != null
             && !member.getSaccoId().isBlank()
             && member.getStationId() != null
             && !member.getStationId().isBlank()) {

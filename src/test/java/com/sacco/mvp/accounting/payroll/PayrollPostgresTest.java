@@ -157,7 +157,7 @@ class PayrollPostgresTest {
     }
     UUID instruction(UUID loan,String limit){var f=new InstructionForm();f.setEmployerId(employer);f.setLoanId(loan);f.setMonthlyLimit(new BigDecimal(limit));f.setEffectiveFrom(TODAY.minusMonths(1));f.setEffectiveTo(TODAY.plusYears(1));f.setEvidence("Synthetic signed borrower mandate\nSynthetic employer evidence");return service.createInstruction(actor,f);}
     BatchForm batch(){var f=new BatchForm();f.setEmployerId(employer);f.setMonth("2026-10");f.setDeductionDate(LocalDate.of(2026,10,31));return f;}
-    AppUserPrincipal actor(String tenant,String branch){UUID id=member(branch,null);return new AppUserPrincipal(Member.builder().id(id).saccoId(tenant).stationId(branch).memberNo(id.toString()).fullName("Synthetic accountant").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+    AppUserPrincipal actor(String tenant,String branch){UUID id=member(branch,null);return new AppUserPrincipal(Member.builder().id(id).saccoId(tenant).stationId(branch).memberNo(id.toString()).fullName("Synthetic accountant").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     UUID member(String branch,String employee){UUID id=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,is_member,password_hash,employee_number,created_at) values(?,?,?,?,'Synthetic Payroll Employee','ACTIVE','MEMBER',true,'not-a-login',?,now())",id,institution,branch,id.toString(),employee);return id;}
     UUID loan(UUID borrower,String branch){
         UUID id=UUID.randomUUID();long number=NUMBERS.incrementAndGet();

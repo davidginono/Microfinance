@@ -4,7 +4,6 @@ import com.sacco.mvp.accounting.dto.VoucherDtos.ReceiptContribution;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.AllocationPreview;
 import com.sacco.mvp.grouplending.dto.GroupCollectionDtos.*;
 import com.sacco.mvp.grouplending.dto.GroupSharedLoanDtos.Balance;
-import java.math.BigDecimal;
 import java.util.*;
 
 /** Matches actual contributors to the signed pro-rata cash-component allocations, without pricing new debts. */

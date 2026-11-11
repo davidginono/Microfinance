@@ -27,10 +27,10 @@
     </div>
 </section>
 <template data-work-labels>
-    <c:forTokens items="create,title,applyLoan,recordLoan,recordDisbursement,createSchedule,addEmployer,addInstruction,createAccount,createActivity,expand,collapse,filters,back,minimumDays,minimumAmount,apply,reset,open,oldest,days,all,empty,updated,chart,amount,loanDrafts,applications,guarantees,queue.manager,queue.loan-officer,queue.accountant,queue.disbursement,queue.board,queue.chairperson,queue.credit-committee,voucher.INCOMPLETE,voucher.NOT_VALIDATED,voucher.ERROR,voucher.REQUIRED,voucher.INITIATED,voucher.READY,voucher.FAILED,voucher.REJECTED" delims="," var="workMessage">
+    <c:forTokens items="title,expand,collapse,filters,back,minimumDays,minimumAmount,apply,reset,open,oldest,days,all,empty,updated,chart,queue.loan-groups,queue.disbursement,voucher.INCOMPLETE,voucher.NOT_VALIDATED,voucher.ERROR,voucher.REQUIRED,voucher.INITIATED,voucher.READY,voucher.FAILED,voucher.REJECTED" delims="," var="workMessage">
         <span data-key="dashboard.work.${workMessage}"><spring:message code="dashboard.work.${workMessage}" /></span>
     </c:forTokens>
-    <c:forTokens items="DRAFT,SUBMITTED,AWAITING_GUARANTORS,ALL_GUARANTORS_APPROVED,READY_FOR_MANAGER,MANAGER_ACCEPTED,AWAITING_LOAN_OFFICER,LOAN_OFFICER_APPROVED,AWAITING_CHAIRPERSON,CHAIRPERSON_APPROVED,AWAITING_BOARD,BOARD_APPROVED,AWAITING_CREDIT_COMMITTEE,CREDIT_COMMITTEE_APPROVED,AWAITING_ACCOUNTANT,ACCOUNTANT_APPROVED,READY_FOR_DISBURSEMENT" delims="," var="workStatus">
+    <c:forTokens items="SUBMITTED,READY_FOR_DISBURSEMENT" delims="," var="workStatus">
         <span data-key="loan.status.${workStatus}"><spring:message code="loan.status.${workStatus}" /></span>
     </c:forTokens>
     <c:forTokens items="RECEIPT,PAYMENT,JOURNAL" delims="," var="workVoucher"><span data-key="voucher.title.${workVoucher}"><spring:message code="voucher.title.${workVoucher}" /></span></c:forTokens>

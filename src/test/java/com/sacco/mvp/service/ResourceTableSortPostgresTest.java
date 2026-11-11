@@ -101,8 +101,8 @@ class ResourceTableSortPostgresTest {
     @Test void databaseAcceptsEveryAccountingDetailSortBeforeItsExistingLimit() {
         var jdbc=context.getBean(JdbcTemplate.class);UUID id=UUID.randomUUID();
         var member=Member.builder().id(id).memberNo(id.toString()).saccoId("__SORT_NO_SCOPE__").stationId("B1")
-            .fullName("Sort fixture").position(Position.ACCOUNTANT).memberAccount(false).status(MemberStatus.ACTIVE).build();
-        var actor=new com.sacco.mvp.security.AppUserPrincipal(member,Set.of(),true);
+            .fullName("Sort fixture").position(Position.ACCOUNTANT).memberAccount(false).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
+        var actor=new com.sacco.mvp.security.AppUserPrincipal(member,Set.of());
         var gl=new com.sacco.mvp.accounting.repository.GeneralLedgerRepository(jdbc);
         columns("account-version-history","number,state,name,creator",()->gl.accountVersions(actor.getSaccoId(),id,0,id,"B1",true));
         columns("account-version-events","event,actor,date,reason",()->gl.accountVersionEvents(actor.getSaccoId(),id,0));

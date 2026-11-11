@@ -12,7 +12,7 @@ class UserClaimTest {
         assertThat(UserClaim.matrixRows()).anyMatch(row->row.feature()==AccessFeature.GROUP_LENDING && row.claimsByAction().size()==9);
         var member=Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B").position(Position.ACCOUNTANT)
             .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
-        var actor=new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.GROUP_LENDING_VIEW),true);
+        var actor=new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.GROUP_LENDING_VIEW));
         assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(actor)).isEqualTo("/finance/groups");
     }
     @Test
@@ -75,8 +75,7 @@ class UserClaimTest {
     void staffWithOnlyVoucherWorkspaceClaimsCanReachTheirWorkspaceAfterLogin() {
         var member = Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B")
             .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
-        var principal = new com.sacco.mvp.security.AppUserPrincipal(member,
-            java.util.Set.of(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.ACCOUNTING_JOURNALS_VIEW), true);
+        var principal = new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.ACCOUNTING_JOURNALS_VIEW));
         assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(principal)).isEqualTo("/finance/approval");
     }
 
@@ -163,26 +162,6 @@ class UserClaimTest {
     }
 
     @Test
-    void everyOperationalStaffWorkspaceHasARequiredViewClaim() {
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.LOAN_OFFICER))
-            .contains(UserClaim.LOAN_OFFICER_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.MANAGER))
-            .contains(UserClaim.MANAGER_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.ACCOUNTANT))
-            .contains(UserClaim.ACCOUNTANT_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.DISBURSEMENT_OFFICER))
-            .contains(UserClaim.DISBURSEMENT_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.CHAIRPERSON))
-            .contains(UserClaim.CHAIRPERSON_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.BOARD))
-            .contains(UserClaim.BOARD_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.CREDIT_COMMITTEE))
-            .contains(UserClaim.CREDIT_COMMITTEE_QUEUE_VIEW);
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.MINOR_ADMIN)).isEmpty();
-        assertThat(UserClaim.requiredWorkspaceViewClaim(Position.ADMIN)).isEmpty();
-    }
-
-    @Test
     void administratorRecoveryClaimsKeepTheAccessMatrixReachable() {
         assertThat(UserClaim.administratorRecoveryClaims()).containsExactlyInAnyOrder(
             UserClaim.ADMIN_DASHBOARD_VIEW,
@@ -191,15 +170,4 @@ class UserClaimTest {
         );
     }
 
-    @Test
-    void chairpersonReadOnlyClaimsAreIndependentMatrixFeaturesAndFutureDefaults() {
-        assertThat(UserClaim.forFeatureAction(AccessFeature.PROCESSED_LOANS, AccessAction.VIEW))
-            .contains(UserClaim.PROCESSED_LOANS_VIEW);
-        assertThat(UserClaim.forFeatureAction(AccessFeature.SACCO_CONFIGURATIONS, AccessAction.VIEW))
-            .contains(UserClaim.SACCO_CONFIGURATIONS_VIEW);
-        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.CHAIRPERSON), false))
-            .contains(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.SACCO_CONFIGURATIONS_VIEW);
-        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.MANAGER), false))
-            .doesNotContain(UserClaim.PROCESSED_LOANS_VIEW, UserClaim.SACCO_CONFIGURATIONS_VIEW);
-    }
 }

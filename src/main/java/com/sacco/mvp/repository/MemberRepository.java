@@ -27,20 +27,11 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                         @Param("branch") String branch);
     Optional<Member> findByIdAndSaccoIdAndStationIdIgnoreCase(UUID id, String saccoId, String stationId);
 
-    @org.springframework.data.jpa.repository.Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-        update Member m set m.clientPortalEnabled=true,m.username=:username,m.passwordHash=:password
-        where m.id=:id and m.saccoId=:institution and m.stationId=:branch and m.clientPortalEnabled=false
-          and m.status=com.sacco.mvp.domain.MemberStatus.ACTIVE and m.memberAccount=true
-        """)
-    int activateClientPortal(@Param("id") UUID id,@Param("institution") String institution,@Param("branch") String branch,
-                             @Param("username") String username,@Param("password") String password);
-
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically=true,flushAutomatically=true)
     @Query("""
         update Member m set m.fullName=:name,m.phone=:phone,m.email=:email,
           m.phoneVerifiedAt=case when m.phone=:phone then m.phoneVerifiedAt else null end
-        where m.id=:id and m.saccoId=:institution and m.stationId=:branch and m.clientPortalEnabled=false
+        where m.id=:id and m.saccoId=:institution and m.stationId=:branch
           and m.status=com.sacco.mvp.domain.MemberStatus.ACTIVE and m.fullName=:beforeName
           and coalesce(m.phone,'')=:beforePhone and coalesce(m.email,'')=:beforeEmail
         """)
@@ -74,8 +65,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     Optional<Member> findByMemberNo(String memberNo);
     Optional<Member> findByUsername(String username);
-    boolean existsByUsername(String username);
-    Optional<Member> findByMemberNoIgnoreCase(String memberNo);
+
     boolean existsByMemberNoIgnoreCase(String memberNo);
     boolean existsByMemberNoIgnoreCaseAndIdNot(String memberNo, UUID id);
     boolean existsBySaccoIdAndStationIdIgnoreCaseAndEmployeeNumberIgnoreCase(String saccoId, String stationId, String employeeNumber);
@@ -104,8 +94,6 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     boolean existsByPhoneAndIdNot(String phone, UUID id);
 
     Optional<Member> findTopBySaccoIdAndPositionOrderByRankDesc(String saccoId, Position position);
-
-    Optional<Member> findBySaccoIdAndStatusAndMemberNoIgnoreCase(String saccoId, MemberStatus status, String memberNo);
 
     List<Member> findBySaccoIdAndPositionAndStatus(String saccoId, Position position, MemberStatus status);
 
@@ -146,23 +134,6 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
                                                                 @Param("stationId") String stationId,
                                                                 @Param("status") MemberStatus status,
                                                                 Pageable pageable);
-
-    @Query("""
-        select m
-        from Member m
-        where m.saccoId = :saccoId
-          and m.status = com.sacco.mvp.domain.MemberStatus.ACTIVE
-          and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
-          and m.id <> :applicantId
-          and (m.memberAccount = true or (m.memberAccount is null and m.position = com.sacco.mvp.domain.Position.MEMBER))
-          and lower(coalesce(m.fullName, '')) like concat('%', :query, '%')
-        order by m.fullName asc
-        """)
-    Page<Member> findGuarantorCandidatesByName(@Param("saccoId") String saccoId,
-                                               @Param("stationId") String stationId,
-                                               @Param("applicantId") UUID applicantId,
-                                               @Param("query") String query,
-                                               Pageable pageable);
 
     @Query(
         value = """
@@ -381,7 +352,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         value = """
             select m.*
             from members m
-            where m.sacco_id = :saccoId and m.client_portal_enabled
+            where m.sacco_id = :saccoId and (m.position<>'MEMBER' or exists(select 1 from member_staff_roles sr where sr.member_id=m.id and sr.role_name<>'MEMBER'))
               and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
               and (
                 :query = ''
@@ -392,7 +363,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
         countQuery = """
             select count(*)
             from members m
-            where m.sacco_id = :saccoId and m.client_portal_enabled
+            where m.sacco_id = :saccoId and (m.position<>'MEMBER' or exists(select 1 from member_staff_roles sr where sr.member_id=m.id and sr.role_name<>'MEMBER'))
               and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
               and (
                 :query = ''
@@ -409,7 +380,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Query(value = """
         select m.*
         from members m
-        where m.sacco_id = :saccoId and m.client_portal_enabled
+        where m.sacco_id = :saccoId and (m.position<>'MEMBER' or exists(select 1 from member_staff_roles sr where sr.member_id=m.id and sr.role_name<>'MEMBER'))
           and (cast(:stationId as text) is null or lower(m.station_id) = lower(cast(:stationId as text)))
           and (
             :query = ''
@@ -425,7 +396,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @Query("""
         select m
         from Member m
-        where m.id = :accountId and m.clientPortalEnabled = true
+        where m.id = :accountId and (m.position <> com.sacco.mvp.domain.Position.MEMBER or exists(select sr from Member mx join mx.staffRoles sr where mx.id=m.id and sr<>com.sacco.mvp.domain.Position.MEMBER))
           and m.saccoId = :saccoId
           and (cast(:stationId as string) is null or lower(m.stationId) = lower(cast(:stationId as string)))
         """)

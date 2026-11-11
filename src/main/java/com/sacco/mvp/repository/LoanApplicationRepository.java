@@ -17,6 +17,21 @@ import java.util.UUID;
 import java.util.Collection;
 
 public interface LoanApplicationRepository extends JpaRepository<LoanApplication, UUID> {
+    interface GroupReviewAnalytics {
+        UUID getLoanId();
+        OffsetDateTime getReviewedAt();
+        String getDecision();
+    }
+    @Query(value="""
+        select r.loan_id as loanId,d.recorded_at as reviewedAt,d.decision from loan_group_decision d
+        join loan_group_request r on r.id=d.request_id
+        where d.actor_id=:actor and r.sacco_id=:institution and r.station_id=:branch
+          and (cast(:fromDate as timestamptz) is null or d.recorded_at>=:fromDate)
+          and (cast(:toDate as timestamptz) is null or d.recorded_at<:toDate)
+        order by d.recorded_at desc,d.id desc limit 5001
+        """,nativeQuery=true)
+    List<GroupReviewAnalytics> groupReviewAnalytics(@Param("actor") UUID actor,@Param("institution") String institution,
+        @Param("branch") String branch,@Param("fromDate") OffsetDateTime fromDate,@Param("toDate") OffsetDateTime toDate);
     @Query(value="select client_kyc_loan_check(:loan,:institution,:branch,:day)",nativeQuery=true)
     String kycError(@Param("loan") UUID loan,@Param("institution") String institution,@Param("branch") String branch,@Param("day") LocalDate day);
     @Query(value="select lending_collateral_check(:loan,:institution,:branch,:day)",nativeQuery=true)
@@ -29,9 +44,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         """)
     List<LoanApplication> findActiveBorrowerLoansForReference(@Param("reference") UUID reference,@Param("institution") String institution,
         @Param("branch") String branch,@Param("statuses") Collection<LoanStatus> statuses,Pageable pageable);
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-    @Query("select l from LoanApplication l where l.id=:id and exists(select m.id from Member m where m.id=:guarantor and m.saccoId=l.saccoId and lower(m.stationId)=lower(l.stationId))")
-    Optional<LoanApplication> findForGuarantorDecision(@Param("id") UUID id,@Param("guarantor") UUID guarantor);
 
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from LoanApplication l where l.id=:id and l.applicantMemberId=:applicant and exists(select m.id from Member m where m.id=:applicant and m.saccoId=l.saccoId)")
@@ -39,7 +51,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select l from LoanApplication l where l.id=:id")
     Optional<LoanApplication> findForDisbursement(@Param("id") UUID id);
-
 
     interface BorrowerNameRow { UUID getLoanId(); String getName(); }
 
@@ -57,11 +68,9 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         left join members m on m.id=b.client_id and m.sacco_id=l.sacco_id
         left join lending_group g on g.id=b.group_id and g.sacco_id=l.sacco_id and g.station_id=l.station_id
         where l.id=:loan and l.sacco_id=:institution and l.station_id=:branch
-          and (cast(:stage as text) is null or exists(select 1 from board_reviews r
-            where r.loan_application_id=l.id and r.board_member_id=:reviewer and r.review_stage=:stage))
         """,nativeQuery=true)
     Optional<BorrowerProfileRow> findBorrowerProfile(@Param("institution") String institution,@Param("branch") String branch,
-        @Param("loan") UUID loan,@Param("reviewer") UUID reviewer,@Param("stage") String stage);
+        @Param("loan") UUID loan);
 
     @Query(value="""
         select l.id as "loanId",b.full_name as "name" from loan_applications l
@@ -92,27 +101,8 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         java.math.BigDecimal getOverduePrincipal();
     }
 
-    List<LoanApplication> findByApplicantMemberIdOrderByCreatedAtDesc(UUID applicantMemberId);
-
     long countBySaccoIdAndApplicantMemberIdAndStatusIn(String saccoId, UUID applicantMemberId,
                                                      Collection<LoanStatus> statuses);
-
-    @Query(value = """
-        select l
-        from LoanApplication l left join LoanProductSetting p on p.id=l.loanProductSettingId
-        where l.applicantMemberId = :applicantMemberId
-          and l.status in :statuses
-          and (cast(:loanIdQuery as string) is null or lower(coalesce(l.loanId, '')) like concat('%', cast(:loanIdQuery as string), '%'))
-          and (cast(:updatedFrom as timestamp) is null or l.updatedAt >= :updatedFrom)
-          and (cast(:updatedToExclusive as timestamp) is null or l.updatedAt < :updatedToExclusive)
-        order by l.updatedAt desc, l.createdAt desc
-        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.MemberArchives.class)
-    Page<LoanApplication> findMemberArchivePage(@Param("applicantMemberId") UUID applicantMemberId,
-                                                @Param("statuses") Collection<LoanStatus> statuses,
-                                                @Param("loanIdQuery") String loanIdQuery,
-                                                @Param("updatedFrom") OffsetDateTime updatedFrom,
-                                                @Param("updatedToExclusive") OffsetDateTime updatedToExclusive,
-                                                Pageable pageable);
 
     @Query("""
         select l
@@ -131,32 +121,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                                                 @Param("createdToExclusive") OffsetDateTime createdToExclusive,
                                                                 @Param("loanType") LoanType loanType,
                                                                 @Param("loanProductId") UUID loanProductId);
-
-    @Query("""
-        select distinct year(l.disbursementDate)
-        from LoanApplication l
-        where l.saccoId = :saccoId
-          and l.status in :statuses
-          and l.disbursementDate is not null
-        order by year(l.disbursementDate) desc
-        """)
-    List<Integer> findDisbursementYears(@Param("saccoId") String saccoId,
-                                        @Param("statuses") Collection<LoanStatus> statuses);
-
-    @Query("""
-        select l
-        from LoanApplication l
-        where l.saccoId = :saccoId
-          and l.status in :statuses
-          and l.disbursementDate is not null
-          and l.disbursementDate >= :fromDate
-          and l.disbursementDate <= :toDate
-        order by l.disbursementDate desc, l.createdAt desc
-        """)
-    List<LoanApplication> findDisbursedInRange(@Param("saccoId") String saccoId,
-                                               @Param("statuses") Collection<LoanStatus> statuses,
-                                               @Param("fromDate") LocalDate fromDate,
-                                               @Param("toDate") LocalDate toDate);
 
     @Query("""
         select l
@@ -323,66 +287,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                l.disbursementDate as disbursementDate,
                l.financialSnapshot as financialSnapshot
         from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
-          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
-          and (cast(:loanType as string) is null or l.loanType = :loanType)
-          and (cast(:status as string) is null or l.status = :status)
-        order by l.createdAt desc
-        """)
-    List<ReportLoanRow> findMemberReportRows(@Param("applicantMemberId") UUID applicantMemberId,
-                                             @Param("createdFrom") OffsetDateTime createdFrom,
-                                             @Param("createdToExclusive") OffsetDateTime createdToExclusive,
-                                             @Param("loanType") LoanType loanType,
-                                             @Param("status") LoanStatus status);
-
-    @Query("""
-        select l.id as id,
-               l.applicationNumber as applicationNumber,
-               l.loanId as loanId,
-               l.status as status,
-               l.loanType as loanType,
-               l.loanProductSettingId as loanProductSettingId,
-               l.createdAt as createdAt,
-               l.updatedAt as updatedAt,
-               l.amount as amount,
-               l.saccoId as saccoId,
-               l.stationId as stationId,
-               l.applicantMemberId as applicantMemberId,
-               l.disbursementDate as disbursementDate,
-               l.financialSnapshot as financialSnapshot
-        from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-          and l.status in :statuses
-          and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
-          and (cast(:createdToExclusive as timestamp) is null or l.createdAt < :createdToExclusive)
-          and (cast(:loanType as string) is null or l.loanType = :loanType)
-          and (cast(:loanProductId as uuid) is null or l.loanProductSettingId = :loanProductId)
-        order by l.createdAt desc
-        """)
-    List<ReportLoanRow> findMemberReportRowsByStatuses(@Param("applicantMemberId") UUID applicantMemberId,
-                                                       @Param("statuses") Collection<LoanStatus> statuses,
-                                                       @Param("createdFrom") OffsetDateTime createdFrom,
-                                                       @Param("createdToExclusive") OffsetDateTime createdToExclusive,
-                                                       @Param("loanType") LoanType loanType,
-                                                       @Param("loanProductId") UUID loanProductId);
-
-    @Query("""
-        select l.id as id,
-               l.applicationNumber as applicationNumber,
-               l.loanId as loanId,
-               l.status as status,
-               l.loanType as loanType,
-               l.loanProductSettingId as loanProductSettingId,
-               l.createdAt as createdAt,
-               l.updatedAt as updatedAt,
-               l.amount as amount,
-               l.saccoId as saccoId,
-               l.stationId as stationId,
-               l.applicantMemberId as applicantMemberId,
-               l.disbursementDate as disbursementDate,
-               l.financialSnapshot as financialSnapshot
-        from LoanApplication l
         where l.saccoId = :saccoId
           and (cast(:stationId as string) is null or lower(l.stationId) = lower(cast(:stationId as string)))
           and (cast(:createdFrom as timestamp) is null or l.createdAt >= :createdFrom)
@@ -526,69 +430,19 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     Page<LoanApplication> findDueForReminder(@Param("status") LoanStatus status,
                                              @Param("dueDates") Collection<LocalDate> dueDates,
                                              Pageable pageable);
-    List<LoanApplication> findByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(UUID applicantMemberId, List<LoanStatus> statuses);
+
     Page<LoanApplication> findByApplicantMemberIdAndStatusInAndLoanIdIsNotNull(UUID applicantMemberId,
                                                                                 Collection<LoanStatus> statuses,
                                                                                 Pageable pageable);
-    long countByApplicantMemberIdAndStatusAndApplicantDisbursementAcknowledgedAtIsNull(UUID applicantMemberId, LoanStatus status);
-    long countByApplicantMemberIdAndStatusInAndApplicantRejectionAcknowledgedAtIsNull(UUID applicantMemberId, Collection<LoanStatus> statuses);
 
-    @Query("""
-        select l
-        from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-          and (
-            l.status in :statuses
-            or (
-              l.status = com.sacco.mvp.domain.LoanStatus.DISBURSED
-              and l.applicantDisbursementAcknowledgedAt is null
-            )
-            or (
-              l.status in :rejectedStatuses
-              and l.applicantRejectionAcknowledgedAt is null
-            )
-          )
-        order by l.createdAt desc
-        """)
-    List<LoanApplication> findVisibleCurrentForApplicant(@Param("applicantMemberId") UUID applicantMemberId,
-                                                         @Param("statuses") Collection<LoanStatus> statuses,
-                                                         @Param("rejectedStatuses") Collection<LoanStatus> rejectedStatuses);
+    Optional<LoanApplication> findFirstBySaccoIdAndStationIdAndApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
+        String saccoId,String stationId,UUID applicantMemberId,Collection<LoanStatus> statuses);
 
-    @Query("""
-        select l
-        from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-          and (
-            l.status in :statuses
-            or (
-              l.status = com.sacco.mvp.domain.LoanStatus.DISBURSED
-              and l.applicantDisbursementAcknowledgedAt is null
-            )
-            or (
-              l.status in :rejectedStatuses
-              and l.applicantRejectionAcknowledgedAt is null
-            )
-          )
-        order by l.updatedAt desc, l.createdAt desc
-        """)
-    List<LoanApplication> findLatestVisibleCurrentForApplicant(@Param("applicantMemberId") UUID applicantMemberId,
-                                                               @Param("statuses") Collection<LoanStatus> statuses,
-                                                               @Param("rejectedStatuses") Collection<LoanStatus> rejectedStatuses,
-                                                               Pageable pageable);
-
-    Optional<LoanApplication> findFirstByApplicantMemberIdAndStatusInOrderByCreatedAtDesc(
-        UUID applicantMemberId,
-        Collection<LoanStatus> statuses
-    );
     Optional<LoanApplication> findFirstByApplicantMemberIdAndStatusInOrderByUpdatedAtDescCreatedAtDesc(
         UUID applicantMemberId,
         Collection<LoanStatus> statuses
     );
     Optional<LoanApplication> findByIdAndApplicantMemberId(UUID id, UUID applicantMemberId);
-
-    long countByTopUpSourceLoanIdAndStatusIn(UUID topUpSourceLoanId, Collection<LoanStatus> statuses);
-
-    long countByTopUpSourceLoanIdAndStatusInAndIdNot(UUID topUpSourceLoanId, Collection<LoanStatus> statuses, UUID id);
 
     boolean existsBySaccoIdAndLoanId(String saccoId, String loanId);
 
@@ -691,40 +545,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
                                      @Param("searchByLoanId") boolean searchByLoanId,
                                      Pageable pageable);
 
-    @Query(value = """
-        select l.* from loan_applications l left join members m on m.id=l.applicant_member_id left join loan_product_settings p on p.id=l.loan_product_setting_id
-        where l.sacco_id = :saccoId
-          and lower(l.station_id) = lower(:stationId)
-          and l.status in :statuses
-          and (:search = ''
-            or lower(coalesce(l.loan_id, '')) like concat(:search, '%')
-            or cast(l.application_number as text) like concat(:search, '%'))
-          and (cast(:updatedFrom as timestamptz) is null or l.updated_at >= :updatedFrom)
-          and (cast(:updatedToExclusive as timestamptz) is null or l.updated_at < :updatedToExclusive)
-          and (cast(:status as text) is null or l.status = :status)
-        order by l.updated_at desc, l.id desc
-        """, nativeQuery = true, queryRewriter = com.sacco.mvp.support.ResourceTableSort.ProcessedLoans.class)
-    Page<LoanApplication> findProcessedLoansPage(@Param("saccoId") String saccoId,
-                                                  @Param("stationId") String stationId,
-                                                  @Param("statuses") Collection<String> statuses,
-                                                  @Param("search") String search,
-                                                  @Param("updatedFrom") OffsetDateTime updatedFrom,
-                                                  @Param("updatedToExclusive") OffsetDateTime updatedToExclusive,
-                                                  @Param("status") String status,
-                                                  Pageable pageable);
-
-    @Query("""
-        select l from LoanApplication l
-        where l.id = :loanId
-          and l.saccoId = :saccoId
-          and lower(l.stationId) = lower(:stationId)
-          and l.status in :statuses
-        """)
-    Optional<LoanApplication> findProcessedLoan(@Param("loanId") UUID loanId,
-                                                 @Param("saccoId") String saccoId,
-                                                 @Param("stationId") String stationId,
-                                                 @Param("statuses") Collection<LoanStatus> statuses);
-
     @Query("""
         select l.status as status, count(l) as total
         from LoanApplication l
@@ -734,14 +554,6 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
         """)
     List<StatusCountProjection> countByStatusForScope(@Param("saccoId") String saccoId,
                                                       @Param("stationId") String stationId);
-
-    @Query("""
-        select l.status as status, count(l) as total
-        from LoanApplication l
-        where l.applicantMemberId = :applicantMemberId
-        group by l.status
-        """)
-    List<StatusCountProjection> countByStatusForApplicant(@Param("applicantMemberId") UUID applicantMemberId);
 
     @Query("""
         select l.status as status, count(l) as total

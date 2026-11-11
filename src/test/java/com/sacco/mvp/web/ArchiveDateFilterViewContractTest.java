@@ -15,12 +15,8 @@ class ArchiveDateFilterViewContractTest {
     @Test
     void everyArchiveViewProvidesResponsiveFromAndToDateControls() throws Exception {
         for (String relativePath : List.of(
-            "manager/archive.jsp",
-            "accountant/archive.jsp",
             "disbursement/archive.jsp",
-            "board/assigned.jsp",
-            "admin/support-archive.jsp",
-            "app/support-archive.jsp"
+            "admin/support-archive.jsp"
         )) {
             String jsp = Files.readString(JSP_ROOT.resolve(relativePath));
 
@@ -31,21 +27,13 @@ class ArchiveDateFilterViewContractTest {
                 .contains("name=\"toDate\"");
         }
 
-        String memberArchives = Files.readString(JSP_ROOT.resolve("app/archives.jsp"));
-        assertThat(occurrences(memberArchives, "type=\"date\" name=\"fromDate\"")).isEqualTo(2);
-        assertThat(occurrences(memberArchives, "type=\"date\" name=\"toDate\"")).isEqualTo(2);
     }
 
     @Test
     void archivePaginationPreservesTheSelectedRange() throws Exception {
         for (String relativePath : List.of(
-            "manager/archive.jsp",
-            "accountant/archive.jsp",
             "disbursement/archive.jsp",
-            "board/assigned.jsp",
-            "admin/support-archive.jsp",
-            "app/support-archive.jsp",
-            "app/archives.jsp"
+            "admin/support-archive.jsp"
         )) {
             String jsp = Files.readString(JSP_ROOT.resolve(relativePath));
 

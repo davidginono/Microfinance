@@ -25,16 +25,16 @@ class StaffDashboardMvcTest {
     @Autowired StaffDashboardService service;
     MockMvc mvc;
     @BeforeEach void setup(){reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
-    AppUserPrincipal actor(Position role,String branch,boolean staff,UserClaim... claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).position(role).build(),new HashSet<>(List.of(claims)),staff);}
+    AppUserPrincipal actor(Position role,String branch,boolean staff,UserClaim... claims){return (staff ? new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).position(role).build(),new HashSet<>(List.of(claims))) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).position(role).build(),new HashSet<>(List.of(claims))));}
     @Test void roleDashboardAccessDoesNotRequireAnUnrelatedAnalyticsPermissionAndIgnoresForgedScope()throws Exception{
-        var actor=actor(Position.ACCOUNTANT,"B1",true,UserClaim.ACCOUNTANT_QUEUE_VIEW);
+        var actor=actor(Position.ACCOUNTANT,"B1",true,UserClaim.LOAN_RECORDING_VIEW);
         var dashboard=new StaffDashboardService.Dashboard(null,List.of(),null,2026);when(service.read(actor)).thenReturn(dashboard);
         mvc.perform(get("/staff/dashboard").with(user(actor)).param("stationId","FOREIGN").param("saccoId","FOREIGN"))
             .andExpect(status().isOk()).andExpect(view().name("staff/dashboard")).andExpect(model().attribute("staffDashboard",dashboard));
         verify(service).read(actor);
     }
     @Test void missingClaimsOrBranchCannotLoadDashboardData()throws Exception{
-        for(var actor:List.of(actor(Position.ACCOUNTANT,"B1",true),actor(Position.ACCOUNTANT,null,true,UserClaim.ACCOUNTANT_QUEUE_VIEW))){
+        for(var actor:List.of(actor(Position.ACCOUNTANT,"B1",true),actor(Position.ACCOUNTANT,null,true,UserClaim.LOAN_RECORDING_VIEW))){
             mvc.perform(get("/staff/dashboard").with(user(actor))).andExpect(status().isForbidden());
         }
         verifyNoInteractions(service);

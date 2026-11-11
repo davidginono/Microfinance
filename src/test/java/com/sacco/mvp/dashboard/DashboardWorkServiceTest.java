@@ -25,7 +25,7 @@ class DashboardWorkServiceTest {
     final OffsetDateTime now=OffsetDateTime.parse("2026-10-22T09:42:00+03:00");
     final DashboardWorkService service=new DashboardWorkService(repository,new AccessControlService(),vouchers,voucherAccess,clock);
     @BeforeEach void setup(){when(clock.now()).thenReturn(now);}
-    AppUserPrincipal actor(Position role,String branch,boolean staff,UserClaim... claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(role).memberAccount(!staff).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims)),staff);}
+    AppUserPrincipal actor(Position role,String branch,boolean staff,UserClaim... claims){return (staff ? new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(role).memberAccount(!staff).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims))) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(role).memberAccount(!staff).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims))));}
     @Test void missingScopeAndUnrelatedClaimsCannotReadCounts(){
         for(var a:List.of(actor(Position.ACCOUNTANT,null,true,UserClaim.ACCOUNTANT_QUEUE_VIEW),actor(Position.ACCOUNTANT,"B1",true))){
             assertThatThrownBy(()->service.read(a,0,BigDecimal.ZERO)).isInstanceOf(AccessDeniedException.class);
@@ -33,21 +33,23 @@ class DashboardWorkServiceTest {
         verifyNoInteractions(repository,vouchers,voucherAccess);
     }
     @Test void invalidAndExtremeDisplayFiltersFailBeforePersistence(){
-        var a=actor(Position.MANAGER,"B1",true,UserClaim.MANAGER_QUEUE_VIEW);
+        var a=actor(Position.MANAGER,"B1",true,UserClaim.LOAN_RECORDING_VIEW);
         for(var amount:List.of(new BigDecimal("-1"),new BigDecimal("0.001"),new BigDecimal("1E+100000"))){assertThatThrownBy(()->service.read(a,0,amount)).isInstanceOf(IllegalArgumentException.class);}
         assertThatThrownBy(()->service.read(a,3651,BigDecimal.ZERO)).isInstanceOf(IllegalArgumentException.class);verifyNoInteractions(repository);
     }
     @Test void managerCountsUseTheActualQueueStatusAndNativeDestination(){
-        var a=actor(Position.MANAGER,"B1",true,UserClaim.MANAGER_QUEUE_VIEW);
-        when(repository.loans(a,List.of("READY_FOR_MANAGER"),false,null,now.minusDays(3),new BigDecimal("400000"))).thenReturn(List.of(new Bucket("READY_FOR_MANAGER","READY_FOR_MANAGER",2,new BigDecimal("1200000"),now.minusDays(6))));
+        var a=actor(Position.MANAGER,"B1",true,UserClaim.LOAN_RECORDING_VIEW);
+        when(repository.loans(a,List.of("SUBMITTED"),now.minusDays(3),new BigDecimal("400000"))).thenReturn(List.of(new Bucket("SUBMITTED","SUBMITTED",2,new BigDecimal("1200000"),now.minusDays(6))));
         var cards=service.read(a,3,new BigDecimal("400000")).infolets();assertThat(cards).hasSize(1);
-        assertThat(cards.getFirst().count()).isEqualTo(2);assertThat(cards.getFirst().oldestDays()).isEqualTo(6);assertThat(cards.getFirst().href()).isEqualTo("/manager/loan-applications");
-        verify(repository).loans(a,List.of("READY_FOR_MANAGER"),false,null,now.minusDays(3),new BigDecimal("400000"));verifyNoMoreInteractions(repository);
+        assertThat(cards.getFirst().count()).isEqualTo(2);assertThat(cards.getFirst().oldestDays()).isEqualTo(6);
+        assertThat(cards.getFirst().href()).isEqualTo("/finance/loan-records?state=SUBMITTED");
+
     }
     @Test void boardCountsRetainTheReviewerAndStageScope(){
         var a=actor(Position.BOARD,"B1",true,UserClaim.BOARD_QUEUE_VIEW);
-        assertThat(service.read(a,0,BigDecimal.ZERO).infolets()).extracting(DashboardWorkService.Infolet::id).containsExactly("queue-board");
-        verify(repository).loans(a,List.of("AWAITING_BOARD"),false,"BOARD",now,BigDecimal.ZERO);verifyNoMoreInteractions(repository);
+        assertThatThrownBy(()->service.read(a,0,BigDecimal.ZERO)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(repository);
+
     }
     @Test void voucherDraftsStaySeparateFromApprovalsAndPostingAndTypesAreClaimScoped(){
         var a=actor(Position.ACCOUNTANT,"B1",true,UserClaim.VOUCHER_WORKSPACE_VIEW,UserClaim.ACCOUNTING_BUSINESS_VIEW);
@@ -58,10 +60,9 @@ class DashboardWorkServiceTest {
         verify(repository).vouchers(a,List.of("RECEIPT","PAYMENT"),now,BigDecimal.ZERO);verifyNoMoreInteractions(repository);
     }
     @Test void memberCountsRequireOwnershipAndGuaranteeAmountsRemainUnavailable(){
-        var a=actor(Position.MEMBER,"B1",false,UserClaim.MEMBER_LOANS_VIEW,UserClaim.GUARANTOR_REQUESTS_VIEW);
-        when(repository.guarantees(a,now)).thenReturn(List.of(new Bucket("PENDING","PENDING",1,null,now.minusDays(1))));
-        var cards=service.read(a,0,BigDecimal.ZERO).infolets();assertThat(cards).extracting(DashboardWorkService.Infolet::id).containsExactly("loan-drafts","loan-applications","guarantees");
-        assertThat(cards.getLast().amount()).isNull();assertThat(cards.getLast().href()).isEqualTo("/app/guarantee-requests");
-        verify(repository).loans(eq(a),anyList(),eq(true),isNull(),eq(now),eq(BigDecimal.ZERO));verify(repository).guarantees(a,now);verifyNoMoreInteractions(repository);verifyNoInteractions(vouchers,voucherAccess);
+        var a=actor(Position.MEMBER,"B1",false,UserClaim.MEMBER_LOANS_VIEW);
+        assertThatThrownBy(()->service.read(a,0,BigDecimal.ZERO)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(repository);
+
     }
 }

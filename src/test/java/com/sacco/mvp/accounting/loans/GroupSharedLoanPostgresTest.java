@@ -22,8 +22,7 @@ class GroupSharedLoanPostgresTest {
     @BeforeAll void start(){s.start();shared=f.context.getBean(GroupSharedLoanService.class);}
     @AfterAll void stop(){s.stop();}
     @BeforeEach void setup(){s.setup();loan=s.s.g.cycles.sharedFacility(f.actor,s.cycle).orElseThrow().loanId();
-        String hash=s.open();assertThat(s.agreements.confirm(s.client,s.cycle,hash,true,"")).isNull();
-        var second=s.s.g.client(s.s.g.second);s.agreements.exportClient(second,s.cycle,Locale.ENGLISH);assertThat(s.agreements.confirm(second,s.cycle,s.agreements.packet(second,s.cycle).row().hash(),true,"")).isNull();
+        s.document();GroupPaperFixture.record(f,s.cycle,"SHARED_PAYOUT",f.client);GroupPaperFixture.record(f,s.cycle,"SHARED_PAYOUT",s.s.g.second);f.approve(loan);
         f.context.getBean(MemberDirectoryService.class).find(f.actor.getMemberId()).orElseThrow().setSignatureText("Synthetic lender signature");
         f.jdbc.update("update members set signature_text='Synthetic lender signature' where id=?",f.actor.getMemberId());
     }
@@ -31,6 +30,11 @@ class GroupSharedLoanPostgresTest {
     com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm payment(String amount){var x=f.post(loan,amount,"SHARED-PAY-"+UUID.randomUUID());x.setSharedPayer("Synthetic member A covering shared obligations");return x;}
     int count(String table){return s.s.count(table);}
     BigDecimal sum(String column){return f.jdbc.queryForObject("select coalesce(sum("+column+"),0) from lending_group_shared_movement where sacco_id=?",BigDecimal.class,f.institution);}
+    @Test void approvalIndependenceIncludesEverySharedBorrower(){
+        for(var client:List.of(f.client,s.s.g.second))
+            assertThat(f.jdbc.queryForObject("select loan_group_related(?,?)",Boolean.class,loan,client)).isTrue();
+        assertThat(f.jdbc.queryForObject("select loan_group_related(?,?)",Boolean.class,loan,f.actor.getMemberId())).isFalse();
+    }
     @Test void completeUnequalFundingCreatesOneDebtAndTwoExactConfirmedTransfers(){
         var x=funding();var post=f.service.disburse(f.actor,x);assertThat(f.service.disburse(f.actor,x).id()).isEqualTo(post.id());
         assertThat(count("loan_ledgers")).isEqualTo(1);assertThat(count("gl_journal")).isEqualTo(1);assertThat(count("lending_group_shared_transfer")).isEqualTo(2);

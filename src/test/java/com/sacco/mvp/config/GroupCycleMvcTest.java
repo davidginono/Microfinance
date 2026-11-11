@@ -27,10 +27,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,GroupCycleMvcTest.Config.class})
 class GroupCycleMvcTest {
-    @Autowired WebApplicationContext context;@Autowired GroupCycleService cycles;@Autowired GroupLendingService groups;@Autowired GroupConsentService consents;
+    @Autowired WebApplicationContext context;@Autowired GroupCycleService cycles;@Autowired GroupLendingService groups;
     MockMvc mvc;AppUserPrincipal actor;final UUID group=UUID.randomUUID(),cycle=UUID.randomUUID(),client=UUID.randomUUID();
-    @BeforeEach void setup(){reset(cycles,groups,consents,context.getBean(GroupConsentDeliveryService.class));mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
-        actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);
+    @BeforeEach void setup(){reset(cycles,groups);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
+        actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
         when(groups.detail(actor,group)).thenReturn(new Group(group,"GRP-1","Synthetic group","INFORMAL","Evidence","ACTIVE",0,2));
         when(cycles.policies(actor,0)).thenReturn(new Page<>(List.of(),0,false));when(cycles.memberLabels(eq(actor),eq(group),any())).thenReturn(Map.of(client,"C31 · Synthetic participant"));}
     @Test void policyAndParticipantDisclosuresUseAllowedFields()throws Exception{
@@ -40,13 +40,7 @@ class GroupCycleMvcTest {
         mvc.perform(post("/finance/groups/"+group+"/cycles").with(user(actor)).with(csrf()).param("participants[0].disclosure.annualCostPercent","27.123456").param("participants[0].disclosure.costEvidence","Checked method").param("participants[0].disclosure.costVerified","true").param("participants[0].disclosure.policyId",UUID.randomUUID().toString()))
             .andExpect(status().is3xxRedirection());verify(cycles).create(eq(actor),eq(group),argThat(f->f.getParticipants().getFirst().getDisclosure().isCostVerified()&&f.getParticipants().getFirst().getDisclosure().getAnnualCostPercent().toPlainString().equals("27.123456")));
     }
-    @Test void contractLanguageIsRetainedAfterAValidationFailure()throws Exception{
-        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
-        when(consents.accept(principal,cycle,true,"","SW")).thenReturn("group.error.disclosureLanguage");
-        mvc.perform(post("/app/group-loans/"+cycle+"/accept").with(user(principal)).with(csrf()).param("accepted","true").param("preferredLanguage","SW"))
-            .andExpect(status().is3xxRedirection()).andExpect(flash().attribute("preferredLanguage","SW")).andExpect(flash().attribute("consentError","group.error.disclosureLanguage"));
-        verify(consents).accept(principal,cycle,true,"","SW");
-    }
+
     @Test void cycleCreationRequiresCsrfAndCannotBindScopeOrLoanIdentity()throws Exception{
         String path="/finance/groups/"+group+"/cycles";mvc.perform(post(path).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(cycles);
         when(cycles.create(eq(actor),eq(group),any())).thenReturn(cycle);
@@ -81,42 +75,19 @@ class GroupCycleMvcTest {
         mvc.perform(post("/finance/groups/"+group+"/cycles").with(user(actor)).with(csrf()).param("participants[50].clientId",client.toString()))
             .andExpect(status().isBadRequest()).andExpect(view().name("groups/error"));verify(cycles,never()).create(any(),any(),any());
     }
-    @Test void personalAcceptanceUsesAuthenticatedClientAndCsrf()throws Exception{
-        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
-        String path="/app/group-loans/"+cycle+"/accept";mvc.perform(post(path).with(user(principal)).param("accepted","true")).andExpect(status().isForbidden());verifyNoInteractions(consents);
-        mvc.perform(post(path).with(user(principal)).with(csrf()).param("accepted","true").param("otpCode","123456").param("clientId",UUID.randomUUID().toString()))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/app/group-loans/"+cycle));verify(consents).accept(principal,cycle,true,"123456");
-    }
-    @Test void codeRequestsRequireCsrfAndUseTheAuthenticatedParticipant()throws Exception{
-        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
-        String path="/app/group-loans/"+cycle+"/code";mvc.perform(post(path).with(user(principal))).andExpect(status().isForbidden());
-        mvc.perform(post(path).with(user(principal)).with(csrf()).param("clientId",UUID.randomUUID().toString())).andExpect(status().is3xxRedirection()).andExpect(flash().attribute("consentCodeSent",true));
-        verify(context.getBean(GroupConsentDeliveryService.class)).send(eq(principal),eq(cycle),any());
-    }
-    @Test void wrongCodeRedirectsWithASafeErrorAndNeverEchoesIt()throws Exception{
-        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
-        when(consents.accept(principal,cycle,true,"123456")).thenReturn("group.error.otpInvalid");
-        mvc.perform(post("/app/group-loans/"+cycle+"/accept").with(user(principal)).with(csrf()).param("accepted","true").param("otpCode","123456"))
-            .andExpect(status().is3xxRedirection()).andExpect(flash().attribute("consentError","group.error.otpInvalid"));
-    }
+
     @Test void withdrawalNeedsCsrfAndBindsOnlyTheReasonAndVersion()throws Exception{
         String path="/finance/groups/cycles/"+cycle+"/withdraw";mvc.perform(post(path).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(cycles);
         mvc.perform(post(path).with(user(actor)).with(csrf()).param("reason","Unfunded request").param("expectedVersion","1").param("actorId",client.toString()).param("stationId","FOREIGN"))
             .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/groups/cycles/"+cycle));
         verify(cycles).withdraw(eq(actor),eq(cycle),argThat(f->f.getReason().equals("Unfunded request") && f.getExpectedVersion()==1));
     }
-    @Test void refusalUsesTheAuthenticatedParticipantAndExplicitConfirmation()throws Exception{
-        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
-        String path="/app/group-loans/"+cycle+"/refuse";mvc.perform(post(path).with(user(principal))).andExpect(status().isForbidden());verifyNoInteractions(consents);
-        mvc.perform(post(path).with(user(principal)).with(csrf()).param("reason","Terms declined").param("confirmed","true").param("clientId",UUID.randomUUID().toString()))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/app/group-loans/"+cycle));verify(consents).refuse(principal,cycle,"Terms declined",true);
-    }
+
     @Configuration @EnableWebMvc static class Config {
-        @Bean GroupCycleService cycles(){return mock(GroupCycleService.class);}@Bean GroupLendingService groups(){return mock(GroupLendingService.class);}@Bean GroupConsentService consents(){return mock(GroupConsentService.class);}
+        @Bean GroupCycleService cycles(){return mock(GroupCycleService.class);}@Bean GroupLendingService groups(){return mock(GroupLendingService.class);}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(LocalDate.of(2026,10,23));return c;}
         @Bean ResourceBundleMessageSource messageSource(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
         @Bean GroupCycleController controller(GroupCycleService c,GroupLendingService g,ApplicationClock clock,ResourceBundleMessageSource m){return new GroupCycleController(c,g,clock,m);}
-        @Bean GroupConsentDeliveryService delivery(){return mock(GroupConsentDeliveryService.class);}
-        @Bean GroupConsentController consentController(GroupConsentService c,GroupConsentDeliveryService d){return new GroupConsentController(c,d,mock(GroupOrganizationAccountService.class));}
+
     }
 }

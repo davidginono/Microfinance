@@ -82,7 +82,7 @@ class FinanceWorkspaceSecurityTest {
             .memberAccount(true).status(MemberStatus.ACTIVE)
             .staffRoles(staff ? Set.of(Position.ACCOUNTANT) : Set.of())
             .staffAccessStatus(staff ? StaffAccessStatus.ACTIVE : StaffAccessStatus.NONE).build();
-        return new AppUserPrincipal(member, Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW), staff);
+        return (staff ? new com.sacco.mvp.security.AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW)) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW)));
     }
 
     @Configuration @EnableWebMvc

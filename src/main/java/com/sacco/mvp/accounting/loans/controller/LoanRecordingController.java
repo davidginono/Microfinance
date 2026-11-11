@@ -17,6 +17,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
@@ -29,6 +30,7 @@ import java.util.*;
 @Controller @RequestMapping("/finance") @RequiredArgsConstructor
 public class LoanRecordingController {
     private final LoanRecordingService service;
+    private final LoanGroupApprovalService groupApprovals;
     private final LoanRecordingPdfService pdf;
     private final ApplicationClock clock;
     private final MessageSource messages;
@@ -52,9 +54,9 @@ public class LoanRecordingController {
         model.addAttribute("recordForm",f);recordProductContext(a,f,model);return "accounting/loans/record-form";}
     @PostMapping("/loan-records") public String save(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute RecordForm recordForm,BindingResult errors,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,@RequestParam(defaultValue="save") String action,Model model,RedirectAttributes flash){
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
-            if(action.equals("draft"))return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments,false)+"/edit";
+            if(action.equals("draft"))return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments)+"/edit";
             if(action.equals("preview")){model.addAttribute("quote",service.preview(a,recordForm));recordProductContext(a,recordForm,model);return "accounting/loans/record-form";}
-            if(!action.equals("save"))throw new IllegalArgumentException("recording.error.request");if(recordForm.getApplicationId()!=null)return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments,true);UUID id=service.save(a,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
+            if(!action.equals("save"))throw new IllegalArgumentException("recording.error.request");UUID id=service.save(a,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
         catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,error(e));}
         catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
@@ -358,10 +360,30 @@ public class LoanRecordingController {
     private String label(String key,Locale locale){return messages.getMessage(key,null,locale);}
     private String kind(jakarta.servlet.http.HttpServletRequest r){return r.getRequestURI().contains("loan-disbursements")?"DISBURSEMENT":r.getRequestURI().contains("loan-repayments")?"PAYMENT":"LOAN";}
     private void context(String kind,Model model){model.addAttribute("kind",kind);model.addAttribute("createClaim",kind.equals("LOAN")?"LOAN_RECORDING_CREATE":kind.equals("DISBURSEMENT")?"LOAN_RECORDING_DISBURSE":"LOAN_RECORDING_POST");model.addAttribute("base",kind.equals("LOAN")?"/finance/loan-records":kind.equals("DISBURSEMENT")?"/finance/loan-disbursements":"/finance/loan-repayments");}
-    private String error(RuntimeException e){return e.getMessage()!=null && (e.getMessage().startsWith("applications.error.") || e.getMessage().startsWith("kyc.error.") || e.getMessage().startsWith("credit.error.") || e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error.") || e.getMessage().startsWith("charges.error.") || e.getMessage().startsWith("prepayment.error."))?e.getMessage():"recording.error.terms";}
+    private String error(RuntimeException e){return e.getMessage()!=null && (e.getMessage().startsWith("loanGroups.error.") || e.getMessage().startsWith("applications.error.") || e.getMessage().startsWith("kyc.error.") || e.getMessage().startsWith("credit.error.") || e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error.") || e.getMessage().startsWith("charges.error.") || e.getMessage().startsWith("prepayment.error."))?e.getMessage():"recording.error.terms";}
 
-    @PostMapping("/loan-records/{id}/submit-for-review")
-    public String submitForReview(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash) {
-        service.submitRecordedApplication(actor,id);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
+    @InitBinder("groupRuleForm") public void groupRuleBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(10);b.setAllowedFields("productId","expectedRevision","groups[*]","approvals[*]");}
+    @PostMapping("/loan-records/rules/custom") public String customRules(@AuthenticationPrincipal AppUserPrincipal a){return "redirect:/finance/loan-records/rules?productId="+groupApprovals.customProduct(a);}
+    @GetMapping("/loan-records/rules") public String groupRules(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID productId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,Model m){
+        m.addAttribute("ruleProducts",groupApprovals.products(a,search,page));m.addAttribute("search",search);m.addAttribute("page",page);m.addAttribute("groupRuleForm",groupApprovals.rule(a,productId));m.addAttribute("userGroups",com.sacco.mvp.domain.Position.staffAssignableRoles().stream().filter(g->g!=com.sacco.mvp.domain.Position.ADMIN).toList());return "accounting/loans/group-rules";
     }
+    @PreAuthorize("@access.has(principal, 'APPROVAL_FLOW_CONFIGURE') and @access.has(principal, 'APPROVAL_FLOW_VIEW')")
+    @PostMapping("/loan-records/rules") public String saveGroupRules(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute GroupRuleForm groupRuleForm,BindingResult errors,Model m,RedirectAttributes flash){
+        if(!errors.hasErrors())try{groupApprovals.saveRule(a,groupRuleForm);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/rules?productId="+groupRuleForm.getProductId();}catch(IllegalArgumentException e){errors.reject(error(e));}
+        if(groupRuleForm.getProductId()!=null)try{groupRuleForm.setProductName(groupApprovals.rule(a,groupRuleForm.getProductId()).getProductName());}catch(IllegalArgumentException ignored){}
+        m.addAttribute("ruleProducts",groupApprovals.products(a,"",0));m.addAttribute("search","");m.addAttribute("page",0);
+        m.addAttribute("userGroups",com.sacco.mvp.domain.Position.staffAssignableRoles().stream().filter(g->g!=com.sacco.mvp.domain.Position.ADMIN).toList());return "accounting/loans/group-rules";
+    }
+    @GetMapping("/loan-records/{id}/review") public String groupReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){
+        m.addAttribute("reviewLoan",groupApprovals.loan(a,id));m.addAttribute("groupReview",groupApprovals.review(a,id));m.addAttribute("loanId",id);m.addAttribute("requestKey",UUID.randomUUID());return "accounting/loans/group-review";
+    }
+    @PostMapping("/loan-records/{id}/submit-for-review") public String submitForReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID requestKey,RedirectAttributes flash){
+        try{groupApprovals.submit(a,id,requestKey);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));}
+        return "redirect:/finance/loan-records/"+id+"/review";
+    }
+    @PostMapping("/loan-records/{id}/review") public String decideGroupReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID approvalRequest,@RequestParam UUID requestKey,@RequestParam String decision,@RequestParam String reason,@RequestParam String evidence,RedirectAttributes flash){
+        try{groupApprovals.decide(a,id,approvalRequest,requestKey,decision,reason,evidence);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));flash.addFlashAttribute("reviewReason",reason);flash.addFlashAttribute("reviewEvidence",evidence);}
+        return "redirect:/finance/loan-records/"+id+"/review";
+    }
+
 }

@@ -30,8 +30,8 @@ class RecordedApplicationDisbursementTest {
     AppUserPrincipal actor;UUID id=UUID.randomUUID(),token=UUID.randomUUID(),key=UUID.randomUUID(),money=UUID.randomUUID(),principal=UUID.randomUUID();
     LocalDate date=LocalDate.of(2026,10,14),due=date.plusMonths(1);
     @BeforeEach void fixture(){
-        var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").email("synthetic@example.invalid").position(Position.DISBURSEMENT_OFFICER).build();
-        actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class),true);
+        var member=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").email("synthetic@example.invalid").position(Position.DISBURSEMENT_OFFICER).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
+        actor=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class));
         when(otpSettings.requiresApprovalOtp(actor.getMemberId(),"I1","B1")).thenReturn(true);
         when(members.find(member.getId())).thenReturn(Optional.of(member));
         when(otp.validateOtp(member.getEmail(),EmailOtpPurpose.BOARD_SIGNATURE,"123456")).thenReturn(token);

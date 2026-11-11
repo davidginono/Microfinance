@@ -31,7 +31,7 @@ public class DashboardWorkService {
     @Transactional(readOnly=true)
     public Work read(AppUserPrincipal actor, int days, BigDecimal minimum) {
         if (actor == null || actor.getSaccoId() == null || actor.getStationId() == null || actor.getStationId().isBlank()
-            || !(access.canAccessMemberArea(actor) || access.staffDashboardAccess(actor)
+            || !(access.staffDashboardAccess(actor)
                 || (actor.isStaffSession() && access.has(actor,"VOUCHER_WORKSPACE_VIEW")))) throw new AccessDeniedException("Dashboard unavailable");
         if (days < 0 || days > 3650 || minimum == null || minimum.signum() < 0 || minimum.scale() > 2 || minimum.scale() < -16 || minimum.precision() - minimum.scale() > 16)
             throw new IllegalArgumentException("Invalid display filters");
@@ -49,37 +49,19 @@ public class DashboardWorkService {
                     cards.add(card("voucher-"+category,"dashboard.work.voucher."+category,Set.of("ERROR","FAILED").contains(category)?"error":"neutral",rows.stream().filter(r->r.category().equals(category)).toList(),href,groups));
                 }
             }
-            queue(cards,actor,access.canAccessManagerArea(actor),"manager","READY_FOR_MANAGER",null,"/manager/loan-applications",before,minimum);
-            queue(cards,actor,access.canAccessLoanOfficerArea(actor),"loan-officer","AWAITING_LOAN_OFFICER",null,"/loan-officer/queue",before,minimum);
-            queue(cards,actor,access.canAccessAccountantArea(actor),"accountant","AWAITING_ACCOUNTANT",null,"/accountant/loan-applications?filter=AWAITING_ACCOUNTANT",before,minimum);
-            queue(cards,actor,access.canAccessDisbursementArea(actor),"disbursement","READY_FOR_DISBURSEMENT",null,"/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT",before,minimum);
-            queue(cards,actor,access.canAccessBoardArea(actor),"board","AWAITING_BOARD","BOARD","/board/queue",before,minimum);
-            queue(cards,actor,access.canAccessChairpersonArea(actor),"chairperson","AWAITING_CHAIRPERSON","CHAIRPERSON","/chairperson/queue",before,minimum);
-            queue(cards,actor,access.canAccessCreditCommitteeArea(actor),"credit-committee","AWAITING_CREDIT_COMMITTEE","CREDIT_COMMITTEE","/credit-committee/queue",before,minimum);
-        } else if (access.canAccessMemberArea(actor)) {
-            if (access.has(actor,"MEMBER_LOANS_VIEW")) {
-                var statuses=List.of("DRAFT","SUBMITTED","AWAITING_GUARANTORS","ALL_GUARANTORS_APPROVED","READY_FOR_MANAGER","MANAGER_ACCEPTED","AWAITING_LOAN_OFFICER","LOAN_OFFICER_APPROVED","AWAITING_CHAIRPERSON","CHAIRPERSON_APPROVED","AWAITING_BOARD","BOARD_APPROVED","AWAITING_CREDIT_COMMITTEE","CREDIT_COMMITTEE_APPROVED","AWAITING_ACCOUNTANT","ACCOUNTANT_APPROVED","READY_FOR_DISBURSEMENT");
-                var rows=repository.loans(actor,statuses,true,null,before,minimum);
-                cards.add(card("loan-drafts","dashboard.work.loanDrafts","neutral",rows.stream().filter(r->r.category().equals("DRAFT")).toList(),"/app/loan-applications",List.of()));
-                var pending=rows.stream().filter(r->!r.category().equals("DRAFT")).toList();
-                cards.add(card("loan-applications","dashboard.work.applications","neutral",pending,"/app/loan-applications",pending.stream().map(r->new Group("loan.status."+r.category(),r.count(),r.amount(),"/app/loan-applications")).toList()));
-            }
-            if (access.has(actor,"GUARANTOR_REQUESTS_VIEW")) {
-                var rows=repository.guarantees(actor,before);
-                cards.add(card("guarantees","dashboard.work.guarantees","neutral",rows,"/app/guarantee-requests",List.of()));
-            }
+            queue(cards,actor,access.has(actor,"LOAN_RECORDING_VIEW"),"loan-groups","SUBMITTED","/finance/loan-records?state=SUBMITTED",before,minimum);
+            queue(cards,actor,access.canAccessDisbursementArea(actor),"disbursement","READY_FOR_DISBURSEMENT","/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT",before,minimum);
         }
         return new Work(List.copyOf(cards),clock.now().toString());
     }
-    private void queue(List<Infolet> cards,AppUserPrincipal actor,boolean permitted,String role,String status,String stage,String href,java.time.OffsetDateTime before,BigDecimal minimum) {
+    private void queue(List<Infolet> cards,AppUserPrincipal actor,boolean permitted,String role,String status,String href,java.time.OffsetDateTime before,BigDecimal minimum) {
         if (!permitted) return;
-        var rows=repository.loans(actor,List.of(status),false,stage,before,minimum);
+        var rows=repository.loans(actor,List.of(status),before,minimum);
         cards.add(card("queue-"+role,"dashboard.work.queue."+role,"neutral",rows,href,List.of(new Group("loan.status."+status,rows.stream().mapToLong(Bucket::count).sum(),rows.stream().map(Bucket::amount).reduce(BigDecimal.ZERO,BigDecimal::add),href))));
     }
     private Infolet card(String id,String label,String tone,List<Bucket> rows,String href,List<Group> groups) {
         var oldest=rows.stream().map(Bucket::oldest).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);
         BigDecimal amount=rows.stream().anyMatch(r->r.amount()==null)?null:rows.stream().map(Bucket::amount).reduce(BigDecimal.ZERO,BigDecimal::add);
-        if(id.equals("guarantees"))amount=null;
         return new Infolet(id,label,tone,rows.stream().mapToLong(Bucket::count).sum(),amount,oldest==null?null:Math.max(0,ChronoUnit.DAYS.between(oldest,clock.now())),href,groups);
     }
 }

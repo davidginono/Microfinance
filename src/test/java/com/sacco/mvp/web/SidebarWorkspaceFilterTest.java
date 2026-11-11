@@ -33,56 +33,19 @@ class SidebarWorkspaceFilterTest {
 
     @Test
     void sidebarDefinesWorkspaceFlagsFromCurrentLoginSession() throws IOException {
-        String sidebar = sidebarFragment();
-
-        assertThat(sidebar).contains(
-            "<c:set var=\"memberWorkspace\" value=\"${not empty currentMember and currentMember.memberAccess and not currentMember.staffSession}\" />",
-            "<c:set var=\"staffWorkspace\" value=\"${not empty currentMember and currentMember.staffSession}\" />"
-        );
+        assertThat(sidebarFragment()).contains("currentMember.staffSession").doesNotContain("memberWorkspace", "memberApplyLoanActive");
     }
 
     @Test
     void memberMenuIsLimitedToMemberWorkspace() throws IOException {
-        String sidebar = sidebarFragment();
-
-        assertGateBefore(sidebar, "<c:if test=\"${memberWorkspace}\">", "<a href=\"/app/dashboard\"");
-        assertThat(sidebar).contains("<a href=\"/app/dashboard\"");
-        assertThat(sidebar).contains("<a href=\"/app/support\"");
-    }
-
-    @Test
-    void memberLoanFormRoutesHighlightApplyForLoanInsteadOfApplicationProgress() throws IOException {
-        String sidebar = sidebarFragment();
-
-        assertThat(sidebar).contains(
-            "<c:set var=\"memberApplyLoanActive\" value=\"${requestUri eq '/app/loan-products' or requestUri eq '/app/loan-applications/new' or (fn:startsWith(requestUri, '/app/loan-applications/') and fn:endsWith(requestUri, '/edit'))}\" />",
-            "<c:set var=\"memberApplicationProgressActive\" value=\"${fn:startsWith(requestUri, '/app/loan-applications') and not memberApplyLoanActive}\" />",
-            "${memberApplyLoanActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'",
-            "${memberApplicationProgressActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'"
-        );
+        assertThat(sidebarFragment()).doesNotContain("/app/", "showManagerPanel", "showBoardPanel", "showChairpersonPanel");
     }
 
     @Test
     void staffMenusAreLimitedToStaffWorkspace() throws IOException {
-        String sidebar = sidebarFragment();
-
-        assertGateBefore(sidebar, "<c:if test=\"${staffWorkspace}\">", "<a href=\"/admin/dashboard\"");
-        assertGateBefore(sidebar, "<c:if test=\"${staffWorkspace}\">", "<c:set var=\"showManagerPanel\"");
-        assertThat(sidebar).contains(
-            "@access.canAccessManagerArea(principal)",
-            "@access.canAccessLoanOfficerArea(principal)",
-            "@access.canAccessAccountantArea(principal)",
-            "@access.canAccessDisbursementArea(principal)"
-        );
-        assertThat(sidebar).contains(
-            "id=\"staffSettingsPanel\"",
-            "href=\"/staff/settings\"",
-            "shell-sidebar-subitem",
-            "shell-sidebar-subitem-label",
-            "menu.settings.language",
-            "Language &amp; Preferences"
-        );
-        assertThat(sidebar).contains("/staff/settings' ? 'shell-nav-active");
+        String sidebar=sidebarFragment();
+        assertThat(sidebar).contains("${staffWorkspace}", "/staff/dashboard", "staffSettingsPanel", "/staff/settings", "finance-navigation.jspf");
+        assertThat(sidebar).doesNotContain("canAccessManagerArea", "canAccessAccountantArea", "canAccessBoardArea");
     }
 
     private String sidebarFragment() throws IOException {

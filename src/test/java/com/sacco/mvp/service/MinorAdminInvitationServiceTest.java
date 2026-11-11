@@ -61,7 +61,7 @@ class MinorAdminInvitationServiceTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"MANAGER,Manager", "MINOR_ADMIN,Institution Admin", "ACCOUNTANT,Accountant"})
+    @org.junit.jupiter.params.provider.CsvSource({"MANAGER,General Manager", "MINOR_ADMIN,ICT Manager", "ACCOUNTANT,Chief Accountant"})
     void activationEmailNamesTheAssignedRoleWithoutChangingAccess(Position role, String label) {
         String token = "synthetic-token";
         UUID id = UUID.randomUUID();
@@ -93,9 +93,9 @@ class MinorAdminInvitationServiceTest {
     void invitationRolesAreLocalizedAndMultipleRolesAreRetained() {
         Member member = Member.builder().position(Position.MANAGER)
             .staffRoles(new java.util.LinkedHashSet<>(List.of(Position.ACCOUNTANT, Position.MANAGER))).build();
-        org.assertj.core.api.Assertions.assertThat(invitationService.invitationRoleLabel(member)).isEqualTo("Manager, Accountant");
+        org.assertj.core.api.Assertions.assertThat(invitationService.invitationRoleLabel(member)).isEqualTo("General Manager, Chief Accountant");
         org.springframework.context.i18n.LocaleContextHolder.setLocale(java.util.Locale.forLanguageTag("sw"));
-        org.assertj.core.api.Assertions.assertThat(invitationService.invitationRoleLabel(member)).isEqualTo("Meneja, Mhasibu");
+        org.assertj.core.api.Assertions.assertThat(invitationService.invitationRoleLabel(member)).isEqualTo("Meneja Mkuu, Mhasibu Mkuu");
     }
 
     @Test
@@ -141,8 +141,8 @@ class MinorAdminInvitationServiceTest {
             "ginonodavid625@gmail.com",
             com.sacco.mvp.domain.EmailOtpPurpose.CLAIM_ACCOUNT,
             memberId,
-            "Credit Committee account activation code",
-            "Use the code below to activate your Credit Committee account.",
+            "Credit Officer account activation code",
+            "Use the code below to activate your Credit Officer account.",
             "SACCO-01",
             "AR704",
             "255746359369"
@@ -198,7 +198,7 @@ class MinorAdminInvitationServiceTest {
     }
 
     @Test
-    void cleanupExpiredInvitationsDeletesUnclaimedInvitedStaffMember() {
+    void cleanupExpiredInvitationsRetiresAccessAndKeepsTheIdentity() {
         UUID memberId = UUID.randomUUID();
         MinorAdminInvitation invitation = MinorAdminInvitation.builder()
             .id(UUID.randomUUID())
@@ -219,8 +219,11 @@ class MinorAdminInvitationServiceTest {
 
         invitationService.cleanupExpiredInvitations();
 
-        verify(invitationRepository).delete(invitation);
-        verify(memberRepository).delete(member);
+        verify(invitationRepository).save(invitation);
+        verify(memberRepository).save(member);
+        verify(memberRepository,never()).delete(member);
+        org.assertj.core.api.Assertions.assertThat(member.getStatus()).isEqualTo(MemberStatus.INACTIVE);
+        org.assertj.core.api.Assertions.assertThat(invitation.getRevokedAt()).isNotNull();
     }
 
     @Test

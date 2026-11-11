@@ -218,7 +218,7 @@ class LoanDocumentControllerSmsUsageSecurityTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, claims, true);
+        return new AppUserPrincipal(member,claims);
     }
 
     private SaccoStation station() {
@@ -275,12 +275,7 @@ class LoanDocumentControllerSmsUsageSecurityTest {
         AuthzService authzService(LoanApplicationRepository loanApplicationRepository,
                                   GuarantorRequestRepository guarantorRequestRepository,
                                   BoardReviewRepository boardReviewRepository) {
-            return new AuthzService(
-                loanApplicationRepository,
-                guarantorRequestRepository,
-                boardReviewRepository,
-                accessControlService()
-            );
+            return new AuthzService(loanApplicationRepository,accessControlService());
         }
 
         @Bean("access")

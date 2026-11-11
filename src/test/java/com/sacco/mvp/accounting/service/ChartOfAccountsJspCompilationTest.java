@@ -21,13 +21,14 @@ class ChartOfAccountsJspCompilationTest {
         var context=tomcat.addContext("",Path.of("src/main/webapp").toAbsolutePath().toString());
         context.setParentClassLoader(getClass().getClassLoader());
         context.addServletContainerInitializer(new JasperInitializer(),null);
-        String[] pages={"accounts.jsp","account-form.jsp","library.jsp","library-activity-edit.jsp","library-code-form.jsp","library-transaction.jsp","library-template-form.jsp","vouchers/register.jsp","vouchers/form.jsp","vouchers/details.jsp","loans/record-form.jsp","loans/register.jsp","loans/details.jsp","loans/posting.jsp","loans/statement.jsp","loans/statement-print.jsp","../reporting/loan-portfolio.jsp","../app/guarantor-selection.jsp","../admin/sms-usage.jsp","../admin/settings-controls.jsp","../admin/customised-loan-workflow.jsp"};
+        String[] pages={"accounts.jsp","account-form.jsp","library.jsp","library-activity-edit.jsp","library-code-form.jsp","library-transaction.jsp","library-template-form.jsp","vouchers/register.jsp","vouchers/form.jsp","vouchers/details.jsp","loans/record-form.jsp","loans/group-rules.jsp","loans/group-review.jsp","../login.jsp","../profile.jsp","../staff/notifications.jsp","loans/register.jsp","loans/details.jsp","loans/posting.jsp","loans/statement.jsp","loans/statement-print.jsp","../reporting/loan-portfolio.jsp","../admin/sms-usage.jsp","../admin/settings-controls.jsp"};
         if(Boolean.getBoolean("microfinance.receipt.jsp-only"))pages=new String[]{"vouchers/form.jsp","vouchers/loan-details.jsp"};
         else {
             var expanded=new java.util.LinkedHashSet<>(java.util.List.of(pages));
             expanded.add("vouchers/loan-details.jsp");
+            expanded.add("../groups/signed-papers.jsp");expanded.add("../groups/member-statement.jsp");
             // Compile every accountant resource view changed by the shared table rollout.
-            String[] folders = {"accounting", "accountant", "reporting", "reports", "app", "admin", "manager", "board", "chairperson", "disbursement", "loan-officer", "staff", "repayments", "account", "credit", "onboarding"};
+            String[] folders = {"accounting", "reporting", "reports", "admin", "disbursement", "staff", "repayments", "account", "credit", "onboarding", "groups"};
             if (Boolean.getBoolean("microfinance.workspace.jsp-only")) expanded.clear();
             for (String folder : folders) {
                 if(!java.nio.file.Files.isDirectory(Path.of("src/main/webapp/WEB-INF/jsp",folder)))continue;

@@ -32,7 +32,7 @@ class GroupAuthorityMvcTest {
     @Autowired WebApplicationContext context;@Autowired GroupAuthorityService service;
     MockMvc mvc;AppUserPrincipal actor;final UUID group=UUID.randomUUID(),authority=UUID.randomUUID(),client=UUID.randomUUID();
     String path(){return "/finance/groups/"+group+"/authority";}
-    @BeforeEach void setup(){reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),true);}
+    @BeforeEach void setup(){reset(service);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     void editor(){when(service.editor(eq(actor),eq(group),any(AuthorityForm.class))).thenAnswer(call->new Editor(new Group(group,"GR-1","Synthetic organization","ORGANIZATION","Evidence","ACTIVE",0,0),call.getArgument(2),Map.of()));}
     @Test void recordingRequiresCsrfAndBindsOnlyAuthorityInputs()throws Exception{
         mvc.perform(post(path()).with(user(actor))).andExpect(status().isForbidden());verifyNoInteractions(service);
@@ -64,7 +64,7 @@ class GroupAuthorityMvcTest {
         doThrow(new AccessDeniedException("Revoked")).when(service).authorize(actor,"CREATE");mvc.perform(post(path()).with(user(actor)).with(csrf()).param("verified","true")).andExpect(status().isForbidden());verify(service,never()).record(any(),any(),any());
     }
     @Test void clientSessionsCannotEnterStaffAuthorityRoutes()throws Exception{
-        var principal=new AppUserPrincipal(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class),false);
+        var principal=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(client).saccoId("I1").stationId("B1").position(Position.MEMBER).memberAccount(true).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));
         mvc.perform(get(path()).with(user(principal))).andExpect(status().isForbidden());mvc.perform(post(path()).with(user(principal)).with(csrf())).andExpect(status().isForbidden());verifyNoInteractions(service);
     }
     @Test void authorityLabelsAndDynamicFieldsExistInBothLanguages()throws Exception{

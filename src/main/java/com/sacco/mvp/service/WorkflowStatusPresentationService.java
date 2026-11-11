@@ -12,60 +12,15 @@ import java.util.EnumMap;
 @Service
 public class WorkflowStatusPresentationService {
 
-    public List<Map<String, Object>> buildDashboardStatusChartRows(List<ManagerService.StatusCount> statusBreakdown) {
-        return buildRows(statusBreakdown.stream()
-            .map(entry -> new DashboardSlice(entry.status().name(), dashboardStatusLabel(entry.status()), dashboardStatusColor(entry.status()), List.of(entry.status())))
-            .toList(), statusBreakdown);
-    }
 
-    public List<Map<String, Object>> buildManagerDashboardChartRows(List<ManagerService.StatusCount> statusBreakdown) {
-        return buildRows(List.of(
-            slice("READY_FOR_MANAGER", "Waiting for Manager Review", "#14B8A6", LoanStatus.READY_FOR_MANAGER),
-            slice("MANAGER_ACCEPTED", "Approved by Manager", "#0EA5E9", LoanStatus.MANAGER_ACCEPTED),
-            slice("MANAGER_REJECTED", "Rejected by Manager", "#F43F5E", LoanStatus.MANAGER_REJECTED),
-            slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED),
-            slice("PAR", "Portfolio At Risk", "#F59E0B", LoanStatus.PAR),
-            slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID),
-            slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED)
-        ), statusBreakdown);
-    }
 
-    public List<Map<String, Object>> buildBoardDashboardChartRows(List<ManagerService.StatusCount> statusBreakdown,
-                                                                  boolean includeDisbursementPortfolio) {
-        List<DashboardSlice> slices = new java.util.ArrayList<>(List.of(
-            slice("AWAITING_BOARD", "Waiting for Board Review", "#6366F1", LoanStatus.AWAITING_BOARD),
-            slice("AWAITING_CHAIRPERSON", "Waiting for Chairperson Review", "#0D9488", LoanStatus.AWAITING_CHAIRPERSON),
-            slice("AWAITING_CREDIT_COMMITTEE", "Waiting for Credit Committee Review", "#8B5CF6", LoanStatus.AWAITING_CREDIT_COMMITTEE),
-            slice("BOARD_APPROVED", "Approved by Board", "#22C55E", LoanStatus.BOARD_APPROVED),
-            slice("BOARD_REJECTED", "Rejected by Board", "#F43F5E", LoanStatus.BOARD_REJECTED),
-            slice("CHAIRPERSON_REJECTED", "Rejected by Chairperson", "#E11D48", LoanStatus.CHAIRPERSON_REJECTED)
-        ));
-        addDisbursementPortfolioSlices(slices, includeDisbursementPortfolio);
-        return buildRows(slices, statusBreakdown);
-    }
 
-    public List<Map<String, Object>> buildLoanOfficerDashboardChartRows(List<ManagerService.StatusCount> statusBreakdown,
-                                                                        boolean includeDisbursementPortfolio) {
-        List<DashboardSlice> slices = new java.util.ArrayList<>(List.of(
-            slice("AWAITING_LOAN_OFFICER", "Waiting for Loan Officer Review", "#7C3AED", LoanStatus.AWAITING_LOAN_OFFICER),
-            slice("LOAN_OFFICER_APPROVED", "Approved by Loan Officer", "#22C55E", LoanStatus.LOAN_OFFICER_APPROVED),
-            slice("LOAN_OFFICER_REJECTED", "Rejected by Loan Officer", "#F43F5E", LoanStatus.LOAN_OFFICER_REJECTED)
-        ));
-        addDisbursementPortfolioSlices(slices, includeDisbursementPortfolio);
-        return buildRows(slices, statusBreakdown);
-    }
 
-    public List<Map<String, Object>> buildAccountantDashboardChartRows(List<ManagerService.StatusCount> statusBreakdown,
-                                                                       boolean includeDisbursementPortfolio) {
-        List<DashboardSlice> slices = new java.util.ArrayList<>(List.of(
-            slice("AWAITING_ACCOUNTANT", "Waiting for Accountant Review", "#0F766E", LoanStatus.AWAITING_ACCOUNTANT),
-            slice("ACCOUNTANT_APPROVED", "Approved by Accountant", "#22C55E", LoanStatus.ACCOUNTANT_APPROVED),
-            slice("ACCOUNTANT_REJECTED", "Rejected by Accountant", "#F43F5E", LoanStatus.ACCOUNTANT_REJECTED),
-            slice("READY_FOR_DISBURSEMENT", "Ready for Disbursement", "#0EA5E9", LoanStatus.READY_FOR_DISBURSEMENT)
-        ));
-        addDisbursementPortfolioSlices(slices, includeDisbursementPortfolio);
-        return buildRows(slices, statusBreakdown);
-    }
+
+
+
+
+
 
     public List<Map<String, Object>> buildDisbursementDashboardChartRows(List<ManagerService.StatusCount> statusBreakdown) {
         return buildRows(List.of(
@@ -122,40 +77,9 @@ public class WorkflowStatusPresentationService {
         };
     }
 
-    public String dashboardStatusColor(LoanStatus status) {
-        return switch (status) {
-            case WRITTEN_OFF -> "#DC2626";
-            case WITHDRAWN, DISBURSEMENT_REVERSED -> "#64748B";
-            case RECORDED -> "#64748B";
-            case DRAFT -> "#60A5FA";
-            case SUBMITTED -> "#94A3B8";
-            case AWAITING_GUARANTORS -> "#F59E0B";
-            case ALL_GUARANTORS_APPROVED -> "#0F766E";
-            case READY_FOR_MANAGER -> "#14B8A6";
-            case AWAITING_LOAN_OFFICER -> "#7C3AED";
-            case AWAITING_CHAIRPERSON -> "#0D9488";
-            case AWAITING_BOARD -> "#6366F1";
-            case AWAITING_CREDIT_COMMITTEE -> "#8B5CF6";
-            case AWAITING_ACCOUNTANT -> "#0F766E";
-            case BOARD_APPROVED, CREDIT_COMMITTEE_APPROVED -> "#2F348D";
-            case LOAN_OFFICER_APPROVED, CHAIRPERSON_APPROVED, ACCOUNTANT_APPROVED, READY_FOR_DISBURSEMENT, MANAGER_ACCEPTED -> "#0EA5E9";
-            case DISBURSED -> "#22C55E";
-            case PAR -> "#F59E0B";
-            case DEFAULTED -> "#DC2626";
-            case PAID -> "#16A34A";
-            case MANAGER_REJECTED, LOAN_OFFICER_REJECTED, CHAIRPERSON_REJECTED, BOARD_REJECTED, CREDIT_COMMITTEE_REJECTED, ACCOUNTANT_REJECTED, REJECTED -> "#F43F5E";
-        };
-    }
 
-    private void addDisbursementPortfolioSlices(List<DashboardSlice> slices, boolean includeDisbursementPortfolio) {
-        if (!includeDisbursementPortfolio) {
-            return;
-        }
-        slices.add(slice("DISBURSED_PORTFOLIO", "Disbursed Loans", "#22C55E", LoanStatus.DISBURSED));
-        slices.add(slice("PAR", "Portfolio At Risk", "#F59E0B", LoanStatus.PAR));
-        slices.add(slice("PAID", "Paid Loans", "#16A34A", LoanStatus.PAID));
-        slices.add(slice("DEFAULTED", "Defaulted Loans", "#DC2626", LoanStatus.DEFAULTED));
-    }
+
+
 
     private List<Map<String, Object>> buildRows(List<DashboardSlice> slices,
                                                 List<ManagerService.StatusCount> statusBreakdown) {

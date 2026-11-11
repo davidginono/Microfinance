@@ -3,7 +3,6 @@ package com.sacco.mvp.grouplending.service;
 import com.sacco.mvp.accounting.dto.VoucherDtos.ReceiptContribution;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.AllocationPreview;
 import com.sacco.mvp.grouplending.dto.GroupCollectionDtos.*;
-import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 

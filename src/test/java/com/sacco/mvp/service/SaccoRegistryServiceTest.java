@@ -60,14 +60,14 @@ class SaccoRegistryServiceTest {
         var member = com.sacco.mvp.domain.Member.builder().id(UUID.randomUUID()).saccoId("PLATFORM")
             .position(com.sacco.mvp.domain.Position.ADMIN).staffRoles(java.util.Set.of(com.sacco.mvp.domain.Position.ADMIN))
             .memberAccount(false).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build();
-        var actor = new com.sacco.mvp.security.AppUserPrincipal(member, java.util.Set.of(com.sacco.mvp.domain.UserClaim.PLATFORM_SETTINGS_VIEW), true);
+        var actor = new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(com.sacco.mvp.domain.UserClaim.PLATFORM_SETTINGS_VIEW));
         var row = Mockito.mock(RegisteredSaccoRepository.LoanTopUpRow.class);
         when(row.getSaccoId()).thenReturn("INST-1");when(row.getSaccoName()).thenReturn("Example institution");
         when(repository.loanTopUpAccess(null, "example", org.springframework.data.domain.PageRequest.of(0, 100)))
             .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(row)));
         assertThat(service.loanTopUpAccessPage(actor, "  EXAMPLE  ", -1, 500).getContent()).singleElement()
             .extracting(SaccoRegistryService.LoanTopUpAccessView::getSaccoId).isEqualTo("INST-1");
-        var noClaim = new com.sacco.mvp.security.AppUserPrincipal(member, java.util.Set.of(), true);
+        var noClaim = new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of());
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.loanTopUpAccessPage(noClaim, "", 0, 25))
             .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.loanTopUpAccess(null, "INST-1"))

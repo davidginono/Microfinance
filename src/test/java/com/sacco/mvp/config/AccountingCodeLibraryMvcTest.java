@@ -208,7 +208,7 @@ class AccountingCodeLibraryMvcTest {
     private AppUserPrincipal principal(boolean staff,Set<UserClaim> claims) {
         var member=Member.builder().id(UUID.randomUUID()).memberNo(UUID.randomUUID().toString()).saccoId("I1").stationId("B1").fullName("Synthetic")
             .position(staff?Position.ACCOUNTANT:null).staffAccessStatus(staff?StaffAccessStatus.ACTIVE:StaffAccessStatus.NONE).status(MemberStatus.ACTIVE).build();
-        return new AppUserPrincipal(member,claims,staff);
+        return (staff ? new com.sacco.mvp.security.AppUserPrincipal(member,claims) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,claims));
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary com.sacco.mvp.service.AccessControlService access(){return new com.sacco.mvp.service.AccessControlService();}

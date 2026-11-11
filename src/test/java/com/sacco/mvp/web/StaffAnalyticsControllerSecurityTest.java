@@ -234,7 +234,7 @@ class StaffAnalyticsControllerSecurityTest {
             .passwordHash("x")
             .createdAt(OffsetDateTime.now())
             .build();
-        return new AppUserPrincipal(member, claims);
+        return position==Position.MEMBER ? com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,claims) : new AppUserPrincipal(member,claims);
     }
 
     private SaccoStation station(SaccoAccessStatus accessStatus) {
@@ -316,12 +316,7 @@ class StaffAnalyticsControllerSecurityTest {
         AuthzService authzService(LoanApplicationRepository loanApplicationRepository,
                                   GuarantorRequestRepository guarantorRequestRepository,
                                   BoardReviewRepository boardReviewRepository) {
-            return new AuthzService(
-                loanApplicationRepository,
-                guarantorRequestRepository,
-                boardReviewRepository,
-                accessControlService()
-            );
+            return new AuthzService(loanApplicationRepository,accessControlService());
         }
 
         @Bean

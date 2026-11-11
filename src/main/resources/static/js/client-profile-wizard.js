@@ -65,7 +65,7 @@
         form.addEventListener('change', syncRequirements, true);
         syncRequirements();
         const breadcrumb = wizard.closest('.shell-main')?.querySelector(':scope > .erp-page-path')
-            || wizard.closest('.kyc-form-workspace, .portal-entry')?.querySelector(':scope > .erp-page-path');
+            || wizard.closest('.kyc-form-workspace')?.querySelector(':scope > .erp-page-path');
         const measureSticky = () => {
             wizard.style.setProperty('--kyc-step-nav-height', nav.offsetHeight + 'px');
             if (breadcrumb) wizard.style.setProperty('--kyc-breadcrumb-height', breadcrumb.getBoundingClientRect().height + 'px');
@@ -135,7 +135,7 @@
             syncRequirements();
             if (!registration && index === documentsIndex) {
                 const evidence = form.querySelector('[data-profile-evidence]');
-                const alert = form.querySelector('[data-workspace-form-error],[data-portal-form-error]');
+                const alert = form.querySelector('[data-workspace-form-error]');
                 if (evidence && alert && [labels.documentsError, labels.documentExpiryError].some(text => text && alert.textContent.includes(text))) alert.remove();
                 if (evidence?.querySelector('[data-evidence-status="missing"],[data-evidence-status="expired"]')) {
                     show(index, false);
@@ -213,7 +213,7 @@
             }
             if (!first) return;
             event.preventDefault();
-            form.querySelector('[data-portal-form-error],[data-workspace-form-error]')?.remove();
+            form.querySelector('[data-workspace-form-error]')?.remove();
             show(first.index, false);
             window.FormValidation?.refresh(form);
             if (!window.FormValidation?.focusFirst(form)) first.input.focus();
@@ -221,7 +221,7 @@
         const errorStep = () => {
             const field = [...wizard.querySelectorAll('[aria-invalid="true"],.field-error:not(:empty),.coa-error:not(:empty)')].find(field => !field.hidden);
             if (field) return panels.findIndex(panel => panel.contains(field));
-            const error = form.querySelector('[data-workspace-form-error],[data-portal-form-error]');
+            const error = form.querySelector('[data-workspace-form-error]');
             if (error) return documentsIndex >= 0 && documentErrors.some(text => error.textContent.includes(text)) ? documentsIndex : reviewIndex;
             return -1;
         };

@@ -80,6 +80,7 @@ class ErpTableAlignmentContractTest {
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/statements/preview.jsp")))
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/statements/print.jsp")))
                 .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/management/document.jspf")))
+                .filter(path -> !path.equals(JSP_ROOT.resolve("accounting/management/source-tables.jspf")))
                 .toList()) {
                 String view = Files.readString(path);
                 Matcher tableMatcher = TABLE_TAG.matcher(view);

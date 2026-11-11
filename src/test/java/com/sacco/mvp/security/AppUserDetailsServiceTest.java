@@ -34,15 +34,6 @@ class AppUserDetailsServiceTest {
     @Mock private UserSettingsRepository userSettingsRepository;
     @Mock private MemberAccessClaimRepository memberAccessClaimRepository;
 
-    @Test void clientPasswordLoginCarriesExplicitOwnCoverageClaimsWithoutStaffClaims(){
-        var id=UUID.randomUUID();var member=Member.builder().id(id).saccoId("SACCO-01").stationId("AR704").memberNo("MEM001").fullName("Client").memberAccount(true).status(MemberStatus.ACTIVE).passwordHash("test-only").build();
-        member.setUsername("client.one");
-        when(memberRepository.findByUsername("client.one")).thenReturn(Optional.of(member));when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE)));
-        when(memberAccessClaimRepository.findByIdMemberId(id)).thenReturn(List.of(new com.sacco.mvp.domain.MemberAccessClaim(new com.sacco.mvp.domain.MemberAccessClaimId(id,"GROUP_COVERAGE_OWN_VIEW")),new com.sacco.mvp.domain.MemberAccessClaim(new com.sacco.mvp.domain.MemberAccessClaimId(id,"GROUP_COVERAGE_LINK"))));
-        var service=new AppUserDetailsService(new com.sacco.mvp.service.MemberDirectoryService(memberRepository),new com.sacco.mvp.service.StationAccessService(saccoStationRepository),new UserClaimService(memberAccessClaimRepository,userSettingsRepository,new ObjectMapper()));
-        var principal=(AppUserPrincipal)service.loadClientByEmailOrUsername(" CLIENT.ONE ");assertThat(principal.isStaffSession()).isFalse();assertThat(principal.getUsername()).isEqualTo("client.one");assertThat(principal.getClaims()).contains("GROUP_COVERAGE_OWN_VIEW").doesNotContain("GROUP_COVERAGE_LINK");
-    }
-
     @Test
     void suspendedSaccoBlocksWorkspaceUserLogin() {
         Member member = Member.builder()
@@ -51,7 +42,7 @@ class AppUserDetailsServiceTest {
             .stationId("AR704")
             .memberNo("MEM001")
             .fullName("Member One")
-            .memberAccount(true)
+            .memberAccount(false).position(Position.MANAGER).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE)
             .status(MemberStatus.ACTIVE)
             .passwordHash("secret")
             .build();
@@ -149,31 +140,7 @@ class AppUserDetailsServiceTest {
     }
 
     @Test
-    void ordinaryMemberLoginRejectsPlatformAdminIdentity() {
-        Member admin = Member.builder()
-            .id(UUID.randomUUID())
-            .memberNo("ADM001")
-            .fullName("Platform Admin")
-            .staffRoles(new LinkedHashSet<>(List.of(Position.ADMIN)))
-            .memberAccount(true)
-            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE)
-            .status(MemberStatus.ACTIVE)
-            .passwordHash("secret")
-            .build();
-        when(memberRepository.findByUsername("platform.admin")).thenReturn(Optional.of(admin));
-
-        AppUserDetailsService service = new AppUserDetailsService(
-            new com.sacco.mvp.service.MemberDirectoryService(memberRepository),
-            new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
-            new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper())
-        );
-
-        assertThatThrownBy(() -> service.loadClientByEmailOrUsername("platform.admin"))
-            .isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
-    }
-
-    @Test
-    void clientEmailLoginIsCaseInsensitiveAndDoesNotGrantStaffClaims() {
+    void borrowerEmailCannotAuthenticate() {
         Member client = Member.builder().id(UUID.randomUUID()).memberNo("CL-00000001").username("asha.mushi")
             .email("asha@example.com").memberAccount(true).status(MemberStatus.ACTIVE).build();
         when(memberRepository.findTop2ByEmailIgnoreCase("asha@example.com")).thenReturn(List.of(client));
@@ -181,11 +148,7 @@ class AppUserDetailsServiceTest {
             new com.sacco.mvp.service.StationAccessService(saccoStationRepository),
             new UserClaimService(memberAccessClaimRepository, userSettingsRepository, new ObjectMapper()));
 
-        var principal = (AppUserPrincipal) users.loadUserByUsername(" ASHA@EXAMPLE.COM ");
-        assertThat(principal.getMemberId()).isEqualTo(client.getId());
-        assertThat(principal.getUsername()).isEqualTo("asha.mushi");
-        assertThat(principal.isStaffSession()).isFalse();
-        assertThat(principal.getStaffRoles()).isEmpty();
+        assertThatThrownBy(()->users.loadUserByUsername(" ASHA@EXAMPLE.COM ")).isInstanceOf(org.springframework.security.core.userdetails.UsernameNotFoundException.class);
     }
 
     @Test

@@ -30,7 +30,7 @@ class LoanRecordingPdfTest {
         var service=mock(LoanRecordingService.class);var logos=mock(SaccoLogoStorageService.class);var actor=mock(AppUserPrincipal.class);
         when(actor.getSaccoId()).thenReturn("QA-INSTITUTION");
         var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));
-        var controller=new LoanRecordingController(service,renderer,null,messages,logos,org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
+        var controller=new LoanRecordingController(service,mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class),renderer,null,messages,logos,org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
         var detail=mock(Detail.class);when(detail.institution()).thenReturn("Example Microfinance Limited");when(detail.branch()).thenReturn("Main branch");
         for(String kind:List.of("DISBURSEMENT","PAYMENT","REVERSAL")){
             var id=UUID.randomUUID();var loan=UUID.randomUUID();boolean payment=kind.equals("DISBURSEMENT"),reversal=kind.equals("REVERSAL");

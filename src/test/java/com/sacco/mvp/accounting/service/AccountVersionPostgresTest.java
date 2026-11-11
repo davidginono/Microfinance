@@ -146,7 +146,7 @@ class AccountVersionPostgresTest {
         jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,created_at,updated_at) values(?,?,?,true,now(),now()) on conflict(sacco_id,station_id) do nothing",UUID.randomUUID(),institution,branch);
         jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) values(?,?,?,?,?,'ACTIVE','ACCOUNTANT',now(),false,'test-only')",id,institution,branch,number,"Synthetic "+number);
         var m=Member.builder().id(id).memberNo(number).fullName("Synthetic "+number).saccoId(institution).stationId(branch).position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
-        when(directory.find(id)).thenReturn(Optional.of(m));return new AppUserPrincipal(m,permissions,true);
+        when(directory.find(id)).thenReturn(Optional.of(m));return new AppUserPrincipal(m,permissions);
     }
     AccountOnboardingForm form(UUID parent,String code,String name){var f=new AccountOnboardingForm();f.setParentId(parent);f.setCode(code);f.setName(name);f.setNormalBalance("DEBIT");f.setReason("Documented account setup");return f;}
     Version version(UUID id){return books.version(institution,id).orElseThrow();}

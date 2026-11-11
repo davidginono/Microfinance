@@ -3,8 +3,6 @@ package com.sacco.mvp.repository;
 import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.BoardDecision;
 import com.sacco.mvp.domain.BoardReview;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,21 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> {
-    @Query(value = """
-        select r from BoardReview r join LoanApplication l on l.id=r.loanApplicationId
-        left join Member m on m.id=l.applicantMemberId
-        left join LoanProductSetting p on p.id=l.loanProductSettingId
-        where r.boardMemberId=:reviewer and r.reviewStage in :stages and r.decision='PENDING'
-          and l.saccoId=:institution and lower(l.stationId)=lower(:branch)
-          and (:search='' or str(l.applicationNumber) like concat('%',:search,'%'))
-          and ((r.reviewStage='BOARD' and l.status='AWAITING_BOARD')
-            or (r.reviewStage='CHAIRPERSON' and l.status='AWAITING_CHAIRPERSON')
-            or (r.reviewStage='CREDIT_COMMITTEE' and l.status='AWAITING_CREDIT_COMMITTEE'))
-        order by r.createdAt desc,r.id
-        """, queryRewriter = com.sacco.mvp.support.ResourceTableSort.BoardQueue.class)
-    List<BoardReview> findAssignedQueue(@Param("reviewer") UUID reviewer,
-        @Param("stages") Collection<ApprovalWorkflowStage> stages,@Param("institution") String institution,
-        @Param("branch") String branch,@Param("search") String search,Pageable page);
 
     List<BoardReview> findByLoanApplicationId(UUID loanApplicationId);
 
@@ -38,17 +21,9 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
 
     List<BoardReview> findByLoanApplicationIdInOrderByCreatedAtDesc(Collection<UUID> loanApplicationIds);
 
-    List<BoardReview> findByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
-
-    long countByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
-
     void deleteByLoanApplicationId(UUID loanApplicationId);
 
-    void deleteByLoanApplicationIdAndReviewStage(UUID loanApplicationId, ApprovalWorkflowStage reviewStage);
-
     long countByLoanApplicationIdAndDecision(UUID loanApplicationId, BoardDecision decision);
-
-    long countByLoanApplicationIdAndReviewStageAndDecision(UUID loanApplicationId, ApprovalWorkflowStage reviewStage, BoardDecision decision);
 
     List<BoardReview> findByBoardMemberIdAndDecision(UUID boardMemberId, BoardDecision decision);
 
@@ -56,76 +31,9 @@ public interface BoardReviewRepository extends JpaRepository<BoardReview, UUID> 
                                                                    ApprovalWorkflowStage reviewStage,
                                                                    BoardDecision decision);
 
-    List<BoardReview> findTop100ByBoardMemberIdAndReviewStageAndDecisionOrderByCreatedAtDesc(UUID boardMemberId,
-                                                                                              ApprovalWorkflowStage reviewStage,
-                                                                                              BoardDecision decision);
-
     List<BoardReview> findByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
 
-    List<BoardReview> findTop100ByBoardMemberIdAndReviewStageOrderByCreatedAtDesc(UUID boardMemberId, ApprovalWorkflowStage reviewStage);
-
     Optional<BoardReview> findByLoanApplicationIdAndBoardMemberId(UUID loanApplicationId, UUID boardMemberId);
-
-    Optional<BoardReview> findByLoanApplicationIdAndBoardMemberIdAndReviewStage(UUID loanApplicationId,
-                                                                                 UUID boardMemberId,
-                                                                                 ApprovalWorkflowStage reviewStage);
-
-    @Query(
-        value = """
-            select r.*
-            from board_reviews r
-            join loan_applications l on l.id = r.loan_application_id
-            left join members m on m.id=l.applicant_member_id
-            left join loan_product_settings p on p.id=l.loan_product_setting_id
-            where r.board_member_id = :reviewerId
-              and r.review_stage in (:reviewStages)
-              and r.decision <> 'PENDING'
-              and l.sacco_id = :saccoId
-              and lower(l.station_id) = lower(:stationId)
-              and (cast(:reviewedFrom as timestamp) is null or coalesce(r.decided_at, r.created_at) >= :reviewedFrom)
-              and (cast(:reviewedToExclusive as timestamp) is null or coalesce(r.decided_at, r.created_at) < :reviewedToExclusive)
-              and (:filterDecision = false or r.decision = :decision)
-              and (:filterStatuses = false or l.status in (:statuses))
-              and (
-                :searchTerm = ''
-                or cast(l.application_number as text) like concat('%', :searchTerm, '%')
-                or lower(coalesce(l.loan_id, '')) like concat('%', lower(:searchTerm), '%')
-              )
-            order by coalesce(r.decided_at, r.created_at) desc
-            """,
-        countQuery = """
-            select count(*)
-            from board_reviews r
-            join loan_applications l on l.id = r.loan_application_id
-            where r.board_member_id = :reviewerId
-              and r.review_stage in (:reviewStages)
-              and r.decision <> 'PENDING'
-              and l.sacco_id = :saccoId
-              and lower(l.station_id) = lower(:stationId)
-              and (cast(:reviewedFrom as timestamp) is null or coalesce(r.decided_at, r.created_at) >= :reviewedFrom)
-              and (cast(:reviewedToExclusive as timestamp) is null or coalesce(r.decided_at, r.created_at) < :reviewedToExclusive)
-              and (:filterDecision = false or r.decision = :decision)
-              and (:filterStatuses = false or l.status in (:statuses))
-              and (
-                :searchTerm = ''
-                or cast(l.application_number as text) like concat('%', :searchTerm, '%')
-                or lower(coalesce(l.loan_id, '')) like concat('%', lower(:searchTerm), '%')
-              )
-            """,
-        nativeQuery = true
-    , queryRewriter = com.sacco.mvp.support.ResourceTableSort.BoardArchives.class)
-    Page<BoardReview> findArchivePage(@Param("reviewerId") UUID reviewerId,
-                                      @Param("reviewStages") Collection<String> reviewStages,
-                                      @Param("saccoId") String saccoId,
-                                      @Param("stationId") String stationId,
-                                      @Param("reviewedFrom") OffsetDateTime reviewedFrom,
-                                      @Param("reviewedToExclusive") OffsetDateTime reviewedToExclusive,
-                                      @Param("filterDecision") boolean filterDecision,
-                                      @Param("decision") String decision,
-                                      @Param("filterStatuses") boolean filterStatuses,
-                                      @Param("statuses") Collection<String> statuses,
-                                      @Param("searchTerm") String searchTerm,
-                                      Pageable pageable);
 
     @Query("""
         select r

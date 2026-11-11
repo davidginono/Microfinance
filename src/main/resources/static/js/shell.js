@@ -22,37 +22,6 @@
     const normalizeBreadcrumbSegment = function (value) {
         return (value || '').replace(/\s+/g, ' ').trim().toLowerCase();
     };
-    const currentReviewWorkspaceBase = function () {
-        const path = window.location.pathname || '';
-        if (path.indexOf('/chairperson') === 0) {
-            return '/chairperson';
-        }
-        if (path.indexOf('/credit-committee') === 0) {
-            return '/credit-committee';
-        }
-        return '/board';
-    };
-    const currentStaffWorkspaceHome = function () {
-        const path = window.location.pathname || '';
-        const match = path.match(/^\/(manager|chairperson|credit-committee|board|loan-officer|accountant|disbursement)(?:\/|$)/);
-        return match ? '/' + match[1] + '/dashboard' : '/staff/analytics';
-    };
-    const memberWorkspaceRoutes = {
-        'application detail': '/app/loan-applications',
-        'application progress': '/app/loan-applications',
-        'archives': '/app/archives',
-        'guarantee archive': '/app/archives?section=guarantors',
-        'guarantee requests': '/app/guarantee-requests',
-        'guarantees': '/app/guaranteed-loans',
-        'guarantor selection': '/app/loan-applications',
-        'loan products': '/app/loan-products',
-        'notifications': '/app/notifications',
-        'reports & analytics': '/app/reports',
-        'replies': '/app/support/replies',
-        'sent archive': '/app/support/archive',
-        'settings': '/app/settings',
-        'support': '/app/support'
-    };
     const breadcrumbRouteGroups = {
         'admin tools': {
             'audit log': '/admin/events',
@@ -66,10 +35,8 @@
             'platform settings': '/admin/platform-settings',
             'reports': '/admin/reports',
             'institution registration': '/admin/saccos/registry',
-            'institution workspace': '/admin/scope/select',
             'institutions': '/admin/saccos',
             'sacco registration': '/admin/saccos/registry',
-            'sacco workspace': '/admin/scope/select',
             'saccos': '/admin/saccos',
             'settings & controls': '/admin/settings-controls',
             'configurations&controls': '/admin/settings-controls',
@@ -78,61 +45,15 @@
             'support': '/admin/support',
             'users & roles': '/admin/users'
         },
-        'member workspace': memberWorkspaceRoutes,
-        'client workspace': memberWorkspaceRoutes,
         'staff workspace': {
             'settings': '/staff/settings',
             'staff reports and analytics': '/staff/analytics'
-        },
-        'manager panel': {
-            'archive': '/manager/archive',
-            'loan reports': '/manager/reports',
-            'notifications': '/manager/notifications',
-            'queue': '/manager/loan-applications?status=READY_FOR_MANAGER',
-            'settings': '/manager/settings'
-        },
-        'accountant panel': {
-            'archive': '/accountant/archive',
-            'notifications': '/accountant/notifications',
-            'queue': '/accountant/loan-applications?filter=AWAITING_ACCOUNTANT',
-            'reports': '/accountant/reports'
         },
         'disbursement panel': {
             'archive': '/disbursement/archive',
             'notifications': '/disbursement/notifications',
             'queue': '/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT',
             'reports': '/disbursement/reports'
-        },
-        'loan officer panel': {
-            'archive': '/loan-officer/archive',
-            'assigned': '/loan-officer/assigned',
-            'loan reports': '/loan-officer/reports',
-            'notifications': '/loan-officer/notifications',
-            'queue': '/loan-officer/queue'
-        },
-        'board panel': {
-            'archive': '/board/archive',
-            'assigned': '/board/assigned',
-            'loan reports': '/board/reports',
-            'notifications': '/board/notifications',
-            'queue': '/board/queue',
-            'reports': '/board/reports'
-        },
-        'chairperson panel': {
-            'archive': '/chairperson/archive',
-            'assigned': '/chairperson/assigned',
-            'loan reports': '/chairperson/reports',
-            'notifications': '/chairperson/notifications',
-            'queue': '/chairperson/queue',
-            'reports': '/chairperson/reports'
-        },
-        'credit committee panel': {
-            'archive': '/credit-committee/archive',
-            'assigned': '/credit-committee/assigned',
-            'loan reports': '/credit-committee/reports',
-            'notifications': '/credit-committee/notifications',
-            'queue': '/credit-committee/queue',
-            'reports': '/credit-committee/reports'
         },
         'documents': {
             'attachment preview': window.location.pathname + window.location.search
@@ -142,36 +63,10 @@
         }
     };
     const breadcrumbRootHref = function (root) {
-        if (root === 'admin tools') {
-            return '/admin/dashboard';
-        }
-        if (root === 'member workspace' || root === 'client workspace') {
-            return '/app/dashboard';
-        }
-        if (root === 'staff workspace') {
-            return currentStaffWorkspaceHome();
-        }
-        if (root === 'manager panel') {
-            return '/manager/dashboard';
-        }
-        if (root === 'accountant panel') {
-            return '/accountant/dashboard';
-        }
-        if (root === 'disbursement panel') {
-            return '/disbursement/dashboard';
-        }
-        if (root === 'loan officer panel') {
-            return '/loan-officer/dashboard';
-        }
-        if (root === 'board panel' || root === 'chairperson panel' || root === 'credit committee panel') {
-            return currentReviewWorkspaceBase() + '/dashboard';
-        }
-        if (root === 'documents') {
-            return '/app/loan-applications';
-        }
-        if (root === 'workspace') {
-            return currentStaffWorkspaceHome();
-        }
+        if (root === 'admin tools') return '/admin/dashboard';
+        if (root === 'disbursement panel') return '/disbursement/dashboard';
+        if (root === 'staff workspace' || root === 'workspace') return '/staff/dashboard';
+        if (root === 'documents') return '/finance/loan-records';
         return null;
     };
     const resolveBreadcrumbHref = function (segment, index, segments) {
@@ -2279,6 +2174,16 @@
     };
 
     onReady( function () {
+        document.querySelectorAll('.profile-avatar-img').forEach(image => {
+            const sync = () => {
+                const loaded = image.complete && image.naturalWidth > 0;
+                image.classList.toggle('hidden', !loaded);
+                image.nextElementSibling?.classList.toggle('hidden', loaded);
+            };
+            image.onload = sync;
+            image.onerror = sync;
+            sync();
+        });
         syncShellNavHeight();
         initConsoleNavigationSearch();
         initUppercaseInputs();

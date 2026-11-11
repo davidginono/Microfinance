@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,PayrollMvcTest.Config.class})
 class PayrollMvcTest {
     @Autowired WebApplicationContext context;@Autowired PayrollService payroll;@Autowired PayrollSpreadsheetService spreadsheet;MockMvc mvc;
-    AppUserPrincipal actor(Set<UserClaim> claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),claims,true);}
+    AppUserPrincipal actor(Set<UserClaim> claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),claims);}
     @BeforeEach void setup(){reset(payroll,spreadsheet);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
     @Test void requiresClaimAndCsrfAndBindsOnlyCommandFields()throws Exception {
         var permitted=actor(EnumSet.allOf(UserClaim.class));

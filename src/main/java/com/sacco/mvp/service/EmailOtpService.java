@@ -107,47 +107,6 @@ public class EmailOtpService {
     }
 
     @Transactional
-    public OtpIssueResult issueOtpWithDeliveryContact(String tokenKey,
-                                                      String deliveryEmail,
-                                                      EmailOtpPurpose purpose,
-                                                      UUID memberId,
-                                                      String subject,
-                                                      String introMessage,
-                                                      String saccoId,
-                                                      String stationId,
-                                                      String phone) {
-        return issueOtpWithMetadata(tokenKey, deliveryEmail, purpose, memberId, subject, introMessage, saccoId, stationId, phone, false, null, null);
-    }
-
-    @Transactional
-    public OtpIssueResult issueLoanOtpWithDeliveryContact(String tokenKey,
-                                                          String deliveryEmail,
-                                                          EmailOtpPurpose purpose,
-                                                          UUID memberId,
-                                                          String subject,
-                                                          String introMessage,
-                                                          String saccoId,
-                                                          String stationId,
-                                                          String phone,
-                                                          UUID loanApplicationId,
-                                                          UUID applicantMemberId) {
-        return issueOtpWithMetadata(
-            tokenKey,
-            deliveryEmail,
-            purpose,
-            memberId,
-            subject,
-            introMessage,
-            saccoId,
-            stationId,
-            phone,
-            false,
-            loanApplicationId,
-            applicantMemberId
-        );
-    }
-
-    @Transactional
     public StationOtpDeliveryService.DeliveryReceipt issueOtpToEmail(String email,
                                                                      EmailOtpPurpose purpose,
                                                                      UUID memberId,
@@ -267,11 +226,6 @@ public class EmailOtpService {
     public void consumeOtp(String email, EmailOtpPurpose purpose, UUID memberId, String code) {
         EmailOtpToken token = requireValidOtp(email, purpose, memberId, code);
         token.setConsumedAt(OffsetDateTime.now());
-    }
-
-    @Transactional
-    public void invalidateClientRegistration(UUID memberId) {
-        emailOtpTokenRepository.invalidateRegistration(memberId,OffsetDateTime.now());
     }
 
     @Transactional(readOnly = true)

@@ -1,18 +1,13 @@
 package com.sacco.mvp.web;
 
-import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.PlatformSupportContactSettings;
 import com.sacco.mvp.domain.RegisteredSacco;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
-import com.sacco.mvp.service.MemberDirectoryService;
 import com.sacco.mvp.service.PlatformSupportContactSettingsService;
 import com.sacco.mvp.service.SaccoLogoStorageService;
 import com.sacco.mvp.service.SaccoRegistryService;
 import com.sacco.mvp.web.view.CurrentUserView;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectFactory;
@@ -26,11 +21,9 @@ public class CurrentUserModelAdvice {
     private static final String REQUEST_ACTIVE_SACCO_BRAND = CurrentUserModelAdvice.class.getName() + ".activeSaccoBrand";
 
     private final AdminScopeService adminScopeService;
-    private final MemberDirectoryService memberDirectoryService;
     private final SaccoRegistryService saccoRegistryService;
     private final SaccoLogoStorageService saccoLogoStorageService;
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
-    private final ObjectMapper objectMapper;
     private final ObjectFactory<HttpServletRequest> requestFactory;
 
     @ModelAttribute("currentMember")
@@ -47,22 +40,6 @@ public class CurrentUserModelAdvice {
             .memberAccess(principal.isMemberAccess())
             .staffSession(principal.isStaffSession())
             .build();
-    }
-
-    @ModelAttribute("pendingStaffAccess")
-    public PendingStaffAccessView pendingStaffAccess(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null || isJsonRequest()) {
-            return null;
-        }
-        return memberDirectoryService.find(principal.getMemberId())
-            .filter(Member::isStaffAccessPendingAcknowledgement)
-            .map(member -> new PendingStaffAccessView(
-                member.getStaffNo(),
-                member.getStaffRolesResolved().stream()
-                    .map(Position::getDisplayName)
-                    .collect(java.util.stream.Collectors.joining(", "))
-            ))
-            .orElse(null);
     }
 
     @ModelAttribute("adminScope")
@@ -107,22 +84,6 @@ public class CurrentUserModelAdvice {
     @ModelAttribute("isSuperAdminObserver")
     public boolean isSuperAdminObserver(@AuthenticationPrincipal AppUserPrincipal principal) {
         return isPlatformAdminIdentity(principal);
-    }
-
-    @ModelAttribute("adminScopeOptionsJson")
-    public String adminScopeOptionsJson(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isJsonRequest()) {
-            return "[]";
-        }
-        AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
-        if (scope == null) {
-            return "[]";
-        }
-        try {
-            return objectMapper.writeValueAsString(scope.getOptions());
-        } catch (JacksonException ex) {
-            return "[]";
-        }
     }
 
     @ModelAttribute("activeSaccoName")
@@ -253,13 +214,6 @@ public class CurrentUserModelAdvice {
     public static class HeaderStationView {
         private String stationId;
         private String stationAddressLocation;
-    }
-
-    @lombok.Getter
-    @lombok.AllArgsConstructor
-    public static class PendingStaffAccessView {
-        private String staffNo;
-        private String roles;
     }
 
     private record ActiveSaccoBrand(String id, String name, String logoText, String logoUrl) {}

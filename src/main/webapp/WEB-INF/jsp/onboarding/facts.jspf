@@ -1,10 +1,9 @@
 <section class="erp-resource-section"><h2><spring:message code="kyc.client"/></h2><dl class="erp-detail-facts">
     <c:forEach items="${['number','name','phone','email']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:out value="${client[field]}"/></dd></div></c:forEach>
     <div><dt><spring:message code="kyc.field.state"/></dt><dd>
-        <c:choose><c:when test="${not historical and not client.portalEnabled and (client.state=='DRAFT' or client.state=='NOT_STARTED' or staffSubmission)}">
+        <c:choose><c:when test="${not historical and (client.state=='DRAFT' or client.state=='NOT_STARTED')}">
             <span data-resource-status="INFO"><spring:message code="kyc.loan.provisional"/></span>
         </c:when><c:otherwise><c:set var="onboardingStatusState" value="${empty viewState?client.state:viewState}"/><%@ include file="status.jspf" %></c:otherwise></c:choose>
     </dd></div>
-    <div><dt><spring:message code="kyc.loan.portal"/></dt><dd><span data-resource-status="${client.portalEnabled?'ENABLED':'DISABLED'}"><spring:message code="${client.portalEnabled?'kyc.loan.portalEnabled':'kyc.loan.noPortal'}"/></span></dd></div>
     <c:if test="${historical and not empty viewReviewDue}"><div><dt><spring:message code="kyc.field.due"/></dt><dd><c:out value="${appTime:display(viewReviewDue)}"/></dd></div></c:if>
 </dl></section>

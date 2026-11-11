@@ -17,7 +17,7 @@ class LoanInterestWaiverAdviceTest {
     final ApplicationClock clock=mock(ApplicationClock.class);
     final LoanInterestWaiverAdvice advice=new LoanInterestWaiverAdvice(ledger,clock);
     final AppUserPrincipal actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
-        .position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.LOAN_RECORDING_VIEW),true);
+        .position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.LOAN_RECORDING_VIEW));
     MockHttpServletRequest request(String pattern){
         var r=new MockHttpServletRequest("GET",pattern.replace("{id}",loan.toString()));
         r.setAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE,pattern);

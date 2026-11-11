@@ -18,21 +18,22 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.Locale;
 
 @Controller
-@RequestMapping("/staff/settings")
+@RequestMapping("/staff")
 @RequiredArgsConstructor
-@PreAuthorize("@authz.staffAnalyticsAccess(principal)")
+@PreAuthorize("principal.staffSession")
 public class StaffSettingsController {
+    private final com.sacco.mvp.service.NotificationInboxService notificationInboxService;
     private final UserSettingsService userSettingsService;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
 
-    @GetMapping
+    @GetMapping("/settings")
     public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         model.addAttribute("staffSettingsLanguage",
             normalizeLanguage(userSettingsService.languageOrDefault(principal.getMemberId())));
         return "staff/settings";
     }
 
-    @PostMapping("/language")
+    @PostMapping("/settings/language")
     public String updateLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam String language,
                                  HttpServletRequest request,
@@ -52,4 +53,11 @@ public class StaffSettingsController {
             default -> "en";
         };
     }
+    @GetMapping("/notifications") @PreAuthorize("principal.staffSession and @access.has(principal,'NOTIFICATIONS_VIEW')")
+    public String notifications(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) java.util.UUID highlight,Model m){m.addAttribute("notifications",notificationInboxService.allViews(a));m.addAttribute("highlightNotificationId",highlight);return "staff/notifications";}
+    @GetMapping("/notifications/{id}/open") @PreAuthorize("principal.staffSession and @access.has(principal,'NOTIFICATIONS_VIEW')")
+    public String notification(@AuthenticationPrincipal AppUserPrincipal a,@org.springframework.web.bind.annotation.PathVariable java.util.UUID id){return "redirect:"+notificationInboxService.openForMember(id,a,"/staff/notifications");}
+    @PostMapping("/notifications/mark-all-read") @PreAuthorize("principal.staffSession and @access.has(principal,'NOTIFICATIONS_UPDATE')")
+    public String readNotifications(@AuthenticationPrincipal AppUserPrincipal a){notificationInboxService.markAllAsRead(a.getMemberId());return "redirect:/staff/notifications";}
+
 }

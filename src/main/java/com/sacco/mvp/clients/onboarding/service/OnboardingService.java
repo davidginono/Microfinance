@@ -28,17 +28,15 @@ public class OnboardingService {
     public static final Set<String> DOCUMENT_CATEGORIES=Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT","PROFILE_PHOTO","SPOUSE_PHOTO");
     private static final List<String> SELF_EVIDENCE=List.of("IDENTITY","ADDRESS","ACTIVITY");
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
-    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber"};
+    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
     private final OnboardingRepository records;
     private final GeneralLedgerService access;
     private final MemberRegistrationService registration;
-    private final MemberDirectoryService directory;
     private final StoredUploadStorageService uploads;
     private final ApplicationClock clock;
     private final AuditService audit;
     private final ObjectMapper json;
     private final PlatformTransactionManager transactions;
-    private final OutboxService outbox;
 
     public void authorize(AppUserPrincipal a,String action) {
         access.requireActor(a,"CLIENT_ONBOARDING_VIEW");
@@ -58,7 +56,7 @@ public class OnboardingService {
     public Page<Client> clients(AppUserPrincipal a,String search,String state,int page,String sort) {
         authorize(a,"VIEW");check(search!=null&&search.length()<=100,"query");page(page);
         check(Set.of("","NOT_STARTED","DRAFT","RECORDED","SUBMITTED","VERIFY","RETURN","REJECT","REVOKE","EXPIRED","STALE").contains(state),"query");
-        var columns=Map.of("number","member_no","name","full_name","state","state","due","review_due","clientType","client_portal_enabled");
+        var columns=Map.of("number","member_no","name","full_name","state","state","due","review_due");
         String value=sort==null||sort.isBlank()?"number_asc":sort;int split=value.lastIndexOf('_');check(split>0,"query");
         String column=columns.get(value.substring(0,split)),direction=value.substring(split+1);check(column!=null&&Set.of("asc","desc").contains(direction),"query");
         var rows=records.clients(a,search,state,page,column+" "+direction+" nulls last",today());
@@ -96,7 +94,7 @@ public class OnboardingService {
         boolean structured=!f.getProfile().getFirstName().isBlank()||!f.getProfile().getLastName().isBlank();if(structured)names(f.getProfile());
         try {String phone=TanzaniaPhoneNumber.normalizeRequired(f.getPhone());f.setPhone(phone);if(structured)f.getProfile().setPhone(phone);}catch(IllegalStateException e){throw invalid("phone");}
         String hash=documents.isEmpty()?hash(f):hash(List.of(f,documents.stream().map(d->List.of(d.metadata().getCategory(),Objects.toString(d.metadata().getExpiresOn(),""),d.content().name(),d.checksum())).toList()));var old=retry(a,"client_onboarding_creation",f.getRequestKey(),hash);if(old.isPresent())return records.created(old.get());
-        var form=new MemberRegistrationForm();form.setEmail(f.getEmail());form.setPhone(f.getPhone());form.setSaccoId(a.getSaccoId());form.setStationId(a.getStationId());
+        var form=new MemberRegistrationForm();form.setEmail(f.getEmail());form.setPhone(f.getPhone());form.setEmployeeNumber(f.getProfile().getEmployeeNumber());form.setSaccoId(a.getSaccoId());form.setStationId(a.getStationId());
         UUID client;
         try {client=registration.registerAssisted(form,f.getName(),a.getSaccoId(),a.getStationId()).getId();}catch(IllegalStateException e){throw invalid("registration");}
         records.creation(a,client,UUID.randomUUID(),f.getRequestKey(),hash,clock.now());event(a,client,"CLIENT_ASSISTED_REGISTRATION");
@@ -112,61 +110,59 @@ public class OnboardingService {
         return client;
     }
     @Transactional(readOnly=true) public ProfileForm profileForm(AppUserPrincipal a,UUID id) {
-        authorize(a,"UPDATE");var c=records.client(a,id,today());check(!c.portalEnabled(),"selfServiceOnly");var f=new ProfileForm();f.setExpectedSequence(c.sequence());var latest=records.latest(a,id);check(!"SUBMITTED".equals(c.state())||latest.filter(r->isStaffSubmission(c,r)).isPresent(),"state");latest.ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);return f;
+        authorize(a,"UPDATE");var c=records.client(a,id,today());var f=new ProfileForm();f.setExpectedSequence(c.sequence());var latest=records.latest(a,id);latest.ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);f.getProfile().setEmployeeNumber(registration.employeeNumber(a,id));return f;
     }
-    public static boolean isStaffSubmission(Client c,Revision r) {
-        return !c.portalEnabled() && "SUBMITTED".equals(c.state()) && r!=null && !r.profile().isSelfService() && !c.id().equals(r.maker());
-    }
+
     @Transactional(readOnly=true) public List<GroupChoice> groups(AppUserPrincipal a,UUID client,String search,int page) {
-        if(a!=null&&!a.isStaffSession()){requireOwner(a);check(Objects.equals(a.getMemberId(),client),"scope");}
-        else if(client==null)authorize(a,"CREATE");else client(a,client);
+        if(client==null)authorize(a,"CREATE");else client(a,client);
         text(search,100,"query",false);page(page);return records.groups(a,search,page);
     }
     @Transactional(timeout=20)
     public UUID save(AppUserPrincipal a,UUID client,ProfileForm f) {
-        authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");
+        authorize(a,"UPDATE");records.client(a,client,today());
         check("DRAFT".equals(f.getAction())||"RECORDED".equals(f.getAction()),"action");
         String hash=hash(List.of(client,f));var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
         var command=json.readValue(json.writeValueAsString(f),ProfileForm.class);
         check(command.getProfile()!=null,"profile");var p=command.getProfile();standardNotice(p,records.notice());p.setSelfService(false);
+        records.latest(a,client).map(r->records.documents(r.id())).orElse(List.of()).stream()
+            .filter(d->"CONSENT".equals(d.category())).findFirst().ifPresent(d->{
+                p.setConsentReference("Client consent document / "+d.id());
+                p.setConsentOn(d.recordedAt().atZoneSameInstant(ZoneId.of("Africa/Dar_es_Salaam")).toLocalDate());
+            });
         return saveRevision(a,client,command,hash);
     }
     private UUID saveRevision(AppUserPrincipal a,UUID client,ProfileForm f,String hash) {
         records.client(a,client,today());var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
         records.lock(client);var c=records.client(a,client,today());
-        if(a.isStaffSession())check(!c.portalEnabled(),"selfServiceOnly");
-        if(c.state().equals("SUBMITTED"))check(a.isStaffSession()&&isStaffSubmission(c,records.latest(a,client).orElse(null)),"state");
+
         check(c.sequence()==f.getExpectedSequence(),"changed");
         check(f.getProfile()!=null,"profile");var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);
-        if(p.isSelfService())records.latest(a,client).ifPresent(previous->p.setLegalHoldReference(previous.profile().getLegalHoldReference()));
-        if(a.isStaffSession()&&!c.portalEnabled()&&(!p.getFirstName().isBlank()||!p.getLastName().isBlank())) {
+        if(!p.getFirstName().isBlank()||!p.getLastName().isBlank()) {
             names(p);String fullName=java.util.stream.Stream.of(p.getFirstName(),p.getMiddleName(),p.getLastName()).filter(v->!v.isBlank()).map(String::strip).collect(java.util.stream.Collectors.joining(" "));
             try{registration.correctProvisionalContact(a,client,fullName,p.getPhone(),p.getEmail());}catch(IllegalStateException e){throw invalid("registration");}
             c=records.client(a,client,today());
         }
+        registration.employeeNumber(a,client,p.getEmployeeNumber());
         identityFields(p,c);p.setGroupName(p.getGroupId()==null?"":records.group(a,p.getGroupId()).orElseThrow(()->invalid("groupId")).label());
-        p.setFullName(c.name());p.setPhone(c.phone());p.setEmail(c.email());p.setClientNumber(c.number());validate(p,f.getAction().equals("SUBMITTED"));
+        p.setFullName(c.name());p.setPhone(c.phone());p.setEmail(c.email());p.setClientNumber(c.number());validate(p,false);
         if("RECORDED".equals(f.getAction()))check(c.phone()!=null&&c.phone().matches("255[0-9]{9}"),"phone");
-        if(f.getAction().equals("SUBMITTED")) {
-            check(c.revisionId()!=null,"documents");checkDocuments(p,records.documents(c.revisionId()));
-        }
         UUID id=UUID.randomUUID();records.revision(a,client,id,c.sequence()+1,f.getAction(),p,identity(p),f.getRequestKey(),hash,clock.now());records.copyDocuments(a,client,c.revisionId(),id);
         event(a,client,"CLIENT_KYC_"+f.getAction());return id;
     }
     public UUID attach(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file) {
-        authorize(a,"UPDATE");check(!records.client(a,client,today()).portalEnabled(),"selfServiceOnly");return attach(a,client,f,file,false);
+        authorize(a,"UPDATE");records.client(a,client,today());return attachStaff(a,client,f,file);
     }
-    private UUID attach(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file,boolean own) {
+    private UUID attachStaff(AppUserPrincipal a,UUID client,DocumentForm f,MultipartFile file) {
         records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRequestKey()!=null,"request");check(DOCUMENT_CATEGORIES.contains(f.getCategory()),"category");
         boolean photo=PHOTO_CATEGORIES.contains(f.getCategory());check(!photo||f.getExpiresOn()==null,"photoExpiry");
         check(f.getExpiresOn()==null||!f.getExpiresOn().isBefore(today()),"documentExpiry");
         var content=prepare(file);String hash=hash(List.of(client,f,hash(content.bytes())));
         var tx=new TransactionTemplate(transactions);tx.setTimeout(20);
         return tx.execute(status->{
-            if(own)requireOwner(a);else authorize(a,"UPDATE");records.client(a,client,today());var old=retry(a,"client_onboarding_document",f.getRequestKey(),hash);if(old.isPresent())return old.get();
+            authorize(a,"UPDATE");records.client(a,client,today());var old=retry(a,"client_onboarding_document",f.getRequestKey(),hash);if(old.isPresent())return old.get();
             var before=records.uploadUsage(a,client);check(before.files()<DocumentForm.MAX_FILES&&before.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             UUID id=UUID.randomUUID();var upload=uploads.store(null,"CLIENT_KYC",id.toString(),f.getCategory(),content.name(),content.contentType(),content.bytes());
-            records.lock(client);var c=records.client(a,client,today());if(!own)check(!c.portalEnabled(),"selfServiceOnly");check((c.state().equals("DRAFT")||!own&&c.state().equals("RECORDED"))&&f.getRevisionId().equals(c.revisionId()),"changed");
+            records.lock(client);var c=records.client(a,client,today());check((c.state().equals("DRAFT")||c.state().equals("RECORDED"))&&f.getRevisionId().equals(c.revisionId()),"changed");
             var usage=records.uploadUsage(a,client);check(usage.files()<DocumentForm.MAX_FILES&&usage.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             records.document(a,client,c.revisionId(),id,upload.getId(),f,hash,clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");return id;
         });
@@ -184,11 +180,10 @@ public class OnboardingService {
         String hash=hash(List.of(client,f));
         records.lock(client);var c=records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRevisionId().equals(c.revisionId()),"changed");
         check(Set.of("VERIFY","RETURN","REJECT","REVOKE").contains(f.getKind()),"action");
-        check(f.getKind().equals("REVOKE")?Set.of("VERIFY","EXPIRED","STALE").contains(c.state()):c.state().equals("SUBMITTED"),"state");
+        check(f.getKind().equals("REVOKE")?Set.of("VERIFY","EXPIRED","STALE").contains(c.state()):Set.of("SUBMITTED","RECORDED").contains(c.state()),"state");
         text(f.getReason(),1000,"reason",true);
         text(f.getClientMessage(),1000,"clientMessage",Set.of("RETURN","REJECT","REVOKE").contains(f.getKind()));
         var r=records.latest(a,client).orElseThrow();
-        check(!isStaffSubmission(c,r),"state");
         if(f.getKind().equals("VERIFY")) {
             check(!client.equals(a.getMemberId())&&!r.maker().equals(a.getMemberId())&&!records.contributed(r.id(),a.getMemberId()),"independent");
             validate(r.profile(),true);checkDocuments(r.profile(),records.documents(r.id()));
@@ -198,7 +193,6 @@ public class OnboardingService {
             String identity=identity(r.profile());records.lock("CLIENT_IDENTITY/"+a.getSaccoId()+"/"+identity);check(!records.duplicate(a.getSaccoId(),identity,client),"duplicate");
         }
         UUID id=UUID.randomUUID();records.decision(a,client,id,f,hash,clock.now());
-        if(f.getKind().equals("VERIFY")&&!c.portalEnabled())outbox.enqueue("CLIENT_KYC",id,"CLIENT_PROFILE_VERIFIED",client,a.getMemberId(),a.getSaccoId(),a.getStationId(),Map.of("clientNumber",c.number(),"message","Your profile is verified. Client number: "+c.number()+". Open the Client portal and request a new access code to apply for a loan.","portalPath","/client-portal"));
         event(a,client,"CLIENT_KYC_"+f.getKind());return id;
     }
     @Transactional(timeout=15)
@@ -211,94 +205,19 @@ public class OnboardingService {
     @Transactional(timeout=15) public Download photo(AppUserPrincipal a,UUID client,UUID document) {
         authorize(a,"DOCUMENTS");records.client(a,client,today());check(records.photo(a,client,document),"photoFile");return download(a,client,document);
     }
-    @Transactional(timeout=15) public Download ownPhoto(AppUserPrincipal a,UUID document) {
-        requireOwner(a);check(records.photo(a,a.getMemberId(),document),"photoFile");return downloadOwn(a,document);
-    }
-    @Transactional(readOnly=true)
-    public OwnStatus ownStatus(AppUserPrincipal a) {
-        requireOwner(a);var c=records.client(a,a.getMemberId(),today());return new OwnStatus(c.state(),c.reviewDue());
-    }
-    private void requireOwner(AppUserPrincipal a) {
-        if(a==null||!a.isMemberAccess()||a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Client workspace required");
-        var member=directory.find(a.getMemberId()).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
-        if(!member.isMemberAccess()||(!member.isClientPortalEnabled()&&!a.isProvisionalPortal())||member.getStatus()!=com.sacco.mvp.domain.MemberStatus.ACTIVE||!Objects.equals(member.getSaccoId(),a.getSaccoId())||!Objects.equals(member.getStationId(),a.getStationId()))throw new org.springframework.security.access.AccessDeniedException("Client unavailable");
-    }
-    @Transactional(readOnly=true)
-    public OwnWorkspace ownWorkspace(AppUserPrincipal a,int page,Integer sequence) {
-        requireOwner(a);page(page);var c=records.client(a,a.getMemberId(),today());
-        var revision=sequence==null?records.latest(a,c.id()).orElse(null):records.version(a,c.id(),sequence);
-        if(sequence!=null) {
-            var decisions=records.decisions(revision.id());var decision=decisions.isEmpty()?null:decisions.getFirst();var p=revision.profile();
-            c=new Client(c.id(),p.getClientNumber(),p.getFullName(),p.getPhone(),p.getEmail(),decision==null?revision.mode():decision.kind(),revision.id(),sequence,decision==null?null:decision.reviewDue(),c.portalEnabled());
-        }
-        var documents=revision==null?List.<OwnDocument>of():records.attachments(revision.id()).stream()
-            .map(d->new OwnDocument(d.id(),d.category(),d.name(),d.expiresOn(),d.sizeBytes(),d.contentType(),d.recordedAt())).toList();
-        var history=records.history(a,c.id(),page);
-        var ownRevision=revision==null?null:new OwnRevision(revision.sequence(),personal(revision.profile()),revision.profile().getNoticeVersion(),revision.profile().getNoticeEnglish(),revision.profile().getNoticeKiswahili(),revision.profile().isNoticeAcknowledged(),revision.profile().getAcknowledgedAt());
-        LocalDate validationDate=today();
-        var requirements=sequence!=null || "SUBMITTED".equals(c.state()) ? List.<EvidenceRequirement>of()
-            : evidenceRequirements(revision==null?List.of():records.documents(revision.id()),validationDate);
-        return new OwnWorkspace(c,ownRevision,documents,records.feedback(a,c.id(),sequence==null?null:revision.id()),
-            new Page<>(history.stream().limit(25).map(h->new OwnHistory(h.sequence(),h.result(),h.recordedAt())).toList(),page,history.size()>25),
-            sequence!=null,requirements,validationDate);
-    }
-    @Transactional(readOnly=true)
-    public SelfForm ownForm(AppUserPrincipal a) {
-        requireOwner(a);var c=records.client(a,a.getMemberId(),today());
-        var f=new SelfForm();f.setExpectedSequence(c.sequence());var notice=records.notice();records.latest(a,c.id()).ifPresent(r->{f.setProfile(personal(r.profile()));if(notice.id().equals(r.profile().getNoticeId())){f.setNoticeAcknowledged(r.profile().isNoticeAcknowledged());f.setDeclarationAccepted(r.profile().isDeclarationAccepted());}});identityFields(f.getProfile(),c);f.setNoticeId(notice.id());return f;
-    }
-    @Transactional(readOnly=true)
-    public Notice ownNotice(AppUserPrincipal a) {requireOwner(a);return records.notice();}
+
     @Transactional(readOnly=true)
     public Notice staffNotice(AppUserPrincipal a) {authorize(a,"UPDATE");return records.notice();}
-    @Transactional(timeout=20)
-    public UUID saveOwn(AppUserPrincipal a,SelfForm f) {
-        requireOwner(a);check("DRAFT".equals(f.getAction())||"SUBMITTED".equals(f.getAction()),"action");check(f.getProfile()!=null,"profile");String hash=hash(List.of(a.getMemberId(),f));
-        var old=retry(a,"client_onboarding_revision",f.getRequestKey(),hash);if(old.isPresent())return old.get();
-        var n=records.notice();var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);p.setSelfService(true);standardNotice(p,n);
-        if(f.getAction().equals("SUBMITTED")) {
-            check(n.id().equals(f.getNoticeId()),"noticeChanged");
-            check(f.isNoticeAcknowledged()&&f.isDeclarationAccepted(),"acknowledgement");
-        }
-        if(n.id().equals(f.getNoticeId())&&f.isNoticeAcknowledged()&&f.isDeclarationAccepted()) {
-            p.setNoticeAcknowledged(true);p.setDeclarationAccepted(true);p.setAcknowledgedAt(clock.now());p.setConsentOn(today());p.setConsentReference("Client acknowledgement / "+n.id());
-        }
-        var command=new ProfileForm();command.setRequestKey(f.getRequestKey());command.setExpectedSequence(f.getExpectedSequence());command.setAction(f.getAction());command.setProfile(p);
-        return saveRevision(a,a.getMemberId(),command,hash);
-    }
-    public UUID attachOwn(AppUserPrincipal a,DocumentForm f,MultipartFile file) {requireOwner(a);return attach(a,a.getMemberId(),f,file,true);}
-    @Transactional(timeout=15)
-    public void removeOwnAttachment(AppUserPrincipal actor,UUID revision,UUID document) {
-        requireOwner(actor);
-        UUID client=actor.getMemberId();
-        records.lock(client);
-        var current=records.client(actor,client,today());
-        check("DRAFT".equals(current.state()) && revision.equals(current.revisionId()),"changed");
-        if (records.removeAttachment(actor,revision,document,clock.now())) {
-            event(actor,client,"CLIENT_KYC_DOCUMENT_REMOVED");
-        } else if (!records.removedFromDraft(revision,document)) {
-            throw new org.springframework.security.access.AccessDeniedException("Document unavailable");
-        }
-    }
-    @Transactional(readOnly=true)
-    public DocumentForm ownDocumentForm(AppUserPrincipal a) {
-        requireOwner(a);var c=records.client(a,a.getMemberId(),today());check(c.state().equals("DRAFT"),"state");return uploadForm(a,c);
-    }
-    @Transactional(readOnly=true) public DocumentForm documentForm(AppUserPrincipal a,UUID client) {authorize(a,"UPDATE");var c=records.client(a,client,today());check(!c.portalEnabled(),"selfServiceOnly");check(Set.of("DRAFT","RECORDED").contains(c.state()),"state");return uploadForm(a,c);}
+
+    @Transactional(readOnly=true) public DocumentForm documentForm(AppUserPrincipal a,UUID client) {authorize(a,"UPDATE");var c=records.client(a,client,today());check(Set.of("DRAFT","RECORDED").contains(c.state()),"state");return uploadForm(a,c);}
     private DocumentForm uploadForm(AppUserPrincipal a,Client c) {var usage=records.uploadUsage(a,c.id());var f=new DocumentForm();f.setRevisionId(c.revisionId());f.setRemainingFiles((int)Math.max(0,DocumentForm.MAX_FILES-usage.files()));f.setRemainingBytes(Math.max(0,DocumentForm.MAX_TOTAL_BYTES-usage.bytes()));return f;}
-    @Transactional(timeout=20)
-    public Download downloadOwn(AppUserPrincipal a,UUID document) {
-        requireOwner(a);var uploadId=records.upload(a,a.getMemberId(),document);var upload=uploads.load(uploadId,"CLIENT_KYC",document.toString());
-        check(upload.getContent().length<=5*1024*1024&&uploads.verify(upload,upload.getContent()),"file");event(a,a.getMemberId(),"CLIENT_KYC_DOCUMENT_READ");return new Download(upload.getContent(),upload.getContentType(),upload.getOriginalName());
-    }
+
     private void standardNotice(Profile p,Notice n) {
         p.setNoticeId(n.id());p.setNoticeVersion(n.version());p.setNoticeEnglish(n.english());p.setNoticeKiswahili(n.kiswahili());p.setLawfulBasis("CONSENT");
         p.setRetentionReference("");p.setRetentionReviewOn(null);p.setConsentReference("");p.setConsentOn(null);
         p.setNoticeAcknowledged(false);p.setDeclarationAccepted(false);p.setAcknowledgedAt(null);
     }
-    private ClientProfile personal(Profile p) {
-        return json.readValue(json.writeValueAsString(p),ClientProfile.class);
-    }
+
     private void identityFields(ClientProfile p,Client c) {
         String[] parts=c.name().strip().split("\\s+");p.setFirstName(parts[0]);p.setLastName(parts.length>1?parts[parts.length-1]:"");
         p.setMiddleName(parts.length>2?String.join(" ",Arrays.copyOfRange(parts,1,parts.length-1)):"");p.setPhone(Objects.toString(c.phone(),""));p.setEmail(Objects.toString(c.email(),""));
@@ -324,22 +243,6 @@ public class OnboardingService {
             }
         }
         return statusByCategory.entrySet().stream().map(entry->new EvidenceRequirement(entry.getKey(),entry.getValue())).toList();
-    }
-    /** Validate incomplete profile input before retaining a single server-session draft. */
-    public String encodeProfileDraft(ClientProfile profile) {
-        check(profile!=null,"profile");var copy=json.readValue(json.writeValueAsString(profile),Profile.class);
-        for(var entry:Map.of("firstName",copy.getFirstName(),"middleName",copy.getMiddleName(),"lastName",copy.getLastName()).entrySet()) {
-            text(entry.getValue(),80,entry.getKey(),false);check(entry.getValue().isBlank()||entry.getValue().strip().matches("\\S+"),"nameParts");
-        }
-        text(copy.getPhone(),16,"phone",false);check(copy.getPhone().isBlank()||TanzaniaPhoneNumber.normalizeOptional(copy.getPhone())!=null,"phone");
-        text(copy.getEmail(),255,"email",false);check(copy.getEmail().isBlank()||copy.getEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"),"email");
-        validate(copy,false);return json.writeValueAsString(personal(copy));
-    }
-    public ClientProfile decodeProfileDraft(String profile) {return json.readValue(profile,ClientProfile.class);}
-    /** Public enrollment accepts the same draft fields; private group choices follow contact verification. */
-    public void validateRegistrationProfile(ClientProfile profile) {
-        check(profile!=null,"profile");names(profile);check(profile.getGroupId()==null,"groupId");
-        validate(json.readValue(json.writeValueAsString(profile),Profile.class),false);
     }
     private void validate(Profile p,boolean complete) {
         if(Boolean.FALSE.equals(p.getHasBusiness())) {

@@ -15,15 +15,12 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -32,15 +29,11 @@ public class ManagerService {
     private static final int MAX_QUEUE_ROWS = 100;
     private final LoanApplicationRepository loanApplicationRepository;
     private final ManagerReviewRepository managerReviewRepository;
-    private final BoardReviewRepository boardReviewRepository;
-    private final GuarantorRequestRepository guarantorRequestRepository;
     private final MemberRepository memberRepository;
-    private final SaccoSettingsRepository saccoSettingsRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
     private final OutboxService outboxService;
     private final RoleDirectoryService roleDirectoryService;
     private final LoanAttachmentService loanAttachmentService;
-    private final WorkflowRoutingService workflowRoutingService;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
     private final RepaymentScheduleService repaymentScheduleService;
@@ -107,8 +100,6 @@ public class ManagerService {
             counts.getOrDefault(LoanStatus.DISBURSED, 0L),
             defaultedLoansCurrentYear,
             counts.getOrDefault(LoanStatus.PAID, 0L),
-            counts.getOrDefault(LoanStatus.READY_FOR_MANAGER, 0L),
-            counts.getOrDefault(LoanStatus.AWAITING_BOARD, 0L),
             breakdown,
             recentDisbursements
         );
@@ -163,24 +154,6 @@ public class ManagerService {
         return rows.stream().map(this::toQueueLoan).toList();
     }
 
-    private LoanApplication toQueueLoan(LoanApplicationRepository.QueueLoanRow row) {
-        LoanApplication loan = new LoanApplication();
-        loan.setId(row.getId());
-        loan.setApplicationNumber(row.getApplicationNumber());
-        loan.setLoanId(row.getLoanId());
-        loan.setLoanType(row.getLoanType());
-        loan.setLoanProductSettingId(row.getLoanProductSettingId());
-        loan.setApplicantMemberId(row.getApplicantMemberId());
-        loan.setAmount(row.getAmount());
-        loan.setStatus(row.getStatus());
-        loan.setCreatedAt(row.getCreatedAt());
-        loan.setDisbursementDate(row.getDisbursementDate());
-        loan.setFinalDueDate(row.getFinalDueDate());
-        loan.setSaccoId(row.getSaccoId());
-        loan.setStationId(row.getStationId());
-        return loan;
-    }
-
     public LoanApplication get(UUID id, String saccoId) {
         return get(id, saccoId, null);
     }
@@ -204,19 +177,6 @@ public class ManagerService {
             List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF),PageRequest.of(0,101));
         if(rows.size()>100)throw new IllegalArgumentException("Client loan history requires a scoped report");
         return rows;
-    }
-
-    public SaccoSettings getSettings(String saccoId) {
-        return saccoSettingsRepository.findById(saccoId)
-            .orElseThrow(() -> new IllegalArgumentException("Settings missing"));
-    }
-
-    public List<ManagerReview> reviewsForLoan(UUID loanId) {
-        return managerReviewRepository.findByLoanApplicationIdOrderByCreatedAtAsc(loanId);
-    }
-
-    public List<ManagerReview> reviewsForLoan(UUID loanId, ApprovalWorkflowStage stage) {
-        return managerReviewRepository.findByLoanApplicationIdAndReviewStageOrderByCreatedAtAsc(loanId, stage);
     }
 
     public org.springframework.data.domain.Page<ManagerReview> archivePage(UUID reviewerId,
@@ -249,124 +209,10 @@ public class ManagerService {
         );
     }
 
-    @Transactional
-    public void decide(UUID loanId,
-                       UUID managerId,
-                       ManagerDecision decision,
-                       String reasons,
-                       String signatureText,
-                       OffsetDateTime signatureVerifiedAt) {
-        LoanApplication app = getManagedApplication(loanId, managerId, managerDecisionClaim(decision));
-        requireIndependentActor(app, managerId);
-        if (app.getStatus() != LoanStatus.READY_FOR_MANAGER) {
-            throw new IllegalStateException("Application is not ready for manager review");
-        }
-        String normalizedReasons = normalizeDecisionReasons(reasons);
-        if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
-            throw new IllegalStateException("Add a reason before rejecting this loan application.");
-        }
-        String normalizedSignature = normalizeSignature(signatureText, signatureVerifiedAt);
-        OffsetDateTime now = OffsetDateTime.now();
-        int requiredGuarantors = app.getRequiredGuarantors() == null ? 0 : Math.max(app.getRequiredGuarantors(), 0);
-        if (requiredGuarantors > 0) {
-            long approvals = guarantorRequestRepository.countByLoanApplicationIdAndStatus(
-                loanId, GuarantorRequestStatus.APPROVED);
-            if (approvals < requiredGuarantors) {
-                throw new IllegalStateException(
-                    "Application requires " + requiredGuarantors + " approved guarantors before manager review");
-            }
-        }
-
-        managerReviewRepository.save(ManagerReview.builder()
-            .id(UUID.randomUUID())
-            .loanApplicationId(loanId)
-            .managerMemberId(managerId)
-            .reviewStage(ApprovalWorkflowStage.MANAGER)
-            .decision(decision)
-            .reasons(normalizedReasons)
-            .managerSignatureText(normalizedSignature)
-            .managerSignatureVerifiedAt(signatureVerifiedAt)
-            .createdAt(now)
-            .build());
-
-        if (decision == ManagerDecision.REJECT) {
-            app.setStatus(LoanStatus.MANAGER_REJECTED);
-            app.setApplicantRejectionAcknowledgedAt(null);
-            app.setUpdatedAt(now);
-            loanApplicationRepository.save(app);
-            outboxService.enqueue("LOAN", loanId, "MANAGER_REJECTED", app.getApplicantMemberId(),
-                managerId, app.getSaccoId(), app.getStationId(),
-                Map.of("reasons", normalizedReasons));
-            auditLoanReview(app, managerId, ApprovalWorkflowStage.MANAGER, decision);
-            return;
-        }
-
-        workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.MANAGER, managerId);
-        loanApplicationRepository.save(app);
-        auditLoanReview(app, managerId, ApprovalWorkflowStage.MANAGER, decision);
-    }
-
-    @Transactional
-    public void decideAccountant(UUID loanId,
-                                 UUID accountantId,
-                                 ManagerDecision decision,
-                                 String reasons,
-                                 String signatureText,
-                                 OffsetDateTime signatureVerifiedAt) {
-        LoanApplication app = getAccountantApplication(loanId, accountantId, accountantDecisionClaim(decision));
-        requireIndependentActor(app, accountantId);
-        if (app.getStatus() != LoanStatus.AWAITING_ACCOUNTANT) {
-            throw new IllegalStateException("Application is not ready for accountant review");
-        }
-        String normalizedReasons = normalizeDecisionReasons(reasons);
-        if (decision == ManagerDecision.REJECT && normalizedReasons.isBlank()) {
-            throw new IllegalStateException("Add a reason before rejecting this loan application.");
-        }
-        String normalizedSignature = normalizeSignature(signatureText, signatureVerifiedAt);
-        OffsetDateTime now = OffsetDateTime.now();
-        managerReviewRepository.save(ManagerReview.builder()
-            .id(UUID.randomUUID())
-            .loanApplicationId(loanId)
-            .managerMemberId(accountantId)
-            .reviewStage(ApprovalWorkflowStage.ACCOUNTANT)
-            .decision(decision)
-            .reasons(normalizedReasons)
-            .managerSignatureText(normalizedSignature)
-            .managerSignatureVerifiedAt(signatureVerifiedAt)
-            .createdAt(now)
-            .build());
-        if (decision == ManagerDecision.REJECT) {
-            app.setStatus(LoanStatus.ACCOUNTANT_REJECTED);
-            app.setApplicantRejectionAcknowledgedAt(null);
-            app.setUpdatedAt(now);
-            loanApplicationRepository.save(app);
-            outboxService.enqueue("LOAN", loanId, "ACCOUNTANT_REJECTED", app.getApplicantMemberId(),
-                accountantId, app.getSaccoId(), app.getStationId(),
-                Map.of("reasons", normalizedReasons));
-            auditLoanReview(app, accountantId, ApprovalWorkflowStage.ACCOUNTANT, decision);
-            return;
-        }
-        workflowRoutingService.advanceAfterApproval(app, ApprovalWorkflowStage.ACCOUNTANT, accountantId);
-        loanApplicationRepository.save(app);
-        auditLoanReview(app, accountantId, ApprovalWorkflowStage.ACCOUNTANT, decision);
-    }
-
-    private String normalizeDecisionReasons(String reasons) {
-        return reasons == null ? "" : reasons.trim();
-    }
-
     private void requireIndependentActor(LoanApplication app, UUID actorId) {
         if (actorId.equals(app.getApplicantMemberId())) {
             throw new IllegalArgumentException("staffClient.error.ownLoan");
         }
-    }
-
-    private String normalizeSignature(String signatureText, OffsetDateTime signatureVerifiedAt) {
-        String normalizedSignature = signatureText == null ? "" : signatureText.trim();
-        if (normalizedSignature.isBlank() || signatureVerifiedAt == null) {
-            throw new IllegalStateException("Save and verify your staff signature before recording this decision.");
-        }
-        return normalizedSignature;
     }
 
     @Transactional
@@ -505,16 +351,6 @@ public class ManagerService {
         return loanStationId != null && loanStationId.equalsIgnoreCase(stationId);
     }
 
-    private void auditLoanReview(LoanApplication app,
-                                 UUID actorId,
-                                 ApprovalWorkflowStage stage,
-                                 ManagerDecision decision) {
-        Map<String, Object> details = new LinkedHashMap<>();
-        details.put("reviewStage", stage == null ? null : stage.name());
-        details.put("decision", decision == null ? null : decision.name());
-        auditLoan(app, actorId, "STAFF_REVIEWED_LOAN_APPLICATION", "Staff reviewed loan application", details);
-    }
-
     private void auditLoan(LoanApplication app,
                            UUID actorId,
                            String action,
@@ -568,7 +404,6 @@ public class ManagerService {
         return product.orElseThrow(() -> new IllegalArgumentException("Loan product is not available for this application"));
     }
 
-
     private boolean hasDisbursementProofAttachment(LoanApplication app) {
         List<Map<String, Object>> attachments = loanAttachmentService.parse(app.getAttachmentsJson());
         if (attachments == null || attachments.isEmpty()) {
@@ -576,32 +411,6 @@ public class ManagerService {
         }
         return attachments.stream()
             .anyMatch(item -> LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF.equals(String.valueOf(item.get("attachmentCategory"))));
-    }
-
-    private LoanApplication getManagedApplication(UUID loanId, UUID managerId) {
-        return getManagedApplication(loanId, managerId, UserClaim.MANAGER_QUEUE_VIEW);
-    }
-
-    private LoanApplication getManagedApplication(UUID loanId, UUID managerId, UserClaim requiredClaim) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        if (!roleDirectoryService.hasActiveClaimInSacco(managerId, app.getSaccoId(), requiredClaim)) {
-            throw new IllegalArgumentException("Forbidden");
-        }
-        return app;
-    }
-
-    private LoanApplication getAccountantApplication(UUID loanId, UUID accountantId) {
-        return getAccountantApplication(loanId, accountantId, UserClaim.ACCOUNTANT_QUEUE_VIEW);
-    }
-
-    private LoanApplication getAccountantApplication(UUID loanId, UUID accountantId, UserClaim requiredClaim) {
-        LoanApplication app = loanApplicationRepository.findById(loanId)
-            .orElseThrow(() -> new IllegalArgumentException("Application not found"));
-        if (!roleDirectoryService.hasActiveClaimInSacco(accountantId, app.getSaccoId(), requiredClaim)) {
-            throw new IllegalArgumentException("Forbidden");
-        }
-        return app;
     }
 
     private LoanApplication getDisbursementApplication(UUID loanId, UUID disbursementActorId) {
@@ -616,18 +425,6 @@ public class ManagerService {
             throw new IllegalArgumentException("Forbidden");
         }
         return app;
-    }
-
-    private UserClaim managerDecisionClaim(ManagerDecision decision) {
-        return decision == ManagerDecision.REJECT
-            ? UserClaim.MANAGER_QUEUE_REJECT
-            : UserClaim.MANAGER_QUEUE_APPROVE;
-    }
-
-    private UserClaim accountantDecisionClaim(ManagerDecision decision) {
-        return decision == ManagerDecision.REJECT
-            ? UserClaim.ACCOUNTANT_QUEUE_REJECT
-            : UserClaim.ACCOUNTANT_QUEUE_APPROVE;
     }
 
     private void validateDisbursement(LocalDate disbursementDate) {
@@ -698,20 +495,6 @@ public class ManagerService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    @Transactional
-    public SaccoSettings updateSettings(String saccoId, Integer requiredGuarantors, Integer boardSize,
-                                        Integer boardQuorum, String language) {
-        SaccoSettings settings = saccoSettingsRepository.findById(saccoId)
-            .orElseThrow(() -> new IllegalArgumentException("Settings missing"));
-
-        settings.setRequiredGuarantors(requiredGuarantors);
-        settings.setBoardSize(boardSize);
-        settings.setBoardQuorum(boardQuorum);
-        settings.setDefaultLanguage(language);
-        settings.setUpdatedAt(OffsetDateTime.now());
-        return saccoSettingsRepository.save(settings);
-    }
-
     public record StatusCount(LoanStatus status, long count) {}
 
     public record ManagerDashboard(
@@ -720,9 +503,25 @@ public class ManagerService {
         long activeDisbursedLoans,
         long defaultedLoansCurrentYear,
         long paidLoans,
-        long onReviewByManagerLoans,
-        long onReviewByBoardLoans,
         List<StatusCount> statusBreakdown,
         List<LoanApplication> recentDisbursements
     ) {}
+    private LoanApplication toQueueLoan(LoanApplicationRepository.QueueLoanRow row) {
+        LoanApplication loan = new LoanApplication();
+        loan.setId(row.getId());
+        loan.setApplicationNumber(row.getApplicationNumber());
+        loan.setLoanId(row.getLoanId());
+        loan.setLoanType(row.getLoanType());
+        loan.setLoanProductSettingId(row.getLoanProductSettingId());
+        loan.setApplicantMemberId(row.getApplicantMemberId());
+        loan.setAmount(row.getAmount());
+        loan.setStatus(row.getStatus());
+        loan.setCreatedAt(row.getCreatedAt());
+        loan.setDisbursementDate(row.getDisbursementDate());
+        loan.setFinalDueDate(row.getFinalDueDate());
+        loan.setSaccoId(row.getSaccoId());
+        loan.setStationId(row.getStationId());
+        return loan;
+    }
+
 }

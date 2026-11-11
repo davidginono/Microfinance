@@ -21,6 +21,22 @@ import java.security.MessageDigest;
 
 @Service @RequiredArgsConstructor
 public class LoanRecordingService {
+    @Transactional(readOnly=true)
+    public void validateStaffReview(AppUserPrincipal actor,UUID id) {
+        authorize(actor,"CREATE");records.groupLoan(actor,id,false);
+        var loan=loans.findById(id).orElseThrow();
+        if(loan.getApplicantMemberId()!=null)check(records.client(actor,loan.getApplicantMemberId()).isPresent(),"client");
+        check(loan.getFinancialSnapshot()!=null&&!loan.getFinancialSnapshot().isBlank(),"terms");
+        LoanAmortizationCalculator.estimate(loan.getAmount(),loan.getTenorMonths(),schedules.parseSummary(loan.getFinancialSnapshot()));
+        String kyc=loans.kycError(id,actor.getSaccoId(),actor.getStationId(),clock.today());
+        if(kyc!=null)throw new IllegalArgumentException(kyc);
+        var files=attachments.parse(loan.getAttachmentsJson());
+        check((loan.getApplicantSignatureVerifiedAt()!=null&&loan.getApplicantSignatureText()!=null&&!loan.getApplicantSignatureText().isBlank())||files.stream().anyMatch(f->"SIGNED_APPLICATION".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id),"signedApplication");
+        if(loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0) {
+            if(loan.getApplicantMemberId()==null)check(records.personalGuaranteesReady(actor,id),"personalGuarantees");
+            else check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
+        }
+    }
     private final LoanRecordingRepository records;
     private final LoanApplicationRepository loans;
     private final LoanProductSettingRepository products;
@@ -34,9 +50,7 @@ public class LoanRecordingService {
     private final AuditService audit;
     private final LoanAttachmentService attachments;
     private final LoanDisbursementNumberService disbursementNumbers;
-    private final LoanProductWorkflowService workflows;
     private final WorkflowRoutingService routing;
-    private final LoanProductBoardReviewerRepository productReviewers;
     private final ManagerReviewRepository reviews;
     private final com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicies;
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
@@ -114,7 +128,7 @@ public class LoanRecordingService {
         case "clients"->records.clients(a,search,page);case "ledger-clients"->records.ledgerClients(a,search,page);case "products"->records.products(a,search,page);
         case "filter-products"->records.filterProducts(a,search,page);
         case "money"->records.accounts(a,"MONEY",search,page);case "principal"->records.accounts(a,"PRINCIPAL",search,page);case "interest"->records.accounts(a,"INTEREST",search,page);
-        case "disbursement-clients"->records.loans(a,new Filter(search,null,null,"RECORDED","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.clientNumber()+" - "+l.client()+" ("+l.number()+")",l.status())).toList();
+        case "disbursement-clients"->records.loans(a,new Filter(search,null,null,"READY_FOR_DISBURSEMENT","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.clientNumber()+" - "+l.client()+" ("+l.number()+")",l.status())).toList();
         case "loans"->records.loans(a,new Filter(search,null,null,"","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.number()+" - "+l.product(),l.status())).toList();
         default->throw new IllegalArgumentException("recording.error.filter");};}
     @Transactional(readOnly=true)
@@ -183,7 +197,7 @@ public class LoanRecordingService {
         authorize(a,kind.equals("DISBURSEMENT")?"DISBURSE":"POST");validatePost(f);records.record(a,f.getLoanId(),false);
         var loan=loans.findById(f.getLoanId()).orElseThrow();
         records.account(a,f.getMoneyAccountId(),"MONEY",false);
-        if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.RECORDED,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
+        if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
         check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
         var linked=productAccounts.required(a,f.getLoanId());records.account(a,linked.principalId(),"PRINCIPAL",false);records.account(a,linked.interestId(),"INTEREST",false);return chargeAllocation(f.getAmount(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());
@@ -224,7 +238,14 @@ public class LoanRecordingService {
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
         validateFiles(files);
-        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);check(f.getApplicationId()==null,"request");if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+        com.sacco.mvp.domain.LoanApplication existingDraft=null;
+        if(f.getApplicationId()!=null){
+            var current=records.groupLoan(a,f.getApplicationId(),true);
+            check("DRAFT".equals(current.status())&&current.recorder()==null&&Objects.equals(current.client(),f.getClientId()),"state");
+            check(records.draftVersion(a,f.getApplicationId())==f.getExpectedVersion(),"changed");
+            existingDraft=loans.findById(f.getApplicationId()).orElseThrow();
+        }
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
@@ -268,19 +289,20 @@ public class LoanRecordingService {
         if(shared.active()>0)policy.put("sharedCredit",Map.of("active",shared.active(),"maximumLiability",shared.liability(),"monthlyPayment",shared.monthlyPayment(),"assessedAt",now));
         snapshot.put("recordedCharges",chargePlan);snapshot.put("recordedChargeTotal",chargePlan.total());snapshot.put("recordedChargeDeductions",chargePlan.deductions());snapshot.put("recordedNetCashEstimate",f.getPrincipal().subtract(settlement==null?ZERO:settlement.total()).subtract(chargePlan.deductions()));snapshot.put("recordedTotalPayable",f.getPrincipal().add(calculation.totalInterest()).add(chargePlan.total()));policy.put("recordedChargePolicy",Objects.toString(chargePlan.policyId(),""));
         long number=numbers.nextFor(a.getSaccoId());
-        var loan=LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
+        var loan=LoanApplication.builder().id(existingDraft==null?UUID.randomUUID():existingDraft.getId()).applicationNumber(existingDraft==null?number:existingDraft.getApplicationNumber()).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).borrowerPartyId(borrowerParty).paymentDetailsSnapshot(payoutSnapshot).topUpSourceLoanId(f.getTopUpSourceLoanId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
             .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(storedForm))
             .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
-            .installmentAmount(calculation.installment()).createdAt(now).updatedAt(now).build();
-        loan.setAttachmentsJson(namedUploads==null?attachments.store(loan.getId(),files,null):attachments.storeNamed(loan.getId(),namedUploads,null));
+            .installmentAmount(calculation.installment()).createdAt(existingDraft==null?now:existingDraft.getCreatedAt()).updatedAt(now).build();
+        loan.setVersion(existingDraft==null?null:existingDraft.getVersion());
+        loan.setAttachmentsJson(namedUploads==null?attachments.store(loan.getId(),files,existingDraft==null?null:existingDraft.getAttachmentsJson()):attachments.storeNamed(loan.getId(),namedUploads,existingDraft==null?null:existingDraft.getAttachmentsJson()));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
         String clientKycError=loans.kycError(id,a.getSaccoId(),a.getStationId(),clock.today());
         if(clientKycError!=null)throw new IllegalArgumentException(clientKycError);
         if(chargePlan.supported())charges.freeze(a,id,chargePlan);
         if(borrowerParty!=null && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
-        else routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);
+        loans.saveAndFlush(loan);
         event(a,id,"LOAN_APPLICATION_RECORDED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
     }
     /** Personal guarantees precede the product-selected review path. */
@@ -288,7 +310,7 @@ public class LoanRecordingService {
         authorize(a,"CREATE");accounting.requireActor(a,"GROUP_LENDING_SUBMIT");records.record(a,id,false);var loan=loans.findForDisbursement(id).orElseThrow();
         check(loan.getApplicantMemberId()==null && loan.getRequiredGuarantors()!=null && loan.getRequiredGuarantors()>0 && records.personalGuaranteesReady(a,id),"personalGuarantees");
         if(loan.getStatus()!=LoanStatus.AWAITING_GUARANTORS)return;
-        routing.moveToFirstReviewStage(loan,a.getMemberId());loans.saveAndFlush(loan);event(a,id,"PERSONAL_GUARANTEES_REVIEW_STARTED",Map.of("status",loan.getStatus().name()));
+        loan.setStatus(LoanStatus.RECORDED);loans.saveAndFlush(loan);event(a,id,"PERSONAL_GUARANTEES_RECORDED",Map.of("status",loan.getStatus().name()));
     }
     @Transactional(readOnly=true)
     public Detail detail(AppUserPrincipal a,UUID id){
@@ -532,7 +554,7 @@ public class LoanRecordingService {
         check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
         check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getExpenses(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private void validatePost(PostForm f){check(f!=null && f.getRequestKey()!=null && f.getLoanId()!=null,"request");money(f.getAmount());check(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(clock.today()),"date");text(f.getReference(),100,true);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);}
-    static void filter(Filter f,boolean posting){check(f!=null && f.search()!=null && f.search().length()<=100 && f.page()>=0 && f.page()<=10000 && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),posting?Set.of("number","product","client","date","amount","reference","status"):Set.of("number","product","client","date","amount","balance","status")),"filter");check(f.from()==null || f.through()==null || !f.from().isAfter(f.through()),"date");check((posting?Set.of("","POSTED","REVERSED","REVERSAL"):Set.of("","DRAFT","AWAITING_GUARANTORS","ALL_GUARANTORS_APPROVED","READY_FOR_MANAGER","AWAITING_LOAN_OFFICER","AWAITING_CHAIRPERSON","AWAITING_BOARD","AWAITING_CREDIT_COMMITTEE","AWAITING_ACCOUNTANT","READY_FOR_DISBURSEMENT","MANAGER_REJECTED","LOAN_OFFICER_REJECTED","CHAIRPERSON_REJECTED","BOARD_REJECTED","CREDIT_COMMITTEE_REJECTED","ACCOUNTANT_REJECTED","REJECTED","RECORDED","WITHDRAWN","DISBURSED","PAR","DEFAULTED","PAID","WRITTEN_OFF","DISBURSEMENT_REVERSED")).contains(f.status()),"filter");}
+    static void filter(Filter f,boolean posting){check(f!=null && f.search()!=null && f.search().length()<=100 && f.page()>=0 && f.page()<=10000 && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),posting?Set.of("number","product","client","date","amount","reference","status"):Set.of("number","product","client","date","amount","balance","status")),"filter");check(f.from()==null || f.through()==null || !f.from().isAfter(f.through()),"date");check((posting?Set.of("","POSTED","REVERSED","REVERSAL"):Set.of("","DRAFT","SUBMITTED","AWAITING_GUARANTORS","ALL_GUARANTORS_APPROVED","READY_FOR_MANAGER","AWAITING_LOAN_OFFICER","AWAITING_CHAIRPERSON","AWAITING_BOARD","AWAITING_CREDIT_COMMITTEE","AWAITING_ACCOUNTANT","READY_FOR_DISBURSEMENT","MANAGER_REJECTED","LOAN_OFFICER_REJECTED","CHAIRPERSON_REJECTED","BOARD_REJECTED","CREDIT_COMMITTEE_REJECTED","ACCOUNTANT_REJECTED","REJECTED","RECORDED","WITHDRAWN","DISBURSED","PAR","DEFAULTED","PAID","WRITTEN_OFF","DISBURSEMENT_REVERSED")).contains(f.status()),"filter");}
     private void kind(String kind){check(Set.of("DISBURSEMENT","PAYMENT","REVERSAL").contains(kind),"filter");}
     private static void money(BigDecimal amount){check(amount!=null && amount.signum()>0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private static void text(String text,int max,boolean required){check(text!=null && text.length()<=max && (!required || !text.isBlank()) && text.chars().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t'),"text");}
@@ -555,6 +577,7 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public boolean allowedTeller(LoanApplication loan,UUID actor) {
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
+        if("GROUP_REVIEW_V1".equals(policy.get("recordingWorkflowVersion")))return true;
         var ids=policy.get("disbursementOfficerIds");
         if("CUSTOM".equals(schedules.parseSummary(loan.getFinancialSnapshot()).get("loanMode")))return ids instanceof List<?> assigned && !assigned.isEmpty() && assigned.contains(actor.toString());
         return !(ids instanceof List<?> assigned) || assigned.contains(actor.toString());
@@ -578,29 +601,11 @@ public class LoanRecordingService {
     }
 
     private Map<String,Object> recordedPolicy(AppUserPrincipal a,LoanProductSetting selectedProduct,String label,Integer guarantors) {
-        var policy=new LinkedHashMap<String,Object>(workflows.snapshotData(workflows.resolveForProduct(a.getSaccoId(),selectedProduct)));
+        var policy=new LinkedHashMap<String,Object>();
         policy.put("collateralRequired",selectedProduct.isCollateralRequired());policy.put("collateralCoverageRatio",selectedProduct.getResolvedMinCollateralCoverageRatio());
-        policy.put("source","ACCOUNTANT_DIRECT");policy.put("product",label);policy.put("guarantorsRequired",guarantors);policy.put("disbursementProofRequired",selectedProduct.isDisbursementProofRequired());policy.put("recordingWorkflowVersion","STAFF_REVIEW_V1");
-        if(selectedProduct.isCustomRecordingConfiguration()) {
-            var tellers=productReviewers.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(selectedProduct.getId(),ApprovalWorkflowStage.DISBURSEMENT_OFFICER).stream().map(LoanProductBoardReviewer::getBoardMemberId).toList();
-            check(!tellers.isEmpty() && records.availableTeller(a,tellers),"customTellers");policy.put("disbursementOfficerIds",tellers.stream().map(UUID::toString).toList());
-        }
-        for(var stage:List.of(ApprovalWorkflowStage.CHAIRPERSON,ApprovalWorkflowStage.BOARD,ApprovalWorkflowStage.CREDIT_COMMITTEE))
-            policy.put("recordingReviewers_"+stage.name(),productReviewers.findByLoanProductSettingIdAndReviewStageOrderByCreatedAtAsc(selectedProduct.getId(),stage).stream().map(r->r.getBoardMemberId().toString()).toList());
+        policy.put("source","ACCOUNTANT_DIRECT");policy.put("product",label);policy.put("guarantorsRequired",guarantors);policy.put("disbursementProofRequired",selectedProduct.isDisbursementProofRequired());policy.put("recordingWorkflowVersion","GROUP_REVIEW_V1");
+
         return policy;
     }
-    @Transactional
-    public void submitRecordedApplication(AppUserPrincipal actor,UUID id) {
-        authorize(actor,"CREATE");var record=records.record(actor,id,true);var application=loans.findForDisbursement(id).orElseThrow();
-        String kycError=loans.kycError(id,actor.getSaccoId(),actor.getStationId(),clock.today());
-        if(kycError!=null)throw new IllegalArgumentException(kycError);
-        if(application.getStatus()!=LoanStatus.RECORDED){check("STAFF_REVIEW_V1".equals(schedules.parseSummary(application.getPolicySnapshot()).get("recordingWorkflowVersion")),"state");return;}
-        var form=read(record.get("metadata").toString(),RecordForm.class);
-        var product="CUSTOM".equals(form.getLoanMode())?products.findBySaccoIdAndCustomRecordingConfigurationTrue(actor.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration")):
-            products.findByIdAndSaccoId(application.getLoanProductSettingId(),actor.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));
-        check(product.getStatus()==LoanProductStatus.ACTIVE,"product");
-        application.setLoanProductSettingId(product.getId());application.setPolicySnapshot(write(recordedPolicy(actor,product,record.get("product_name").toString(),application.getRequiredGuarantors())));
-        routing.moveToFirstReviewStage(application,actor.getMemberId());loans.saveAndFlush(application);
-        event(actor,id,"RECORDED_APPLICATION_SUBMITTED",Map.of("status",application.getStatus().name()));
-    }
+
 }

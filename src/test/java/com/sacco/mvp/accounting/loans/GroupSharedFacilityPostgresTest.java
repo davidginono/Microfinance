@@ -38,31 +38,13 @@ class GroupSharedFacilityPostgresTest {
         assertThat(shared.quote().dueShares().stream().map(SharedDue::principal).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(shared.quote().principal());
         assertThat(shared.quote().dueShares()).allMatch(d->d.date().equals(LocalDate.of(2026,11,8)));
     }
-    @Test void proportionateAndWholeLoanLiabilitiesAreExplicitAndDoNotCreateGuarantees(){
-        rule(SharedLiability.JOINT_AND_SEVERAL);UUID id=submit();var shared=g.cycles.sharedFacility(g.f.actor,id).orElseThrow();
-        for(var client:List.of(g.f.client,g.second)){
-            var packet=g.consents.packet(g.client(client),id);assertThat(packet.shared().liability()).isEqualTo(SharedLiability.JOINT_AND_SEVERAL);
-            assertThat(packet.shared().cap()).isEqualByComparingTo(shared.quote().totalPayable());assertThat(packet.terms().principal()).isEqualByComparingTo("1000.01");assertThat(packet.guarantees()).isEmpty();
-        }
-    }
-    @Test void personalSigningDoesNotRequireOrGrantGuarantorPermission(){
-        UUID id=submit();var a=g.client(g.f.client);var claims=EnumSet.allOf(UserClaim.class);claims.remove(UserClaim.GUARANTOR_REQUESTS_APPROVE);
-        when(g.f.context.getBean(UserClaimService.class).effectiveClaims(eq(g.f.client),anyCollection(),anyBoolean())).thenReturn(claims);
-        assertThat(g.consents.accept(a,id,true,"")).isNull();assertThat(g.consents.packet(a,id).accepted()).isTrue();
-        assertThat(g.consents.packet(a,id).shared().cap()).isEqualByComparingTo(g.consents.packet(a,id).shared().allocation().principal().add(g.consents.packet(a,id).shared().allocation().interest()));
-        assertThat(g.f.jdbc.queryForObject("select count(*) from lending_group_guarantee where cycle_id=?",Integer.class,id)).isZero();
-    }
+
     @Test void retryReturnsTheSameParentAndConcurrentSubmissionsCannotDuplicateIt()throws Exception{
         var f=form();UUID id=g.cycles.create(g.f.actor,g.group,f);
         try(var workers=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);var work=new ArrayList<Future<?>>();for(int n=0;n<2;n++)work.add(workers.submit(()->{start.await();g.cycles.submit(g.f.actor,id,f);return null;}));start.countDown();for(var result:work)result.get(45,TimeUnit.SECONDS);}
         g.cycles.submit(g.f.actor,id,f);assertThat(count("loan_applications")).isEqualTo(1);assertThat(g.cycles.participants(g.f.actor,id)).hasSize(2);
     }
-    @Test void refusalClosesTheOneUnfundedParentAndRetainsPriorSignatures(){
-        UUID id=submit();var first=g.client(g.f.client);assertThat(g.consents.accept(first,id,true,"")).isNull();
-        g.consents.refuse(g.client(g.second),id,"Synthetic joint borrower declined",true);
-        assertThat(g.cycles.detail(g.f.actor,id).state()).isEqualTo("CANCELLED");assertThat(g.cycles.sharedFacility(g.f.actor,id).orElseThrow().status()).isEqualTo("WITHDRAWN");
-        assertThat(g.consents.packet(first,id).accepted()).isTrue();assertThat(count("loan_ledgers")).isZero();
-    }
+
     @Test void allFrozenSharedEvidenceIsAppendOnlyAndLateAllocationsCannotBeAdded(){
         UUID id=submit();assertThatThrownBy(()->g.f.jdbc.update("update lending_group_shared_allocation set principal=principal+1 where cycle_id=?",id)).hasMessageContaining("append-only");
         assertThatThrownBy(()->g.f.jdbc.update("delete from lending_group_shared_facility where cycle_id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);

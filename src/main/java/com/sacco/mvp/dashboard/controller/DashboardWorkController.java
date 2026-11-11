@@ -14,7 +14,7 @@ import java.math.BigDecimal;
 public class DashboardWorkController {
     private final DashboardWorkService work;
     @GetMapping
-    @PreAuthorize("principal.stationId != null and principal.stationId != '' and (@access.canAccessMemberArea(principal) or @access.staffDashboardAccess(principal) or (principal.staffSession and @access.has(principal, 'VOUCHER_WORKSPACE_VIEW')))")
+    @PreAuthorize("principal.stationId != null and principal.stationId != '' and (@access.staffDashboardAccess(principal) or (principal.staffSession and @access.has(principal, 'VOUCHER_WORKSPACE_VIEW')))")
     public ResponseEntity<DashboardWorkService.Work> read(@AuthenticationPrincipal AppUserPrincipal actor,
         @RequestParam(defaultValue="0") int days,@RequestParam(defaultValue="0") BigDecimal amount) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(work.read(actor,days,amount));

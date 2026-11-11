@@ -2,7 +2,6 @@ package com.sacco.mvp.service;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.domain.LoanApplication;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.LoanType;
@@ -23,10 +22,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class LoanNotificationFormatterTest {
-    @Test void verifiedProvisionalClientsReceiveTheirNumberAndThePublicPortalLink()throws Exception{
+    @Test void verifiedClientsReceiveTheirNumberWithoutLoginInstructions()throws Exception{
         var formatter=formatter(mock(LoanApplicationRepository.class),mock(MemberRepository.class));
         var content=formatter.format(OutboxEvent.builder().eventType("CLIENT_PROFILE_VERIFIED").aggregateType("CLIENT_KYC").build(),payload("{\"details\":{\"clientNumber\":\"CL-00000123\"}}"),NotificationDeliveryService.DeliveryContent.plain("Fallback","Fallback"));
-        assertThat(content.smsText()).contains("CL-00000123","https://sacco.example/client-portal").doesNotContain("/app/loan-applications/");
+        assertThat(content.smsText()).contains("CL-00000123").doesNotContain("http", "access code", "View Loan Details");
     }
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -48,7 +47,7 @@ class LoanNotificationFormatterTest {
 
         assertThat(content.subject()).isEqualTo("Loan application review required");
         assertThat(content.plainText()).contains("Board Member", "Loan Application ID: 42", "Applicant: Grace Member (MEM-42)");
-        assertThat(content.smsText()).contains("View Loan Details: https://sacco.example/loan-notifications/" + loanId + "/open");
+        assertThat(content.smsText()).contains("View Loan Details: https://sacco.example/finance/loan-records/" + loanId);
         assertThat(content.html()).contains("View Loan Details", "Loan Application Review Required By Board Member");
     }
 
@@ -69,7 +68,7 @@ class LoanNotificationFormatterTest {
 
         assertThat(content.subject()).isEqualTo("Loan application status updated");
         assertThat(content.plainText()).contains("Status: Manager Rejected", "Reason: Insufficient savings");
-        assertThat(content.smsText()).contains("View Loan Details: https://sacco.example/app/loan-applications/" + loanId);
+        assertThat(content.smsText()).doesNotContain("View Loan Details", "https://");
         assertThat(content.html()).contains("Loan Application Status Updated", "Insufficient savings");
     }
 
@@ -94,8 +93,8 @@ class LoanNotificationFormatterTest {
 
         assertThat(content.subject()).isEqualTo("New guarantor request");
         assertThat(content.plainText()).contains("New Guarantor Request", "Applicant: Grace Member (MEM-42)");
-        assertThat(content.smsText()).contains("https://sacco.example/app/guarantee-requests");
-        assertThat(content.html()).contains("New Guarantor Request", "View Loan Details");
+        assertThat(content.smsText()).doesNotContain("View Loan Details", "https://");
+        assertThat(content.html()).contains("New Guarantor Request").doesNotContain("View Loan Details");
     }
 
     @Test
@@ -120,7 +119,7 @@ class LoanNotificationFormatterTest {
         assertThat(content.subject()).isEqualTo("Guarantor request rejected");
         assertThat(content.plainText()).contains("Guarantor Request Rejected", "Guarantor: Peter Guarantor (GUA-7)");
         assertThat(content.plainText()).contains("Reason: Savings committed elsewhere");
-        assertThat(content.smsText()).contains("https://sacco.example/app/loan-applications/" + loanId);
+        assertThat(content.smsText()).doesNotContain("View Loan Details", "https://");
     }
 
     @Test

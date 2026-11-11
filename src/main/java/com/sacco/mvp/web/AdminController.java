@@ -6,13 +6,11 @@ import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductSetting;
 import com.sacco.mvp.domain.LoanProductStatus;
 import com.sacco.mvp.domain.LoanStatus;
-import com.sacco.mvp.domain.OutboxStatus;
 import com.sacco.mvp.domain.OtpDeliveryChannel;
 import com.sacco.mvp.domain.OtpSelectionPolicy;
 import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.SmsUnitStatus;
 import com.sacco.mvp.domain.UserClaim;
-import com.sacco.mvp.domain.ApprovalWorkflowStage;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.AdminScopeService;
 import com.sacco.mvp.service.AdminService;
@@ -102,19 +100,6 @@ public class AdminController {
     private final PlatformEmailSettingsService platformEmailSettingsService;
     private final PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
     private final org.springframework.context.MessageSource messages;
-
-    @GetMapping("/scope/select")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_VIEW')")
-    public String selectScope(@AuthenticationPrincipal AppUserPrincipal principal,
-                              @RequestParam(required = false) String next,
-                              Model model) {
-        if (principal != null && principal.isWorkspaceAdminScope() && !principal.isPlatformIdentity()) {
-            return "redirect:" + normalizeAdminNextPath(next);
-        }
-        model.addAttribute("scopeSelection", adminScopeService.currentScope(principal));
-        model.addAttribute("nextAdminPath", normalizeAdminNextPath(next));
-        return "admin/scope-select";
-    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'ADMIN_DASHBOARD_VIEW')")
@@ -963,7 +948,6 @@ public class AdminController {
             );
             List<Position> staffPositions = staffPositionsFor(principal);
             model.addAttribute("user", user);
-            model.addAttribute("canEnableClientAccess", user.isCanEnableClientAccess());
             model.addAttribute("staffPositions", staffPositions);
             model.addAttribute("accessActions", com.sacco.mvp.domain.AccessAction.values());
             model.addAttribute("accessMatrixRows", UserClaim.matrixRows());
@@ -1018,7 +1002,7 @@ public class AdminController {
                              @RequestParam MemberStatus status,
                              RedirectAttributes ra) {
         try {
-            AdminService.UserUpdateResult result = adminService.updateUser(
+            adminService.updateUser(
                 adminScopeService.currentSaccoId(principal),
                 adminScopeService.currentStationId(principal),
                 principal.getMemberId(),
@@ -1028,29 +1012,10 @@ public class AdminController {
                 status,
                 claims
             );
-            if (result.isStaffAccessPending()) {
-                ra.addFlashAttribute("message", "User updated. Staff Number " + result.getStaffNo() + " is pending member acknowledgement.");
-            } else {
-                ra.addFlashAttribute("message", "User updated.");
-            }
+            ra.addFlashAttribute("message", "User updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(),
                 org.springframework.context.i18n.LocaleContextHolder.getLocale()));
-        }
-        return "redirect:/admin/users/" + id + "/edit";
-    }
-
-    @PostMapping("/users/{id}/enable-client-access")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
-    public String enableClientAccess(@PathVariable UUID id,
-                                     @AuthenticationPrincipal AppUserPrincipal principal,
-                                     RedirectAttributes ra) {
-        var locale = org.springframework.context.i18n.LocaleContextHolder.getLocale();
-        try {
-            String clientNumber = adminService.enableClientAccess(principal, id);
-            ra.addFlashAttribute("message", messages.getMessage("staffClient.enabled", new Object[]{clientNumber}, locale));
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(), locale));
         }
         return "redirect:/admin/users/" + id + "/edit";
     }
@@ -1149,17 +1114,6 @@ public class AdminController {
             ? settings.getPortfolioAtRiskDays()
             : stationPolicy.getPortfolioAtRiskDays();
         model.addAttribute("policyPortfolioAtRiskDays", portfolioAtRiskDays == null ? 30 : portfolioAtRiskDays);
-        model.addAttribute("activeBoardMemberCount", adminService.activeBoardMemberCount(saccoId));
-        model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
-        model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
-        model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
-        model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
-        model.addAttribute("activeLoanOfficerCount", adminService.activeLoanOfficerCount(saccoId));
-        model.addAttribute("activeAccountantCount", adminService.activeAccountantCount(saccoId));
-        model.addAttribute("activeDisbursementClaimHolderCount", adminService.activeDisbursementClaimHolderCount(saccoId));
-        model.addAttribute("approvalFlowStageLabels", settings.resolvedApprovalFlow().stream()
-            .map(ApprovalWorkflowStage::getDisplayLabel)
-            .toList());
         model.addAttribute("settingsSection", normalizeSettingsSection(section));
         model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
         model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
@@ -1198,27 +1152,11 @@ public class AdminController {
                                     @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
                                     @RequestParam(required = false) Integer maximumActiveLoans,
                                     @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
-                                    @RequestParam(defaultValue = "false") boolean managerReviewRequired,
-                                    @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
-                                    @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
-                                    @RequestParam(defaultValue = "false") boolean chairpersonReviewRequired,
-                                    @RequestParam(required = false) Integer chairpersonPriority,
-                                    @RequestParam(name = "chairpersonReviewerIds", required = false) java.util.List<UUID> chairpersonReviewerIds,
-                                    @RequestParam(defaultValue = "false") boolean boardReviewRequired,
-                                    @RequestParam(required = false) Integer boardPriority,
-                                    @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
-                                    @RequestParam(defaultValue = "false") boolean committeeReviewRequired,
-                                    @RequestParam(required = false) Integer committeePriority,
-                                    @RequestParam(required = false) Integer committeeMinimumVotes,
-                                    @RequestParam(required = false) Integer committeeApprovalThreshold,
-                                    @RequestParam(name = "creditCommitteeReviewerIds", required = false) java.util.List<UUID> creditCommitteeReviewerIds,
-                                    @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
-                                    @RequestParam(required = false) Integer accountantPriority,
+
                                     @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                     @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
                                     @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
-                                    @RequestParam(defaultValue = "1") Integer managerPriority,
-                                    @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
+
                                     @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
                                     @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                     @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
@@ -1233,21 +1171,10 @@ public class AdminController {
             BigDecimal processingFeeRate = percentToRatio(processingFeePercent);
             BigDecimal insuranceRate = percentToRatio(insurancePercent);
             BigDecimal annualRate = percentToRatio(annualInterestPercent);
-            ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
-                managerReviewRequired,
-                loanOfficerReviewRequired,
-                workflowStartStage,
-                managerPriority,
-                loanOfficerPriority
-            );
-            adminService.updateLoanProductTenure(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
+                adminService.updateLoanProductTenure(adminScopeService.currentSaccoId(principal), principal.getMemberId(), id,
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
                 maxLoanSavingsRatio, savingsLimitCheckRequired, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
-                allowApplicationWithActiveLoan, freshFinancialDataRequired, managerReviewRequired, loanOfficerReviewRequired,
-                resolvedWorkflowStartStage, managerPriority, loanOfficerPriority, chairpersonReviewRequired, chairpersonPriority, chairpersonReviewerIds,
-                boardReviewRequired, boardPriority, boardReviewerIds,
-                committeeReviewRequired, committeePriority, committeeMinimumVotes,
-                committeeApprovalThreshold, creditCommitteeReviewerIds, accountantReviewRequired, accountantPriority, disbursementOfficerRequired,
+                allowApplicationWithActiveLoan, freshFinancialDataRequired, disbursementOfficerRequired,
                 disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -1270,10 +1197,6 @@ public class AdminController {
         model.addAttribute("settings", settings);
         model.addAttribute("requiredAttachments", requiredAttachmentService.activeForProduct(id));
         model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
-        model.addAttribute("boardReviewerOptions", adminService.activeBoardReviewerOptions(saccoId));
-        model.addAttribute("creditCommitteeReviewerOptions", adminService.activeCreditCommitteeReviewerOptions(saccoId));
-        model.addAttribute("productBoardReviewerIdTokens", adminService.loanProductBoardReviewerIdTokens(saccoId));
-        model.addAttribute("productCreditCommitteeReviewerIdTokens", adminService.loanProductCreditCommitteeReviewerIdTokens(saccoId));
         model.addAttribute("suppressToastMessages", true);
         return "admin/loan-product-edit";
     }
@@ -1350,29 +1273,13 @@ public class AdminController {
                                               @RequestParam(defaultValue = "false") boolean allowApplicationWithActiveLoan,
                                               @RequestParam(required = false) Integer maximumActiveLoans,
                                               @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
-                                              @RequestParam(defaultValue = "false") boolean managerReviewRequired,
-                                              @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
-                                              @RequestParam(defaultValue = "MANAGER") ApprovalWorkflowStage workflowStartStage,
-                                              @RequestParam(defaultValue = "false") boolean chairpersonReviewRequired,
-                                              @RequestParam(required = false) Integer chairpersonPriority,
-                                              @RequestParam(name = "chairpersonReviewerIds", required = false) java.util.List<UUID> chairpersonReviewerIds,
-                                              @RequestParam(defaultValue = "false") boolean boardReviewRequired,
-                                              @RequestParam(required = false) Integer boardPriority,
-                                              @RequestParam(name = "boardReviewerIds", required = false) java.util.List<UUID> boardReviewerIds,
-                                              @RequestParam(defaultValue = "false") boolean committeeReviewRequired,
-                                              @RequestParam(required = false) Integer committeePriority,
-                                              @RequestParam(required = false) Integer committeeMinimumVotes,
-                                              @RequestParam(required = false) Integer committeeApprovalThreshold,
-                                              @RequestParam(name = "creditCommitteeReviewerIds", required = false) java.util.List<UUID> creditCommitteeReviewerIds,
-                                              @RequestParam(defaultValue = "true") boolean accountantReviewRequired,
-                                              @RequestParam(required = false) Integer accountantPriority,
+
                                               @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
                                               @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
                                               @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
                                               @RequestParam(name = "requiredAttachmentName", required = false) List<String> requiredAttachmentNames,
                                               @RequestParam(name = "requiredAttachmentMaxSizeMb", required = false) List<BigDecimal> requiredAttachmentMaxSizeMb,
-                                              @RequestParam(defaultValue = "1") Integer managerPriority,
-                                              @RequestParam(defaultValue = "2") Integer loanOfficerPriority,
+
                                               @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
                                               @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
                                               @RequestParam(defaultValue = "ACTIVE") LoanProductStatus productStatus,
@@ -1383,14 +1290,7 @@ public class AdminController {
                                               RedirectAttributes ra) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
-            ApprovalWorkflowStage resolvedWorkflowStartStage = resolveLoanOfficerWorkflowStartStage(
-                managerReviewRequired,
-                loanOfficerReviewRequired,
-                workflowStartStage,
-                managerPriority,
-                loanOfficerPriority
-            );
-            LoanProductSetting product = adminService.createLoanProductTenure(
+                LoanProductSetting product = adminService.createLoanProductTenure(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
                 productCode,
@@ -1411,24 +1311,7 @@ public class AdminController {
                 maxRepaymentMonths,
                 allowApplicationWithActiveLoan,
                 freshFinancialDataRequired,
-                managerReviewRequired,
-                loanOfficerReviewRequired,
-                resolvedWorkflowStartStage,
-                managerPriority,
-                loanOfficerPriority,
-                chairpersonReviewRequired,
-                chairpersonPriority,
-                chairpersonReviewerIds,
-                boardReviewRequired,
-                boardPriority,
-                boardReviewerIds,
-                committeeReviewRequired,
-                committeePriority,
-                committeeMinimumVotes,
-                committeeApprovalThreshold,
-                creditCommitteeReviewerIds,
-                accountantReviewRequired,
-                accountantPriority,
+
                 disbursementOfficerRequired,
                 disbursementProofRequired,
                 applicantAttachmentRequired,
@@ -1560,36 +1443,6 @@ public class AdminController {
             ra.addFlashAttribute("error", ex.getMessage());
         }
         return "redirect:/admin/settings-controls?section=guarantor";
-    }
-
-    private ApprovalWorkflowStage resolveLoanOfficerWorkflowStartStage(boolean managerReviewRequired,
-                                                                       boolean loanOfficerReviewRequired,
-                                                                       ApprovalWorkflowStage workflowStartStage,
-                                                                       Integer managerPriority,
-                                                                       Integer loanOfficerPriority) {
-        int resolvedManagerPriority = managerPriority == null ? 1 : managerPriority;
-        int resolvedLoanOfficerPriority = loanOfficerPriority == null ? 2 : loanOfficerPriority;
-        if (resolvedManagerPriority < 1 || resolvedManagerPriority > 6) {
-            throw new IllegalStateException("Manager priority must be between 1 and 6.");
-        }
-        if (resolvedLoanOfficerPriority < 1 || resolvedLoanOfficerPriority > 6) {
-            throw new IllegalStateException("Loan Officer priority must be between 1 and 6.");
-        }
-        if (!managerReviewRequired && loanOfficerReviewRequired) {
-            return ApprovalWorkflowStage.LOAN_OFFICER;
-        }
-        if (!loanOfficerReviewRequired) {
-            return ApprovalWorkflowStage.MANAGER;
-        }
-        if (!managerReviewRequired) {
-            return ApprovalWorkflowStage.MANAGER;
-        }
-        if (resolvedManagerPriority == resolvedLoanOfficerPriority) {
-            return workflowStartStage == ApprovalWorkflowStage.LOAN_OFFICER
-                ? ApprovalWorkflowStage.LOAN_OFFICER
-                : ApprovalWorkflowStage.MANAGER;
-        }
-        return resolvedLoanOfficerPriority < resolvedManagerPriority ? ApprovalWorkflowStage.LOAN_OFFICER : ApprovalWorkflowStage.MANAGER;
     }
 
     private String loanSettingsRedirect(String modalKey) {
@@ -1851,24 +1704,6 @@ public class AdminController {
         return "admin/reports";
     }
 
-    @PostMapping("/settings-controls/review-rules")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'APPROVAL_FLOW_CONFIGURE')")
-    public String updateReviewRules(@AuthenticationPrincipal AppUserPrincipal principal,
-                                    @RequestParam(defaultValue = "false") boolean loanOfficerReviewRequired,
-                                    @RequestParam(defaultValue = "false") boolean boardReviewRequired,
-                                    @RequestParam Integer boardQuorum,
-                                    RedirectAttributes ra) {
-        adminService.updateBoardReviewRequirement(
-            adminScopeService.currentSaccoId(principal),
-            principal.getMemberId(),
-            loanOfficerReviewRequired,
-            boardReviewRequired,
-            boardQuorum
-        );
-        ra.addFlashAttribute("message", "Approval flow updated.");
-        return "redirect:/admin/settings-controls?section=board";
-    }
-
     @GetMapping("/outbox")
     @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'OUTBOX_VIEW')")
     public String outbox(@RequestParam(required = false) String dateFrom,
@@ -1968,6 +1803,7 @@ public class AdminController {
     }
 
     @GetMapping("/saccos")
+    @PreAuthorize("@access.has(principal, 'SACCO_REGISTRY_VIEW')")
     public String saccos(@AuthenticationPrincipal AppUserPrincipal principal,
                          Model model) {
         boolean superAdmin = principal != null && principal.isPlatformIdentity();
@@ -1975,9 +1811,7 @@ public class AdminController {
             model.addAttribute("platformDashboard", platformAdminService.dashboard());
             return "admin/platform-saccos";
         }
-        java.util.List<SaccoRegistryService.RegisteredSaccoView> registeredSaccos = saccoRegistryService.listRegisteredSaccos().stream()
-            .filter(sacco -> sacco.saccoId().equals(adminScopeService.currentSaccoId(principal)))
-            .toList();
+        var registeredSaccos = saccoRegistryService.findRegisteredSaccoView(adminScopeService.currentSaccoId(principal)).stream().toList();
         model.addAttribute("superAdmin", false);
         model.addAttribute("registeredSaccos", sortInstitutions(registeredSaccos));
         model.addAttribute("logoUploadPolicy", platformBrandingSettingsService.logoUploadPolicy());
@@ -2466,20 +2300,6 @@ public class AdminController {
         return redirect.toString();
     }
 
-    @PostMapping("/scope")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'WORKSPACE_SETTINGS_CONFIGURE')")
-    public String updateScope(@AuthenticationPrincipal AppUserPrincipal principal,
-                              @RequestParam String saccoId,
-                              @RequestParam String stationId,
-                              @RequestParam(required = false) String next,
-                              RedirectAttributes ra) {
-        adminScopeService.updateScope(principal, saccoId, stationId);
-        ra.addFlashAttribute("message", principal != null && principal.isPlatformIdentity()
-            ? "You are now working under the selected SACCO and station."
-            : "You are now working under the selected station.");
-        return "redirect:" + normalizeAdminNextPath(next);
-    }
-
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     public String handleError(RuntimeException ex,
                               HttpServletRequest request,
@@ -2785,23 +2605,6 @@ public class AdminController {
         return percent.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP);
     }
 
-    private String normalizeAdminNextPath(String next) {
-        if (next == null || next.isBlank()) {
-            return "/admin/dashboard";
-        }
-        try {
-            URI uri = URI.create(next);
-            String path = uri.getPath();
-            if (path == null || !path.startsWith("/admin") || path.startsWith("/admin/scope")) {
-                return "/admin/dashboard";
-            }
-            String query = uri.getRawQuery();
-            return query == null || query.isBlank() ? path : path + "?" + query;
-        } catch (IllegalArgumentException ex) {
-            return "/admin/dashboard";
-        }
-    }
-
     private String resolveAdminReturnPath(HttpServletRequest request) {
         String referer = request.getHeader("Referer");
         if (referer == null || referer.isBlank()) {
@@ -2820,38 +2623,6 @@ public class AdminController {
         }
     }
 
-    @org.springframework.web.bind.annotation.InitBinder("customisedWorkflowForm")
-    public void customWorkflowBinder(org.springframework.web.bind.WebDataBinder binder) {
-        binder.setAllowedFields("managerReviewRequired","managerPriority","loanOfficerReviewRequired","loanOfficerPriority","chairpersonReviewRequired","chairpersonPriority","boardReviewRequired","boardPriority","boardReviewerIds","committeeReviewRequired","committeePriority","creditCommitteeReviewerIds","accountantReviewRequired","accountantPriority","disbursementOfficerIds","disbursementProofRequired","principalGlAccountId","interestGlAccountId");
-    }
-    @GetMapping("/settings-controls/customised-loan")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.hasAny(principal, 'LOAN_PRODUCTS_VIEW','LOAN_PRODUCTS_CREATE','LOAN_PRODUCTS_UPDATE')")
-    public String customisedLoanWorkflow(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        String saccoId=adminScopeService.currentSaccoId(principal);
-        model.addAttribute("customisedWorkflowForm",adminService.customisedLoanWorkflowForm(saccoId));
-        customWorkflowOptions(saccoId,model);return "admin/customised-loan-workflow";
-    }
-    @PostMapping("/settings-controls/customised-loan")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_UPDATE')")
-    public String saveCustomisedLoanWorkflow(@AuthenticationPrincipal AppUserPrincipal principal,
-        @org.springframework.web.bind.annotation.ModelAttribute("customisedWorkflowForm") com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm form,
-        org.springframework.validation.BindingResult errors,Model model,RedirectAttributes flash) {
-        String saccoId=adminScopeService.currentSaccoId(principal);
-        if(!errors.hasErrors())try {
-            adminService.configureCustomisedLoanWorkflow(saccoId,principal.getMemberId(),form);
-            flash.addFlashAttribute("customisedWorkflowSaved",true);
-            return "redirect:/admin/settings-controls?section=loan";
-        } catch(IllegalArgumentException|IllegalStateException ex){model.addAttribute("customisedWorkflowError",ex.getMessage());}
-        catch(org.springframework.dao.DataIntegrityViolationException ex){errors.reject("recording.error.duplicate");}
-        customWorkflowOptions(saccoId,model);return "admin/customised-loan-workflow";
-    }
-    private void customWorkflowOptions(String saccoId,Model model) {
-        if(model.asMap().get("customisedWorkflowForm") instanceof com.sacco.mvp.web.dto.CustomisedLoanWorkflowForm form)
-            model.addAttribute("productAccountLabels",productAccounts.selectedLabels(saccoId,form.getPrincipalGlAccountId(),form.getInterestGlAccountId()));
-        model.addAttribute("boardReviewerOptions",adminService.activeBoardReviewerOptions(saccoId));
-        model.addAttribute("creditCommitteeReviewerOptions",adminService.activeCreditCommitteeReviewerOptions(saccoId));
-        model.addAttribute("disbursementReviewerOptions",adminService.activeDisbursementReviewerOptions(saccoId));
-    }
     private List<SaccoRegistryService.RegisteredSaccoView> sortInstitutions(List<SaccoRegistryService.RegisteredSaccoView> records) {
         var columns=Map.<String,java.util.Comparator<SaccoRegistryService.RegisteredSaccoView>>of(
             "logo",java.util.Comparator.comparing(SaccoRegistryService.RegisteredSaccoView::isHasLogo),

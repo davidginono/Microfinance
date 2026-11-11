@@ -11,7 +11,6 @@ import com.sacco.mvp.service.NotificationInboxService;
 import com.sacco.mvp.service.NotificationViewService;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,7 +24,7 @@ class HeaderNotificationControllerTest {
     void memberPayloadPreservesNotificationTargetAndCount() {
         NotificationInboxService inbox = mock(NotificationInboxService.class);
         HeaderNotificationController controller = new HeaderNotificationController(inbox, new AccessControlService());
-        AppUserPrincipal principal = principal(Position.MEMBER, true);
+        AppUserPrincipal principal = principal(Position.ACCOUNTANT, false);
         UUID notificationId = UUID.randomUUID();
         NotificationViewService.HeaderNotificationView view = new NotificationViewService.HeaderNotificationView(
             notificationId, "Approved", "Your loan was approved", "Workflow", null, "2026-06-12 12:00"
@@ -36,10 +35,10 @@ class HeaderNotificationControllerTest {
         HeaderNotificationController.HeaderNotificationPayload payload = controller.notifications(principal);
 
         assertThat(payload.count()).isEqualTo(4L);
-        assertThat(payload.targetUrl()).isEqualTo("/app/notifications");
+        assertThat(payload.targetUrl()).isEqualTo("/staff/notifications");
         assertThat(payload.notifications()).singleElement()
             .satisfies(item -> assertThat(item.href()).isEqualTo(
-                "/app/notifications?highlight=" + notificationId + "#notification-" + notificationId));
+                "/staff/notifications?highlight=" + notificationId + "#notification-" + notificationId));
     }
 
     @Test
@@ -77,8 +76,10 @@ class HeaderNotificationControllerTest {
             .status(MemberStatus.ACTIVE)
             .passwordHash("hash")
             .build();
-        return new AppUserPrincipal(member, memberAccess
+        return (!memberAccess ? new com.sacco.mvp.security.AppUserPrincipal(member,memberAccess
             ? java.util.Set.of(UserClaim.NOTIFICATIONS_VIEW)
-            : java.util.Set.of(UserClaim.NOTIFICATIONS_VIEW), !memberAccess);
+            : java.util.Set.of(UserClaim.NOTIFICATIONS_VIEW)) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,memberAccess
+            ? java.util.Set.of(UserClaim.NOTIFICATIONS_VIEW)
+            : java.util.Set.of(UserClaim.NOTIFICATIONS_VIEW)));
     }
 }

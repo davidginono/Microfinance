@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringJUnitWebConfig({MvcSecurityTestConfiguration.class,PayrollFeedbackMvcTest.Config.class})
 class PayrollFeedbackMvcTest {
     @Autowired WebApplicationContext context;@Autowired PayrollFeedbackService feedback;@Autowired PayrollService payroll;MockMvc mvc;
-    AppUserPrincipal actor(Set<UserClaim> claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),claims,true);}
+    AppUserPrincipal actor(Set<UserClaim> claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),claims);}
     @BeforeEach void setup(){reset(feedback,payroll);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
     @Test void uploadRequiresViewCurrentImportClaimAndCsrf()throws Exception {
         var a=actor(EnumSet.allOf(UserClaim.class));String path="/finance/payroll/"+UUID.randomUUID()+"/feedback/new";var file=new MockMultipartFile("file","results.xlsx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",new byte[]{1});
