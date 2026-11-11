@@ -124,6 +124,8 @@ class ClientApplicationEndToEndPostgresTest {
             draft.setProductId(fixture.f.product);
             draft.setAmount(new BigDecimal("100000.00"));
             draft.setTenureValue(2);
+            draft.setBusiness("Previously saved business details");
+            draft.setUseOfFunds("Previously saved use of funds");
             draft.setDocumentNames(new ArrayList<>(List.of("Signed synthetic application", "Temporary synthetic evidence")));
             draft.setDocumentTypes(new ArrayList<>(List.of("SIGNED_APPLICATION", "OTHER")));
             draft.setRequiredAttachmentIds(new ArrayList<>(List.of("", "")));
@@ -133,7 +135,8 @@ class ClientApplicationEndToEndPostgresTest {
             String staffForm = get(staffHttp, base + "/finance/loan-records/new?applicationId=" + id);
             assertThat(staffForm).contains("Record Loan Application",
                 "data-recording-evidence", "data-schedule-preview", "Signed synthetic application", "name=\"loanMode\"")
-                .doesNotContain("href=\"/finance/client-applications\"", "data-application-tab", "Preferred loan officer");
+                .doesNotContain("href=\"/finance/client-applications\"", "data-application-tab", "Preferred loan officer",
+                    "name=\"business\"", "name=\"informationSource\"", "name=\"notes\"", "name=\"applicationDetails.useOfFunds\"");
             var staffQuote = ClientOnboardingRenderedPostgresTest.hidden(staffForm);
             staffQuote.put("productId", fixture.f.product.toString());
             staffQuote.put("principal", "100000.00");
@@ -174,17 +177,14 @@ class ClientApplicationEndToEndPostgresTest {
             recordedFields.put("tenureValue", "2");
             recordedFields.put("applicationDate", fixture.day.toString());
             recordedFields.put("purpose", "BUSINESS STOCK");
-            recordedFields.put("informationSource", "DECLARED");
             recordedFields.put("income","1500000.00");recordedFields.put("expenses","200000.00");recordedFields.put("otherDebt","0.00");
-            recordedFields.put("applicationDetails.useOfFunds", "Recorded inventory");
             recordedFields.put("applicationDetails.collateral[0].itemName", "Synthetic asset");
             recordedFields.put("applicationDetails.collateral[0].itemNumber", "ASSET-1");
             recordedFields.put("applicationDetails.collateral[0].estimatedValue", "100000.00");
             recordedFields.put("action", "save");
             post(staffHttp, base + "/finance/loan-records", recordedFields);
             UUID recordedId = fixture.f.jdbc.queryForObject("select loan_id from accountant_loan_record where sacco_id=? and request_key=?",UUID.class,fixture.f.institution,UUID.fromString(recordedFields.get("requestKey")));
-            assertThat(fixture.f.jdbc.queryForObject("select metadata->'applicationDetails'->>'useOfFunds' from accountant_loan_record where loan_id=?",String.class,recordedId)).isEqualTo("Recorded inventory");
-            assertThat(get(staffHttp,base+"/finance/loan-records/"+recordedId)).contains("ASSET-1","Recorded inventory");
+            assertThat(get(staffHttp,base+"/finance/loan-records/"+recordedId)).contains("ASSET-1");
             // Complete the independent recorded request before exercising the borrower's own draft.
             fixture.f.jdbc.update("update loan_applications set status='MANAGER_REJECTED' where id=?",recordedId);
 
@@ -194,11 +194,13 @@ class ClientApplicationEndToEndPostgresTest {
             draftFields.put("requestKey",ClientOnboardingRenderedPostgresTest.hidden(latestDraft).get("requestKey"));
             draftFields.put("expectedVersion","2");
             draftFields.put("purpose","ASSISTED STOCK");
-            draftFields.put("applicationDetails.useOfFunds","Updated through accountant form");
             draftFields.put("action","draft");
             post(staffHttp,base+"/finance/loan-records",draftFields);
             assertThat(applications.details(fixture.f.actor,id).version()).isEqualTo(3);
-            assertThat(get(staffHttp,base+"/finance/loan-records/new?applicationId="+id)).contains("Updated through accountant form");
+            var savedDraft = applications.recorded(fixture.f.actor,id);
+            assertThat(savedDraft.getPurpose()).isEqualTo("ASSISTED STOCK");
+            assertThat(savedDraft.getBusiness()).isEqualTo("Previously saved business details");
+            assertThat(savedDraft.getUseOfFunds()).isEqualTo("Previously saved use of funds");
 
             var borrowerHttp = login(base, borrowerLogin, password, false);
             String borrowerPath = "/app/loan-applications";

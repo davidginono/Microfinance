@@ -127,11 +127,18 @@ class LoanRecordingMvcTest {
         when(evidence.product(actor,id)).thenThrow(new IllegalArgumentException("applications.error.product"));
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
             .param("loanMode","CONFIGURED").param("productId",id.toString()).param("principal","invalid").param("purpose","Retained stock purchase")
-            .param("applicationDetails.loanOfficerId",officerId.toString()))
+            .param("applicationDetails.loanOfficerId",officerId.toString())
+            .param("business","Old business field").param("informationSource","DOCUMENTED")
+            .param("notes","Old description").param("applicationDetails.useOfFunds","Old use of funds"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/loans/record-form"))
             .andExpect(model().attributeHasFieldErrors("recordForm","principal"))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("applicationDetails",
                 org.hamcrest.Matchers.hasProperty("loanOfficerId",org.hamcrest.Matchers.nullValue()))))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("applicationDetails",
+                org.hamcrest.Matchers.hasProperty("useOfFunds",org.hamcrest.Matchers.is("")))))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("business",org.hamcrest.Matchers.is(""))))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("informationSource",org.hamcrest.Matchers.is("DECLARED"))))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("notes",org.hamcrest.Matchers.is(""))))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("purpose",org.hamcrest.Matchers.is("Retained stock purchase"))));
     }
     @Test void documentDownloadChecksScopeThroughServiceAndPreventsSniffing() throws Exception {

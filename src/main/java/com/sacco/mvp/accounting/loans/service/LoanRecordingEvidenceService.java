@@ -147,6 +147,17 @@ public class LoanRecordingEvidenceService {
         check("CONFIGURED".equals(form.getLoanMode()) && form.getTopUpSourceLoanId()==null,"details");
         records.lockRequest(actor,form.getRequestKey());
         check(!records.directRequest(actor,form.getRequestKey()),"retry");
+        // Keep previously recorded values for fields removed from the recording form.
+        var previous=form.getApplicationId()==null?null:applications.recorded(actor,form.getApplicationId());
+        if(previous!=null) {
+            form.setBusiness(previous.getBusiness());
+            if(form.getApplicationDetails()==null)form.setApplicationDetails(new ApplicationDetails());
+            form.getApplicationDetails().setUseOfFunds(previous.getUseOfFunds());
+            if(previous.getRecordingDraft()!=null) {
+                form.setNotes(previous.getRecordingDraft().getNotes());
+                form.setInformationSource(previous.getRecordingDraft().getInformationSource());
+            }
+        }
         var draft=application(form);
         draft.setCommand(submit?"SUBMIT":"DRAFT");
         draft.setRecordingDraft(form);
