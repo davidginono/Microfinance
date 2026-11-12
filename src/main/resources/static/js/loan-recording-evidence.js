@@ -73,23 +73,40 @@
             function fail() { error.textContent = root.dataset.error; error.hidden = false; }
             initWizard(root, form);
             function reindex(list) {
-                list.querySelectorAll('[data-repeat-row]').forEach(function (row, index) {
-                    row.querySelectorAll('input,select,textarea').forEach(function (control) {
-                        if (control.matches('[data-document-field],[data-row-photos]')) return;
-                        if (control.dataset.field) control.name = 'applicationDetails.' + list.dataset.repeatList + '[' + index + '].' + control.dataset.field;
-                        else if (control.name) control.name = control.name.replace(/\[\d+\]/, '[' + index + ']');
+                var index = 0;
+                list.querySelectorAll('[data-repeat-row]').forEach(function (row) {
+                    var controls = [...row.querySelectorAll('input,select,textarea')].filter(control =>
+                        !control.matches('[data-document-field],[data-row-photos]') && (control.dataset.field || /^applicationDetails\./.test(control.name)));
+                    var populated = controls.some(control => control.value.trim()) || !!row.querySelector('[data-row-photo-list]')?.children.length;
+                    controls.forEach(function (control) {
+                        if (!control.dataset.field) control.dataset.field = control.name.substring(control.name.lastIndexOf('.') + 1);
+                        if (!('recordingRequired' in control.dataset)) control.dataset.recordingRequired = String(control.required);
+                        control.required = populated && control.dataset.recordingRequired === 'true';
+                        if (populated) control.name = 'applicationDetails.' + list.dataset.repeatList + '[' + index + '].' + control.dataset.field;
+                        else control.removeAttribute('name');
                         if (!control.id) control.id = 'recording-evidence-control-' + (++nextFieldId);
                         var label = control.labels[0] || control.parentElement.querySelector('label');
                         if (label) label.htmlFor = control.id;
                     });
+                    if (populated) index++;
                 });
+            }
+            function ensurePreview(list) {
+                if (list.children.length) return;
+                list.append(root.querySelector('[data-row-template="' + list.dataset.repeatList + '"]').content.cloneNode(true));
+                reindex(list);
+                list.lastElementChild.dispatchEvent(new Event('loan:choices-added',{bubbles:true}));
             }
             function placeAdd(list, button) {
                 var actions = list.lastElementChild?.querySelector('.recording-item-actions');
                 if (actions) actions.append(button);
                 else list.after(button);
             }
-            root.querySelectorAll('[data-repeat-list]').forEach(reindex);
+            root.querySelectorAll('[data-repeat-list]').forEach(function (list) { ensurePreview(list); reindex(list); });
+            ['input','change'].forEach(type => root.addEventListener(type, function (event) {
+                var list = event.target.closest('[data-repeat-list]');
+                if (list) reindex(list);
+            }));
             root.querySelectorAll('[data-add-row]').forEach(function (button) {
                 var kind = button.dataset.addRow, list = root.querySelector('[data-repeat-list="' + kind + '"]');
                 button.disabled = list.children.length >= 20;
@@ -112,7 +129,7 @@
                 var add = root.querySelector('[data-add-row="' + list.dataset.repeatList + '"]');
                 list.after(add);
                 uploads.filter(upload => row.contains(upload.row)).forEach(removeUpload);
-                row.remove(); reindex(list); bindUploads();
+                row.remove(); ensurePreview(list); reindex(list); bindUploads();
                 placeAdd(list, add);
                 add.disabled = false;
                 (next?.querySelector('[data-remove-row]') || add).focus();
@@ -182,7 +199,7 @@
                         }
                     }
                     var remove = row.querySelector('[data-remove-upload]');
-                    remove.setAttribute('aria-label',remove.textContent.trim() + ' ' + file.name);
+                    remove.setAttribute('aria-label',(remove.dataset.removeLabel || remove.textContent.trim()) + ' ' + file.name);
                     remove.addEventListener('click', function () {
                         removeUpload(upload); bindUploads(); picker.focus();
                         files.dispatchEvent(new Event('input',{bubbles:true}));
@@ -207,6 +224,7 @@
             });
             window.addEventListener('pagehide', () => uploads.forEach(upload => {if(upload.preview) URL.revokeObjectURL(upload.preview);}), {once:true});
             function bindUploads() {
+                root.querySelectorAll('[data-repeat-list]').forEach(reindex);
                 uploads.forEach(function (upload,index) {
                     if (upload.owner) {
                         var choice = upload.owner.querySelector('[data-choice-select]');

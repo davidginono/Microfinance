@@ -249,7 +249,7 @@ test('the recording wizard validates each step and preserves fields and uploads'
       <section id="guarantors" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Guarantors</h2></section>
       <section id="collateral" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Collateral</h2><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
       <section id="documents" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Attachments</h2><input type="file" name="attachments"><div data-evidence-documents></div></section>
-      <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName"></div><div class="recording-row-photos"><label class="attachment-dropzone"><input type="file" data-row-photos><span class="attachment-dropzone-help">Choose a photo</span></label><div data-row-photo-list></div></div><div class="recording-item-actions"><button type="button" data-remove-row>Remove</button></div></div></template>
+      <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName" required><input data-field="description"></div><div class="recording-row-photos"><label class="attachment-dropzone"><input type="file" data-row-photos><span class="attachment-dropzone-help">Choose a photo</span></label><div data-row-photo-list></div></div><div class="recording-item-actions"><button type="button" data-remove-row>Remove</button></div></div></template>
       <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option><option>COLLATERAL_PHOTO</option></select></label><label><select data-document-field="requiredAttachmentIds"><option value=""></option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
       <div data-evidence-error hidden></div><div data-evidence-requirements></div>
     </div><button type="button" data-recording-previous hidden>Previous</button><button type="button" data-recording-next hidden>Next</button>
@@ -278,14 +278,23 @@ test('the recording wizard validates each step and preserves fields and uploads'
     assert.equal(steps[1].getAttribute('aria-current'),'step');
     next.click();
     assert.equal(steps[2].getAttribute('aria-current'),'step');
-    d.querySelector('[data-add-row]').click();
+    assert.equal(d.querySelectorAll('[data-repeat-row]').length,1);
+    assert.equal(d.querySelector('[data-field]').name,'');
+    assert.equal(d.querySelector('[data-field]').required,false);
+    next.click();
+    assert.equal(steps[3].getAttribute('aria-current'),'step');
+    previous.click();
     assert.ok(d.querySelector('[data-repeat-row] .recording-item-actions [data-add-row]'));
     d.querySelector('[data-field]').value = 'Motorcycle';
+    d.querySelector('[data-field]').dispatchEvent(new w.Event('input',{bubbles:true}));
     d.querySelector('[data-add-row]').click();
     const first = d.querySelector('[data-remove-row]');
     first.click();
-    assert.equal(d.querySelector('[data-field]').name,'applicationDetails.collateral[0].itemName');
+    assert.equal(d.querySelector('[data-field]').name,'');
     d.querySelector('[data-field]').value = 'Bicycle';
+    d.querySelector('[data-field]').dispatchEvent(new w.Event('input',{bubbles:true}));
+    assert.equal(d.querySelector('[data-field]').name,'applicationDetails.collateral[0].itemName');
+    assert.equal(d.querySelector('[data-field]').required,true);
     next.click();
     assert.equal(steps[3].getAttribute('aria-current'),'step');
     assert.equal(save.hidden,false);
@@ -333,8 +342,16 @@ test('the recording wizard validates each step and preserves fields and uploads'
     d.querySelector('[data-remove-row]').click();
     assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf']);
     assert.equal(d.querySelector('[data-document-field="documentNames"]').name,'applicationDetails.documentNames[0]');
-    assert.ok(d.querySelector('[data-add-row]'));
+    assert.equal(d.querySelectorAll('[data-repeat-row]').length,1);
+    assert.equal(d.querySelector('[data-field]').name,'');
+    assert.equal(d.querySelector('[data-field]').required,false);
     d.querySelector('[data-add-row]').click();
+    const second = d.querySelectorAll('[data-field=description]')[1];
+    second.value = 'Needs a name';
+    second.dispatchEvent(new w.Event('input',{bubbles:true}));
+    assert.equal(second.name,'applicationDetails.collateral[0].description');
+    assert.equal(d.querySelectorAll('[data-field=itemName]')[1].required,true);
+    assert.equal(d.querySelector('[data-field]').name,'');
     assert.ok(d.querySelector('[data-repeat-row] .recording-item-actions [data-add-row]'));
 
   } finally {dom.window.close();}

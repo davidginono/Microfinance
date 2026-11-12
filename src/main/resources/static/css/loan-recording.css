@@ -51,13 +51,16 @@
 .recording-saved-files{list-style:none;padding:0;display:grid;gap:8px}
 .recording-saved-files li{display:flex;align-items:center;gap:12px;border:1px solid #d5dbdb;padding:12px;min-width:0}
 .recording-saved-files a{flex:1;min-width:0;overflow-wrap:anywhere}
-@media(max-width:480px){.recording-photo-token{flex-wrap:wrap}.recording-photo-token .loan-form-grid{flex-basis:calc(100% - 88px)}}
 
-/* One wrapping attribute row per guarantor or collateral item. */
-.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{display:flex;flex-flow:row wrap;align-items:flex-start;gap:16px;max-width:none}
-.aws-console [data-repeat-row]>.loan-form-grid>div{flex:1 1 12rem;min-width:0}
-.aws-console [data-repeat-row]>.loan-form-grid>.recording-row-photos{flex:1 1 18rem;max-width:none;margin:0}
-.aws-console [data-repeat-row]>.loan-form-grid>.recording-item-actions{display:flex;flex:0 0 16rem;max-width:100%;flex-flow:row wrap;align-items:center;gap:8px;padding-top:25px}
+/* Keep item actions beside the complete field and photo group. */
+.aws-console [data-repeat-row]{display:grid;grid-template-columns:minmax(0,1fr) 13rem;align-items:start;gap:16px}
+.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));align-items:start;gap:16px;max-width:none;min-width:0}
+.aws-console [data-repeat-row]>.loan-form-grid>div{min-width:0}
+.aws-console [data-repeat-row]>.loan-form-grid>.recording-row-photos{max-width:none;margin:0}
+.recording-row-photos .attachment-dropzone-copy{min-width:0}
+.aws-console [data-repeat-row]>.recording-item-actions{display:flex;flex-flow:row nowrap;align-items:center;align-self:end;gap:8px;max-width:100%}
 .aws-console .recording-item-actions [data-add-row]{margin:0}
 .recording-item-actions button{flex:0 0 auto}
-@media(max-width:640px){.aws-console [data-repeat-row]>.loan-form-grid>div{flex-basis:100%}.aws-console [data-repeat-row]>.loan-form-grid>.recording-item-actions{flex-basis:auto;padding-top:0}}
+.recording-file-remove{flex:0 0 auto;align-self:center}
+@media(max-width:767px){.aws-console [data-repeat-row]{grid-template-columns:minmax(0,1fr)}.aws-console [data-repeat-row]>.recording-item-actions{justify-self:end}}
+@media(max-width:480px){.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{grid-template-columns:minmax(0,1fr)}}
