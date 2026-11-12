@@ -69,6 +69,13 @@ class CustomLoanChargeEntryTest {
         var f=form();f.setLoanMode("CONFIGURED");f.setCustomApplicationCharge(money("99"));f.setCustomProcessingCharge(money("99"));f.setInsurancePremium(null);f.setInsuranceEvidence(null);
         assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::amount).containsExactly(money("10.00"),money("20.00"),money("10.00"));
     }
+    @Test void zeroInsuranceCeilingStillRejectsPositiveCustomPremiums(){
+        product.setInsuranceRate(BigDecimal.ZERO);
+        var f=form();
+        assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.insuranceLimit");
+        f.setInsurancePremium(BigDecimal.ZERO);
+        assertThat(service.quote(actor,f,product,true).terms()).noneMatch(t->t.kind().equals("INSURANCE"));
+    }
     @Test void percentageEntriesAreCalculatedOnTheServerAndIgnoreTheDisplayedAmounts(){
         var f=form();f.setCustomProcessingBasis("PERCENTAGE");f.setCustomProcessingPercent(money("0.75"));f.setCustomProcessingCharge(money("999"));
         f.setCustomInsuranceBasis("PERCENTAGE");f.setCustomInsurancePercent(money("0.5"));f.setInsurancePremium(money("999"));

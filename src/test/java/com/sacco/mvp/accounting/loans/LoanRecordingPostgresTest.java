@@ -172,6 +172,9 @@ class LoanRecordingPostgresTest {
         var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.LOAN_CHARGES_CUSTOM);
         var restricted=new AppUserPrincipal(context.getBean(MemberDirectoryService.class).find(actor.getMemberId()).orElseThrow(),permissions);
         assertThatThrownBy(()->service.save(restricted,f)).isInstanceOf(AccessDeniedException.class);
+        f.setInsurancePremium(new BigDecimal("10.01"));
+        assertThatThrownBy(()->service.save(actor,f)).hasMessage("charges.error.insuranceLimit");
+        f.setInsurancePremium(new BigDecimal("7.65"));
         var id=service.save(actor,f);assertThat(service.save(actor,f)).isEqualTo(id);
         var saved=service.chargeSummary(actor,id,0);
         assertThat(saved.plan().terms()).extracting(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term::amount)

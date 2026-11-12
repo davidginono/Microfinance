@@ -5,7 +5,7 @@ function fixture(mode='CONFIGURED',allowed=true){
   .replace(/<spring:message code="([^"]+)"\s*\/>/g,(_,code)=>({'charges.title':'Charges','charges.application':'Application fee','charges.processing':'Processing fee','charges.insurance':'Insurance'}[code]||code))
   .replace(/<form:hidden path="([^"]+)"([^]*?)\/>/g,'<input type="hidden" name="$1" $2>')
   .replace(/<form:input path="([^"]+)"([^]*?)\/>/g,'<input name="$1" $2>').replace(/cssClass=/g,'class=');
- const dom=new JSDOM(`<html lang="en"><form><select name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>${card}<p data-charge-error hidden></p></form></html>`,{url:'http://localhost',runScripts:'outside-only'});
+ const dom=new JSDOM(`<html lang="en"><form><select name="loanMode"><option>CONFIGURED</option><option>CUSTOM</option></select>${card}</form></html>`,{url:'http://localhost',runScripts:'outside-only'});
  dom.window.document.querySelector('[name="loanMode"]').value=mode;
  dom.window.eval(fs.readFileSync('src/main/resources/static/js/loan-charges.js','utf8'));return dom;
 }
@@ -15,7 +15,8 @@ function edit(dom,name,value,type='input'){const input=dom.window.document.query
 test('configured card contains only named charge fields with rates and exact server amounts',()=>{
  const dom=fixture(),d=dom.window.document;quote(dom);
  assert.equal(d.querySelectorAll('[data-charge-preview] input:not([type="hidden"])').length,5);
- assert.equal(d.querySelector('[data-charge-preview]').querySelector('p,table,details,a'),null);
+ assert.equal(d.querySelector('[data-charge-preview]').querySelector('p:not([data-charge-error]),table,details,a'),null);
+ assert.equal(d.querySelectorAll('[data-charge-error]').length,1);assert.equal(d.querySelector('[data-charge-error]').hidden,true);
  assert.equal(d.querySelector('[name="customProcessingPercent"]').value,'2');assert.equal(d.querySelector('[name="insurancePremium"]').value,'30000.00');
  d.querySelectorAll('[data-charge-amount],[data-charge-percentage]').forEach(input=>{assert.equal(input.readOnly,true);assert.equal(input.required,false);});
  quote(dom,{...plan,terms:[{code:'APPLICATION',percentage:'',amount:'9999999999999999.99'}]});assert.equal(d.querySelector('[name="customApplicationCharge"]').value,'9999999999999999.99');dom.window.close();
@@ -36,10 +37,17 @@ test('mode changes clear prior charges and preserve the custom-charge permission
  edit(dom,'customApplicationCharge','10');edit(dom,'loanMode','CONFIGURED','change');assert.equal(d.querySelector('[name="customApplicationCharge"]').value,'');assert.equal(d.querySelector('[name="customApplicationCharge"]').readOnly,true);dom.window.close();
  const denied=fixture('CUSTOM',false);denied.window.document.querySelectorAll('[data-charge-amount],[data-charge-percentage]').forEach(input=>assert.equal(input.readOnly,true));denied.window.close();
 });
-test('pending and failed quotes preserve custom source values, clear derived values, and keep feedback outside the card',()=>{
+test('pending and failed quotes preserve custom sources and clear stale field feedback',()=>{
  const dom=fixture('CUSTOM'),w=dom.window,d=w.document,form=d.querySelector('form');edit(dom,'customProcessingPercent','1.25');quote(dom);form.dispatchEvent(new w.CustomEvent('loan:quote-pending'));
  assert.equal(d.querySelector('[name="customProcessingPercent"]').value,'1.25');assert.equal(d.querySelector('[name="customProcessingCharge"]').value,'');
- form.dispatchEvent(new w.CustomEvent('loan:quote-error',{detail:'<unsafe> unavailable'}));assert.equal(d.querySelector('[data-charge-error]').textContent,'<unsafe> unavailable');assert.equal(d.querySelector('unsafe'),null);assert.equal(d.querySelector('[data-charge-preview] [role="alert"]'),null);dom.window.close();
+ quote(dom,{...plan,supported:false,error:'Premium too high',errorField:'insurancePremium'});assert.equal(d.querySelector('[data-charge-error]').hidden,false);
+ form.dispatchEvent(new w.CustomEvent('loan:quote-error',{detail:'<unsafe> unavailable'}));assert.equal(d.querySelector('[data-charge-error]').textContent,'');assert.equal(d.querySelector('[data-charge-error]').hidden,true);assert.equal(d.querySelector('[name="customProcessingPercent"]').value,'1.25');assert.equal(d.querySelector('[name="customProcessingCharge"]').value,'');assert.equal(d.querySelector('unsafe'),null);dom.window.close();
+});
+test('charge validation shows safe feedback beside the affected field and clears it on success',()=>{
+ const dom=fixture('CUSTOM'),d=dom.window.document;
+ quote(dom,{...plan,supported:false,error:'<unsafe> premium too high',errorField:'insurancePremium'});
+ const error=d.querySelector('[data-charge-error]');assert.equal(error.previousElementSibling,d.querySelector('[name="insurancePremium"]').closest('label'));assert.equal(error.textContent,'<unsafe> premium too high');assert.equal(error.hidden,false);assert.equal(d.querySelector('unsafe'),null);
+ quote(dom);assert.equal(error.hidden,true);assert.equal(error.textContent,'');dom.window.close();
 });
 test('grouped amount controls keep editable input values during pending requests and release the spinner',()=>{
  const dom=fixture('CUSTOM'),w=dom.window,d=w.document,form=d.querySelector('form');w.eval(fs.readFileSync('src/main/resources/static/js/amount-inputs.js','utf8'));d.dispatchEvent(new w.Event('DOMContentLoaded'));

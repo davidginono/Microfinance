@@ -1,5 +1,13 @@
 # Recorded loan charges
 
+## Custom insurance and charge-card regression fixes (12 November 2026)
+
+Custom loan recording now retains the internal product's stored insurance ceiling when building the per-loan terms. It still takes application and processing amounts from staff entry. Premiums above that ceiling, including any positive premium against a zero ceiling, remain rejected. No pricing controls are added to the approval-only Customised Loan Configuration screen.
+
+The charge-card JavaScript fixture now uses the actual JSP's single error element. Checks follow the current field-validation behavior: safely render the server message beside the affected field, clear stale field feedback when a quote request fails, and keep entered source amounts/percentages. Request failures remain displayed by the quote request owner.
+
+Verification: affected Java source/tests compiled with Java 25. All 17 selected Java checks passed: the three previously failing PostgreSQL recording scenarios, ten custom-charge checks, two calculator checks and two fee-policy checks. All 30 related JavaScript checks passed; the final seven charge-card checks were rechecked after the fixture adjustment and passed. PostgreSQL checks used the owned disposable database on loopback port 55441 and validated all 177 existing migrations. No operational database was changed. This is a focused regression result, not a full-suite or throughput result.
+
 ## Simple charge entry (8 November 2026)
 
 The recording form's Charges card contains only Application fee (TZS), Processing fee (% / TZS) and Insurance (% / TZS). Configured loans show read-only product values. Authorized staff entering a customized loan supply the application amount and can edit either the processing/insurance percentage or its amount; the server returns the matching value. The last edited value is authoritative. Missing custom values remain missing until explicitly entered, including zero. Monetary calculations and rounding stay in `LoanChargeCalculator`; JavaScript performs no financial arithmetic and preserves the edited control while quotes refresh.
