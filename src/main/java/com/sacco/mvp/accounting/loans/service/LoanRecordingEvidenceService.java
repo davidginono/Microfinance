@@ -17,12 +17,24 @@ import java.util.*;
 @Service @RequiredArgsConstructor
 public class LoanRecordingEvidenceService {
     private static final Set<String> STANDARD = Set.of("purpose","business","monthlyIncome","monthlyExpenses",
-        "otherDebtRepayments","collateralDescription","collateralEstimatedValue");
+        "otherDebtRepayments","loanPurpose","businessOrEmployerName","businessOrEmploymentType","incomeSource",
+        "collateralDescription","collateralEstimatedValue");
     private final LoanRecordingRepository records;
     private final GeneralLedgerService accounting;
     private final FormSchemaService schemas;
     private final LoanProductRequiredAttachmentService requirements;
     private final ClientApplicationService applications;
+    private final com.sacco.mvp.clients.onboarding.service.OnboardingService onboarding;
+
+    public void applyClientProfile(AppUserPrincipal actor,RecordForm form) {
+        var profile=onboarding.loanProfile(actor,form.getClientId());
+        form.setIncome(profile.monthlyIncome());form.setOtherDebt(profile.monthlyDebtRepayments());
+        form.setBusiness(java.util.stream.Stream.of(profile.businessName(),profile.employerName(),profile.businessType())
+            .filter(value->value!=null&&!value.isBlank()).collect(java.util.stream.Collectors.joining(" / ")));
+        form.setInformationSource(profile.revisionId()==null?"UNAVAILABLE":"DECLARED");
+        if(form.getApplicationDetails()==null)form.setApplicationDetails(new ApplicationDetails());
+        form.getApplicationDetails().setClientProfile(profile);
+    }
 
     @Transactional(readOnly=true)
     public List<Choice> guarantorChoices(AppUserPrincipal actor,String search,int page) {
@@ -92,7 +104,20 @@ public class LoanRecordingEvidenceService {
                 .map(com.sacco.mvp.service.dto.FormField::getName).collect(java.util.stream.Collectors.toSet());
             details.getFields().forEach((key,value)->{check(allowed.contains(key)&&!STANDARD.contains(key),"details");text(value,1000);});
             var values=new LinkedHashMap<>(details.getFields());
-            values.put("purpose",form.getPurpose());values.put("business",form.getBusiness());
+            values.put("purpose",form.getPurpose());values.put("loanPurpose",form.getPurpose());values.put("business",form.getBusiness());
+            var profile=details.getClientProfile();
+            if(profile!=null) {
+                var type=formFields.stream().filter(field->field.getName().equals("businessOrEmploymentType")).findFirst();
+                var options=type.map(com.sacco.mvp.service.dto.FormField::getEnumOptions).orElse(null);
+                String activity=profile.activity();
+                if(options!=null && activity!=null)activity=Arrays.stream(activity.split(";"))
+                    .map(String::strip).filter(options::contains).findFirst().orElse(activity);
+                values.put("businessOrEmploymentType",activity);
+                String name="Employment".equals(activity)?profile.employerName():profile.businessName();
+                if((name==null||name.isBlank()) && !"Business".equals(activity))name=profile.employerName();
+                values.put("businessOrEmployerName",name);
+                values.put("incomeSource",profile.incomeSource());
+            }
             if(form.getIncome()!=null)values.put("monthlyIncome",form.getIncome().toPlainString());
             if(form.getExpenses()!=null)values.put("monthlyExpenses",form.getExpenses().toPlainString());
             if(form.getOtherDebt()!=null)values.put("otherDebtRepayments",form.getOtherDebt().toPlainString());
@@ -101,6 +126,11 @@ public class LoanRecordingEvidenceService {
             if(!details.getCollateral().isEmpty() && details.getCollateral().stream().allMatch(asset->asset.getEstimatedValue()!=null))
                 values.put("collateralEstimatedValue",details.getCollateral().stream().map(ClientApplicationDtos.Collateral::getEstimatedValue).reduce(BigDecimal.ZERO,BigDecimal::add).toPlainString());
             values.keySet().retainAll(allowed);
+            for(var field:formFields)if(field.isRequired() && Set.of("monthlyIncome","otherDebtRepayments",
+                "businessOrEmployerName","businessOrEmploymentType","incomeSource").contains(field.getName())) {
+                checkField(values.get(field.getName())!=null&&!values.get(field.getName()).isBlank(),"clientId",
+                    Set.of("monthlyIncome","otherDebtRepayments").contains(field.getName())?"clientCashFlow":"clientBusiness");
+            }
             schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(values,product.getFormSchema()));
         } else check(details.getFields().isEmpty(),"details");
         if(details.getDocumentNames().isEmpty() && details.getDocumentTypes().isEmpty() && details.getRequiredAttachmentIds().isEmpty())return null;
@@ -132,7 +162,8 @@ public class LoanRecordingEvidenceService {
         form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(draft.getExpenses());form.setOtherDebt(draft.getOtherDebt());
         var details=form.getApplicationDetails()==null?new ApplicationDetails():form.getApplicationDetails();
         details.setUseOfFunds(draft.getUseOfFunds());
-        details.setGuarantors(draft.getGuarantors());details.setCollateral(draft.getCollateral());details.setFields(draft.getFields());
+        details.setGuarantors(draft.getGuarantors());details.setCollateral(draft.getCollateral());details.setFields(new LinkedHashMap<>(draft.getFields()));
+        details.getFields().keySet().removeAll(STANDARD);
         details.setDocumentNames(new ArrayList<>());details.setDocumentTypes(new ArrayList<>());details.setRequiredAttachmentIds(new ArrayList<>());
         details.setDeclarationAccepted(false);form.setApplicationDetails(details);return form;
     }
@@ -145,17 +176,17 @@ public class LoanRecordingEvidenceService {
     public UUID saveApplication(AppUserPrincipal actor,RecordForm form,List<MultipartFile> files) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         check("CONFIGURED".equals(form.getLoanMode()) && form.getTopUpSourceLoanId()==null,"details");
+        applyClientProfile(actor,form);
+        check(form.getApplicationDetails().getFields()!=null && form.getApplicationDetails().getFields().keySet().stream().noneMatch(STANDARD::contains),"details");
         records.lockRequest(actor,form.getRequestKey());
         check(!records.directRequest(actor,form.getRequestKey()),"retry");
         // Keep previously recorded values for fields removed from the recording form.
         var previous=form.getApplicationId()==null?null:applications.recorded(actor,form.getApplicationId());
         if(previous!=null) {
-            form.setBusiness(previous.getBusiness());
             if(form.getApplicationDetails()==null)form.setApplicationDetails(new ApplicationDetails());
             form.getApplicationDetails().setUseOfFunds(previous.getUseOfFunds());
             if(previous.getRecordingDraft()!=null) {
                 form.setNotes(previous.getRecordingDraft().getNotes());
-                form.setInformationSource(previous.getRecordingDraft().getInformationSource());
             }
         }
         var draft=application(form);
@@ -219,7 +250,7 @@ public class LoanRecordingEvidenceService {
     }
     public static final class FieldValidation extends IllegalArgumentException {
         private final String field;
-        private FieldValidation(String field,String key){super("applications.error."+key);this.field=field;}
+        private FieldValidation(String field,String key){super((key.startsWith("client")?"recording.error.":"applications.error.")+key);this.field=field;}
         public String field(){return field;}
     }
     private static void check(boolean value,String key) {if(!value)throw new IllegalArgumentException("applications.error."+key);}

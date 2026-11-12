@@ -71,6 +71,9 @@
 
 <section class="erp-resource-section" data-profile-section="finances"><h2><spring:message code="kyc.section.activity"/></h2>
 <div class="kyc-profile-grid">
+<label class="kyc-field"><span><spring:message code="kyc.field.monthlyIncome"/></span><form:input path="profile.monthlyIncome" type="number" cssClass="aws-control" min="0" step="0.01" max="9999999999999999.99"/><form:errors path="profile.monthlyIncome" cssClass="field-error"/></label>
+<label class="kyc-field"><span><spring:message code="kyc.field.monthlyDebtRepayments"/></span><form:input path="profile.monthlyDebtRepayments" type="number" cssClass="aws-control" min="0" step="0.01" max="9999999999999999.99"/><form:errors path="profile.monthlyDebtRepayments" cssClass="field-error"/></label>
+<label class="kyc-field"><span><spring:message code="kyc.field.employerName"/></span><form:input path="profile.employerName" type="text" cssClass="aws-control" maxlength="255"/><form:errors path="profile.employerName" cssClass="field-error"/></label>
 <fieldset class="kyc-income-choices">
     <legend><spring:message code="kyc.field.activity"/></legend>
     <div class="kyc-income-options">

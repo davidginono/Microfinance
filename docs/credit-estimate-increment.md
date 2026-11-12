@@ -16,6 +16,10 @@ Implementation date: 2026-10-01. This closes calculation and input-trust gaps, n
 - Monthly dates are anchored to the original first repayment date rather than repeatedly advancing from a shortened February date.
 - The calculator rejects unsupported payment counts, invalid amounts/rates/dates, and overrides that create negative principal or settle before the last scheduled payment. The schedule is bounded to 600 payments.
 
+## Staff recording uses the client profile (2026-11-12)
+
+The loan form keeps one loan purpose and monthly expenses. Monthly income and monthly debt repayments are recorded on the client profile. New individual loan records and staff drafts copy those figures and the business/income-source details on the server from the latest recorded profile revision in the current institution and branch. A later profile draft does not replace recorded facts. The loan snapshot retains its source revision and declared values; later profile edits do not rewrite existing loans or establish independent verification. Missing required figures remain unavailable and block the required assessment. Historical loan fields remain readable for compatibility.
+
 ## Compatibility And Limits
 
 Existing stored schedules, posted transactions, receipts, balances, and database identifiers are not rewritten. Unversioned weekly quotes retain their legacy `months * 4` count until explicitly reassessed; newly generated legacy schedules are labelled `LEGACY_PERIOD_COUNT_DECIMAL`. They are not silently certified as the new policy.

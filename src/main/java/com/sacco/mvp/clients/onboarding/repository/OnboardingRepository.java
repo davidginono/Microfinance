@@ -46,6 +46,18 @@ public class OnboardingRepository {
         return jdbc.query("select r.*,m.full_name maker from client_onboarding_revision r join members m on m.id=r.actor_id where r.client_id=? and r.sacco_id=? and r.station_id=? order by r.sequence desc limit 1",
             (r,n)->new Revision(r.getObject("id",UUID.class),client,r.getInt("sequence"),r.getString("mode"),json.readValue(r.getString("profile"),Profile.class),r.getObject("actor_id",UUID.class),r.getString("maker"),r.getObject("recorded_at",OffsetDateTime.class)),client,a.getSaccoId(),a.getStationId()).stream().findFirst();
     }
+    public Optional<LoanProfile> loanProfile(AppUserPrincipal actor,UUID client) {
+        return jdbc.query("""
+            select r.id,r.profile from client_onboarding_revision r
+            join members m on m.id=r.client_id and m.sacco_id=r.sacco_id and m.station_id=r.station_id
+            where r.client_id=? and r.sacco_id=? and r.station_id=? and r.mode<>'DRAFT'
+            order by r.sequence desc limit 1
+            """,(r,n)->{
+                var p=json.readValue(r.getString("profile"),Profile.class);
+                return new LoanProfile(r.getObject("id",UUID.class),p.getMonthlyIncome(),p.getMonthlyDebtRepayments(),
+                    p.getBusinessName(),p.getBusinessType(),p.getActivity(),p.getSourceOfFunds(),p.getEmployerName());
+            },client,actor.getSaccoId(),actor.getStationId()).stream().findFirst();
+    }
     public List<Decision> decisions(UUID revision) {
         return jdbc.query("select d.*,m.full_name actor from client_onboarding_decision d join members m on m.id=d.actor_id where revision_id=? order by d.recorded_at desc,(d.kind='REVOKE') desc limit 2",
             (r,n)->new Decision(r.getObject("id",UUID.class),r.getString("kind"),r.getString("reason"),r.getString("client_message"),r.getString("screening"),r.getString("screening_reference"),r.getObject("checked_on",LocalDate.class),r.getObject("review_due",LocalDate.class),r.getString("policy_reference"),r.getObject("actor_id",UUID.class),r.getString("actor"),r.getObject("recorded_at",OffsetDateTime.class)),revision);

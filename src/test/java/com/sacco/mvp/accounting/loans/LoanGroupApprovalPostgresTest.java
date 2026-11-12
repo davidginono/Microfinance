@@ -26,7 +26,7 @@ class LoanGroupApprovalPostgresTest {
         s.start();
         var evidence=new com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService(new LoanRecordingRepository(f.jdbc),f.context.getBean(GeneralLedgerService.class),
             new FormSchemaService(f.context.getBean(com.sacco.mvp.repository.LoanProductSettingRepository.class),f.context.getBean(tools.jackson.databind.ObjectMapper.class)),
-            new LoanProductRequiredAttachmentService(f.context.getBean(com.sacco.mvp.repository.LoanProductRequiredAttachmentRepository.class)),mock(com.sacco.mvp.clients.applications.service.ClientApplicationService.class));
+            new LoanProductRequiredAttachmentService(f.context.getBean(com.sacco.mvp.repository.LoanProductRequiredAttachmentRepository.class)),mock(com.sacco.mvp.clients.applications.service.ClientApplicationService.class),f.context.getBean(com.sacco.mvp.clients.onboarding.service.OnboardingService.class));
         Object recordingTarget=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(f.service);
         org.springframework.test.util.ReflectionTestUtils.setField(recordingTarget,"evidence",evidence);
         f.context.registerBean(LoanGroupApprovalService.class,()->new LoanGroupApprovalService(new LoanRecordingRepository(f.jdbc),f.context.getBean(GeneralLedgerService.class),f.context.getBean(MemberDirectoryService.class),f.context.getBean(AuditService.class),f.context.getBean(ApplicationClock.class),f.context.getBean(tools.jackson.databind.ObjectMapper.class),f.service,mock(SaccoConfigurationService.class)));

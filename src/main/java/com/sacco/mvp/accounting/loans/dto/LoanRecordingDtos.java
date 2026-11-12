@@ -72,6 +72,9 @@ public final class LoanRecordingDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String insuranceEvidence;
     }
     @Data public static class ApplicationDetails {
+        /** Frozen source revision; never accepted from the recording form. */
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.LoanProfile clientProfile;
         private UUID loanOfficerId;
         private String loanOfficerLabel = "";
         private Map<String,String> fieldLabels = new LinkedHashMap<>();

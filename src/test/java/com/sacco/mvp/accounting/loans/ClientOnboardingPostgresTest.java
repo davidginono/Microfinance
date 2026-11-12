@@ -51,6 +51,26 @@ class ClientOnboardingPostgresTest {
         UUID id=UUID.randomUUID();var maker=branch.equals("B1")?f.actor:f.operator(branch);
         f.jdbc.update("insert into lending_group(id,sacco_id,station_id,request_key,payload_hash,code,name,legal_form,identity_evidence,created_by,created_at) values(?,?,?,?,?,?,?,'INFORMAL','Synthetic evidence',?,now())",id,f.institution,branch,UUID.randomUUID(),"a".repeat(64),id.toString().substring(0,8),"Synthetic group "+id,maker.getMemberId());return id;
     }
+    @Test void loanProfileUsesRecordedFiguresAndIgnoresLaterDraftsWithinTheCurrentBranch() {
+        var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());form.setAction("RECORDED");
+        form.getProfile().setActivity("Employment");form.getProfile().setEmployerName("Synthetic employer");
+        form.getProfile().setMonthlyIncome(new java.math.BigDecimal("2500000.50"));
+        form.getProfile().setMonthlyDebtRepayments(java.math.BigDecimal.ZERO);
+        UUID revision=service.save(f.actor,f.client,form);
+        var pending=service.profileForm(f.actor,f.client);pending.setAction("DRAFT");
+        pending.getProfile().setMonthlyIncome(new java.math.BigDecimal("9000000.00"));service.save(f.actor,f.client,pending);
+        var source=service.loanProfile(f.actor,f.client);
+        assertThat(source.revisionId()).isEqualTo(revision);assertThat(source.employerName()).isEqualTo("Synthetic employer");
+        assertThat(source.monthlyIncome()).isEqualByComparingTo("2500000.50");assertThat(source.monthlyDebtRepayments()).isZero();
+        assertThatThrownBy(()->service.loanProfile(f.operator("B2"),f.client)).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void profileCashFlowRejectsInvalidMoney() {
+        var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());
+        form.getProfile().setMonthlyIncome(new java.math.BigDecimal("1.001"));
+        assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyIncome");
+        form.getProfile().setMonthlyIncome(null);form.getProfile().setMonthlyDebtRepayments(new java.math.BigDecimal("-1"));
+        assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyDebtRepayments");
+    }
     @Test void recordedProfileNeedsAnIndependentEvidenceCheckAndNeverGainsLoginAccess() {
         var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());form.setAction("RECORDED");
         form.getProfile().setEmployeeNumber("EMP-1001");UUID draft=service.save(f.actor,f.client,form);

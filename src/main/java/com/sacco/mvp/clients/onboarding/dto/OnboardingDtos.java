@@ -9,6 +9,9 @@ public final class OnboardingDtos {
     private OnboardingDtos() {}
     public record Page<T>(List<T> rows, int page, boolean hasNext) {}
     public record ContactCheck(boolean valid, boolean exists) {}
+    public record LoanProfile(UUID revisionId, java.math.BigDecimal monthlyIncome,
+                              java.math.BigDecimal monthlyDebtRepayments, String businessName,
+                              String businessType, String activity, String incomeSource, String employerName) {}
     public record ProfileDraft(String profile,UUID actor,String institution,String branch,UUID requestKey) implements java.io.Serializable {}
     public record Client(UUID id, String number, String name, String phone, String email, String state,
                          UUID revisionId, int sequence, LocalDate reviewDue, boolean staffUser) {
@@ -44,11 +47,11 @@ public final class OnboardingDtos {
         private String postalAddress="", city="", ward="", villageStreet="", nearbyPlace="";
         private Boolean hasBusiness;
         private String businessName="", businessType="", businessTin="", businessLicence="", businessLocation="", businessWard="", businessCity="", otherIncomeSources="";
-        private java.math.BigDecimal dailySales, dailyExpenditure;
+        private java.math.BigDecimal dailySales, dailyExpenditure, monthlyIncome, monthlyDebtRepayments;
         private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
         private String bankName="", bankAccountName="", bankAccountNumber="";
         private String employeeNumber;
-        private String activity="", activityAddress="", sourceOfFunds="";
+        private String activity="", activityAddress="", sourceOfFunds="", employerName="";
         @com.fasterxml.jackson.annotation.JsonIgnore
         public List<String> getIncomeActivities() {
             if(activity==null||activity.isBlank())return List.of();

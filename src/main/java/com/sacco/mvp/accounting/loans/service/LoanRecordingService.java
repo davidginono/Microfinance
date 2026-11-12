@@ -238,7 +238,7 @@ public class LoanRecordingService {
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
         validateFiles(files);
-        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);if(borrowerParty==null)evidence.applyClientProfile(a,f);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
         com.sacco.mvp.domain.LoanApplication existingDraft=null;
         if(f.getApplicationId()!=null){
             var current=records.groupLoan(a,f.getApplicationId(),true);
@@ -248,6 +248,10 @@ public class LoanRecordingService {
         }
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
+        if(borrowerParty==null && product.isAffordabilityCheckRequired()) {
+            check(f.getIncome()!=null && f.getIncome().signum()>0 && f.getOtherDebt()!=null,"clientCashFlow");
+            check(f.getExpenses()!=null,"amount");
+        }
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
         if(shared.active()>0){
             check(product.isApplicationWithActiveLoanAllowed(),"sharedActiveLoan");

@@ -127,6 +127,16 @@ class LoanRecordingMvcTest {
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("notes",org.hamcrest.Matchers.is(""))))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("purpose",org.hamcrest.Matchers.is("Retained stock purchase"))));
     }
+    @Test void recordingCannotOverrideCashFlowOrItsProfileSource() throws Exception {
+        mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
+            .param("principal","invalid").param("income","999999999").param("otherDebt","0")
+            .param("applicationDetails.clientProfile.revisionId",UUID.randomUUID().toString()))
+            .andExpect(view().name("accounting/loans/record-form"))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("income",org.hamcrest.Matchers.nullValue())))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("otherDebt",org.hamcrest.Matchers.nullValue())))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("applicationDetails",
+                org.hamcrest.Matchers.hasProperty("clientProfile",org.hamcrest.Matchers.nullValue()))));
+    }
     @Test void documentDownloadChecksScopeThroughServiceAndPreventsSniffing() throws Exception {
         var id=UUID.randomUUID();when(service.attachment(eq(actor),eq(id),eq("proof"))).thenReturn(new LoanAttachmentService.AttachmentResource("%PDF synthetic".getBytes(),"proof.pdf","application/pdf"));
         mvc.perform(get("/finance/loan-records/"+id+"/attachments/proof").with(user(actor))).andExpect(status().isOk()).andExpect(header().string("X-Content-Type-Options","nosniff")).andExpect(content().contentType("application/pdf"));
