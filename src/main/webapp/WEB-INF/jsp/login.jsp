@@ -32,7 +32,7 @@
         <div id="authToastContainer" class="auth-notification-rail" aria-live="polite"></div>
     <div class="auth-frame public-access-card">
         <%@ include file="fragments/public-access-brand.jspf" %>
-        <h1 class="auth-heading mb-6"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'login.staff'}" /></h1>
+        <h1 class="auth-heading mb-6"><spring:message code="${systemAdminLogin ? 'login.systemAdminHeading' : 'login.title'}" /></h1>
         <div class="pb-1">
 
                     <spring:message code="login.invalidCredentials" var="loginInvalidCredentials" />
@@ -105,9 +105,6 @@
 
                     <div id="staffLoginPanel" data-login-tab="staff" class="space-y-5">
                         <div class="space-y-4">
-                            <div>
-                                <p class="auth-mode-title"><spring:message code="login.staffPassword" /></p>
-                            </div>
                             <form action="/login" method="post" class="space-y-4" data-login-password-form>
                                 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                                 <input type="hidden" name="loginType" value="staff-password" />
@@ -119,12 +116,11 @@
                                     <label class="mb-2 block auth-section-label"><spring:message code="login.password" /></label>
                                     <div class="auth-password-control"><input id="staffLoginPassword" type="password" name="password" autocomplete="current-password" required class="auth-input w-full px-4 py-3.5 text-slate-900" /><button type="button" class="password-visibility-toggle" data-password-visibility aria-controls="staffLoginPassword" aria-pressed="false" data-show-label="<spring:message code='password.show' />" data-hide-label="<spring:message code='password.hide' />"><spring:message code="password.show" /></button></div>
                                 </div>
-                                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                    <span class="text-slate-500"><spring:message code="login.passwordHelp" /></span>
+                                <div class="flex flex-wrap items-center justify-end gap-2 text-xs">
                                     <a href="#forgotPasswordModal" class="auth-text-link" data-forgot-password-open="staff"><spring:message code="login.forgotPassword" /></a>
                                 </div>
                                 <button class="auth-primary-btn inline-flex w-full items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold" type="submit" data-login-submit-button>
-                                    <span data-login-submit-label><spring:message code="login.asStaff" /></span>
+                                    <span data-login-submit-label><spring:message code="login.submit" /></span>
                                     <span class="hidden items-center gap-2" data-login-submit-loading>
                                         <span class="auth-submit-spinner" aria-hidden="true"></span>
                                         <span><spring:message code="login.signingIn" /></span>
