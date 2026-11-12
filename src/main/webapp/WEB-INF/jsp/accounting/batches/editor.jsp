@@ -1,5 +1,5 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
-<%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %><%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
+<%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %><%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" /><link rel="stylesheet" href="<c:url value='/css/receipt-batches.css' />" />
 <meta name="_csrf" content="${_csrf.token}" /><meta name="_csrf_header" content="${_csrf.headerName}" />
@@ -9,20 +9,27 @@
 <div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-payroll-sealed="${payrollLinked}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
 <c:if test="${payrollLinked}"><p role="status"><spring:message code="payroll.feedback.sealed" /></p></c:if>
 <c:if test="${not empty importedReceiptCount}"><p class="console-message" data-message-type="success" role="status"><spring:message code="batch.sheet.imported" arguments="${importedReceiptCount}" /></p></c:if>
-<section class="erp-resource-section"><h2><spring:message code="batch.batchDetails" /></h2><dl class="erp-detail-facts" data-batch-summary aria-live="polite"></dl></section>
-<div class="batch-alert" role="alert" tabindex="-1" data-batch-error hidden></div>
+<section class="erp-resource-section"><h2><spring:message code="batch.batchDetails" /></h2><dl class="erp-detail-facts" data-batch-summary aria-live="polite">
+<div><dt><spring:message code="batch.status" /></dt><dd><spring:message code="batch.state.${summary.batch.state}" /></dd></div>
+<div><dt><spring:message code="batch.receiptRows" /></dt><dd><c:out value="${summary.receipts}" /></dd></div>
+<div><dt><spring:message code="batch.total" /></dt><dd><fmt:formatNumber value="${summary.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+<div><dt><spring:message code="batch.posted" /></dt><dd><c:out value="${summary.posted}" /></dd></div>
+<div><dt><spring:message code="batch.ready" /></dt><dd><c:out value="${summary.ready}" /></dd></div>
+<div><dt><spring:message code="batch.failed" /></dt><dd><c:out value="${summary.failed}" /></dd></div>
+</dl></section>
+<div class="console-message" data-message-type="error" role="alert" tabindex="-1" data-batch-error hidden></div>
 <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2><spring:message code="batch.receiptRows" /></h2><div class="accounting-actions">
 <button type="button" class="app-btn btn-neutral" data-batch-refresh data-aws-table-refresh><spring:message code="common.refresh" /></button>
-<button type="button" class="app-btn btn-neutral" data-batch-save><spring:message code="batch.saveDraft" /></button>
+<button type="button" class="app-btn btn-neutral" data-batch-save disabled><spring:message code="batch.saveDraft" /></button>
 <c:if test="${canPostBatch and not payrollLinked and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">
 <a class="app-btn btn-neutral" data-batch-spreadsheet href="<c:url value='/finance/batches/receipts/${summary.batch.id}/spreadsheet' />" hidden><spring:message code="batch.sheet.import" /></a>
 </c:if>
-<button type="button" class="app-btn btn-launch" data-batch-add><spring:message code="batch.addReceipt" /></button></div></div>
+<button type="button" class="app-btn btn-launch" data-batch-add disabled><spring:message code="batch.addReceipt" /></button></div></div>
 <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label><spring:message code="batch.defaultDate" /><input type="date" class="aws-control" data-default-date value="${today}" max="${today}" /></label><label><spring:message code="batch.defaultAccount" /><select class="aws-control" data-default-account data-batch-choice="money" data-searchable="true"><option value=""><spring:message code="batch.choose" /></option></select></label>
 <label><spring:message code="batch.show" /><select class="aws-control" data-batch-filter><option value=""><spring:message code="voucher.all" /></option><c:forEach items="${['DRAFT','READY','FAILED','POSTED']}" var="state"><option value="${state}"><spring:message code="batch.state.${state}" /></option></c:forEach></select></label>
 <span role="status" aria-live="polite" data-save-status></span></div>
-<div class="erp-table-scroll batch-grid-scroll"><table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table batch-grid"><caption class="sr-only"><spring:message code="batch.receiptRows" /></caption><thead><tr><c:forEach items="${['client','date','loan','balances','amount','receivingAccount','reference','evidence','status']}" var="column"><th data-table-identifier><spring:message code="batch.${column}" /><c:if test="${column=='amount'}"> (TZS)</c:if></th></c:forEach></tr></thead><tbody data-batch-rows></tbody></table></div>
+<div class="erp-table-scroll batch-grid-scroll"><table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table batch-grid"><caption class="sr-only"><spring:message code="batch.receiptRows" /></caption><thead><tr><c:forEach items="${['client','date','loan','balances','amount','receivingAccount','reference','evidence','status']}" var="column"><th data-table-identifier><spring:message code="batch.${column}" /><c:if test="${column=='amount'}"> (TZS)</c:if></th></c:forEach></tr></thead><tbody data-batch-rows><tr><td colspan="9"><span class="app-loading-spinner" data-batch-loading role="status" aria-label="<spring:message code='common.loading' />"></span></td></tr></tbody></table></div>
 </section>
-<div class="batch-footer"><span data-batch-progress role="status" aria-live="polite"></span><div class="accounting-actions"><button type="button" class="app-btn btn-neutral" data-batch-stop hidden><spring:message code="batch.stop" /></button><button type="button" class="app-btn btn-neutral" data-batch-validate><spring:message code="batch.validate" /></button><button type="button" class="app-btn btn-launch" data-aws-action-pin="true" data-batch-post disabled><spring:message code="batch.post" /></button></div></div>
+<div class="batch-footer"><span data-batch-progress role="status" aria-live="polite"></span><div class="accounting-actions"><button type="button" class="app-btn btn-neutral" data-batch-stop hidden><spring:message code="batch.stop" /></button><button type="button" class="app-btn btn-neutral" data-batch-validate disabled><spring:message code="batch.validate" /></button><button type="button" class="app-btn btn-launch" data-aws-action-pin="true" data-batch-post disabled><spring:message code="batch.post" /></button></div></div>
 <div class="app-modal-overlay batch-post-modal" data-batch-confirm hidden><div class="app-modal-panel app-modal-panel--compact" role="dialog" aria-modal="true" aria-labelledby="batch-confirm-title" tabindex="-1"><div class="app-modal-header"><h2 id="batch-confirm-title"><spring:message code="batch.postTitle" /></h2><button type="button" class="app-modal-close" data-confirm-cancel aria-label="<spring:message code='common.close' />">×</button></div><div class="app-modal-body"><p data-confirm-message></p></div><div class="app-modal-actions"><button type="button" class="app-btn btn-neutral" data-confirm-cancel><spring:message code="common.cancel" /></button><button type="button" class="app-btn btn-launch" data-confirm-post><spring:message code="batch.postConfirm" /></button></div></div></div>
 <%@ include file="messages.jspf" %></div><script src="<c:url value='/js/receipt-batches.js' />" defer></script><%@ include file="../../fragments/footer.jspf" %>

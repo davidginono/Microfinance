@@ -228,16 +228,16 @@ function initializeReceiptBatches() {
         const spreadsheet = editor.querySelector('[data-batch-spreadsheet]');
         if (spreadsheet) spreadsheet.hidden = !editable();
         if(editor.dataset.payrollSealed === 'true')editor.querySelectorAll('[data-default-date],[data-default-account]').forEach(n=>{n.disabled = true;n.closest('label').hidden = true;});
-        editor.querySelector('[data-batch-add]').disabled = !editable() || editor.dataset.payrollSealed === 'true';
-        editor.querySelector('[data-batch-save]').disabled = !editable() || editor.dataset.payrollSealed === 'true' || (!dirty.size && !pending.size);
-        editor.querySelector('[data-batch-validate]').disabled = !editable() || !summary || summary.receipts === summary.posted || pending.size>0;
-        editor.querySelector('[data-batch-post]').disabled = !editable() || dirty.size>0 || pending.size>0 || summary?.batch.state !== 'READY';
+        editor.querySelector('[data-batch-add]').disabled = loading || !editable() || editor.dataset.payrollSealed === 'true';
+        editor.querySelector('[data-batch-save]').disabled = loading || !editable() || editor.dataset.payrollSealed === 'true' || (!dirty.size && !pending.size);
+        editor.querySelector('[data-batch-validate]').disabled = loading || !editable() || !summary || summary.receipts === summary.posted || pending.size>0;
+        editor.querySelector('[data-batch-post]').disabled = loading || !editable() || dirty.size>0 || pending.size>0 || summary?.batch.state !== 'READY';
         const stop = editor.querySelector('[data-batch-stop]');stop.hidden = !busy() || !canEdit;stop.disabled = !!summary?.batch.cancelRequested;
         window.ResourceTable.setPage(tableRegion,{page,hasNext,loading});
     }
     async function refreshSummary(){summary = await api(url + '/summary');canEdit = editor.dataset.canEdit === 'true';
-        const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)+' TZS'],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed],['remaining',summary.receipts-summary.posted]]){const fact = el('div');fact.append(el('dt',t(label)),el('dd',String(value)));area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
-    async function load(){if(loading)return;loading = true;controls();try{await flush();await refreshSummary();const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){globalError(error.message);}finally{loading = false;controls();}}
+        const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed]]){const fact = el('div');fact.append(el('dt',t(label)),el('dd',String(value)));area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
+    async function load(){if(loading)return;loading = true;try{controls();await flush();await refreshSummary();const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){body.querySelector('[data-batch-loading]')?.replaceWith(document.createTextNode(t('error.failed')));globalError(error.message);}finally{loading = false;controls();}}
     editor.querySelector('[data-default-account]').addEventListener('change',event=>{
         const account = event.target;if(!editable() || editor.dataset.payrollSealed === 'true' || !account.value)return;
         for(const item of rows.values())if(item.state !== 'POSTED' && !item.form.moneyAccountId){item.form.moneyAccountId = account.value;item.labels ||= {};item.labels[account.value] = account.selectedOptions[0].textContent;mark(item);}

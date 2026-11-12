@@ -5,13 +5,13 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/receipt-batches.js','utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const settle=async()=>{for(let n=0;n<6;n++)await tick();};
-async function setup(estimate,patch={}){
+async function setup(estimate,patch={},realWidgets=false){
   const messages=Object.fromEntries(readFileSync('src/main/resources/messages_en.properties','utf8').split(/\r?\n/).filter(line=>line.startsWith('batch.field.')).map(line=>{const split=line.indexOf('=');return [line.slice(6,split),line.slice(split+1)];}));Object.assign(messages,{saveFailed:'Could not save draft.',checking:'Checking receipt...',client:'Client',status:'Status','state.DRAFT':'Draft',receipts:'Receipts',total:'Total',posted:'Posted',ready:'Ready',failed:'Needs attention',remaining:'Remaining'});
   const dom=new JSDOM(`<body><h1>Repayment 1</h1><main data-receipt-batch="batch" data-can-edit="true" data-today="2026-10-19">
     <section class="erp-resource-section"><h2>Batch details</h2><dl class="erp-detail-facts" data-batch-summary></dl></section><div data-batch-error hidden></div>
-    <section data-resource-table><button data-batch-add></button><button data-batch-save></button><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
-    <input data-default-date value="2026-10-19"><select data-default-account></select><select data-batch-filter></select>
-    <div class="batch-grid-scroll"><table><tbody data-batch-rows></tbody></table></div></section><span data-batch-progress></span>
+    <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2>Receipts</h2><div class="accounting-actions"><button data-batch-refresh data-aws-table-refresh>Refresh</button><button data-batch-add></button><button data-batch-save></button></div></div><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
+    <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label>Date<input data-default-date value="2026-10-19"></label><label>Account<select data-default-account data-batch-choice="money"></select></label><label>Show<select data-batch-filter></select></label></div>
+    <div class="erp-table-scroll batch-grid-scroll"><table class="erp-table" data-table-sort-mode="none"><thead><tr>${Array.from({length:9},(_,i)=>`<th data-table-identifier>Column ${i}</th>`).join('')}</tr></thead><tbody data-batch-rows></tbody></table></div></section><span data-batch-progress></span>
     <div data-batch-confirm hidden><div role="dialog"><h2 id="batch-confirm-title"></h2><p data-confirm-message></p><div class="app-modal-actions"><button data-confirm-cancel></button><button data-confirm-post></button></div></div></div>
     <div data-batch-messages>${Object.entries(messages).map(([key,value])=>`<span data-message="${key}">${value}</span>`).join('')}</div>
   </main></body>`,{url:'http://localhost/finance/batches/receipts/batch',runScripts:'outside-only'});
@@ -21,6 +21,7 @@ async function setup(estimate,patch={}){
   w.setTimeout=(fn,ms)=>ms===800?(autosave=fn,-1):nativeTimeout(fn,ms);w.clearTimeout=id=>id===-1?(autosave=undefined):nativeClear(id);w.setInterval=()=>0;
   w.ResourceTable={setPage(){}};w.AppSearch={bind(){return {cancel(){}};}};
   w.NeoSelect={search(){return {input:d.createElement('input'),more:d.createElement('button'),setLoading(){}};}};
+  if(realWidgets){w.requestAnimationFrame=fn=>nativeTimeout(fn,0);w.cancelAnimationFrame=nativeClear;for(const file of ['live-search','select-enhancer','resource-table'])w.eval(readFileSync('src/main/resources/static/js/'+file+'.js','utf8'));}
   const item={id:'receipt',lineNo:1,version:0,state:'FAILED',clientLabel:'Client One',labels:{loan:'1'},failureKey:'voucher.error.date',failureMessage:'Choose a valid payment date.',form:{clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:'cash',reference:'RV-009',rows:[{loanId:'loan',amount:'500.00',description:''}]}};
   Object.assign(item,patch);
   const response=(data,ok=true)=>({ok,redirected:false,headers:{get:()=> 'application/json'},json:async()=>data});
@@ -37,6 +38,31 @@ async function setup(estimate,patch={}){
   return {dom,w,d,async edit(value){const input=d.querySelector('input[type="number"]');input.value=value;input.dispatchEvent(new w.Event('input'));},async save(){const callback=autosave;autosave=undefined;callback();await settle();}};
 }
 const visible=d=>[...d.querySelectorAll('.batch-field-error:not([hidden])')];
+
+test('batch editor initializes its real account selector and loads summary and receipt rows',async()=>{
+  const {dom,d}=await setup(response=>Promise.resolve(response({lines:[]})),{},true);
+  try {
+    assert.match(d.querySelector('[data-batch-summary]').textContent,/Draft/);
+    assert.equal(d.querySelectorAll('[data-batch-rows] > .batch-row').length,1);
+    assert.equal(d.querySelector('[data-default-account]').dataset.neoEnhanced,'true');
+  }finally{dom.window.close();}
+});
+
+test('failed table refresh preserves receipt values and recovers through the shared refresh control',async()=>{
+  const {dom,w,d}=await setup(response=>Promise.resolve(response({lines:[]})),{},true);
+  try {
+    const fetch=w.fetch,amount=d.querySelector('input[type="number"]');
+    w.fetch=async()=>{throw Error('Connection lost');};
+    d.querySelector('[data-resource-table]').dispatchEvent(new w.CustomEvent('resource-table:refresh',{cancelable:true}));await settle();
+    assert.equal(d.querySelector('[data-batch-error]').textContent,'Connection lost');
+    assert.equal(d.querySelector('input[type="number"]'),amount);
+    assert.match(d.querySelector('[data-batch-summary]').textContent,/Draft/);
+    w.fetch=fetch;
+    d.querySelector('[data-resource-table]').dispatchEvent(new w.CustomEvent('resource-table:refresh',{cancelable:true}));await settle();
+    assert.equal(d.querySelector('[data-batch-error]').hidden,true);
+    assert.equal(d.querySelector('input[type="number"]').value,'500.00');
+  }finally{w.close();}
+});
 test('balances show total loan outstanding and retain the separate amounts due before and after preview',async()=>{
   const line={loanNumber:'LN-001',outstandingPrincipal:'1000.00',duePrincipal:'100.00',dueInterest:'25.50',totalLoanOutstanding:'1025.50',principal:'24.50',interest:'25.50',principalBalance:'975.50'};
   const {dom,d,edit,save}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'Cash',lines:[line]})));

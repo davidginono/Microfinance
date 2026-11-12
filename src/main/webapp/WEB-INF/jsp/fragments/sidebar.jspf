@@ -251,9 +251,9 @@
                             </button>
                             <div id="adminSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
                                 <sec:authorize access="@access.hasAny(principal,'LOAN_PRODUCTS_VIEW','APPROVAL_FLOW_VIEW')">
-                                <a href="/admin/settings-controls?section=loan" class="shell-sidebar-subitem ${((requestUri eq '/admin/settings-controls' and (empty param.section or param.section eq 'loan') and param.custom ne 'true') or requestUri eq '/admin/loan-products' or (fn:startsWith(requestUri, '/admin/settings-controls/loan-products/'))) ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.settings.loanProducts" /></a>
+                                <a href="/admin/settings-controls?section=loan" class="shell-sidebar-subitem block ${((requestUri eq '/admin/settings-controls' and (empty param.section or param.section eq 'loan') and param.custom ne 'true') or requestUri eq '/admin/loan-products' or (fn:startsWith(requestUri, '/admin/settings-controls/loan-products/'))) ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.settings.loanProducts" /></a>
                                 <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
-                                <a href="/admin/settings-controls?section=loan&amp;custom=true" class="shell-sidebar-subitem ${(requestUri eq '/admin/settings-controls' and param.custom eq 'true') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.settings.customisedLoan" /></a>
+                                <a href="/admin/settings-controls?section=loan&amp;custom=true" class="shell-sidebar-subitem block ${(requestUri eq '/admin/settings-controls' and param.custom eq 'true') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.settings.customisedLoan" /></a>
                                 </sec:authorize>
                                 </sec:authorize>
                                 <sec:authorize access="@access.has(principal,'WORKSPACE_SETTINGS_VIEW')">

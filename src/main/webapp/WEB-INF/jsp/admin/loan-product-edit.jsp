@@ -56,6 +56,7 @@
             <button type="button" data-product-config-nav="pricing">
                 <span><strong><spring:message code="admin.settings.loanProducts.repaymentCharges" /></strong></span>
             </button>
+            <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')"><button type="button" data-product-config-nav="workflow"><span><strong><spring:message code="admin.settings.workflow.title" /></strong></span></button></sec:authorize>
             <button type="button" data-product-config-nav="accounts">
                 <span><strong><spring:message code="productAccounts.title" /></strong></span>
             </button>
@@ -63,7 +64,6 @@
                 <span><strong><spring:message code="recording.attachments" /></strong></span>
             </button>
 
-            <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')"><button type="button" data-product-config-nav="workflow"><span><strong><spring:message code="admin.settings.workflow.title" /></strong></span></button></sec:authorize>
         </nav>
     </section>
 

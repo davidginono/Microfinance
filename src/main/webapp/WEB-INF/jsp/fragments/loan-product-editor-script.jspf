@@ -478,8 +478,10 @@
 
         document.querySelectorAll('[data-product-config-workspace]').forEach((workspace) => {
             const form = workspace.querySelector('[data-product-config-form]');
-            const steps = Array.from(workspace.querySelectorAll('[data-product-config-step]'));
             const navButtons = Array.from(workspace.querySelectorAll('[data-product-config-nav]'));
+            const stepOrder = navButtons.map((button) => button.getAttribute('data-product-config-nav'));
+            const steps = Array.from(workspace.querySelectorAll('[data-product-config-step]'))
+                .sort((a, b) => stepOrder.indexOf(a.getAttribute('data-product-config-step')) - stepOrder.indexOf(b.getAttribute('data-product-config-step')));
             const previousButton = workspace.querySelector('[data-product-config-previous]');
             const nextButton = workspace.querySelector('[data-product-config-next]');
             const saveState = workspace.querySelector('[data-product-config-save-state]');
