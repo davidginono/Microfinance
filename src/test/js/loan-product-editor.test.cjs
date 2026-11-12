@@ -31,3 +31,11 @@ test('workflow return links and server errors reopen the approval form',()=>{
     finally{dom.window.close();}
   }
 });
+
+test('charge return links reopen the account mappings and keep product values',()=>{
+  const dom=setup('?tab=accounts');
+  try{
+    assert.equal(dom.window.document.querySelector('[aria-selected="true"]').dataset.productConfigNav,'accounts');
+    assert.equal(dom.window.document.querySelector('[name="pricing"]').value,'retained');
+  }finally{dom.window.close();}
+});

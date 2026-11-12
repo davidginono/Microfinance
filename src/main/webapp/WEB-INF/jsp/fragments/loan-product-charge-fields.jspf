@@ -1,0 +1,48 @@
+<%@ page pageEncoding="UTF-8" %>
+<div class="md:col-span-2"><h3><spring:message code="charges.postingSetup" /></h3></div>
+<c:if test="${creatingLoanProduct}">
+    <p class="md:col-span-2"><spring:message code="charges.generatedOnCreate" /></p>
+    <label class="md:col-span-2"><input form="${chargeFormId}" type="checkbox" name="saveChargePolicy" value="true" ${chargePolicy.saveChargePolicy ? 'checked' : ''} /> <spring:message code="charges.saveWithProduct" /></label>
+</c:if>
+<c:if test="${not empty currentChargePolicy}">
+    <dl class="erp-detail-facts md:col-span-2">
+        <div><dt><spring:message code="charges.currentPolicy" /></dt><dd><c:out value="${currentChargePolicy.policyReference}" /></dd></div>
+        <div><dt><spring:message code="charges.effectiveFrom" /></dt><dd><c:out value="${appTime:display(currentChargePolicy.effectiveFrom())}" /></dd></div>
+        <div><dt><spring:message code="charges.feeTreatment" /></dt><dd><spring:message code="charges.treatment.${currentChargePolicy.accountingVersion}" /></dd></div>
+        <c:forEach items="${['APPLICATION','PROCESSING','RECEIVABLE','INSURANCE']}" var="currentChargeKind"><div><dt><spring:message code="charges.account.${currentChargeKind}" /></dt><dd><c:out value="${currentChargeMappings[currentChargeKind]}" default="-" /></dd></div></c:forEach>
+    </dl>
+</c:if>
+<c:forEach items="${generatedChargeAccounts}" var="generatedChargeAccount">
+    <div class="min-w-0 break-words"><span><spring:message code="charges.account.${generatedChargeAccount.component}" /></span>: <c:out value="${generatedChargeAccount.label}" /> - <spring:message code="coav.state.${generatedChargeAccount.state}" /></div>
+</c:forEach>
+<input form="${chargeFormId}" type="hidden" name="requestKey" value="<c:out value='${chargePolicy.requestKey}' />" />
+<input form="${chargeFormId}" type="hidden" name="expectedVersion" value="<c:out value='${chargePolicy.expectedVersion}' />" />
+<label><spring:message code="charges.effectiveFrom" /><input form="${chargeFormId}" name="effectiveFrom" type="date" value="<c:out value='${chargePolicy.effectiveFrom}' />" class="aws-control" /></label>
+<c:forEach items="${['policyReference','agreementReference']}" var="chargeField">
+    <label><spring:message code="charges.${chargeField}" /><input form="${chargeFormId}" name="${chargeField}" value="<c:out value='${chargePolicy[chargeField]}' />" maxlength="500" class="aws-control" /></label>
+</c:forEach>
+<c:forEach items="${['managementTiming','insuranceTiming']}" var="chargeTiming">
+    <label><spring:message code="charges.${chargeTiming}" /><select form="${chargeFormId}" name="${chargeTiming}" class="aws-control">
+        <c:forEach items="${['SEPARATE','DEDUCT']}" var="chargeTimingValue"><option value="${chargeTimingValue}" ${chargePolicy[chargeTiming] == chargeTimingValue ? 'selected' : ''}><spring:message code="charges.timing.${chargeTimingValue}" /></option></c:forEach>
+    </select></label>
+</c:forEach>
+<c:forEach items="${['APPLICATION','PROCESSING','RECEIVABLE','INSURANCE']}" var="chargeCategory">
+    <c:set var="chargeAccountPath" value="${chargeCategory=='APPLICATION'?'applicationAccountId':chargeCategory=='PROCESSING'?'processingAccountId':chargeCategory=='RECEIVABLE'?'receivableAccountId':'insuranceAccountId'}" />
+    <div class="min-w-0" data-loan-choice data-category="${chargeCategory}" data-choice-url="<c:url value='/admin/settings-controls/loan-charge-accounts/${chargeCategory}' />">
+        <label><spring:message code="charges.account.${chargeCategory}" /><select form="${chargeFormId}" name="${chargeAccountPath}" class="aws-control" data-choice-select data-searchable="true">
+            <option value=""><spring:message code="recording.choose" /></option>
+            <c:set var="chargeSelectionListed" value="${false}" />
+            <c:forEach items="${chargeAccounts[chargeCategory]}" var="chargeAccount"><c:if test="${chargePolicy[chargeAccountPath] == chargeAccount.id}"><c:set var="chargeSelectionListed" value="${true}" /></c:if><option value="${chargeAccount.id}" ${chargePolicy[chargeAccountPath] == chargeAccount.id ? 'selected' : ''}><c:out value="${chargeAccount.label}" /></option></c:forEach>
+            <c:forEach items="${generatedChargeAccounts}" var="pendingChargeAccount"><c:if test="${not chargeSelectionListed and pendingChargeAccount.component == chargeCategory and pendingChargeAccount.state == 'PENDING' and chargePolicy[chargeAccountPath] == pendingChargeAccount.accountId}"><option value="${pendingChargeAccount.accountId}" selected><c:out value="${pendingChargeAccount.label}" /> - <spring:message code="coav.state.PENDING" /></option></c:if></c:forEach>
+        </select></label>
+        <%@ include file="../accounting/loans/choice-search.jspf" %>
+    </div>
+</c:forEach>
+<c:forEach items="${['insurer','insurerVerification']}" var="chargeField">
+    <label><spring:message code="charges.${chargeField}" /><input form="${chargeFormId}" name="${chargeField}" value="<c:out value='${chargePolicy[chargeField]}' />" maxlength="500" class="aws-control" /></label>
+</c:forEach>
+<label><spring:message code="charges.customLimit" /> (TZS)<input form="${chargeFormId}" name="customManagementLimit" value="<c:out value='${chargePolicy.customManagementLimit}' />" type="number" min="0" step="0.01" class="aws-control" /></label>
+<label><input form="${chargeFormId}" type="checkbox" name="allowCustom" value="true" ${chargePolicy.allowCustom ? 'checked' : ''} /> <spring:message code="charges.allowCustom" /></label>
+<label><input form="${chargeFormId}" type="checkbox" name="enabled" value="true" ${chargePolicy.enabled ? 'checked' : ''} /> <spring:message code="charges.enable" /></label>
+<c:if test="${not empty chargeError}"><div class="console-message md:col-span-2" data-message-type="error" role="alert" tabindex="-1"><spring:message code="${chargeError}" /></div></c:if>
+<c:if test="${not creatingLoanProduct}"><div class="accounting-actions md:col-span-2"><button type="submit" form="${chargeFormId}" class="app-btn btn-launch"><spring:message code="charges.savePolicy" /></button></div></c:if>

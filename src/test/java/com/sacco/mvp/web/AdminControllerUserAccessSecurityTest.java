@@ -71,6 +71,7 @@ import java.net.SocketTimeoutException;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -78,6 +79,7 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -600,7 +602,7 @@ class AdminControllerUserAccessSecurityTest {
         LoanProductSetting createdProduct = LoanProductSetting.builder().id(productId).build();
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
-        when(adminService.createLoanProductTenure(eq("SACCO-01"),eq(principal.getMemberId()),eq(null),eq("School Fees Booster"),eq("Created product"),eq(5),eq(new BigDecimal("0")),eq(new BigDecimal("500000")),eq(2),eq(new BigDecimal("3.000000")),eq(false),eq(new BigDecimal("15000")),eq(new BigDecimal("0.015000")),eq(new BigDecimal("0.000000")),eq(new BigDecimal("0.100000")),eq(InterestMethod.FLAT_RATE),eq(1),eq(12),eq(true),eq(false),eq(false),eq(false),eq(false),eq(false),eq(null),eq(LoanProductStatus.ACTIVE),eq(2),eq("MONTHS"),eq(null),eq(null),eq(principal),any(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm.class))).thenReturn(createdProduct);
+        when(adminService.createLoanProductTenure(eq("SACCO-01"),eq(principal.getMemberId()),eq(null),eq("School Fees Booster"),eq("Created product"),eq(5),eq(new BigDecimal("0")),eq(new BigDecimal("500000")),eq(2),eq(new BigDecimal("3.000000")),eq(false),eq(new BigDecimal("15000")),eq(new BigDecimal("0.015000")),eq(new BigDecimal("0.000000")),eq(new BigDecimal("0.100000")),eq(InterestMethod.FLAT_RATE),eq(1),eq(12),eq(true),eq(false),eq(false),eq(false),eq(false),eq(false),eq(null),eq(LoanProductStatus.ACTIVE),eq(2),eq("MONTHS"),eq(null),eq(null),eq(principal),any(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm.class),isNull())).thenReturn(createdProduct);
 
         mockMvc.perform(post("/admin/settings-controls/loan-products")
                 .param("modalKey", "create-product")
@@ -636,7 +638,7 @@ class AdminControllerUserAccessSecurityTest {
         AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
 
-        org.mockito.Mockito.doThrow(new IllegalStateException("Minimum amount is invalid.")).when(adminService).createLoanProductTenure(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doThrow(new IllegalStateException("Minimum amount is invalid.")).when(adminService).createLoanProductTenure(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
         mockMvc.perform(post("/admin/settings-controls/loan-products")
                 .param("modalKey", "create-product")
                 .param("productName", "School Fees Booster")
@@ -992,7 +994,10 @@ class AdminControllerUserAccessSecurityTest {
                                         PlatformSupportContactSettingsService platformSupportContactSettingsService,
                                         PlatformEmailSettingsService platformEmailSettingsService,
                                         PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService) {
+            var loanCharges=org.mockito.Mockito.mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);
+            when(loanCharges.editor(any(),any(),any())).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Editor(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm(),null,Map.of(),List.of(),Map.of()));
             return new AdminController(
+                loanCharges,
                 adminService,
                 new com.sacco.mvp.service.ApplicationClock("Africa/Nairobi"),
                 adminScopeService,

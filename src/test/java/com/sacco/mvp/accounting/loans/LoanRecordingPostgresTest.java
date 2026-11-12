@@ -50,14 +50,15 @@ class LoanRecordingPostgresTest {
     UUID recordTopUp(UUID source){var f=form();f.setTopUpSourceLoanId(source);f.setApplicationDate(TODAY);f.setFirstPaymentDate(null);f.setPrincipal(new BigDecimal("1500.00"));f.setEvidence("Synthetic signed top-up agreement");return service.save(actor,f);}
     PostForm topUpPost(UUID loan){var f=post(loan,"1500.00","TOPUP-"+UUID.randomUUID());f.setFirstPaymentDate(TODAY.plusMonths(1));f.setInterestAccountId(interest);f.setEvidence("Synthetic signed top-up and verified bank transfer");var q=service.disbursementTopUp(actor,loan,TODAY).orElseThrow();f.setSettlementSequence(q.sequence());f.setSettlementPrincipal(q.principal());f.setSettlementInterest(q.interest());return f;}
     com.sacco.mvp.accounting.charges.service.LoanChargeService chargeService(){return context.getBean(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}
-    UUID chargeAccount; UUID managementAccount; UUID insuranceAccount;
+    UUID chargeAccount; UUID managementAccount; UUID processingAccount; UUID insuranceAccount;
     void chargePolicy(String timing){chargePolicy(timing,false,null);}
     void chargePolicy(String timing,boolean allowCustom,BigDecimal limit){
         chargeAccount=account("CHARGES","ASSET","DEBIT","POSTING","FEE_RECEIVABLE");
-        managementAccount=account("DEFERRED","LIABILITY","CREDIT","POSTING","CLEARING");
+        managementAccount=account("APPLICATION-INCOME","INCOME","CREDIT","POSTING","INCOME");
+        processingAccount=account("PROCESSING-INCOME","INCOME","CREDIT","POSTING","INCOME");
         insuranceAccount=account("INSURER","LIABILITY","CREDIT","POSTING","PAYABLE");
         var f=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();f.setProductId(product);f.setEffectiveFrom(LocalDate.of(2026,1,1));f.setPolicyReference("Synthetic approved policy reference");f.setAgreementReference("Synthetic approved bilingual agreement");f.setInsurer("Synthetic licensed insurer");f.setInsurerVerification("Synthetic licence and premium evidence");f.setEnabled(true);f.setAllowCustom(allowCustom);f.setCustomManagementLimit(limit);
-        f.setReceivableAccountId(chargeAccount);f.setManagementAccountId(managementAccount);f.setInsuranceAccountId(insuranceAccount);f.setManagementTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.valueOf(timing));f.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.valueOf(timing));chargeService().savePolicy(actor,f);
+        f.setReceivableAccountId(chargeAccount);f.setApplicationAccountId(managementAccount);f.setProcessingAccountId(processingAccount);f.setInsuranceAccountId(insuranceAccount);f.setManagementTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.valueOf(timing));f.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.valueOf(timing));chargeService().savePolicy(actor,f);
         jdbc.update("update loan_product_settings set application_fee=10,processing_fee_rate=0.01,insurance_rate=0.01 where id=?",product);
     }
     UUID chargedLoan(){var f=form();f.setInsurancePremium(new BigDecimal("10.00"));f.setInsuranceEvidence("Synthetic actual insurer premium 10.00 / "+UUID.randomUUID());f.setEvidence("Synthetic signed agreement");return service.save(actor,f);}
@@ -67,6 +68,31 @@ class LoanRecordingPostgresTest {
         var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(LocalDate.of(2026,9,1),TODAY,false);
         var run=UUID.randomUUID();var cutoff=OffsetDateTime.now();repository.create(run,actor,period,cutoff,UUID.randomUUID());repository.capture(run,actor,period,cutoff);
         return repository.activity(run,account,period,0,5001);
+    }
+    @Test void frozenLegacyFeesStayDeferredWhenAStaffMemberSavesIncomeMappings(){
+        chargePolicy("SEPARATE");var deferred=account("LEGACY-DEFERRED","LIABILITY","CREDIT","POSTING","CLEARING");
+        var legacyPolicy=UUID.randomUUID();
+        jdbc.update("insert into loan_charge_policy(id,sacco_id,product_id,effective_from,enabled,management_timing,insurance_timing,receivable_account_id,management_account_id,insurance_account_id,policy_reference,agreement_reference,insurer,insurer_verification,allow_custom,request_key,payload_hash,actor_id,recorded_at) values(?,?,?,'2026-08-01',true,'SEPARATE','SEPARATE',?,?,?,'Frozen legacy policy','Legacy signed agreement','Synthetic insurer','Synthetic insurance evidence',false,?,repeat('0',64),?,now())",legacyPolicy,institution,product,chargeAccount,deferred,insuranceAccount,UUID.randomUUID(),actor.getMemberId());
+        var loan=chargedLoan();var terms=chargeService().frozen(actor,loan);
+        assertThat(terms.policyId()).isEqualTo(legacyPolicy);assertThat(terms.terms().getFirst().liabilityAccountId()).isEqualTo(deferred);
+        var upgrade=chargeService().editor(actor,product,null).form();upgrade.setEffectiveFrom(TODAY);
+        chargeService().savePolicy(actor,upgrade);
+        service.disburse(actor,chargedFunding(loan));
+        assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,deferred)).isEqualByComparingTo("20.00");
+        assertThat(chargeService().frozen(actor,loan)).isEqualTo(terms);
+        assertThat(jdbc.queryForObject("select accounting_version from loan_charge_policy where id=?",Integer.class,legacyPolicy)).isEqualTo(1);
+    }
+    @Test void feesCreditSeparateIncomeAtAssessmentAndCollectionsNeverRecognizeThemTwice(){
+        chargePolicy("SEPARATE");var loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
+        for(var account:List.of(managementAccount,processingAccount))
+            assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,account)).isEqualByComparingTo("10.00");
+        assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,insuranceAccount)).isEqualByComparingTo("10.00");
+        var originalLines=jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where account_id in (?,?) order by id",managementAccount,processingAccount);
+        var policy=chargeService().policy(actor,product).orElseThrow();assertThat(policy.accountingVersion()).isEqualTo(2);assertThat(policy.managementAccountId()).isNull();
+        assertThat(chargeService().savePolicy(actor,chargeService().editor(actor,product,null).form())).isNotNull();
+        receiptService().post(actor,receiptForm(loan));
+        assertThat(jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where account_id in (?,?) order by id",managementAccount,processingAccount)).isEqualTo(originalLines);
+        assertThat(jdbc.queryForObject("select count(*) from gl_journal_line where journal_id in (select journal_id from loan_charge_command where loan_id=?)",Integer.class,loan)).isEqualTo(6);
     }
     @Test void statementAccountNumbersFollowLoansAcrossFundingFeesRepaymentsReversalsAndAdjustments(){
         chargePolicy("SEPARATE");var loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
@@ -188,13 +214,13 @@ class LoanRecordingPostgresTest {
     @Test void chargedFundingCorrectionReversesDeductionsAndAssessmentsTogether(){
         chargePolicy("DEDUCT");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var request=adjustments().request(actor,adjustment(id,"DISBURSEMENT_REVERSAL"));var other=operator("B1");adjustments().decide(other,request,UUID.randomUUID(),true,"Synthetic verified cash return");
         assertThat(status(id)).isEqualTo("DISBURSEMENT_REVERSED");var balance=service.chargeSummary(actor,id,0).balance();assertThat(balance.assessed()).isZero();assertThat(balance.collected()).isZero();assertThat(balance.outstanding()).isZero();
-        for(var account:List.of(cash,principal,chargeAccount,managementAccount,insuranceAccount))assertThat(jdbc.queryForObject("select coalesce(sum(debit-credit),0) from gl_journal_line where account_id=?",BigDecimal.class,account)).isZero();
+        for(var account:List.of(cash,principal,chargeAccount,managementAccount,processingAccount,insuranceAccount))assertThat(jdbc.queryForObject("select coalesce(sum(debit-credit),0) from gl_journal_line where account_id=?",BigDecimal.class,account)).isZero();
         assertThatThrownBy(()->jdbc.update("delete from loan_charge_event where loan_id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
     @Test void sourceChargesSettleOnceAndNewInsuranceDeductionIsIndependentlyDisclosed(){
         chargePolicy("DEDUCT");var source=chargedLoan();service.disburse(actor,chargedFunding(source));
         // Use an unpaid source for settlement, preserving the first loan's original terms.
-        var p=chargeService().policy(actor,product).orElseThrow();var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();policy.setExpectedVersion(p.id());policy.setProductId(product);policy.setEffectiveFrom(LocalDate.of(2026,8,1));policy.setEnabled(true);policy.setPolicyReference("Synthetic separate collection policy");policy.setAgreementReference("Synthetic bilingual agreement");policy.setReceivableAccountId(chargeAccount);policy.setManagementAccountId(managementAccount);policy.setInsuranceAccountId(insuranceAccount);policy.setInsurer("Synthetic insurer");policy.setInsurerVerification("Synthetic licensed insurance evidence");chargeService().savePolicy(actor,policy);
+        var p=chargeService().policy(actor,product).orElseThrow();var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();policy.setExpectedVersion(p.id());policy.setProductId(product);policy.setEffectiveFrom(LocalDate.of(2026,8,1));policy.setEnabled(true);policy.setPolicyReference("Synthetic separate collection policy");policy.setAgreementReference("Synthetic bilingual agreement");policy.setReceivableAccountId(chargeAccount);policy.setApplicationAccountId(managementAccount);policy.setProcessingAccountId(processingAccount);policy.setInsuranceAccountId(insuranceAccount);policy.setInsurer("Synthetic insurer");policy.setInsurerVerification("Synthetic licensed insurance evidence");chargeService().savePolicy(actor,policy);
         var original=chargedLoan();service.disburse(actor,chargedFunding(original));
         assertThatThrownBy(()->recordTopUp(original)).hasMessage("charges.error.topUpFee");
         jdbc.update("update loan_product_settings set application_fee=0,processing_fee_rate=0,insurance_rate=0.005 where id=?",product);
@@ -224,7 +250,7 @@ class LoanRecordingPostgresTest {
     }
     @Test void chargeOverridesRequirePermissionApprovedLimitAndDistinctInsuranceEvidence(){
         product=jdbc.queryForObject("select id from loan_product_settings where sacco_id=? and custom_recording_configuration",UUID.class,institution);
-        chargePolicy("SEPARATE");var latest=chargeService().policy(actor,product).orElseThrow();var p=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();p.setProductId(product);p.setExpectedVersion(latest.id());p.setEffectiveFrom(LocalDate.of(2026,8,1));p.setEnabled(true);p.setPolicyReference("Synthetic approved custom charge limit");p.setAgreementReference("Synthetic approved agreement");p.setReceivableAccountId(chargeAccount);p.setManagementAccountId(managementAccount);p.setInsuranceAccountId(insuranceAccount);p.setInsurer(latest.insurer());p.setInsurerVerification(latest.insurerVerification());p.setAllowCustom(true);p.setCustomManagementLimit(new BigDecimal("10.00"));chargeService().savePolicy(actor,p);assertThat(chargeService().savePolicy(actor,p)).isNotNull();
+        chargePolicy("SEPARATE");var latest=chargeService().policy(actor,product).orElseThrow();var p=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();p.setProductId(product);p.setExpectedVersion(latest.id());p.setEffectiveFrom(LocalDate.of(2026,8,1));p.setEnabled(true);p.setPolicyReference("Synthetic approved custom charge limit");p.setAgreementReference("Synthetic approved agreement");p.setReceivableAccountId(chargeAccount);p.setApplicationAccountId(managementAccount);p.setProcessingAccountId(processingAccount);p.setInsuranceAccountId(insuranceAccount);p.setInsurer(latest.insurer());p.setInsurerVerification(latest.insurerVerification());p.setAllowCustom(true);p.setCustomManagementLimit(new BigDecimal("10.00"));chargeService().savePolicy(actor,p);assertThat(chargeService().savePolicy(actor,p)).isNotNull();
         var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setInterestPercent(new BigDecimal("12"));f.setEvidence("Synthetic approved custom terms");f.setInsurancePremium(new BigDecimal("10.00"));f.setInsuranceEvidence("Synthetic unique premium "+UUID.randomUUID());f.setCustomApplicationCharge(new BigDecimal("5.00"));f.setCustomProcessingCharge(new BigDecimal("6.00"));assertThatThrownBy(()->service.save(actor,f)).hasMessage("charges.error.custom");f.setCustomProcessingCharge(new BigDecimal("5.00"));
         var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.LOAN_CHARGES_CUSTOM);var member=context.getBean(MemberDirectoryService.class).find(actor.getMemberId()).orElseThrow();var restricted=new AppUserPrincipal(member,permissions);assertThatThrownBy(()->service.save(restricted,f)).isInstanceOf(AccessDeniedException.class);
         var id=service.save(actor,f);assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("20.00");var duplicate=form();duplicate.setLoanMode("CUSTOM");duplicate.setProductId(null);duplicate.setInterestPercent(new BigDecimal("12"));duplicate.setCustomApplicationCharge(new BigDecimal("5.00"));duplicate.setCustomProcessingCharge(new BigDecimal("5.00"));duplicate.setInsurancePremium(f.getInsurancePremium());duplicate.setInsuranceEvidence(f.getInsuranceEvidence());assertThatThrownBy(()->service.save(actor,duplicate)).hasMessage("charges.error.insuranceDuplicate");
@@ -687,6 +713,11 @@ class LoanRecordingPostgresTest {
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo(balance);
         assertThat(books.account(institution,principal).orElseThrow().code()).isEqualTo("131001");
         assertThat(books.account(institution,interest).orElseThrow().code()).isEqualTo("511001");
+        String placement=new org.springframework.core.io.ClassPathResource("db/migration/V156__loan_product_current_assets_and_fee_income.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8).split("ALTER TABLE loan_charge_policy",2)[0];
+        tx.executeWithoutResult(t->jdbc.execute(placement));
+        assertThat(books.account(institution,principal).orElseThrow().code()).isEqualTo("112001");
+        assertThat(jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where sacco_id=? order by id",institution)).isEqualTo(lines);
+        assertThat(jdbc.queryForMap("select * from loan_product_account_binding where loan_id=?",loan)).isEqualTo(binding);
         var input=receiptForm(loan);var collected=receiptService().post(actor,input);
         assertThat(receiptService().post(actor,input).header().id()).isEqualTo(collected.header().id());
         receiptService().reverse(operator("B1"),collected.header().id(),UUID.randomUUID(),TODAY,"Correct post-numbering receipt");
@@ -1130,7 +1161,7 @@ class LoanRecordingPostgresTest {
         verify(context.getBean(AuditService.class)).log(eq("STAFF_USER"),eq(actor.getMemberId()),eq("STAFF_UPDATE_OWN_SIGNATURE"),eq(actor.getMemberId()),any(),any());
         verify(context.getBean(AuditService.class),times(1)).log(eq("STAFF_USER"),eq(actor.getMemberId()),eq("STAFF_REGISTER_OWN_SIGNATURE"),eq(actor.getMemberId()),any(),any());
     }
-    RecordForm form(){var f=new RecordForm();f.setClientId(client);f.setProductId(product);f.setApplicationDate(LocalDate.of(2026,9,1));f.setFirstPaymentDate(LocalDate.of(2026,10,1));f.setMonths(1);f.setRequestedPrincipal(new BigDecimal("1000.00"));f.setPrincipal(new BigDecimal("1000.00"));f.setPurpose("Business stock");return f;}
+    RecordForm form(){var f=new RecordForm();f.setClientId(client);f.setProductId(product);f.setApplicationDate(LocalDate.of(2026,9,1));f.setFirstPaymentDate(LocalDate.of(2026,10,1));f.setMonths(1);f.setRequestedPrincipal(new BigDecimal("1000.00"));f.setPrincipal(new BigDecimal("1000.00"));f.setPurpose("Business stock");f.setExpenses(new BigDecimal("100.00"));f.setIncome(new BigDecimal("10000.00"));f.setOtherDebt(BigDecimal.ZERO);return f;}
     // Financial-engine cases start with a fully evidenced approval round. Workflow tests submit through the approval service.
     void approve(UUID loan){
         if(!"RECORDED".equals(jdbc.queryForObject("select status from loan_applications where id=?",String.class,loan)))return;

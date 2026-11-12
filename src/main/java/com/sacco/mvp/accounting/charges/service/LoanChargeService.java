@@ -35,12 +35,63 @@ public class LoanChargeService {
     @Transactional(readOnly=true) public List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice> accounts(AppUserPrincipal a,String kind,String search,int page){configure(a);require(search!=null && search.length()<=100 && page>=0 && page<=10000,"input");return repository.accounts(a.getSaccoId(),kind,search,page);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice productChoice(AppUserPrincipal a,UUID product){configure(a);return repository.productChoice(a.getSaccoId(),product);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice selectedAccount(AppUserPrincipal a,UUID id,String kind){configure(a);return repository.selectedAccount(a.getSaccoId(),id,kind);}
+    @Transactional(readOnly=true) public Editor editor(AppUserPrincipal actor,UUID product,PolicyForm draft) {
+        configure(actor);var prior=product==null?Optional.<Policy>empty():policy(actor,product);
+        var effective=product==null?Optional.<Policy>empty():repository.policy(actor.getSaccoId(),product,clock.today());
+        var generated=product==null?List.<GeneratedAccount>of():repository.generatedAccounts(actor.getSaccoId(),product);
+        var f=draft==null?new PolicyForm():draft;
+        if(draft==null){
+            f.setProductId(product);f.setExpectedVersion(prior.map(Policy::id).orElse(null));
+            f.setEffectiveFrom(prior.map(p->p.effectiveFrom().plusDays(1).isAfter(clock.today())?p.effectiveFrom().plusDays(1):clock.today()).orElse(clock.today()));
+            prior.ifPresent(p->{f.setEnabled(p.enabled());f.setManagementTiming(p.managementTiming());f.setInsuranceTiming(p.insuranceTiming());
+                f.setReceivableAccountId(p.receivableAccountId());f.setInsuranceAccountId(p.insuranceAccountId());
+                f.setApplicationAccountId(p.applicationAccountId());f.setProcessingAccountId(p.processingAccountId());
+                f.setPolicyReference(p.policyReference());f.setAgreementReference(p.agreementReference());f.setInsurer(p.insurer());f.setInsurerVerification(p.insurerVerification());
+                f.setAllowCustom(p.allowCustom());f.setCustomManagementLimit(p.customManagementLimit());});
+            for(var account:generated){
+                if(account.component().equals("APPLICATION") && f.getApplicationAccountId()==null)f.setApplicationAccountId(account.accountId());
+                if(account.component().equals("PROCESSING") && f.getProcessingAccountId()==null)f.setProcessingAccountId(account.accountId());
+            }
+        }
+        var choices=new LinkedHashMap<String,List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice>>();
+        for(String kind:List.of("APPLICATION","PROCESSING","RECEIVABLE","INSURANCE")){
+            UUID selected=switch(kind){case "APPLICATION"->f.getApplicationAccountId();case "PROCESSING"->f.getProcessingAccountId();case "RECEIVABLE"->f.getReceivableAccountId();default->f.getInsuranceAccountId();};
+            var values=new ArrayList<>(repository.accounts(actor.getSaccoId(),kind,"",0).stream().limit(25).toList());
+            if(selected!=null && values.stream().noneMatch(c->c.id().equals(selected))){var choice=repository.selectedAccount(actor.getSaccoId(),selected,kind);if(choice!=null)values.add(choice);}
+            choices.put(kind,List.copyOf(values));
+        }
+        var currentMappings=new LinkedHashMap<String,String>();
+        if(effective.isPresent()){
+            var p=effective.get();var selected=new LinkedHashMap<String,UUID>();
+            selected.put("APPLICATION",p.account("APPLICATION"));selected.put("PROCESSING",p.account("PROCESSING"));
+            selected.put("RECEIVABLE",p.receivableAccountId());selected.put("INSURANCE",p.insuranceAccountId());
+            var labels=repository.accountLabels(actor.getSaccoId(),selected.values().stream().filter(Objects::nonNull).distinct().toList());
+            selected.forEach((kind,id)->{if(id!=null && labels.containsKey(id))currentMappings.put(kind,labels.get(id));});
+        }
+        return new Editor(f,effective.orElse(null),choices,generated,Map.copyOf(currentMappings));
+    }
     @Transactional public UUID savePolicy(AppUserPrincipal a,PolicyForm f){
         configure(a);require(f!=null && f.getRequestKey()!=null && f.getProductId()!=null && f.getEffectiveFrom()!=null && f.getManagementTiming()!=null && f.getInsuranceTiming()!=null,"input");
         require(f.getManagementTiming()!=Timing.FINANCED && f.getInsuranceTiming()!=Timing.FINANCED,"financed");text(f.getPolicyReference(),f.isEnabled());text(f.getAgreementReference(),f.isEnabled());text(f.getInsurer(),false);text(f.getInsurerVerification(),false);
         require(repository.product(a.getSaccoId(),f.getProductId()),"policy");repository.policyLock(a.getSaccoId(),f.getProductId());String hash=hash(f);var retry=repository.policyRetry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get();
+        var command=new PolicyForm();org.springframework.beans.BeanUtils.copyProperties(f,command);f=command;
+        var product=repository.productChoice(a.getSaccoId(),f.getProductId());
+        accounting.provisionLoanProductFeeAccounts(a.getSaccoId(),a.getMemberId(),f.getProductId(),product.label());
+        for(var generated:repository.generatedAccounts(a.getSaccoId(),f.getProductId())){
+            if(!f.isEnabled() && !Set.of("APPROVED","BASELINE").contains(generated.state())){
+                if(Objects.equals(f.getApplicationAccountId(),generated.accountId()))f.setApplicationAccountId(null);
+                if(Objects.equals(f.getProcessingAccountId(),generated.accountId()))f.setProcessingAccountId(null);
+                continue;
+            }
+            if(generated.component().equals("APPLICATION") && f.getApplicationAccountId()==null)f.setApplicationAccountId(generated.accountId());
+            if(generated.component().equals("PROCESSING") && f.getProcessingAccountId()==null)f.setProcessingAccountId(generated.accountId());
+        }
+        f.setManagementAccountId(null);
         var prior=repository.policy(a.getSaccoId(),f.getProductId(),LocalDate.of(9999,12,31));require(Objects.equals(prior.map(Policy::id).orElse(null),f.getExpectedVersion()),"stale");require(prior.isEmpty() || f.getEffectiveFrom().isAfter(prior.get().effectiveFrom()),"date");
-        if(f.isEnabled()){repository.account(a.getSaccoId(),f.getReceivableAccountId(),"RECEIVABLE");if(f.getManagementAccountId()!=null)repository.account(a.getSaccoId(),f.getManagementAccountId(),"MANAGEMENT");if(f.getInsuranceAccountId()!=null){repository.account(a.getSaccoId(),f.getInsuranceAccountId(),"INSURANCE");text(f.getInsurer(),true);text(f.getInsurerVerification(),true);}}
+        if(f.isEnabled() || f.getReceivableAccountId()!=null)repository.account(a.getSaccoId(),f.getReceivableAccountId(),"RECEIVABLE");
+        if(f.isEnabled() || f.getApplicationAccountId()!=null)repository.account(a.getSaccoId(),f.getApplicationAccountId(),"APPLICATION");
+        if(f.isEnabled() || f.getProcessingAccountId()!=null)repository.account(a.getSaccoId(),f.getProcessingAccountId(),"PROCESSING");
+        if(f.getInsuranceAccountId()!=null){repository.account(a.getSaccoId(),f.getInsuranceAccountId(),"INSURANCE");if(f.isEnabled()){text(f.getInsurer(),true);text(f.getInsurerVerification(),true);}}
         if(f.isAllowCustom())require(f.getCustomManagementLimit()!=null && amount(f.getCustomManagementLimit()).signum()>0,"custom");
         var id=repository.insertPolicy(a,f,hash,clock.now());event(a,id,"LOAN_CHARGE_POLICY_RECORDED");return id;
     }
@@ -69,7 +120,7 @@ public class LoanChargeService {
         if(application.add(processing).add(insurance).signum()>0 && (policy==null || !policy.enabled()))failure="charges.error.policy";
         var terms=new ArrayList<Term>();
         if(policy!=null && policy.enabled()){
-            if(application.add(processing).signum()>0 && policy.managementAccountId()==null)failure="charges.error.account";
+            if(application.signum()>0 && policy.account("APPLICATION")==null || processing.signum()>0 && policy.account("PROCESSING")==null)failure="charges.error.account";
             if(insurance.signum()>0 && (policy.insuranceAccountId()==null || policy.insurer().isBlank() || policy.insurerVerification().isBlank()))failure="charges.error.insurance";
         }
         String entryEvidence="Loan charge entry / "+f.getRequestKey();
@@ -90,7 +141,7 @@ public class LoanChargeService {
                 text(t.evidence(),custom || t.kind().equals("INSURANCE"));
                 try{
                     repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");
-                    repository.account(a.getSaccoId(),t.liabilityAccountId(),t.kind().equals("INSURANCE")?"INSURANCE":"MANAGEMENT");
+                    repository.account(a.getSaccoId(),t.liabilityAccountId(),policy.accountKind(t.kind()));
                 }catch(IllegalArgumentException error){
                     var pending=new Plan(plan.policyId(),plan.policyReference(),plan.agreementReference(),plan.terms(),false,error.getMessage());
                     if(allowPending && canRecordWithPendingCharges(f,pending))return pending;
@@ -135,9 +186,9 @@ public class LoanChargeService {
             boolean insurance=term.kind().equals("INSURANCE");
             var timing=insurance?policy.insuranceTiming():policy.managementTiming();
             require(term.timing()==timing,"fundingTiming");
-            var account=insurance?policy.insuranceAccountId():policy.managementAccountId();
+            var account=policy.account(term.kind());
             repository.account(actor.getSaccoId(),policy.receivableAccountId(),"RECEIVABLE");
-            repository.account(actor.getSaccoId(),account,insurance?"INSURANCE":"MANAGEMENT");
+            repository.account(actor.getSaccoId(),account,policy.accountKind(term.kind()));
             if(insurance){
                 text(term.evidence(),true);
                 require(!repository.insuranceUsed(actor.getSaccoId(),policy.insurer(),term.evidence()),"insuranceDuplicate");
@@ -154,7 +205,7 @@ public class LoanChargeService {
         return snapshot.path("supported").isBoolean() && !snapshot.path("supported").asBoolean()
             ?Optional.of(json.treeToValue(snapshot,Plan.class)):Optional.empty();
     }
-    private Term term(String kind,String basis,BigDecimal value,BigDecimal total,Policy p,boolean insurance,String evidence){return new Term(UUID.randomUUID(),kind,basis,value,total,p==null?Timing.SEPARATE:insurance?p.insuranceTiming():p.managementTiming(),p==null?null:p.receivableAccountId(),p==null?null:insurance?p.insuranceAccountId():p.managementAccountId(),evidence,insurance && p!=null?p.insurer():"",insurance && p!=null?p.insurerVerification():"");}
+    private Term term(String kind,String basis,BigDecimal value,BigDecimal total,Policy p,boolean insurance,String evidence){return new Term(UUID.randomUUID(),kind,basis,value,total,p==null?Timing.SEPARATE:insurance?p.insuranceTiming():p.managementTiming(),p==null?null:p.receivableAccountId(),p==null?null:p.account(kind),evidence,insurance && p!=null?p.insurer():"",insurance && p!=null?p.insurerVerification():"");}
     @Transactional(propagation=Propagation.MANDATORY) public void freeze(AppUserPrincipal a,UUID loan,Plan plan){repository.freeze(a,loan,plan,clock.now());}
     private LoanChargeRepository.Loan readable(AppUserPrincipal a,UUID loan,boolean lock){if(a==null||!a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Loan unavailable");return repository.loan(a,loan,lock);}
     @Transactional(readOnly=true) public Plan quotedTerms(AppUserPrincipal actor,UUID loan){
@@ -173,7 +224,8 @@ public class LoanChargeService {
         require(repository.pendingPlan(a,loan).isEmpty(),"fundingSetup");
         var plan=repository.frozen(loan);require(!plan.terms().isEmpty() && !repository.assessed(loan),"assessed");dated(loan,f.getDate());
         UUID journal=UUID.randomUUID(),period=periods.period(a.getSaccoId(),f.getDate(),a.getMemberId(),clock.now());var now=clock.now();var id=repository.command(a,loan,f.getRequestKey(),hash,f.getDate(),"ASSESS",f.getEvidence(),f.getReason(),null,journal,now);repository.journal(a,journal,id,f.getRequestKey(),hash,f.getDate(),period,null,f.getEvidence(),f.getReason(),now);
-        for(var t:plan.terms()){repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");repository.account(a.getSaccoId(),t.liabilityAccountId(),t.kind().equals("INSURANCE")?"INSURANCE":"MANAGEMENT");repository.event(a,loan,t,"ASSESS",t.amount(),f.getDate(),journal,null,id,null,f.getEvidence(),f.getReason(),now);repository.line(a,journal,t.receivableAccountId(),t.amount(),ZERO);repository.line(a,journal,t.liabilityAccountId(),ZERO,t.amount());}
+        var policy=repository.contractPolicy(loan).orElseThrow(()->new IllegalArgumentException("charges.error.policy"));
+        for(var t:plan.terms()){repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");repository.account(a.getSaccoId(),t.liabilityAccountId(),policy.accountKind(t.kind()));repository.event(a,loan,t,"ASSESS",t.amount(),f.getDate(),journal,null,id,null,f.getEvidence(),f.getReason(),now);repository.line(a,journal,t.receivableAccountId(),t.amount(),ZERO);repository.line(a,journal,t.liabilityAccountId(),ZERO,t.amount());}
         repository.post(a,journal,now);event(a,id,"LOAN_CHARGES_ASSESSED");return id;
     }
     @Transactional(propagation=Propagation.MANDATORY) public void assessAtFunding(AppUserPrincipal a,UUID loan,LocalDate date,String evidence){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");var p=repository.frozen(loan);if(p.terms().isEmpty() || repository.assessed(loan))return;var f=new AssessmentForm();f.setRequestKey(UUID.nameUUIDFromBytes(("CHARGE_ASSESS/"+loan+"/"+repository.sequence(loan)).getBytes(java.nio.charset.StandardCharsets.UTF_8)));f.setDate(date);f.setEvidence(evidence);f.setReason("");assessment(a,loan,f);}

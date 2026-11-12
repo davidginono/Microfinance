@@ -157,20 +157,20 @@ class AccountVersionPostgresTest {
         return LoanProductSetting.builder().id(id).saccoId(institution).productName("Business growth").productCode("PRODUCT-"+id).build();
     }
     com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts(){return new com.sacco.mvp.accounting.loans.service.LoanProductAccountService(new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc),new ApplicationClock("Africa/Nairobi"),audit,ledger);}
-    @Test void newProductsGenerateTwoApprovedPostingAccountsWithoutGrantingChartPermissions(){
+    @Test void newProductsGenerateFourApprovedPostingAccountsWithoutGrantingChartPermissions(){
         var creator=operator("B1",Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
         when(claims.effectiveClaims(eq(creator.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
         var product=product();var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
         tx.executeWithoutResult(t->productAccounts().provision(product,creator.getMemberId()));
         assertThat(product.getPrincipalGlAccountId()).isNotNull();assertThat(product.getInterestGlAccountId()).isNotNull();
-        assertThat(books.account(institution,product.getPrincipalGlAccountId()).orElseThrow()).satisfies(a->{assertThat(a.code()).isEqualTo("131001");assertThat(a.parentId()).isEqualTo(books.accountCode(institution,"131000").orElseThrow().id());assertThat(a.kind()).isEqualTo("POSTING");assertThat(a.type()).isEqualTo("ASSET");assertThat(a.name()).isEqualTo("Business growth - Principal");});
+        assertThat(books.account(institution,product.getPrincipalGlAccountId()).orElseThrow()).satisfies(a->{assertThat(a.code()).isEqualTo("112001");assertThat(a.parentId()).isEqualTo(books.accountCode(institution,"112000").orElseThrow().id());assertThat(a.kind()).isEqualTo("POSTING");assertThat(a.type()).isEqualTo("ASSET");assertThat(a.name()).isEqualTo("Business growth - Principal");});
         assertThat(books.account(institution,product.getInterestGlAccountId()).orElseThrow()).satisfies(a->{assertThat(a.code()).isEqualTo("511001");assertThat(a.parentId()).isEqualTo(books.accountCode(institution,"511000").orElseThrow().id());assertThat(a.kind()).isEqualTo("POSTING");assertThat(a.type()).isEqualTo("INCOME");assertThat(a.name()).isEqualTo("Business growth - Interest");});
         tx.executeWithoutResult(t->productAccounts().provision(product,creator.getMemberId()));
-        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and kind='POSTING'",Integer.class,institution)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and kind='POSTING'",Integer.class,institution)).isEqualTo(4);
         assertThat(jdbc.queryForMap("select principal_gl_account_id,interest_gl_account_id from loan_product_settings where id=?",product.getId())).containsEntry("principal_gl_account_id",product.getPrincipalGlAccountId()).containsEntry("interest_gl_account_id",product.getInterestGlAccountId());
         assertThat(creator.getClaims()).containsExactly("LOAN_PRODUCTS_CREATE");
         var vouchers=new com.sacco.mvp.accounting.repository.VoucherRepository(jdbc);
-        assertThat(vouchers.accounts(institution,"131001",0)).isEmpty();
+        assertThat(vouchers.accounts(institution,"112001",0)).isEmpty();
         assertThat(vouchers.selectedAccounts(institution,List.of(product.getPrincipalGlAccountId(),product.getInterestGlAccountId()),false)).isEmpty();
     }
     @Test void independentlyApprovedProductAccountsLinkOnlyWhenBothAreEffective(){
@@ -194,7 +194,7 @@ class AccountVersionPostgresTest {
         assertThatThrownBy(()->tx.executeWithoutResult(t->ledger.provisionLoanProductAccounts("FOREIGN",maker.getMemberId(),product.getId(),product.getDisplayName()))).hasMessage("accounting.error.account");
         assertThatThrownBy(()->tx.executeWithoutResult(t->{productAccounts().provision(product,maker.getMemberId());throw new IllegalStateException("Rollback whole command");})).hasMessage("Rollback whole command");
         assertThat(jdbc.queryForObject("select count(*) from loan_product_account_provision where product_id=?",Integer.class,product.getId())).isZero();
-        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code in ('130000','131000','510000','511000','131001','511001')",Integer.class,institution)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from gl_account where sacco_id=? and code in ('130000','112000','510000','511000','112001','511001')",Integer.class,institution)).isZero();
     }
     @Test void generatedNumbersReservePendingCodesAndRemainDistinctForConcurrentProducts() throws Exception {
         ledger.configureAccountApproval(maker,policy(false,true,true,true));
@@ -205,15 +205,15 @@ class AccountVersionPostgresTest {
             var two=pool.submit(()->{ready.await();tx.executeWithoutResult(t->productAccounts().provision(second,maker.getMemberId()));return true;});
             ready.countDown();assertThat(one.get(30,TimeUnit.SECONDS)).isTrue();assertThat(two.get(30,TimeUnit.SECONDS)).isTrue();
         }
-        assertThat(jdbc.queryForList("select snapshot->>'code' from gl_account_version where sacco_id=? and state='PENDING' order by snapshot->>'code'",String.class,institution)).containsExactly("131001","131002","511001","511002");
+        assertThat(jdbc.queryForList("select snapshot->>'code' from gl_account_version where sacco_id=? and state='PENDING' order by snapshot->>'code'",String.class,institution)).containsExactly("112001","112002","511001","511002","512001","512002","513001","513002");
         tx.executeWithoutResult(t->productAccounts().provision(first,maker.getMemberId()));
         assertThat(jdbc.queryForObject("select count(*) from loan_product_account_provision where sacco_id=?",Integer.class,institution)).isEqualTo(2);
     }
     @Test void generatedGroupsRejectIncompatibleChartSlotsWithoutLeavingPartialAccounts() {
-        ledger.createAccount(maker,new AccountCommand("130000","Existing heading","ASSET","CREDIT","HEADING","OTHER",books.accountCode(institution,"100000").orElseThrow().id(),null,null));
+        ledger.createAccount(maker,new AccountCommand("112000","Existing heading","ASSET","CREDIT","HEADING","OTHER",books.accountCode(institution,"110000").orElseThrow().id(),null,null));
         var product=product();var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
         assertThatThrownBy(()->tx.executeWithoutResult(t->productAccounts().provision(product,maker.getMemberId()))).hasMessage("accounting.error.mainGroupConflict");
-        assertThat(books.accountCode(institution,"131000")).isEmpty();
+        assertThat(books.accountCode(institution,"512000")).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from loan_product_account_provision where product_id=?",Integer.class,product.getId())).isZero();
     }
     private ProductAccountVersions legacyProductAccounts(LoanProductSetting product) {
@@ -226,7 +226,8 @@ class AccountVersionPostgresTest {
     }
     private void correctLegacyNumbers() throws Exception {
         String sql=new org.springframework.core.io.ClassPathResource("db/migration/V150__generated_loan_account_coa_numbers.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
-        new org.springframework.transaction.support.TransactionTemplate(manager).executeWithoutResult(t->jdbc.execute(sql));
+        String baseline=new org.springframework.core.io.ClassPathResource("db/migration/V156__loan_product_current_assets_and_fee_income.sql").getContentAsString(java.nio.charset.StandardCharsets.UTF_8).split("CREATE OR REPLACE FUNCTION pg_temp.loan_number_group",2)[0];
+        new org.springframework.transaction.support.TransactionTemplate(manager).executeWithoutResult(t->{jdbc.execute(sql);jdbc.execute(baseline);});
     }
     @Test void numberingMigrationKeepsAccountIdsOriginalApprovalsAndGuards() throws Exception {
         var product=product();var original=legacyProductAccounts(product);
@@ -420,4 +421,31 @@ class AccountVersionPostgresTest {
         assertThat(vouchers.view(maker,com.sacco.mvp.accounting.dto.VoucherDtos.Type.JOURNAL,posted.id()).transactions().getFirst().debit().name()).isEqualTo("Original cash name");
         assertThat(ledger.accountCurrent(maker,account).proposed().name()).isEqualTo("New cash name");
     }
+    @Test void generatedFeeAccountsUseIncomeAndRequireTheirOwnIndependentApprovals() {
+        ledger.configureAccountApproval(maker,policy(false,true,true,true));var product=product();
+        var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+        tx.executeWithoutResult(t->productAccounts().provision(product,maker.getMemberId()));
+        var rows=jdbc.queryForList("select component,account_id,version_id from loan_product_fee_account_provision where product_id=? order by component",product.getId());
+        assertThat(rows).hasSize(2);var reviewer=operator("B2",EnumSet.allOf(UserClaim.class));
+        for(var row:rows){
+            var proposal=version((UUID)row.get("version_id"));assertThat(proposal.state()).isEqualTo("PENDING");
+            assertThat(books.account(institution,proposal.accountId())).isEmpty();
+            assertThat(proposal.proposed().type()).isEqualTo("INCOME");assertThat(proposal.proposed().normalBalance()).isEqualTo("CREDIT");
+            ledger.accountVersionAction(reviewer,proposal.id(),proposal.revision(),"APPROVE","Fee account reviewed");
+            assertThat(books.account(institution,proposal.accountId())).isPresent();
+            assertThat(new com.sacco.mvp.accounting.repository.VoucherRepository(jdbc).selectedAccounts(institution,List.of(proposal.accountId()),false)).isEmpty();
+        }
+        assertThat(jdbc.queryForObject("select count(*) from loan_charge_policy where product_id=?",Integer.class,product.getId())).isZero();
+        assertThat(books.accountCode(institution,"512000").orElseThrow().parentId()).isEqualTo(books.accountCode(institution,"510000").orElseThrow().id());
+    }
+    @Test void generatedPrincipalInheritsCurrentAssetsAndFeeProvisioningRetriesDoNotDuplicate() {
+        var product=product();var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+        tx.executeWithoutResult(t->productAccounts().provision(product,maker.getMemberId()));
+        var parent=books.account(institution,books.account(institution,product.getPrincipalGlAccountId()).orElseThrow().parentId()).orElseThrow();
+        assertThat(parent.code()).isEqualTo("112000");assertThat(parent.parentId()).isEqualTo(books.accountCode(institution,"110000").orElseThrow().id());
+        var fees=jdbc.queryForList("select * from loan_product_fee_account_provision where product_id=? order by component",product.getId());
+        tx.executeWithoutResult(t->ledger.provisionLoanProductFeeAccounts(institution,maker.getMemberId(),product.getId(),"Renamed product"));
+        assertThat(jdbc.queryForList("select * from loan_product_fee_account_provision where product_id=? order by component",product.getId())).isEqualTo(fees);
+    }
+
 }

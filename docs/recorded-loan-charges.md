@@ -95,3 +95,12 @@ Verification on 18 October 2026 used Java 25, PostgreSQL 17.9 and synthetic reco
 - Loan and client-statement PDF extraction passed in both languages; the rendered English loan PDF was inspected for legibility and overlap. Browser evidence is saved outside the repository as loan-charges-recording.png in the task visualization directory. git diff --check passed.
 
 The synthetic harness does not establish a full production login/logout, OTP or channel reconciliation acceptance run. Institution policy, actual insurer verification, approved account configuration and the release gates above remain required.
+# Separate fee Income mappings (12 November 2026)
+
+New staff-saved charge policies use accounting version 2 and separate Application fee and Processing fee Income posting accounts. Assessment debits charge receivables and credits the corresponding Income account; later collections clear receivables and do not recognize income again. Insurance retains its insurer payable account. Existing timing, insurer evidence, custom-charge limits, top-up restrictions and independent linked corrections remain enforced.
+
+Version 1 policies retain the shared deferred management-fee account. Frozen loans keep their original immutable policy and term accounts, including when staff subsequently save version 2 for the product. Assessment and corrections resolve that frozen policy, rather than today's product mappings. The stored `liability_account_id` and serialized `liabilityAccountId` remain compatibility identifiers for the term's credit account; version 2 can reference Income through these identifiers. Prior deferred balances are not transferred to Income by this change.
+
+Charge configuration is embedded in Create/Edit Loan Product. Existing products show generated Income accounts as proposed defaults and retain their old policy until staff save a new effective revision. Account generation supplies no missing policy/agreement/insurer evidence and does not enable charges. See [account generation, migration and deployment](loan-product-account-links.md).
+
+The deferred-fee-only statements in the earlier implementation notes describe accounting version 1. They do not apply to the explicitly selected version 2 assessment treatment.

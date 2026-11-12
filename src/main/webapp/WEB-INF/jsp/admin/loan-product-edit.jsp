@@ -8,6 +8,7 @@
 <%@ include file="../fragments/admin-workspace-support.jspf" %>
 
 
+<c:if test="${chargePolicySaved}"><spring:message code="charges.policySaved" var="chargeSavedMessage" /><div hidden data-toast-message="${fn:escapeXml(chargeSavedMessage)}" data-toast-type="success" data-toast-placement="workspace"></div></c:if>
 <div class="erp-page-header" data-aws-page-header>
     <div class="admin-page-heading">
     <p class="erp-breadcrumb"><spring:message code="admin.workspace.productBreadcrumb" /></p>
@@ -30,6 +31,7 @@
 </div>
 </div>
 
+<c:if test="${chargePolicySaved}"><spring:message code="charges.policySaved" var="chargeSavedMessage" /><div hidden data-toast-message="${fn:escapeXml(chargeSavedMessage)}" data-toast-type="success" data-toast-placement="workspace"></div></c:if>
 <div class="product-config-workspace"
      data-product-config-workspace
      data-product-config-stage="Step 2 of 2 &middot; focused product"
@@ -183,12 +185,10 @@
                     <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')" var="canSetChargeAccounts" />
                     <div class="product-builder-section-header">
                         <h2><spring:message code="productAccounts.title" /></h2>
-                        <c:if test="${canSetChargeAccounts}">
-                            <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />"><spring:message code="charges.postingSetup" /></a>
-                        </c:if>
                     </div>
                     <div id="product-config-accounts" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %><c:set var="productAccountSection" value="${false}" />
+                        <c:if test="${canSetChargeAccounts}"><c:set var="chargeFormId" value="productChargePolicyForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></c:if>
                         <c:if test="${not canSetChargeAccounts}">
                             <p class="text-sm md:col-span-2"><spring:message code="charges.postingSetupPermission" /></p>
                         </c:if>
@@ -282,6 +282,9 @@
                 </div>
     </div>
         </form>
+        <c:if test="${canSetChargeAccounts}"><form id="productChargePolicyForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />" data-workspace-submit="recover" data-product-charge-form>
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        </form></c:if>
         <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
         <section class="product-builder-section product-config-step" data-product-config-step="workflow">
             <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>

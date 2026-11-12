@@ -40,6 +40,7 @@ public class LoanProductAccountService {
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public void configure(LoanProductSetting product,UUID actor,UUID principal,UUID interest){
+        ledger.provisionLoanProductFeeAccounts(product.getSaccoId(),actor,product.getId(),product.getDisplayName());
         require((principal==null)==(interest==null),"productAccountsPair");
         if(principal!=null)validate(product.getSaccoId(),new Accounts(principal,interest));
         if(Objects.equals(product.getPrincipalGlAccountId(),principal) && Objects.equals(product.getInterestGlAccountId(),interest))return;

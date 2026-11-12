@@ -129,11 +129,12 @@ class LoanRecordingMvcTest {
     }
     @Test void recordingCannotOverrideCashFlowOrItsProfileSource() throws Exception {
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
-            .param("principal","invalid").param("income","999999999").param("otherDebt","0")
+            .param("principal","invalid").param("income","999999999").param("otherDebt","0").param("expenses","0")
             .param("applicationDetails.clientProfile.revisionId",UUID.randomUUID().toString()))
             .andExpect(view().name("accounting/loans/record-form"))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("income",org.hamcrest.Matchers.nullValue())))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("otherDebt",org.hamcrest.Matchers.nullValue())))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("expenses",org.hamcrest.Matchers.nullValue())))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("applicationDetails",
                 org.hamcrest.Matchers.hasProperty("clientProfile",org.hamcrest.Matchers.nullValue()))));
     }
@@ -182,12 +183,29 @@ class LoanRecordingMvcTest {
         doThrow(new org.springframework.security.access.AccessDeniedException("Missing explicit permission")).when(charges).savePolicy(eq(actor),any());
         mvc.perform(post(path).with(user(actor)).with(csrf())).andExpect(status().isForbidden());
         mvc.perform(post(path).with(user(admin)).with(csrf()).param("productId",UUID.randomUUID().toString()).param("effectiveFrom","2026-09-01").param("enabled","true").param("managementTiming","DEDUCT").param("insuranceTiming","SEPARATE").param("saccoId","FOREIGN"))
-            .andExpect(redirectedUrl(path));verify(charges).savePolicy(eq(admin),argThat(f->f.getProductId().equals(product) && f.getEffectiveFrom().equals(java.time.LocalDate.of(2026,9,1)) && f.getManagementTiming()==com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT));
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"));verify(charges).savePolicy(eq(admin),argThat(f->f.getProductId().equals(product) && f.getEffectiveFrom().equals(java.time.LocalDate.of(2026,9,1)) && f.getManagementTiming()==com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT));
+    }
+    @Test void chargeMappingErrorsReturnToTheAccountsTabAndKeepAllowedValues() throws Exception {
+        var product=UUID.randomUUID();var application=UUID.randomUUID();var processing=UUID.randomUUID();
+        var charges=context.getBean(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);reset(charges);
+        var admin=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ICT_MANAGER)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
+        doThrow(new IllegalArgumentException("charges.error.account")).when(charges).savePolicy(eq(admin),any());
+        mvc.perform(post("/admin/settings-controls/loan-products/"+product+"/charge-accounts").with(user(admin)).with(csrf())
+            .param("applicationAccountId",application.toString()).param("processingAccountId",processing.toString()).param("policyReference","Retain this policy")
+            .param("accountingVersion","1").param("managementAccountId",UUID.randomUUID().toString()))
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"))
+            .andExpect(flash().attribute("chargeError","charges.error.account"));
+        verify(charges).savePolicy(eq(admin),argThat(f->f.getProductId().equals(product) && f.getApplicationAccountId().equals(application)
+            && f.getProcessingAccountId().equals(processing) && f.getPolicyReference().equals("Retain this policy") && f.getManagementAccountId()==null));
+        mvc.perform(get("/admin/settings-controls/loan-products/"+product+"/charge-accounts").with(user(admin)))
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"));
+        verify(charges).policy(admin,product);
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}
         @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService charges(){return mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}
-        @Bean com.sacco.mvp.accounting.charges.controller.LoanChargeController chargeController(com.sacco.mvp.accounting.charges.service.LoanChargeService charges){return new com.sacco.mvp.accounting.charges.controller.LoanChargeController(charges,mock(ApplicationClock.class));}
+        @Bean com.sacco.mvp.accounting.charges.controller.LoanChargeController chargeController(com.sacco.mvp.accounting.charges.service.LoanChargeService charges){return new com.sacco.mvp.accounting.charges.controller.LoanChargeController(charges);}
         @Bean com.sacco.mvp.clients.applications.service.ClientApplicationService applications(){return mock(com.sacco.mvp.clients.applications.service.ClientApplicationService.class);}
 
         @Bean com.sacco.mvp.clients.applications.controller.ClientApplicationController historyController(com.sacco.mvp.clients.applications.service.ClientApplicationService applications){return new com.sacco.mvp.clients.applications.controller.ClientApplicationController(applications,new org.springframework.context.support.StaticMessageSource());}

@@ -41,7 +41,7 @@
 .aws-console:has([data-admin-workspace]) .product-config-workspace-summary>.erp-widget-title {display:none;}
 .aws-console:has([data-admin-workspace]) .product-config-workspace-summary .erp-detail-facts {padding:0 20px;}
 .aws-console:has([data-admin-workspace]) .product-config-workspace-meta {margin:16px 20px 0;padding:0;border:0;}
-.aws-console:has([data-admin-workspace]) .product-config-step-nav {display:flex;flex-direction:row;align-items:stretch;gap:0;overflow-x:auto;max-width:100%;margin:0 0 16px;border-bottom:1px solid #aab7b8;}
+.aws-console:has([data-admin-workspace]) .product-config-step-nav {display:flex;flex-direction:row;flex-wrap:wrap;align-items:stretch;gap:0;overflow:visible;max-width:100%;margin:0 0 16px;border-bottom:1px solid #aab7b8;}
 .aws-console:has([data-admin-workspace]) .product-config-step-nav button {position:relative;display:block;flex:none;width:auto!important;min-height:48px;margin:0;padding:12px 20px;border:0!important;border-bottom:2px solid transparent!important;border-radius:0;background:transparent!important;color:#545b64;box-shadow:none!important;text-align:left;font-size:14px;line-height:20px;white-space:nowrap;}
 .aws-console:has([data-admin-workspace]) .product-config-step-nav button:not(:last-child)::after {content:"";position:absolute;right:0;top:8px;bottom:10px;border-right:1px solid #d5dbdb;}
 .aws-console:has([data-admin-workspace]) .product-config-step-nav button[aria-selected=true] {color:#0073bb;border-bottom-color:#16191f!important;}

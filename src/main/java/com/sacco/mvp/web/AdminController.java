@@ -45,6 +45,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriUtils;
 
@@ -83,6 +84,7 @@ public class AdminController {
         "guarantorMinSavingsCheckRequired"
     );
 
+    private final com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges;
     private final AdminService adminService;
     private final ApplicationClock applicationClock;
     private final AdminScopeService adminScopeService;
@@ -110,6 +112,15 @@ public class AdminController {
         binder.setAllowedFields("expectedRevision", "groups[*]", "approvals[*]");
     }
 
+    @InitBinder("chargePolicy") void chargePolicyBinder(org.springframework.web.bind.WebDataBinder binder) {
+        binder.setAllowedFields("requestKey","expectedVersion","effectiveFrom","enabled","managementTiming","insuranceTiming","receivableAccountId","applicationAccountId","processingAccountId","insuranceAccountId","policyReference","agreementReference","insurer","insurerVerification","allowCustom","customManagementLimit","saveChargePolicy");
+    }
+    private void productCharges(AppUserPrincipal actor,UUID product,Model model) {
+        if(!actor.getClaims().containsAll(List.of("LOAN_PRODUCTS_CONFIGURE","ACCOUNTING_ACCOUNTS_UPDATE")))return;
+        var editor=loanCharges.editor(actor,product,(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm)model.asMap().get("chargePolicy"));
+        model.addAttribute("chargePolicy",editor.form());model.addAttribute("currentChargePolicy",editor.current());
+        model.addAttribute("chargeAccounts",editor.accounts());model.addAttribute("generatedChargeAccounts",editor.generated());model.addAttribute("currentChargeMappings",editor.currentMappings());
+    }
     private void productApproval(AppUserPrincipal actor, UUID product, Model model) {
         if (!actor.getClaims().contains(UserClaim.APPROVAL_FLOW_VIEW.name())) return;
         if (!model.containsAttribute("groupRuleForm")) model.addAttribute("groupRuleForm", groupApprovals.rule(actor, product));
@@ -1134,6 +1145,7 @@ public class AdminController {
                                @RequestParam(required = false, defaultValue = "loan") String section,
                                @RequestParam(required = false) String modal,
                                @RequestParam(defaultValue = "false") boolean custom,
+                               @RequestParam(defaultValue = "") String task,
                                Model model) {
         if (custom) {
             if (!principal.getClaims().contains(UserClaim.APPROVAL_FLOW_VIEW.name())) throw new org.springframework.security.access.AccessDeniedException("Approval view required");
@@ -1173,6 +1185,7 @@ public class AdminController {
         model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
         model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
         productApproval(principal, null, model);
+        if("create".equals(task) || "create-product".equals(normalizeLoanSettingsModalKey(modal)))productCharges(principal,null,model);
         return "admin/settings-controls";
     }
 
@@ -1241,7 +1254,7 @@ public class AdminController {
     }
 
     @GetMapping("/settings-controls/loan-products/{id}/edit")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.hasAny(principal, 'LOAN_PRODUCTS_VIEW', 'APPROVAL_FLOW_VIEW')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and (@access.hasAny(principal, 'LOAN_PRODUCTS_VIEW', 'APPROVAL_FLOW_VIEW') or (@access.has(principal, 'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')) )")
     public String editLoanProduct(@PathVariable UUID id,
                                   @AuthenticationPrincipal AppUserPrincipal principal,
                                   Model model) {
@@ -1255,6 +1268,7 @@ public class AdminController {
         model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
         model.addAttribute("suppressToastMessages", true);
         productApproval(principal, id, model);
+        productCharges(principal,id,model);
         return "admin/loan-product-edit";
     }
 
@@ -1312,6 +1326,8 @@ public class AdminController {
     public String createLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
                                               @ModelAttribute("groupRuleForm") GroupRuleForm groupRuleForm,
                                               org.springframework.validation.BindingResult groupErrors,
+                                              @ModelAttribute("chargePolicy") com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm chargePolicy,
+                                              org.springframework.validation.BindingResult chargeErrors,
                                               @RequestParam(required = false) String productCode,
                                               @RequestParam(required = false) String productName,
                                               @RequestParam(required = false) String productDescription,
@@ -1350,6 +1366,7 @@ public class AdminController {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
                 if (groupErrors.hasErrors()) throw new IllegalArgumentException("loanGroups.error.steps");
+                if (chargePolicy.isSaveChargePolicy() && chargeErrors.hasErrors()) throw new IllegalArgumentException("charges.error.input");
                 LoanProductSetting product = adminService.createLoanProductTenure(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
@@ -1378,7 +1395,7 @@ public class AdminController {
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus,
-                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm
+                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm,chargePolicy.isSaveChargePolicy()?chargePolicy:null
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Loan product created successfully.");
@@ -1387,6 +1404,7 @@ public class AdminController {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
             attachLoanProductFormDraft(ra, request);
+            if(chargePolicy.isSaveChargePolicy()){ra.addFlashAttribute("chargePolicy",chargePolicy);if(ex.getMessage().startsWith("charges.error."))ra.addFlashAttribute("chargeError",ex.getMessage());}
             if (ex.getMessage().startsWith("loanGroups.error.")) ra.addFlashAttribute("groupError", ex.getMessage());
         }
         return loanSettingsRedirect(resolvedModalKey);

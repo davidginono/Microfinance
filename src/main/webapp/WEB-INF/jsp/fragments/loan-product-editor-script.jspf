@@ -654,6 +654,7 @@
             const firstServerError = form.querySelector('.field-error-input, [aria-invalid="true"]');
             let initialKey = workspace.querySelector('[data-product-approval-form] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'workflow'
                 ? 'workflow' : firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
+            if (workspace.querySelector('[data-product-config-step="accounts"] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'accounts') initialKey = 'accounts';
             if (!initialKey && storageKey) {
                 try {
                     initialKey = window.sessionStorage.getItem(storageKey);

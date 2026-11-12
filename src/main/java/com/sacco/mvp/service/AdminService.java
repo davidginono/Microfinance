@@ -79,6 +79,7 @@ public class AdminService {
     private final NameSignatureService nameSignatureService;
     private final ApplicationClock applicationClock;
     private final com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
+    private final com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges;
     private final com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService prepaymentService;
     private final com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService groupApprovals;
 
@@ -3051,7 +3052,8 @@ public class AdminService {
                                                 LoanProductStatus productStatus,
                                                 Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,
                                                 com.sacco.mvp.security.AppUserPrincipal actor,
-                                                com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval) {
+                                                com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval,
+                                                com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm chargePolicy) {
         if (actor == null || !saccoId.equals(actor.getSaccoId()) || !adminId.equals(actor.getMemberId()))
             throw new org.springframework.security.access.AccessDeniedException("Product scope mismatch");
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
@@ -3067,6 +3069,7 @@ public class AdminService {
             approval.setExpectedRevision(0);
             groupApprovals.saveRule(actor, approval);
         }
+        if(chargePolicy!=null){loanProductSettingRepository.flush();chargePolicy.setProductId(product.getId());loanCharges.savePolicy(actor,chargePolicy);}
         return product;
     }
 

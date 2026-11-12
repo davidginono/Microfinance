@@ -9,7 +9,8 @@ public final class LoanChargeDtos {
     private LoanChargeDtos() {}
     public enum Timing { SEPARATE, DEDUCT, FINANCED }
     @Data public static class PolicyForm {
-        private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,managementAccountId,insuranceAccountId;
+        private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,managementAccountId,insuranceAccountId,applicationAccountId,processingAccountId;
+        private boolean saveChargePolicy;
         @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
         private LocalDate effectiveFrom;
         private Timing managementTiming=Timing.SEPARATE,insuranceTiming=Timing.SEPARATE;
@@ -19,7 +20,27 @@ public final class LoanChargeDtos {
     }
     public record Policy(UUID id,UUID productId,LocalDate effectiveFrom,boolean enabled,Timing managementTiming,Timing insuranceTiming,
         UUID receivableAccountId,UUID managementAccountId,UUID insuranceAccountId,String policyReference,String agreementReference,
-        String insurer,String insurerVerification,boolean allowCustom,BigDecimal customManagementLimit) {}
+        String insurer,String insurerVerification,boolean allowCustom,BigDecimal customManagementLimit,
+        int accountingVersion,UUID applicationAccountId,UUID processingAccountId) {
+        public Policy(UUID id,UUID productId,LocalDate effectiveFrom,boolean enabled,Timing managementTiming,Timing insuranceTiming,
+                UUID receivableAccountId,UUID managementAccountId,UUID insuranceAccountId,String policyReference,String agreementReference,
+                String insurer,String insurerVerification,boolean allowCustom,BigDecimal customManagementLimit) {
+            this(id,productId,effectiveFrom,enabled,managementTiming,insuranceTiming,receivableAccountId,managementAccountId,insuranceAccountId,
+                policyReference,agreementReference,insurer,insurerVerification,allowCustom,customManagementLimit,1,null,null);
+        }
+        public int getAccountingVersion(){return accountingVersion;}
+        public String getPolicyReference(){return policyReference;}
+        public UUID account(String kind) {
+            return switch(kind) {case "INSURANCE" -> insuranceAccountId;case "APPLICATION" -> accountingVersion==1?managementAccountId:applicationAccountId;
+                case "PROCESSING" -> accountingVersion==1?managementAccountId:processingAccountId;default -> throw new IllegalArgumentException("charges.error.account");};
+        }
+        public String accountKind(String kind) {return kind.equals("INSURANCE")?"INSURANCE":accountingVersion==1?"MANAGEMENT":kind;}
+    }
+    public record GeneratedAccount(String component,UUID accountId,String label,String state) {
+        public String getComponent(){return component;} public UUID getAccountId(){return accountId;}
+        public String getLabel(){return label;} public String getState(){return state;}
+    }
+    public record Editor(PolicyForm form,Policy current,Map<String,List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice>> accounts,List<GeneratedAccount> generated,Map<String,String> currentMappings) {}
     public record Term(UUID id,String kind,String basis,BigDecimal basisValue,BigDecimal amount,Timing timing,
         UUID receivableAccountId,UUID liabilityAccountId,String evidence,String provider,String verification) {}
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)

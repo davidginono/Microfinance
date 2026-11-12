@@ -3,6 +3,7 @@ package com.sacco.mvp.accounting.repository;
 import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.*;
 import com.sacco.mvp.accounting.dto.AccountVersionDtos.*;
 import lombok.RequiredArgsConstructor;
+import com.sacco.mvp.security.AppUserPrincipal;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -135,6 +136,13 @@ public class GeneralLedgerRepository {
     }
     public Optional<Version> generatedAccountVersion(String institution,UUID account) {
         return jdbc.query(VERSION_SELECT+" where v.sacco_id=? and v.account_id=? and v.operation in ('CREATE','BASELINE') order by v.number desc limit 1",this::version,institution,account).stream().findFirst();
+    }
+    public boolean productFeeAccount(String institution,UUID product,String component) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_product_fee_account_provision where sacco_id=? and product_id=? and component=?)",Boolean.class,institution,product,component));
+    }
+    public void registerProductFeeAccount(AppUserPrincipal actor,UUID product,String component,Version version,OffsetDateTime now) {
+        jdbc.update("insert into loan_product_fee_account_provision(product_id,sacco_id,station_id,component,account_id,version_id,created_by,created_at) values(?,?,?,?,?,?,?,?)",
+            product,actor.getSaccoId(),actor.getStationId(),component,version.accountId(),version.id(),actor.getMemberId(),now);
     }
     public boolean generatedLoanAccount(String institution,UUID account) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_product_account_provision where sacco_id=? and (principal_account_id=? or interest_account_id=?))",Boolean.class,institution,account,account));

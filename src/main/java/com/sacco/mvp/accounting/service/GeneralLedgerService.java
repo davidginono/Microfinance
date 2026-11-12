@@ -318,8 +318,8 @@ public class GeneralLedgerService {
         var current=books.currentVersion(actor.getSaccoId(),old.accountId());var before=current.map(Version::proposed).orElse(null);
         require(old.operation().equals("CREATE")?current.isEmpty():current.isPresent(),"versionStale");
         var source=old.proposed();var a=before==null?source:before;
-        if(before==null && a.code().matches("LP-[A-F0-9]{32}-[PI]") && books.generatedLoanAccount(actor.getSaccoId(),a.id())) {
-            var parent=loanAccountFamily(actor,a.code().endsWith("-P"));int base=Integer.parseInt(parent.code());
+        if(before==null && (a.code().matches("LP-[A-F0-9]{32}-[PI]") || a.type().equals("ASSET") && a.code().matches("131[0-9]{3}")) && books.generatedLoanAccount(actor.getSaccoId(),a.id())) {
+            var parent=loanAccountFamily(actor,a.type().equals("ASSET"));int base=Integer.parseInt(parent.code());
             String code=books.availableChartCode(actor.getSaccoId(),base+1,base+999,1).orElseThrow(()->invalid("chartCode"));
             a=new Account(a.id(),code,a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),parent.id(),a.active(),a.nameSw(),a.description(),a.reporting());
         }
@@ -351,7 +351,7 @@ public class GeneralLedgerService {
         }
         return id;
     }
-    /** Product creation delegates only its two generated accounts; it grants no chart-management claims. */
+    /** Product creation delegates only its generated accounts; it grants no chart-management claims. */
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
     public ProductAccountVersions provisionLoanProductAccounts(String institution,UUID creator,UUID product,String productName) {
         var member=directory.find(creator).orElseThrow(()->new AccessDeniedException("Product creator unavailable"));
@@ -372,12 +372,37 @@ public class GeneralLedgerService {
             UUID version=createAccountVersion(actor,command,key,"Generated for loan product "+product,true,true);
             versions.add(books.version(institution,version).orElseThrow());
         }
+        provisionLoanProductFeeAccounts(institution,creator,product,productName);
         return new ProductAccountVersions(versions.get(0),versions.get(1));
     }
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void provisionLoanProductFeeAccounts(String institution,UUID creator,UUID product,String productName) {
+        var member=directory.find(creator).orElseThrow(()->new AccessDeniedException("Product creator unavailable"));
+        var actor=new AppUserPrincipal(member,userClaims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),member.isMemberAccess()));
+        require(Objects.equals(institution,actor.getSaccoId()),"account");
+        String claim=access.has(actor,"LOAN_PRODUCTS_CONFIGURE")?"LOAN_PRODUCTS_CONFIGURE":access.has(actor,"LOAN_PRODUCTS_UPDATE")?"LOAN_PRODUCTS_UPDATE":"LOAN_PRODUCTS_CREATE";
+        requireActor(actor,claim);
+        books.lockAccounts(institution);initializeChartDefaults(actor);
+        String name=trim(productName);require(!name.isEmpty(),"name");if(name.length()>130)name=name.substring(0,130);
+        for(String component:List.of("APPLICATION","PROCESSING")) {
+            if(books.productFeeAccount(institution,product,component))continue;
+            var root=books.accountCode(institution,"500000").orElseThrow();
+            var group=loanAccountGroup(actor,root,"510000","Loan income","Mapato ya mikopo");
+            boolean application=component.equals("APPLICATION");
+            var family=loanAccountGroup(actor,group,application?"512000":"513000",application?"Application fees":"Processing fees",application?"Ada za maombi":"Ada za uchakataji");
+            int base=Integer.parseInt(family.code());
+            String code=books.availableChartCode(institution,base+1,base+999,1).orElseThrow(()->invalid("chartCode"));
+            UUID key=UUID.nameUUIDFromBytes(("PRODUCT_FEE_ACCOUNT/"+product+"/"+component).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            var command=new AccountCommand(code,name+(application?" - Application fee":" - Processing fee"),"INCOME","CREDIT","POSTING","INCOME",family.id(),null,"Loan product "+product+" "+component.toLowerCase(Locale.ROOT));
+            UUID version=createAccountVersion(actor,command,key,"Generated for loan product "+product,true,true);
+            books.registerProductFeeAccount(actor,product,component,books.version(institution,version).orElseThrow(),clock.now());
+        }
+    }
     private Account loanAccountFamily(AppUserPrincipal actor,boolean principal) {
-        var root=books.accountCode(actor.getSaccoId(),principal?"100000":"500000").orElseThrow(()->invalid("parent"));
-        var group=loanAccountGroup(actor,root,principal?"130000":"510000",principal?"Loans":"Loan income",principal?"Mikopo":"Mapato ya mikopo");
-        return loanAccountGroup(actor,group,principal?"131000":"511000",principal?"Loan principal":"Loan interest",principal?"Mtaji wa mkopo":"Riba ya mkopo");
+        var root=books.accountCode(actor.getSaccoId(),principal?"110000":"500000").orElseThrow(()->invalid("parent"));
+        if(principal)return loanAccountGroup(actor,root,"112000","Loan principal","Mtaji wa mkopo");
+        var group=loanAccountGroup(actor,root,"510000","Loan income","Mapato ya mikopo");
+        return loanAccountGroup(actor,group,"511000","Loan interest","Riba ya mkopo");
     }
     private Account loanAccountGroup(AppUserPrincipal actor,Account parent,String code,String name,String nameSw) {
         var group=books.accountCode(actor.getSaccoId(),code);

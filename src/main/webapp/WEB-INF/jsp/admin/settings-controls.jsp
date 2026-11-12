@@ -303,7 +303,7 @@
 
 <c:if test="${creatingLoanProduct}">
 <div class="admin-focused-form">
-                <form action="/admin/settings-controls/loan-products"
+                <form id="loanProductCreateForm" action="/admin/settings-controls/loan-products"
                       method="post"
                       class="product-builder-form accounting-create-form admin-product-create"
                       data-inline-validation-form="loan-settings"
@@ -438,6 +438,11 @@
                     <section class="product-builder-section">
                         <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
                         <div class="product-builder-section-body"><%@ include file="../fragments/loan-product-approval-fields.jspf" %></div>
+                    </section>
+                    </sec:authorize>
+                    <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')">
+                    <section class="product-builder-section"><div class="product-builder-section-header"><h2><spring:message code="productAccounts.title" /></h2></div>
+                        <div class="product-builder-section-body product-builder-grid two-up"><c:set var="chargeFormId" value="loanProductCreateForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></div>
                     </section>
                     </sec:authorize>
                     <div class="admin-form-actions">

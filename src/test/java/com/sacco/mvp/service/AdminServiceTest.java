@@ -78,6 +78,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
     private final com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService groupApprovals = org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class);
+    private final com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges = org.mockito.Mockito.mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"daniel.manager"})
@@ -276,6 +277,7 @@ class AdminServiceTest {
             nameSignatureService,
             applicationClock,
             org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanProductAccountService.class),
+            loanCharges,
             org.mockito.Mockito.mock(com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService.class),
             groupApprovals
         );
@@ -436,12 +438,26 @@ class AdminServiceTest {
         var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"WORKFLOW","Workflow Loan","Staff approval",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval);
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,null);
         assertThat(approval.getProductId()).isEqualTo(product.getId()).isNotEqualTo(suppliedProduct);
         assertThat(approval.getExpectedRevision()).isZero();
         verify(groupApprovals).saveRule(actor,approval);
         assertThat(product.getMinTenure()).isEqualTo(1);
         assertThat(product.getMaxTenure()).isEqualTo(12);
+    }
+
+    @Test void creatingProductSavesChargeSetupForTheServerGeneratedProduct() {
+        var actor=new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01")
+            .stationId("ST-1").position(Position.ICT_MANAGER).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),
+            Set.of(UserClaim.LOAN_PRODUCTS_CREATE,UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
+        var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();var supplied=UUID.randomUUID();policy.setProductId(supplied);
+        when(loanProductSettingRepository.save(any())).thenAnswer(call->call.getArgument(0));
+        var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"CHARGES","Fee loan","Staff charge setup",1,
+            new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.TEN,BigDecimal.ZERO,new BigDecimal("0.01"),
+            BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,policy);
+        assertThat(policy.getProductId()).isEqualTo(product.getId()).isNotEqualTo(supplied);
+        verify(loanCharges).savePolicy(actor,policy);
     }
 
     @org.junit.jupiter.params.ParameterizedTest
