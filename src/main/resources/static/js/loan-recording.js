@@ -57,7 +57,6 @@
   });
   initChoices(document);
   window.addEventListener('pagehide', () => document.querySelectorAll('[data-loan-choice]').forEach(box => choiceCleanup.get(box)?.()));
-  document.addEventListener('loan:choices-added', event => initChoices(event.target));
   const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');
   if(disbursementSelect){let sequence=0, controller;disbursementSelect.addEventListener('change',async()=>{
     controller?.abort();controller=new AbortController();const version=++sequence,form=disbursementSelect.form;

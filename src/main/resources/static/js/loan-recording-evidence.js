@@ -95,7 +95,6 @@
                 if (list.children.length) return;
                 list.append(root.querySelector('[data-row-template="' + list.dataset.repeatList + '"]').content.cloneNode(true));
                 reindex(list);
-                list.lastElementChild.dispatchEvent(new Event('loan:choices-added',{bubbles:true}));
             }
             function placeAdd(list, button) {
                 var actions = list.lastElementChild?.querySelector('.recording-item-actions');
@@ -115,8 +114,7 @@
                     if (list.children.length >= 20) return;
                     list.append(root.querySelector('[data-row-template="' + kind + '"]').content.cloneNode(true));
                     reindex(list); placeAdd(list, button);
-                    list.lastElementChild.dispatchEvent(new Event('loan:choices-added',{bubbles:true}));
-                    (list.lastElementChild.querySelector('.neo-select-button') || list.lastElementChild.querySelector('input,select'))?.focus();
+                    list.lastElementChild.querySelector('input,select')?.focus();
                     button.disabled = list.children.length >= 20;
                     form.dispatchEvent(new Event('change',{bubbles:true}));
                 });
@@ -182,7 +180,7 @@
                     var row = target.lastElementChild;
                     row.querySelector('[data-evidence-filename]').textContent = file.name;
                     var title = row.querySelector('[data-document-field="documentNames"]');
-                    var subject = photo ? (kind === 'guarantors' ? owner.querySelector('[data-choice-select]')?.selectedOptions[0]?.textContent : owner.querySelector('[name$=".itemName"]')?.value) : '';
+                    var subject = photo ? (kind === 'guarantors' ? owner.querySelector('[data-field="fullName"]')?.value : owner.querySelector('[name$=".itemName"]')?.value) : '';
                     title.value = ((subject ? subject.trim() + ' - ' : '') + file.name).slice(0,120);
                     row.querySelector('[data-document-field="documentTypes"]').value = photo ? type : 'OTHER';
                     var upload = {file:file, row:row, owner:owner}; uploads.push(upload);
@@ -227,8 +225,7 @@
                 root.querySelectorAll('[data-repeat-list]').forEach(reindex);
                 uploads.forEach(function (upload,index) {
                     if (upload.owner) {
-                        var choice = upload.owner.querySelector('[data-choice-select]');
-                        var subject = choice ? (choice.value ? choice.selectedOptions[0]?.textContent : '') : upload.owner.querySelector('[name$=".itemName"]')?.value;
+                        var subject = upload.owner.querySelector('[data-field="fullName"],[data-field="itemName"]')?.value;
                         upload.row.querySelector('[data-document-field="documentNames"]').value = ((subject ? subject.trim() + ' - ' : '') + upload.file.name).slice(0,120);
                     }
                     upload.row.querySelectorAll('[data-document-field]').forEach(function (control) {

@@ -356,3 +356,30 @@ test('the recording wizard validates each step and preserves fields and uploads'
 
   } finally {dom.window.close();}
 });
+
+
+test('typed guarantor names label photos and survive item reindexing', () => {
+  const source = require('node:fs').readFileSync('src/main/resources/static/js/loan-recording-evidence.js','utf8');
+  const row = '<div data-repeat-row><div><label>Name</label><input data-field="fullName" required></div><div class="recording-row-photos"><label class="attachment-dropzone"><input type="file" data-row-photos><span class="attachment-dropzone-help">Photo required</span></label></div><div class="recording-item-actions"><button type="button" data-remove-row>Remove</button></div><div data-row-photo-list></div></div>';
+  const dom = new JSDOM('<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId"><div data-recording-evidence><nav data-recording-steps><button type="button" data-recording-step-button aria-controls="guarantors">Guarantors</button></nav><section id="guarantors"><h2 data-recording-step-heading>Guarantors</h2><div data-repeat-list="guarantors"></div><button type="button" data-add-row="guarantors">Add</button></section><template data-row-template="guarantors">'+row+'</template><input type="file" name="attachments"><div data-evidence-documents></div><template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames" required></label><label><select data-document-field="documentTypes"><option>GUARANTOR_PHOTO</option></select></label><label><select data-document-field="requiredAttachmentIds"><option value=""></option></select></label><button type="button" data-remove-upload data-remove-label="Remove"></button></div></template><div data-evidence-error></div><div data-evidence-requirements></div><div data-evidence-fields></div></div><button type="button" data-recording-previous>Previous</button><button type="button" data-recording-next>Next</button><button type="submit" data-recording-submit>Save</button></form>',{runScripts:'outside-only'});
+  try {
+    const w=dom.window,d=w.document,files=d.querySelector('[name=attachments]');
+    Object.defineProperty(files,'files',{value:[],writable:true});
+    w.DataTransfer=class {files=[];items={add:file=>this.files.push(file)};};
+    w.WorkspaceNavigation={onReady:callback=>callback()};w.eval(source);
+    const name=d.querySelector('[data-field=fullName]');name.value='Asha Example';name.dispatchEvent(new w.Event('input',{bubbles:true}));
+    assert.equal(name.name,'applicationDetails.guarantors[0].fullName');
+    const picker=d.querySelector('[data-row-photos]');
+    Object.defineProperty(picker,'files',{value:[new w.File(['photo'],'guarantor.png',{type:'image/png'})],writable:true});
+    picker.dispatchEvent(new w.Event('change',{bubbles:true}));
+    const title=d.querySelector('[data-document-field=documentNames]');
+    assert.equal(title.value,'Asha Example - guarantor.png');
+    assert.equal(d.querySelector('[data-remove-upload]').getAttribute('aria-label'),'Remove guarantor.png');
+    name.value='Asha Updated';name.dispatchEvent(new w.Event('input',{bubbles:true}));
+    d.querySelector('form').dispatchEvent(new w.Event('submit',{cancelable:true}));
+    assert.equal(title.value,'Asha Updated - guarantor.png');
+    d.querySelector('[data-remove-row]').click();
+    assert.equal(files.files.length,0);
+    assert.equal(d.querySelector('[data-field=fullName]').name,'');
+  } finally {dom.window.close();}
+});

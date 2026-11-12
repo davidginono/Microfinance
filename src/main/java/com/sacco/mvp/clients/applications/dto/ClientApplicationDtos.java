@@ -24,7 +24,10 @@ public final class ClientApplicationDtos {
         private boolean declarationAccepted;
     }
     @Data public static class Guarantor {
+        // Retained for historical client-linked guarantors. New recording uses fullName.
         private UUID clientId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+        private String fullName="";
         private String relationship="",business="",location="",phone="";
     }
     @Data public static class Collateral {

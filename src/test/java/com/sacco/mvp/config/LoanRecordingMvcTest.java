@@ -211,6 +211,16 @@ class LoanRecordingMvcTest {
             .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"));
         verify(charges).policy(admin,product);
     }
+    @Test void recordingBindsGuarantorNamesWithoutAcceptingClientLinks() throws Exception {
+        var id=UUID.randomUUID();when(service.save(eq(actor),any(),any())).thenReturn(id);
+        mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
+            .param("applicationDetails.guarantors[0].fullName","Asha Example")
+            .param("applicationDetails.guarantors[0].clientId",UUID.randomUUID().toString()))
+            .andExpect(redirectedUrl("/finance/loan-records/"+id));
+        verify(service).save(eq(actor),argThat(f->f.getApplicationDetails().getGuarantors().getFirst().getFullName().equals("Asha Example")
+            && f.getApplicationDetails().getGuarantors().getFirst().getClientId()==null),any());
+        mvc.perform(get("/finance/loan-recording/evidence/choices/guarantors").with(user(actor))).andExpect(status().isNotFound());
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}
         @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService charges(){return mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}

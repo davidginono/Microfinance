@@ -25,7 +25,8 @@ class LoanRecordingProfileTest {
     final LoanProductSettingRepository products=mock(LoanProductSettingRepository.class);
     final LoanProductRequiredAttachmentService requirements=mock(LoanProductRequiredAttachmentService.class);
     final FormSchemaService schemas=new FormSchemaService(products,JsonMapper.builder().build());
-    final LoanRecordingEvidenceService evidence=new LoanRecordingEvidenceService(mock(LoanRecordingRepository.class),
+    final LoanRecordingRepository records=mock(LoanRecordingRepository.class);
+    final LoanRecordingEvidenceService evidence=new LoanRecordingEvidenceService(records,
         mock(GeneralLedgerService.class),schemas,requirements,applications,onboarding);
     final UUID product=UUID.randomUUID(),client=UUID.randomUUID(),revision=UUID.randomUUID();
     final String schema="""
@@ -104,5 +105,55 @@ class LoanRecordingProfileTest {
     @Test void removedProfileQuestionsCannotBePostedAsDynamicOverrides() {
         var f=form();evidence.applyClientProfile(actor,f);f.getApplicationDetails().getFields().put("incomeSource","Forged source");
         assertThatThrownBy(()->evidence.prepare(actor,f,List.of())).hasMessage("applications.error.details");
+    }
+
+    @Test void guarantorNamesNeedNoClientRecordAndSurviveJsonRoundTrip() {
+        var f=form();f.setLoanMode("CUSTOM");
+        var g=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor();
+        g.setFullName("  Asha Example  ");g.setPhone("255712345678");
+        f.getApplicationDetails().getGuarantors().add(g);
+        evidence.prepare(actor,f,List.of());
+        assertThat(g.getFullName()).isEqualTo("Asha Example");assertThat(g.getClientId()).isNull();
+        var json=JsonMapper.builder().build();
+        var restored=json.readValue(json.writeValueAsString(f),RecordForm.class);
+        assertThat(restored.getApplicationDetails().getGuarantors().getFirst().getFullName()).isEqualTo("Asha Example");
+    }
+    @Test void incompleteOrInvalidGuarantorNamesReturnAFieldError() {
+        for(String name:List.of("", " ", "a".repeat(256), "Asha\nExample")) {
+            var f=form();f.setLoanMode("CUSTOM");
+            var g=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor();g.setFullName(name);
+            f.getApplicationDetails().getGuarantors().add(g);
+            assertThatThrownBy(()->evidence.prepare(actor,f,List.of())).isInstanceOfSatisfying(
+                LoanRecordingEvidenceService.FieldValidation.class,error->assertThat(error.field()).isEqualTo("applicationDetails.guarantors[0].fullName"));
+        }
+    }
+    @Test void historicalClientLinkedGuarantorsRemainScopedAndLoadIntoTheNameField() {
+        var id=UUID.randomUUID();var g=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor();g.setClientId(id);
+        var f=form();f.setLoanMode("CUSTOM");f.getApplicationDetails().getGuarantors().add(g);
+        assertThatThrownBy(()->evidence.prepare(actor,f,List.of())).hasMessage("applications.error.guarantors");
+        when(records.evidenceClients(eq(actor),anyCollection())).thenReturn(Map.of(id,"CL-1 - Historical Name"));
+        assertThatCode(()->evidence.prepare(actor,f,List.of())).doesNotThrowAnyException();
+        var draft=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Form();draft.getGuarantors().add(g);
+        var application=UUID.randomUUID();when(applications.form(actor,null,application)).thenReturn(draft);
+        assertThat(evidence.draftForm(actor,application).getApplicationDetails().getGuarantors().getFirst().getFullName()).isEqualTo("Historical Name");
+        assertThat(g.getClientId()).isEqualTo(id);
+    }
+    @Test void clientApplicationDraftsKeepUnregisteredGuarantorNames() {
+        var repository=mock(com.sacco.mvp.clients.applications.repository.ClientApplicationRepository.class);
+        var workflow=mock(LoanWorkflowService.class);var clock=mock(ApplicationClock.class);
+        var transactions=mock(org.springframework.transaction.PlatformTransactionManager.class);
+        when(transactions.getTransaction(any())).thenReturn(mock(org.springframework.transaction.TransactionStatus.class));
+        var service=new ClientApplicationService(repository,onboarding,schemas,workflow,requirements,mock(LoanAttachmentService.class),
+            mock(FinancialDetailsService.class),clock,JsonMapper.builder().build(),transactions,mock(AuditService.class));
+        when(actor.isStaffSession()).thenReturn(true);when(clock.today()).thenReturn(java.time.LocalDate.of(2026,11,12));
+        var draft=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Form();draft.setClientId(client);draft.setProductId(product);
+        draft.setApplicationDate(clock.today());draft.setAmount(new BigDecimal("1000.00"));draft.setTenureValue(6);
+        for(String name:List.of("Asha Example","Juma Example")) {
+            var g=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor();g.setFullName(name);draft.getGuarantors().add(g);
+        }
+        var id=UUID.randomUUID();when(workflow.saveRecordingDraft(any(),any(),any(),any(),any(),any(),any())).thenReturn(id);
+        assertThat(service.save(actor,draft,List.of())).isEqualTo(id);
+        verify(repository).command(eq(actor),eq(id),eq(client),eq(1),eq(draft.getRequestKey()),anyString(),contains("Asha Example"),any());
+        assertThat(draft.getGuarantors()).hasSize(2);
     }
 }

@@ -88,12 +88,16 @@ public class ClientApplicationService {
         check(files==null||files.size()<=10,"attachments");var uploads=new ArrayList<LoanAttachmentService.NamedUpload>();long total=0;
         if(files!=null)for(int i=0;i<files.size();i++){var file=files.get(i);if(file==null||file.isEmpty())continue;total+=file.getSize();check(file.getSize()<=5*1024*1024&&total<=25*1024*1024,"attachments");String title=at(f.getDocumentNames(),i),type=at(f.getDocumentTypes(),i),id=at(f.getRequiredAttachmentIds(),i);text(title,120,true);check(DOCUMENT_TYPES.contains(type),"attachments");UUID requiredId=id.isBlank()?null:UUID.fromString(id);if(requiredId!=null){var def=required.get(requiredId);check(def!=null&&file.getSize()<=requirements.maxSizeBytes(def),"attachments");title=def.getAttachmentName();}uploads.add(new LoanAttachmentService.NamedUpload(file,title,type,requiredId));}
         check(f.getGuarantors()!=null&&f.getGuarantors().size()<=20&&f.getCollateral()!=null&&f.getCollateral().size()<=20,"details");
-        f.getGuarantors().removeIf(g->g!=null&&g.getClientId()==null&&g.getRelationship().isBlank()&&g.getBusiness().isBlank()&&g.getLocation().isBlank()&&g.getPhone().isBlank());
+        f.getGuarantors().removeIf(g->g!=null&&g.getClientId()==null&&Objects.toString(g.getFullName(),"").isBlank()&&g.getRelationship().isBlank()&&g.getBusiness().isBlank()&&g.getLocation().isBlank()&&g.getPhone().isBlank());
         f.getCollateral().removeIf(c->c!=null&&c.getItemName().isBlank()&&c.getItemNumber().isBlank()&&c.getItemType().isBlank()&&c.getDescription().isBlank()&&c.getEstimatedValue()==null&&c.getOwner().isBlank()&&c.getPhone().isBlank()&&c.getLocation().isBlank());
         var labels=guarantorLabels(a,f);
-        for(var g:f.getGuarantors()){check(g!=null&&g.getClientId()!=null&&!g.getClientId().equals(f.getClientId())&&labels.containsKey(g.getClientId()),"guarantors");text(g.getRelationship(),255,false);text(g.getBusiness(),255,false);text(g.getLocation(),255,false);phone(g.getPhone());}
+        for(var g:f.getGuarantors()){
+            check(g!=null,"guarantors");
+            if(g.getClientId()!=null)check(!g.getClientId().equals(f.getClientId())&&labels.containsKey(g.getClientId()),"guarantors");
+            else {text(g.getFullName(),255,true);check(g.getFullName().codePoints().noneMatch(Character::isISOControl),"guarantorName");g.setFullName(g.getFullName().strip());}
+            text(g.getRelationship(),255,false);text(g.getBusiness(),255,false);text(g.getLocation(),255,false);phone(g.getPhone());}
         for(var c:f.getCollateral()){check(c!=null,"collateral");text(c.getItemName(),255,true);text(c.getItemNumber(),100,false);text(c.getItemType(),100,false);text(c.getDescription(),500,false);text(c.getOwner(),255,false);text(c.getLocation(),255,false);phone(c.getPhone());money(c.getEstimatedValue(),false);}
-        var selected=f.getGuarantors().stream().map(Guarantor::getClientId).toList();check(new HashSet<>(selected).size()==selected.size(),"guarantors");
+        var selected=f.getGuarantors().stream().map(Guarantor::getClientId).filter(Objects::nonNull).toList();check(new HashSet<>(selected).size()==selected.size(),"guarantors");
         var fields=parameters(f,p);String hash=hash(List.of(f,uploads.stream().map(u->List.of(u.title(),u.purpose(),Objects.toString(u.requiredId(),""),Objects.toString(u.file().getOriginalFilename(),""),fileHash(u.file()))).toList()));
         var tx=new TransactionTemplate(transactions);tx.setTimeout(30);
         return tx.execute(status->{

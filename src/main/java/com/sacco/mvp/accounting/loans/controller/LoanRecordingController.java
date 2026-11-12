@@ -38,7 +38,7 @@ public class LoanRecordingController {
     private final LoanRecordingEvidenceService evidence;
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalidRequest(IllegalArgumentException exception,Model model){model.addAttribute("recordingError",error(exception));return "accounting/loans/error";}
-    @InitBinder("recordForm") public void recordBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(100);b.setAllowedFields("applicationId","expectedVersion","applicationDetails.declarationAccepted","applicationDetails.fields[*]","applicationDetails.guarantors[*].clientId","applicationDetails.guarantors[*].relationship","applicationDetails.guarantors[*].business","applicationDetails.guarantors[*].location","applicationDetails.guarantors[*].phone","applicationDetails.collateral[*].itemName","applicationDetails.collateral[*].itemNumber","applicationDetails.collateral[*].itemType","applicationDetails.collateral[*].description","applicationDetails.collateral[*].phone","applicationDetails.documentNames[*]","applicationDetails.documentTypes[*]","applicationDetails.requiredAttachmentIds[*]","requestKey","clientId","topUpSourceLoanId","productId","applicationDate","principal","months","tenureUnit","tenureValue","loanMode","interestEntry","interestBasis","interestPercent","interestAmount","customFrequency","customMethod","purpose","guarantors","collateral","evidence","customApplicationCharge","customProcessingCharge","insurancePremium","customProcessingPercent","customInsurancePercent","customProcessingBasis","customInsuranceBasis");}
+    @InitBinder("recordForm") public void recordBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(100);b.setAllowedFields("applicationId","expectedVersion","applicationDetails.declarationAccepted","applicationDetails.fields[*]","applicationDetails.guarantors[*].fullName","applicationDetails.guarantors[*].relationship","applicationDetails.guarantors[*].business","applicationDetails.guarantors[*].location","applicationDetails.guarantors[*].phone","applicationDetails.collateral[*].itemName","applicationDetails.collateral[*].itemNumber","applicationDetails.collateral[*].itemType","applicationDetails.collateral[*].description","applicationDetails.collateral[*].phone","applicationDetails.documentNames[*]","applicationDetails.documentTypes[*]","applicationDetails.requiredAttachmentIds[*]","requestKey","clientId","topUpSourceLoanId","productId","applicationDate","principal","months","tenureUnit","tenureValue","loanMode","interestEntry","interestBasis","interestPercent","interestAmount","customFrequency","customMethod","purpose","guarantors","collateral","evidence","customApplicationCharge","customProcessingCharge","insurancePremium","customProcessingPercent","customInsurancePercent","customProcessingBasis","customInsuranceBasis");}
     @GetMapping({"/loan-records","/loan-disbursements","/loan-repayments"})
     public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
@@ -90,15 +90,9 @@ public class LoanRecordingController {
         if(form.getApplicationDetails()==null)form.setApplicationDetails(new ApplicationDetails());
         if(form.getApplicationId()!=null)model.addAttribute("savedApplicationDocuments",evidence.draftDocuments(actor,form.getApplicationId()));
         model.addAttribute("documentTypes",com.sacco.mvp.clients.applications.service.ClientApplicationService.DOCUMENT_TYPES);
-        model.addAttribute("evidenceGuarantorLabels",evidence.labels(actor,form.getApplicationDetails()));
         if(form.getClientId()!=null){var client=service.recordClient(actor,form.getClientId());model.addAttribute("selectedClientLabel",client.label());model.addAttribute("selectedClientType",client.purpose());}
         if("CONFIGURED".equals(form.getLoanMode()) && form.getProductId()!=null)
             try{model.addAttribute("evidenceProduct",evidence.product(actor,form.getProductId()));}catch(IllegalArgumentException ignored){/* Preserve entered values if the product became unavailable. */}
-    }
-    @GetMapping("/loan-recording/evidence/choices/guarantors") @ResponseBody
-    public ResponseEntity<?> evidenceGuarantors(@AuthenticationPrincipal AppUserPrincipal actor,
-        @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(evidence.guarantorChoices(actor,search,page));
     }
     @GetMapping("/loan-recording/evidence/product/{id}") @ResponseBody
     public ResponseEntity<?> evidenceProduct(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Locale locale) {

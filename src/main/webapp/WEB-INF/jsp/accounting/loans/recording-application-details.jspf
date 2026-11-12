@@ -7,7 +7,7 @@
 </dl></section>
 <section class="accounting-section erp-detail-card"><h2><spring:message code="applications.guarantors"/></h2>
 <c:forEach items="${supportingDetails.guarantors}" var="row"><dl class="erp-detail-facts">
-<c:forEach items="${['clientId','relationship','business','location','phone']}" var="key"><div><dt><spring:message code="applications.${key}"/></dt><dd><c:choose><c:when test="${key=='clientId'}"><c:out value="${evidenceGuarantorLabels[row.clientId]}"/></c:when><c:otherwise><c:out value="${row[key]}"/></c:otherwise></c:choose></dd></div></c:forEach>
+<c:forEach items="${['fullName','relationship','business','location','phone']}" var="key"><div><dt><c:choose><c:when test="${key=='fullName'}"><spring:message code="recording.guarantorName"/></c:when><c:otherwise><spring:message code="applications.${key}"/></c:otherwise></c:choose></dt><dd><c:choose><c:when test="${key=='fullName' and empty row.fullName}"><c:out value="${evidenceGuarantorLabels[row.clientId]}"/></c:when><c:otherwise><c:out value="${row[key]}"/></c:otherwise></c:choose></dd></div></c:forEach>
 </dl></c:forEach></section>
 <section class="accounting-section erp-detail-card"><h2><spring:message code="applications.collateral"/></h2>
 <c:forEach items="${supportingDetails.collateral}" var="row"><dl class="erp-detail-facts">

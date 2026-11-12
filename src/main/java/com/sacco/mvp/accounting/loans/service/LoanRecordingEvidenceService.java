@@ -37,13 +37,6 @@ public class LoanRecordingEvidenceService {
     }
 
     @Transactional(readOnly=true)
-    public List<Choice> guarantorChoices(AppUserPrincipal actor,String search,int page) {
-        accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
-        check(search!=null && search.length()<=100 && page>=0 && page<=10000,"query");
-        return records.clients(actor,search,page);
-    }
-
-    @Transactional(readOnly=true)
     public ClientApplicationDtos.ProductForm product(AppUserPrincipal actor,UUID id) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         var product=schemas.getSchema(actor.getSaccoId(),id,null);
@@ -57,8 +50,7 @@ public class LoanRecordingEvidenceService {
                 .map(r->new ClientApplicationDtos.Requirement(r.getId(),r.getAttachmentName(),r.getMaxSizeMb())).toList());
     }
 
-    @Transactional(readOnly=true)
-    public Map<UUID,String> labels(AppUserPrincipal actor,ApplicationDetails details) {
+    private Map<UUID,String> labels(AppUserPrincipal actor,ApplicationDetails details) {
         accounting.requireActor(actor,"LOAN_RECORDING_CREATE");
         if(details==null || details.getGuarantors()==null)return Map.of();
         check(details.getGuarantors().size()<=20,"guarantors");
@@ -80,8 +72,16 @@ public class LoanRecordingEvidenceService {
         for(int index=0;index<details.getGuarantors().size();index++) {
             var guarantor=details.getGuarantors().get(index);
             String row="applicationDetails.guarantors["+index+"].";
-            checkField(guarantor!=null && guarantor.getClientId()!=null && !guarantor.getClientId().equals(form.getClientId())
-                && labels.containsKey(guarantor.getClientId()) && selected.add(guarantor.getClientId()),row+"clientId","guarantors");
+            checkField(guarantor!=null,row+"fullName","guarantorName");
+            if(guarantor.getClientId()!=null) {
+                checkField(!guarantor.getClientId().equals(form.getClientId()) && labels.containsKey(guarantor.getClientId())
+                    && selected.add(guarantor.getClientId()),row+"fullName","guarantors");
+            } else {
+                String name=guarantor.getFullName();
+                checkField(name!=null && !name.isBlank() && name.length()<=255
+                    && name.codePoints().noneMatch(Character::isISOControl),row+"fullName","guarantorName");
+                guarantor.setFullName(name.strip());
+            }
             text(guarantor.getRelationship(),255);text(guarantor.getBusiness(),255);text(guarantor.getLocation(),255);
             phone(guarantor.getPhone(),row+"phone");
         }
@@ -162,7 +162,13 @@ public class LoanRecordingEvidenceService {
         form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(draft.getExpenses());form.setOtherDebt(draft.getOtherDebt());
         var details=form.getApplicationDetails()==null?new ApplicationDetails():form.getApplicationDetails();
         details.setUseOfFunds(draft.getUseOfFunds());
-        details.setGuarantors(draft.getGuarantors());details.setCollateral(draft.getCollateral());details.setFields(new LinkedHashMap<>(draft.getFields()));
+        details.setGuarantors(draft.getGuarantors());
+        var legacyNames=labels(actor,details);
+        details.getGuarantors().stream().filter(Objects::nonNull).filter(g->g.getFullName()==null||g.getFullName().isBlank()).forEach(g->{
+            String label=legacyNames.get(g.getClientId());
+            if(label!=null)g.setFullName(label.contains(" - ")?label.substring(label.indexOf(" - ")+3):label);
+        });
+        details.setCollateral(draft.getCollateral());details.setFields(new LinkedHashMap<>(draft.getFields()));
         details.getFields().keySet().removeAll(STANDARD);
         details.setDocumentNames(new ArrayList<>());details.setDocumentTypes(new ArrayList<>());details.setRequiredAttachmentIds(new ArrayList<>());
         details.setDeclarationAccepted(false);form.setApplicationDetails(details);return form;
