@@ -40,8 +40,8 @@
 .recording-loan-panel [data-evidence-fields]{display:contents}
 .recording-evidence-panel{padding:16px 20px}.recording-evidence-panel[hidden]{display:none}.recording-evidence-panel [data-add-row]{margin-top:12px}.recording-evidence-panel h3{font-size:1rem;font-weight:600;margin:16px 0 8px}.recording-evidence-row{padding:12px 0;border-bottom:1px solid #d5dbdb}.recording-evidence-row>button{margin-top:8px}.recording-evidence-panel .aws-control{width:100%;min-width:0}.recording-declaration{display:flex;align-items:flex-start;gap:8px;margin-top:16px}.recording-declaration input{flex:0 0 auto}.recording-application-evidence [data-evidence-filename]{display:block;overflow-wrap:anywhere}
 
-.recording-row-photos{max-width:728px;margin-top:16px;min-width:0}
-.recording-photo-list{display:grid;gap:8px;margin-top:8px}
+.recording-row-photos{min-width:0}
+.recording-photo-list{display:grid;gap:8px;min-width:0}.recording-photo-list:empty{display:none}
 .recording-photo-token{display:flex;align-items:center;gap:12px;border:1px solid #d5dbdb;padding:12px;min-width:0}
 .recording-photo-token .loan-form-grid{flex:1;min-width:0}
 .recording-photo-token label[hidden]{display:none!important}
@@ -52,15 +52,19 @@
 .recording-saved-files li{display:flex;align-items:center;gap:12px;border:1px solid #d5dbdb;padding:12px;min-width:0}
 .recording-saved-files a{flex:1;min-width:0;overflow-wrap:anywhere}
 
-/* Keep item actions beside the complete field and photo group. */
-.aws-console [data-repeat-row]{display:grid;grid-template-columns:minmax(0,1fr) 13rem;align-items:start;gap:16px}
-.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));align-items:start;gap:16px;max-width:none;min-width:0}
-.aws-console [data-repeat-row]>.loan-form-grid>div{min-width:0}
-.aws-console [data-repeat-row]>.loan-form-grid>.recording-row-photos{max-width:none;margin:0}
-.recording-row-photos .attachment-dropzone-copy{min-width:0}
-.aws-console [data-repeat-row]>.recording-item-actions{display:flex;flex-flow:row nowrap;align-items:center;align-self:end;gap:8px;max-width:100%}
+/* The phone, chooser and item actions share one control row. */
+.aws-console [data-repeat-row]{display:grid;gap:16px;min-width:0}
+.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px;max-width:none;width:calc(100% - 13rem - 16px);min-width:0}
+.recording-item-footer{display:flex;flex-flow:row wrap;align-items:flex-start;gap:16px;min-width:0}
+.recording-item-footer>.recording-phone,.recording-item-footer>.recording-row-photos{flex:1 1 0;min-width:0}
+.aws-console .recording-item-footer .recording-phone>label,.aws-console .recording-item-footer .attachment-dropzone-title{display:block;font-size:14px;font-weight:400;line-height:20px;margin:0}
+.aws-console .recording-item-footer .attachment-dropzone{display:block;padding:0;margin:0;border:0;background:transparent}
+.recording-item-footer .attachment-dropzone-main{display:flex;flex-direction:column;align-items:flex-start;gap:0}
+.recording-item-footer .attachment-dropzone-action{height:32px;box-sizing:border-box}
+.recording-item-footer .recording-phone>.aws-control{height:32px;box-sizing:border-box}
+.aws-console .recording-item-actions{display:flex;flex:0 0 13rem;flex-flow:row nowrap;align-items:center;gap:8px;padding-top:20px;max-width:100%}
 .aws-console .recording-item-actions [data-add-row]{margin:0}
 .recording-item-actions button{flex:0 0 auto}
 .recording-file-remove{flex:0 0 auto;align-self:center}
-@media(max-width:767px){.aws-console [data-repeat-row]{grid-template-columns:minmax(0,1fr)}.aws-console [data-repeat-row]>.recording-item-actions{justify-self:end}}
-@media(max-width:480px){.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:767px){.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{width:100%}.recording-item-footer>.recording-phone,.recording-item-footer>.recording-row-photos{flex-basis:calc(50% - 8px)}.aws-console .recording-item-actions{flex-basis:auto;padding-top:0;margin-left:auto}}
+@media(max-width:480px){.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{grid-template-columns:minmax(0,1fr)}.recording-item-footer>.recording-phone,.recording-item-footer>.recording-row-photos{flex-basis:100%}}
