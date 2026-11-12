@@ -90,7 +90,6 @@
       recordForm.querySelector('[data-reducing-terms-note]').hidden = !reducing || basis.value !== 'WHOLE_LOAN';
       const amount = entry.value === 'AMOUNT';
       show(recordForm.querySelector('[data-configured-product]'), !custom);
-      const productNote=recordForm.querySelector('[data-configured-terms-note]');if(productNote)productNote.hidden=custom;
       show(recordForm.querySelector('[data-custom-terms]'), custom);
       recordForm.querySelectorAll('[data-custom-percentage]').forEach(box => show(box, custom && !amount));
       show(recordForm.querySelector('[data-custom-amount]'), custom && amount);
@@ -114,7 +113,7 @@
         tenureLimits.querySelector('[data-limit-unit]').textContent = region.dataset[unit.value.toLowerCase()] || '';
       }
       clearTimeout(timer); controller?.abort(); ++version;
-      recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = '';
+      recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = ''; description.hidden = true;
       if(schedule){schedule.hidden = true;rows.replaceChildren();summary.textContent = '';}
       if (!recordForm.querySelector('#principal').value || !unit.value || !recordForm.querySelector('#tenureValue').value
         || (!custom && !recordForm.querySelector('#productId').value)
@@ -131,7 +130,6 @@
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
           recordForm.dispatchEvent(new CustomEvent('loan:quote',{detail:quote}));output.textContent = money(quote.interest);
           const approvedRate=recordForm.querySelector('[data-approved-rate]');if(approvedRate){approvedRate.hidden=custom;if(!custom)approvedRate.textContent=approvedRate.dataset.label+': '+quote.ratePercent+'% · '+approvedRate.dataset.basis;}
-          description.textContent = custom ? (amount ? entry.selectedOptions[0].text : recordForm.querySelector('#interestBasis').selectedOptions[0].text) : quote.product + " \u00b7 " + quote.tenureValue + " " + region.dataset[quote.tenureUnit.toLowerCase()];
           if(schedule && quote.schedule?.length){
             rows.replaceChildren(...quote.schedule.map(payment => {
               const row = document.createElement('tr');
@@ -144,7 +142,7 @@
             summary.textContent = summary.dataset[quote.frequency.toLowerCase()] + ' \u00b7 ' + quote.tenureValue + ' ' + region.dataset[quote.tenureUnit.toLowerCase()];
             schedule.hidden = false;
           }
-        } catch(error) {if(current === version && error.name !== 'AbortError'){description.textContent = error.message || region.dataset.error;recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));}}
+        } catch(error) {if(current === version && error.name !== 'AbortError'){description.textContent = error.message || region.dataset.error;description.hidden = false;recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));}}
         finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-settled'));}}
       }, 150);
     }
