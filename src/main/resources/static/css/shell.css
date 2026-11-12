@@ -2477,7 +2477,6 @@ body.aws-console {
 }
 
 .aws-status-summary-label,
-.aws-settings-kicker,
 .aws-settings-field,
 .platform-settings-field {
     color: var(--aws-muted) !important;
@@ -2514,10 +2513,6 @@ body.aws-console {
     border-bottom: 1px solid var(--aws-line);
     background: #f7f8f8;
     padding: 8px 10px;
-}
-
-.aws-settings-kicker {
-    margin: 0;
 }
 
 .aws-settings-title {

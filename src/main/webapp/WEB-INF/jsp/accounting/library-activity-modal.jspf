@@ -4,7 +4,7 @@
         <div class="app-modal-scroll">
             <div class="app-modal-header"><h2 class="erp-panel-title" id="library-modal-title"><spring:message code="library.addActivity" /></h2><button type="button" class="app-modal-close" data-library-close aria-label="<spring:message code='common.closeModal' />"><i data-lucide="x" aria-hidden="true"></i></button></div>
             <div class="app-modal-body">
-                <c:choose><c:when test="${not empty createdCode}"><p class="coa-success" role="status"><spring:message code="library.activityCreated" /></p><p><strong><c:out value="${createdCode}" /></strong> · <c:out value="${createdName}" /></p><p><spring:message code="library.closeToRegister" /></p></c:when><c:otherwise>
+                <c:choose><c:when test="${not empty createdCode}"><p class="coa-success" role="status"><spring:message code="library.activityCreated" /></p><p><strong><c:out value="${createdCode}" /></strong> · <c:out value="${createdName}" /></p></c:when><c:otherwise>
                     <c:url value="/finance/library/activities" var="activitySaveUrl" />
                     <form:form method="post" modelAttribute="codeForm" action="${activitySaveUrl}" cssClass="library-modal-form accounting-create-form">
                         <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>

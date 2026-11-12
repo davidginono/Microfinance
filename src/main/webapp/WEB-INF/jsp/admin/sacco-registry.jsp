@@ -212,7 +212,6 @@
                 <div class="app-modal-header">
                     <div>
                         <p class="erp-panel-title"><spring:message code="admin.saccoRegistry.addStation" text="Add Branch" /></p>
-                        <p class="mt-2 text-sm text-slate-500"><spring:message code="admin.saccoRegistry.addStationHelp" text="Save one new branch under this institution." /></p>
                 </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="add-Station-${Sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

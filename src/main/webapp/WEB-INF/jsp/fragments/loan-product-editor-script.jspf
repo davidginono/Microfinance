@@ -635,6 +635,7 @@
 
             form.addEventListener('input', () => {
                 if (saveState) {
+                    saveState.hidden = false;
                     saveState.textContent = saveState.dataset.unsavedLabel || 'Unsaved changes';
                     saveState.classList.add('is-dirty');
                 }

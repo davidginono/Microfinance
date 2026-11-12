@@ -46,9 +46,7 @@
 <c:if test="${settingsSection eq 'otp'}">
     <section class="erp-panel overflow-hidden">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
-            <p class="erp-widget-title"><spring:message code="admin.settings.otp.eyebrow" text="Authentication" /></p>
             <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.otp.title" text="Branch OTP Delivery" /></h2>
-            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.otp.subtitle" text="Choose how this Branch sends authentication and workflow confirmation codes." /></p>
         </div>
         <form action="/admin/settings-controls/otp-delivery" method="post" class="erp-panel-body">
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -57,7 +55,6 @@
                     <input name="otpDeliveryChannel" type="radio" value="EMAIL" class="mt-1" ${stationOtpDeliveryChannel eq 'EMAIL' ? 'checked' : ''} />
                     <span>
                         <span class="block font-semibold text-slate-900"><spring:message code="admin.settings.otp.email" text="Email" /></span>
-                        <span class="mt-1 block text-xs text-slate-500"><spring:message code="admin.settings.otp.emailHelp" text="Always send OTP codes to the account email." /></span>
                     </span>
                 </label>
                 <label class="settings-checkbox-card flex items-start gap-3 rounded border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700">
@@ -137,7 +134,6 @@
 <c:if test="${settingsSection eq 'guarantor'}">
     <section class="erp-panel aws-settings-panel aws-qualification-settings mb-4" aria-labelledby="qualification-settings-title">
         <div class="aws-settings-header">
-            <p class="aws-settings-kicker"><spring:message code="admin.settings.qualification.eyebrow" text="Qualification Policies" /></p>
             <h2 id="qualification-settings-title" class="aws-settings-title"><spring:message code="admin.settings.qualification.title" text="Qualification Controls" /></h2>
         </div>
         <form action="/admin/settings-controls/qualification-policies" method="post" class="aws-settings-form aws-qualification-form">
@@ -152,7 +148,6 @@
                             <input class="aws-settings-checkbox" name="applicantMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyApplicantMaxDefaultedLoans and policyApplicantMaxDefaultedLoans gt 0 ? 'checked' : ''} />
                             <span class="aws-settings-checkbox-copy">
                                 <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.blockDefaultedApplicants" text="Block applicants with defaulted loans" /></span>
-                                <span class="aws-settings-help"><spring:message code="admin.settings.blockDefaultedApplicantsHelp" text="If checked, one defaulted loan blocks new applications." /></span>
                             </span>
                         </label>
                     </div>
@@ -166,7 +161,6 @@
                             <input class="aws-settings-checkbox" name="guarantorWithActiveLoanAllowed" type="checkbox" value="true" ${policyGuarantorWithActiveLoanAllowed ? 'checked' : ''} />
                             <span class="aws-settings-checkbox-copy">
                                 <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.allowActiveLoanGuarantors" text="Allow guarantors with active loans" /></span>
-                                <span class="aws-settings-help"><spring:message code="admin.settings.allowActiveLoanGuarantorsHelp" text="If unchecked, clients with active loans cannot guarantee." /></span>
                             </span>
                         </label>
                         <fmt:formatNumber value="${policyGuarantorMaxGuaranteedLoanAmount}" maxFractionDigits="0" groupingUsed="false" var="policyGuarantorMaxGuarantees" />
@@ -178,7 +172,6 @@
                             <input class="aws-settings-checkbox" name="guarantorMaxDefaultedLoans" type="checkbox" value="1" ${not empty policyGuarantorMaxDefaultedLoans and policyGuarantorMaxDefaultedLoans gt 0 ? 'checked' : ''} />
                             <span class="aws-settings-checkbox-copy">
                                 <span class="aws-settings-checkbox-title"><spring:message code="admin.settings.blockDefaultedGuarantors" text="Block guarantors with defaulted loans" /></span>
-                                <span class="aws-settings-help"><spring:message code="admin.settings.blockDefaultedGuarantorsHelp" text="If checked, one defaulted loan blocks guarantee approvals." /></span>
                             </span>
                         </label>
                     </div>
@@ -245,7 +238,6 @@
             <div class="app-modal-scroll">
                 <div class="app-modal-header">
                     <div>
-                        <p class="erp-widget-title"><spring:message code="admin.settings.loanControls" text="Loan Controls" /></p>
                         <h2 class="mt-1 text-xl font-bold text-sacco-ink"><spring:message code="admin.settings.editApplicationFee" text="Edit Application Fee" /></h2>
                         <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.applicationFeeHelp" text="Default fee used when a loan product has no product-specific application fee." /></p>
                     </div>
@@ -340,7 +332,6 @@
 
                     <section class="product-builder-section">
                         <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.basics" text="Basics" /></p>
                             <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h2>
                         </div>
                         <div class="product-builder-section-body product-identity-grid">
@@ -366,9 +357,7 @@
 
                     <section class="product-builder-section">
                         <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></p>
                             <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></h2>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.eligibilityCreateHelp" text="Define lending limits and Disposable Income coverage for this product." /></p>
                         </div>
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -389,9 +378,7 @@
 
                     <section class="product-builder-section">
                         <div class="product-builder-section-header">
-                            <p class="erp-widget-title"><spring:message code="admin.settings.loanProducts.repayment" text="Repayment" /></p>
                             <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></h2>
-                            <p class="mt-1 text-sm text-slate-500"><spring:message code="admin.settings.loanProducts.repaymentChargesCreateHelp" text="Control pricing, interest treatment, and the repayment period for this product." /></p>
                         </div>
                         <div class="product-builder-section-body product-builder-grid two-up">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">

@@ -276,7 +276,7 @@
                         <button type="button" class="app-btn btn-neutral" data-product-config-next>Next section</button>
                     </div>
                     <div class="product-config-save-actions">
-                        <span class="product-config-save-state" data-product-config-save-state data-unsaved-label="<spring:message code='admin.workspace.unsaved' />"><spring:message code="admin.workspace.saveHint" /></span>
+                        <span class="product-config-save-state" hidden data-product-config-save-state data-unsaved-label="<spring:message code='admin.workspace.unsaved' />"></span>
                         <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
                         <button type="submit" class="app-btn btn-launch"><spring:message code="admin.workspace.saveProduct" /></button>
                 </div>
