@@ -150,6 +150,7 @@ The root `SKILL.md` routes to these maintained instructions. These are the proje
 
 - Product approval configuration belongs in Create/Edit Loan Product; the edit tab follows Repayment & Charges and precedes Map to COA accounts. Keep its independent save form outside the product form, preserve failed submissions, and match keyboard navigation to the visible tab order. Customised Loan Configuration controls approval only; customised loan terms are recorded per loan.
 - Receipt batch details render their scoped summary on the server, then refresh through the existing JSON editor. Keep compact shared table controls, contained row scrolling, a useful empty state, local retry errors and unframed bottom actions. Posting remains disabled until current batch state and existing permissions allow it. Do not alter receipt validation, approvals or posting to restyle the page.
+- The shared shell mounts modal overlays on `document.body` before workspace initialization; receipt batch confirmation must resolve that mounted dialog. Repayment imports require funded, ledger-backed client loans in the current branch and an active asset posting account with Cash, Bank or Mobile Money purpose. Empty setup is not permission to broaden scope, reclassify accounts or invent loans; use isolated fixtures for import checks.
 
 ### Workspace rendering and branding (2026-10-21)
 

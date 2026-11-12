@@ -21,7 +21,7 @@ async function setup(estimate,patch={},realWidgets=false){
   w.setTimeout=(fn,ms)=>ms===800?(autosave=fn,-1):nativeTimeout(fn,ms);w.clearTimeout=id=>id===-1?(autosave=undefined):nativeClear(id);w.setInterval=()=>0;
   w.ResourceTable={setPage(){}};w.AppSearch={bind(){return {cancel(){}};}};
   w.NeoSelect={search(){return {input:d.createElement('input'),more:d.createElement('button'),setLoading(){}};}};
-  if(realWidgets){w.requestAnimationFrame=fn=>nativeTimeout(fn,0);w.cancelAnimationFrame=nativeClear;for(const file of ['live-search','select-enhancer','resource-table'])w.eval(readFileSync('src/main/resources/static/js/'+file+'.js','utf8'));}
+  if(realWidgets){w.requestAnimationFrame=fn=>nativeTimeout(fn,0);w.cancelAnimationFrame=nativeClear;d.body.append(d.querySelector('[data-batch-confirm]'));for(const file of ['live-search','select-enhancer','resource-table'])w.eval(readFileSync('src/main/resources/static/js/'+file+'.js','utf8'));}
   const item={id:'receipt',lineNo:1,version:0,state:'FAILED',clientLabel:'Client One',labels:{loan:'1'},failureKey:'voucher.error.date',failureMessage:'Choose a valid payment date.',form:{clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:'cash',reference:'RV-009',rows:[{loanId:'loan',amount:'500.00',description:''}]}};
   Object.assign(item,patch);
   const response=(data,ok=true)=>({ok,redirected:false,headers:{get:()=> 'application/json'},json:async()=>data});
@@ -45,7 +45,23 @@ test('batch editor initializes its real account selector and loads summary and r
     assert.match(d.querySelector('[data-batch-summary]').textContent,/Draft/);
     assert.equal(d.querySelectorAll('[data-batch-rows] > .batch-row').length,1);
     assert.equal(d.querySelector('[data-default-account]').dataset.neoEnhanced,'true');
+    assert.equal(d.querySelector('[data-batch-confirm]').parentElement,d.body);
+    assert.equal(d.querySelector('[data-batch-add]').disabled,false);
   }finally{dom.window.close();}
+});
+
+test('confirmation still opens and cancels after the shared shell mounts its modal on the body',async()=>{
+  const {dom,w,d,edit}=await setup(response=>Promise.resolve(response({lines:[]})),{},true);
+  try {
+    await edit('75.00');
+    d.querySelector('[data-resource-table]').dispatchEvent(new w.CustomEvent('resource-table:refresh',{cancelable:true}));
+    const modal=d.querySelector('[data-batch-confirm]');
+    assert.equal(modal.hidden,false);
+    assert.equal(modal.querySelector('[role="dialog"]').contains(d.activeElement),true);
+    modal.querySelector('[data-confirm-cancel]').click();
+    assert.equal(modal.hidden,true);
+    assert.equal(d.querySelector('input[type="number"]').value,'75.00');
+  }finally{w.close();}
 });
 
 test('failed table refresh preserves receipt values and recovers through the shared refresh control',async()=>{

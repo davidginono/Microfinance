@@ -223,7 +223,7 @@ function initializeReceiptBatches() {
         if(!editable() || editor.dataset.payrollSealed === 'true' || item.state === 'POSTED'){tr.querySelectorAll('input,select').forEach(n=>n.disabled = true);details.querySelectorAll('input,select,button').forEach(n=>n.disabled = true);}
         paintPreview(item);body.append(tr,details);showIssue(item,item.failureKey?item.failureMessage || t('error.failed'):'',false,item.failureKey);
     }
-    function rerender(){cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',t('empty'));td.colSpan = 9;tr.append(td);body.append(tr);}}
+    function rerender(){cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',null,'batch-empty-cell');td.colSpan = 9;td.append(el('span',t('empty'),'batch-empty-message'));tr.append(td);body.append(tr);}}
     function controls(){
         const spreadsheet = editor.querySelector('[data-batch-spreadsheet]');
         if (spreadsheet) spreadsheet.hidden = !editable();
@@ -251,7 +251,7 @@ function initializeReceiptBatches() {
     async function action(kind,version){await flush();if(kind !== 'post')await refreshSummary();await api(url + '/' + kind + (kind === 'stop'?'':'?version=' + (version ?? summary.batch.version)),'POST');await load();}
     editor.querySelector('[data-batch-validate]').addEventListener('click',()=>action('validate').catch(error=>globalError(error.message)));
     editor.querySelector('[data-batch-stop]').addEventListener('click',()=>action('stop').catch(error=>globalError(error.message)));
-    const modal = editor.querySelector('[data-batch-confirm]');document.body.append(modal);const dialog = modal.querySelector('[role="dialog"]');let priorOverflow,reviewedVersion,confirmedAction,modalBusy = false;
+    const modal = document.querySelector('[data-batch-confirm]');document.body.append(modal);const dialog = modal.querySelector('[role="dialog"]');let priorOverflow,reviewedVersion,confirmedAction,modalBusy = false;
     const close = () => {if(modalBusy)return;modal.hidden = true;modal.classList.remove('is-open');document.body.style.overflow = priorOverflow;lastFocus?.focus();};
     const openConfirm = (title,message,actionText,action) => {confirmedAction = action;lastFocus = document.activeElement;priorOverflow = document.body.style.overflow;document.body.style.overflow = 'hidden';modal.hidden = false;modal.classList.add('is-open');modal.querySelector('#batch-confirm-title').textContent = title;modal.querySelector('[data-confirm-message]').textContent = message;modal.querySelector('[data-confirm-post]').textContent = actionText;modal.querySelector('.app-modal-actions [data-confirm-cancel]').focus();};
     modal.querySelectorAll('[data-confirm-cancel]').forEach(b=>b.addEventListener('click',close));
