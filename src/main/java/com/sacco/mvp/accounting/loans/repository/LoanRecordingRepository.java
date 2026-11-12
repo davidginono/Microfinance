@@ -31,6 +31,14 @@ public class LoanRecordingRepository {
         return candidates;
     }
     public int draftVersion(AppUserPrincipal a,UUID id){return jdbc.queryForObject("select coalesce(max(version),0) from client_application_command where application_id=? and sacco_id=? and station_id=?",Integer.class,id,a.getSaccoId(),a.getStationId());}
+    public boolean retiredGroup(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select retired_group_application(id) from loan_applications where id=? and sacco_id=? and station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
+    public boolean groupWithdrawalAvailable(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select (l.applicant_member_id is null or exists(select 1 from lending_group_participant where loan_id=l.id)) and l.status not in('DISBURSED','PAR','DEFAULTED','PAID','WRITTEN_OFF','DISBURSEMENT_REVERSED','WITHDRAWN') and not exists(select 1 from loan_ledgers where loan_application_id=l.id) from loan_applications l where l.id=? and l.sacco_id=? and l.station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
+    public void withdrawGroup(AppUserPrincipal a,GroupLoan loan,UUID key,String reason,java.time.OffsetDateTime at){
+        var previous=jdbc.queryForList("select * from staff_group_withdrawal where loan_id=? and sacco_id=? and station_id=?",loan.id(),a.getSaccoId(),a.getStationId());
+        if(!previous.isEmpty()){var p=previous.getFirst();if(!key.equals(p.get("request_key"))||!a.getMemberId().equals(p.get("actor_id"))||!reason.strip().equals(p.get("reason")))throw new IllegalArgumentException("simpleGroup.error.changed");return;}
+        jdbc.update("insert into staff_group_withdrawal(loan_id,request_key,sacco_id,station_id,actor_id,previous_status,terms_hash,reason,recorded_at) values(?,?,?,?,?,?,?,?,?)",loan.id(),key,a.getSaccoId(),a.getStationId(),a.getMemberId(),loan.status(),loan.termsHash(),reason.strip(),at);
+        jdbc.update("update loan_applications set status='WITHDRAWN',updated_at=?,version=version+1 where id=? and sacco_id=? and station_id=?",at,loan.id(),a.getSaccoId(),a.getStationId());
+    }
     public GroupLoan groupLoan(AppUserPrincipal a,UUID id,boolean lock) {
         return jdbc.query("""
             select l.id,l.loan_product_setting_id,l.applicant_member_id,r.actor_id,l.status,
@@ -88,8 +96,6 @@ public class LoanRecordingRepository {
         """,Boolean.class,loan,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),loan,loan));}
     public boolean personalGuaranteesReady(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select coalesce(lending_personal_guarantees_ready(id),false) from loan_applications where id=? and sacco_id=? and station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     public boolean recordedGuarantees(AppUserPrincipal a,UUID id,int required){return Boolean.TRUE.equals(jdbc.queryForObject("select count(distinct g.guarantor_member_id)>=? from guarantor_requests g join loan_applications l on l.id=g.loan_application_id where l.id=? and l.sacco_id=? and l.station_id=? and g.status='APPROVED'",Boolean.class,required,id,a.getSaccoId(),a.getStationId()));}
-    public boolean sharedParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='JOINT_GROUP' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
-    public boolean organizationParty(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_borrower_party p join lending_group g on g.id=p.group_id and g.sacco_id=p.sacco_id and g.station_id=p.group_station_id where p.id=? and p.sacco_id=? and p.group_station_id=? and p.kind='ORGANIZATION' and g.legal_form='ORGANIZATION' and g.status='ACTIVE')",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     private final JdbcTemplate jdbc;
     private static final String LOANS="""
         select coalesce(c.outstanding,0) charges,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.party_id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,

@@ -21,9 +21,11 @@ import java.util.*;
 @Controller @RequestMapping("/finance/groups") @RequiredArgsConstructor
 public class GroupLendingController {
     private final GroupLendingService service;
+    private final com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups;
     private final ApplicationClock clock;
-    @InitBinder("groupForm") public void groupBinder(WebDataBinder binder){binder.setAllowedFields("requestKey","name","legalForm","evidence");}
+    @InitBinder("groupForm") public void groupBinder(WebDataBinder binder){binder.setAllowedFields("requestKey","name","evidence");}
     @InitBinder("memberForm") public void memberBinder(WebDataBinder binder){binder.setAllowedFields("requestKey","clientId","office","startsOn","evidence");}
+    @InitBinder("groupSetupForm") public void setupBinder(WebDataBinder binder){binder.setAllowedFields("expectedVersion","leaderId","destinationType","provider","holder","identifier","evidence","checked");}
     @InitBinder("endForm") public void endBinder(WebDataBinder binder){binder.setAllowedFields("date","reason");}
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalid(IllegalArgumentException error,Model model){model.addAttribute("groupError",error(error));return "groups/error";}
@@ -35,12 +37,13 @@ public class GroupLendingController {
         service.authorize(actor,"CREATE");model.addAttribute("groupForm",new GroupForm());return "groups/create";
     }
     @PostMapping public String create(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute GroupForm groupForm,BindingResult errors,RedirectAttributes flash) {
-        service.authorize(actor,"CREATE");if(!errors.hasErrors())try{service.create(actor,groupForm);flash.addFlashAttribute("successMessageCode","group.created");return "redirect:/finance/groups";}
+        service.authorize(actor,"CREATE");if(!errors.hasErrors())try{UUID id=service.create(actor,groupForm);flash.addFlashAttribute("successMessageCode","group.created");return "redirect:/finance/groups/"+id;}
         catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("group.error.duplicate");}
         return "groups/create";
     }
     @GetMapping("/{id}") public String detail(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
-        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="startsOn_desc") String sort,Model model) {
+        @RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="0") int draftPage,@RequestParam(defaultValue="startsOn_desc") String sort,Model model) {
+        if(actor.getClaims().contains("LOAN_RECORDING_CREATE"))model.addAttribute("groupDrafts",simpleGroups.drafts(actor,id,draftPage));
         var form=new MemberForm();form.setStartsOn(clock.today());model.addAttribute("memberForm",form);details(actor,id,page,sort,model);return "groups/details";
     }
     @PostMapping("/{id}/members") public String member(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
@@ -48,6 +51,10 @@ public class GroupLendingController {
         service.authorize(actor,"UPDATE");if(!errors.hasErrors())try{service.addMember(actor,id,memberForm);return "redirect:/finance/groups/"+id;}
         catch(IllegalArgumentException e){errors.reject(error(e));}catch(DataIntegrityViolationException e){errors.reject("group.error.duplicate");}
         details(actor,id,0,"startsOn_desc",model);service.selectedClient(actor,memberForm.getClientId()).ifPresent(c->model.addAttribute("selectedClient",c));return "groups/details";
+    }
+    @PostMapping("/{id}/payment-details") public String setup(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute("groupSetupForm") com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.SetupForm f,BindingResult errors,Model model,RedirectAttributes flash){
+        if(!errors.hasErrors())try{simpleGroups.configure(a,id,f);flash.addFlashAttribute("successMessageCode","simpleGroup.setupSaved");return "redirect:/finance/groups/"+id;}catch(IllegalArgumentException e){errors.reject(e.getMessage());}
+        var member=new MemberForm();member.setStartsOn(clock.today());model.addAttribute("memberForm",member);details(a,id,0,"startsOn_desc",model);return "groups/details";
     }
     @GetMapping("/{id}/members/{member}") public String endForm(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@PathVariable UUID member,Model model) {
         var form=new EndForm();form.setDate(clock.today());model.addAttribute("endForm",form);endContext(actor,id,member,model);return "groups/end-membership";
@@ -68,6 +75,9 @@ public class GroupLendingController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.clients(actor,search,page));
     }
     private void details(AppUserPrincipal actor,UUID id,int page,String sort,Model model) {
+        if(!model.containsAttribute("groupDrafts")&&actor.getClaims().contains("LOAN_RECORDING_CREATE"))model.addAttribute("groupDrafts",simpleGroups.drafts(actor,id,0));
+        var setup=simpleGroups.setup(actor,id);model.addAttribute("groupSetup",setup);
+        if(!model.containsAttribute("groupSetupForm")){var f=new com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.SetupForm();f.setExpectedVersion(setup.version());f.setLeaderId(setup.leaderId());f.setDestinationType(setup.destinationType()==null?"BANK_ACCOUNT":setup.destinationType());f.setProvider(setup.provider());f.setHolder(setup.holder());f.setIdentifier(setup.identifier());f.setEvidence(setup.evidence());model.addAttribute("groupSetupForm",f);}
         model.addAttribute("group",service.detail(actor,id));model.addAttribute("members",service.members(actor,id,page,sort));model.addAttribute("sort",sort);model.addAttribute("today",clock.today());
     }
     private void endContext(AppUserPrincipal actor,UUID id,UUID member,Model model){model.addAttribute("group",service.detail(actor,id));model.addAttribute("membership",service.membership(actor,id,member));}

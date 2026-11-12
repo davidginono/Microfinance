@@ -126,12 +126,18 @@ public class LoanRecordingEvidenceService {
             if(!details.getCollateral().isEmpty() && details.getCollateral().stream().allMatch(asset->asset.getEstimatedValue()!=null))
                 values.put("collateralEstimatedValue",details.getCollateral().stream().map(ClientApplicationDtos.Collateral::getEstimatedValue).reduce(BigDecimal.ZERO,BigDecimal::add).toPlainString());
             values.keySet().retainAll(allowed);
-            for(var field:formFields)if(field.isRequired() && Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments",
+            for(var field:formFields)if(!"GROUP".equals(form.getLoanFor()) && field.isRequired() && Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments",
                 "businessOrEmployerName","businessOrEmploymentType","incomeSource").contains(field.getName())) {
                 checkField(values.get(field.getName())!=null&&!values.get(field.getName()).isBlank(),"clientId",
                     Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments").contains(field.getName())?"clientCashFlow":"clientBusiness");
             }
-            schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(values,product.getFormSchema()));
+            if("GROUP".equals(form.getLoanFor())) {
+                check(!details.getGroupClientValues().isEmpty(),"clientCashFlow");
+                for(var person:details.getGroupClientValues()){
+                    var individual=new LinkedHashMap<>(values);individual.putAll(person);individual.keySet().retainAll(allowed);
+                    schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(individual,product.getFormSchema()));
+                }
+            } else schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(values,product.getFormSchema()));
         } else check(details.getFields().isEmpty(),"details");
         if(details.getDocumentNames().isEmpty() && details.getDocumentTypes().isEmpty() && details.getRequiredAttachmentIds().isEmpty())return null;
         check(files.size()<=10,"attachments");

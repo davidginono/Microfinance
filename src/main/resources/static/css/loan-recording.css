@@ -68,3 +68,12 @@
 .recording-file-remove{flex:0 0 auto;align-self:center}
 @media(max-width:767px){.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{width:100%}.recording-item-footer>.recording-phone,.recording-item-footer>.recording-row-photos{flex-basis:calc(50% - 8px)}.aws-console .recording-item-actions{flex-basis:auto;padding-top:0;margin-left:auto}}
 @media(max-width:480px){.aws-console .accounting-create-workspace [data-repeat-row]>.loan-form-grid{grid-template-columns:minmax(0,1fr)}.recording-item-footer>.recording-phone,.recording-item-footer>.recording-row-photos{flex-basis:100%}}
+
+.simple-group-debt-clients { min-height: 6rem; height: auto; max-width: 100%; }
+
+.loan-form-grid > [data-simple-group-fields] { grid-column: 1 / -1; min-width: 0; }
+[data-group-roster] { overflow-wrap: anywhere; }
+
+.simple-group-borrower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; min-width: 0; }
+.simple-group-borrower > span { grid-column: 1 / -1; font-weight: 600; }
+@media (max-width: 767px) { .simple-group-borrower { grid-template-columns: minmax(0, 1fr); } }

@@ -17,7 +17,7 @@
         </div>
         <c:if test="${paymentDetails.available}">
             <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                <c:choose><c:when test="${paymentDetails.sourceLabel=='GROUP_AUTHORITY'}"><spring:message code="group.verifiedAuthority" /></c:when><c:otherwise><c:out value="${paymentDetails.sourceLabel}" /></c:otherwise></c:choose>
+                <c:choose><c:when test="${paymentDetails.sourceLabel=='GROUP_AUTHORITY' or paymentDetails.sourceLabel=='SIGNED_GROUP_INSTRUCTION'}"><spring:message code="simpleGroup.groupAccount" /></c:when><c:otherwise><c:out value="${paymentDetails.sourceLabel}" /></c:otherwise></c:choose>
             </span>
         </c:if>
     </div>

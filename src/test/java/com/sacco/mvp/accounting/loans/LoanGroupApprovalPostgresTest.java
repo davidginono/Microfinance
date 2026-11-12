@@ -18,8 +18,9 @@ import static org.mockito.Mockito.*;
 @EnabledIfEnvironmentVariable(named="MICROFINANCE_RECORDING_TEST_URL",matches="jdbc:postgresql://127\\.0\\.0\\.1:[0-9]+/microfinance_recording_test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class LoanGroupApprovalPostgresTest {
-    final GroupOrganizationAgreementPostgresTest s=new GroupOrganizationAgreementPostgresTest();
-    final LoanRecordingPostgresTest f=s.o.f;
+    final SimpleGroupLoanPostgresTest s=new SimpleGroupLoanPostgresTest();
+    final LoanRecordingPostgresTest f=s.f;
+    UUID loan;
     LoanGroupApprovalService service;
     AppUserPrincipal first,second,manager;
     @BeforeAll void start(){
@@ -33,7 +34,11 @@ class LoanGroupApprovalPostgresTest {
         service=f.context.getBean(LoanGroupApprovalService.class);
     }
     @AfterAll void stop(){s.stop();}
-    @BeforeEach void fixture(){s.fixture();first=reviewer(Position.ACCOUNTANT);second=reviewer(Position.ACCOUNTANT);manager=reviewer(Position.MANAGER);}
+    @BeforeEach void fixture(){s.fixture();first=reviewer(Position.ACCOUNTANT);second=reviewer(Position.ACCOUNTANT);manager=reviewer(Position.MANAGER);rule(0,2);loan=s.record();}
+    RecordForm individual(){
+        var registration=new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.CreateForm();var profile=registration.getProfile();profile.setFirstName("Individual");profile.setLastName("Borrower");profile.setPhone("+255712"+String.format("%06d",++s.phone));profile.setMonthlyIncome(new java.math.BigDecimal("2000000.00"));profile.setMonthlyExpenses(new java.math.BigDecimal("500000.00"));profile.setMonthlyDebtRepayments(java.math.BigDecimal.ZERO);profile.setActivity("Synthetic business");
+        f.client=f.context.getBean(com.sacco.mvp.clients.onboarding.service.OnboardingService.class).create(f.actor,registration);return f.form();
+    }
     AppUserPrincipal reviewer(Position role){
         var p=f.operator("B1");var m=f.context.getBean(MemberDirectoryService.class).find(p.getMemberId()).orElseThrow();m.setPosition(role);m.setStaffRoles(Set.of(role));
         f.jdbc.update("update members set position=? where id=?",role.name(),m.getId());
@@ -41,26 +46,29 @@ class LoanGroupApprovalPostgresTest {
         return new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class));
     }
     void rule(int expected,int count){var r=new GroupRuleForm();r.setProductId(f.product);r.setExpectedRevision(expected);r.setGroups(List.of(Position.ACCOUNTANT,Position.MANAGER));r.setApprovals(List.of(count,1));service.saveRule(f.actor,r);}
-    UUID submit(){s.sign(s.signer,s.cycle);rule(0,2);UUID key=UUID.randomUUID();service.submit(f.actor,s.loan,key);return key;}
-    void decide(AppUserPrincipal p,UUID request,String decision){service.decide(p,s.loan,request,UUID.randomUUID(),decision,"Synthetic independent paper review","Synthetic paper reference");}
+    UUID submit(){UUID key=UUID.randomUUID();service.submit(f.actor,loan,key);return key;}
+    void decide(AppUserPrincipal p,UUID request,String decision){service.decide(p,loan,request,UUID.randomUUID(),decision,"Synthetic independent paper review","Synthetic paper reference");}
+    String status(){return f.jdbc.queryForObject("select status from loan_applications where id=?",String.class,loan);}
+    int count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Integer.class,f.institution);}
     @Test void staffRecordedIndividualApplicationUsesItsSignedPaperAndTheSameIndependentGroups(){
-        var form=f.form();form.setApplicationDetails(new ApplicationDetails());form.getApplicationDetails().setDocumentTypes(List.of("SIGNED_APPLICATION"));form.getApplicationDetails().setDocumentNames(List.of("Synthetic signed application"));
-        UUID loan=f.service.save(f.actor,form,List.of(GroupOrganizationPostgresTest.documentFile()));rule(0,2);
+        var form=individual();form.setApplicationDetails(new ApplicationDetails());form.getApplicationDetails().setDocumentTypes(List.of("SIGNED_APPLICATION"));form.getApplicationDetails().setDocumentNames(List.of("Synthetic signed application"));
+        UUID loan=f.service.save(f.actor,form,List.of(s.paper()));
         UUID request=UUID.randomUUID();service.submit(f.actor,loan,request);
         for(var reviewer:List.of(first,second,manager))service.decide(reviewer,loan,request,UUID.randomUUID(),"APPROVE","Synthetic independent review","Synthetic signed application");
         assertThat(f.jdbc.queryForObject("select status from loan_applications where id=?",String.class,loan)).isEqualTo("READY_FOR_DISBURSEMENT");
-        assertThat(s.count("loan_ledgers")).isZero();
+        assertThat(count("loan_ledgers")).isZero();
         f.service.disburse(f.actor,f.post(loan,"1000.00","D-SYNTHETIC-INDIVIDUAL"));
-        assertThat(s.count("loan_ledgers")).isEqualTo(1);
+        assertThat(count("loan_ledgers")).isEqualTo(1);
     }
+    @Test void anUnsignedIndividualApplicationCannotEnterReview(){UUID individual=f.service.save(f.actor,individual());assertThatThrownBy(()->service.submit(f.actor,individual,UUID.randomUUID())).hasMessage("recording.error.signedApplication");}
     @Test void orderedFrozenPlanRequiresDifferentPeopleAndPostsNoMoney(){
         UUID request=submit();rule(1,1);
         assertThatThrownBy(()->decide(manager,request,"APPROVE")).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->decide(f.actor,request,"APPROVE")).hasMessage("loanGroups.error.independent");
-        decide(first,request,"APPROVE");assertThat(s.o.status(s.loan)).isEqualTo("SUBMITTED");
+        decide(first,request,"APPROVE");assertThat(status()).isEqualTo("SUBMITTED");
         assertThatThrownBy(()->decide(first,request,"APPROVE")).hasMessage("loanGroups.error.independent");
         decide(second,request,"APPROVE");decide(manager,request,"APPROVE");
-        assertThat(s.o.status(s.loan)).isEqualTo("READY_FOR_DISBURSEMENT");assertThat(s.count("loan_ledgers")).isZero();assertThat(s.count("gl_journal")).isZero();
+        assertThat(status()).isEqualTo("READY_FOR_DISBURSEMENT");assertThat(count("loan_ledgers")).isZero();assertThat(count("gl_journal")).isZero();
         assertThatThrownBy(()->f.jdbc.update("delete from loan_group_decision where request_id=?",request)).isInstanceOf(DataAccessException.class);
     }
     @Test void termFingerprintIgnoresNumericScaleAndKeepsActualValuesDistinct(){
@@ -70,32 +78,31 @@ class LoanGroupApprovalPostgresTest {
             "{\"amount\":1000.00,\"fees\":[10.00]}","{\"amount\":1000.00,\"fees\":[11.00]}")).isFalse();
     }
     @Test void databaseRejectsFundingAndForgedOrRevokedDecisions(){
-        assertThatThrownBy(()->f.jdbc.update("update loan_applications set status='READY_FOR_DISBURSEMENT' where id=?",s.loan)).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(()->f.jdbc.update("update loan_applications set status='READY_FOR_DISBURSEMENT' where id=?",loan)).isInstanceOf(DataAccessException.class);
         UUID request=submit();
         assertThatThrownBy(()->f.jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,1,?,'APPROVE','Wrong order','Paper',now())",UUID.randomUUID(),request,manager.getMemberId())).isInstanceOf(DataAccessException.class);
         f.jdbc.update("delete from member_access_claims where member_id=? and claim_name='LOAN_RECORDING_APPROVE'",first.getMemberId());
         assertThatThrownBy(()->decide(first,request,"APPROVE")).isInstanceOf(DataAccessException.class);
-        assertThatThrownBy(()->service.review(f.operator("B2"),s.loan)).isInstanceOf(AccessDeniedException.class);
-        assertThat(s.o.status(s.loan)).isEqualTo("SUBMITTED");assertThat(s.count("loan_ledgers")).isZero();
+        assertThatThrownBy(()->service.review(f.operator("B2"),loan)).isInstanceOf(AccessDeniedException.class);
+        assertThat(status()).isEqualTo("SUBMITTED");assertThat(count("loan_ledgers")).isZero();
     }
-    @Test void missingSignedPaperCannotEnterReviewAndARejectedRoundRetainsItsDecision(){
-        rule(0,2);assertThatThrownBy(()->service.submit(f.actor,s.loan,UUID.randomUUID())).hasMessage("recording.error.signedApplication");
-        s.sign(s.signer,s.cycle);UUID request=UUID.randomUUID();service.submit(f.actor,s.loan,request);decide(first,request,"REJECT");
-        assertThat(s.o.status(s.loan)).isEqualTo("REJECTED");UUID next=UUID.randomUUID();service.submit(f.actor,s.loan,next);
-        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_request where loan_id=?",Integer.class,s.loan)).isEqualTo(2);
+    @Test void aRejectedRoundRetainsItsDecisionAndRequiresFreshIndependentPeople(){
+        UUID request=UUID.randomUUID();service.submit(f.actor,loan,request);decide(first,request,"REJECT");
+        assertThat(status()).isEqualTo("REJECTED");UUID next=UUID.randomUUID();service.submit(f.actor,loan,next);
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_request where loan_id=?",Integer.class,loan)).isEqualTo(2);
         assertThat(f.jdbc.queryForObject("select decision from loan_group_decision where request_id=?",String.class,request)).isEqualTo("REJECT");
     }
-    @Test void aCompanyRepresentativeWithStaffPermissionsCannotApproveTheirOwnBorrowingSide(){
+    @Test void aNamedGroupBorrowerWithStaffPermissionsCannotApproveTheirOwnLoan(){
         UUID request=submit();
-        var m=Member.builder().id(f.client).saccoId(f.institution).stationId("B1").fullName("Synthetic company representative")
+        var m=Member.builder().id(s.clients.getFirst()).saccoId(f.institution).stationId("B1").fullName("Synthetic group borrower")
             .status(MemberStatus.ACTIVE).position(Position.ACCOUNTANT).staffRoles(Set.of(Position.ACCOUNTANT))
             .staffAccessStatus(StaffAccessStatus.ACTIVE).memberAccount(true).build();
-        f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE' where id=?",f.client);
-        for(var claim:List.of("LOAN_RECORDING_VIEW","LOAN_RECORDING_APPROVE"))f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?)",f.client,claim);
-        when(f.context.getBean(MemberDirectoryService.class).find(f.client)).thenReturn(Optional.of(m));
+        f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE' where id=?",s.clients.getFirst());
+        for(var claim:List.of("LOAN_RECORDING_VIEW","LOAN_RECORDING_APPROVE"))f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?)",s.clients.getFirst(),claim);
+        when(f.context.getBean(MemberDirectoryService.class).find(s.clients.getFirst())).thenReturn(Optional.of(m));
         var actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class));
-        assertThat(service.review(actor,s.loan).canApprove()).isFalse();
+        assertThat(service.review(actor,loan).canApprove()).isFalse();
         assertThatThrownBy(()->decide(actor,request,"APPROVE")).hasMessage("loanGroups.error.independent");
-        assertThatThrownBy(()->f.jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,0,?,'APPROVE','Own company','Paper',now())",UUID.randomUUID(),request,f.client)).isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(()->f.jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,0,?,'APPROVE','Own group','Paper',now())",UUID.randomUUID(),request,s.clients.getFirst())).isInstanceOf(DataAccessException.class);
     }
 }

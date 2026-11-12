@@ -42,8 +42,8 @@ public class LoanReceiptService {
     @Transactional(readOnly=true)
     public Optional<LoanReceipt> find(AppUserPrincipal a,UUID id){ordinary.authorize(a,Type.RECEIPT,"VIEW");var source=receipts.find(a,id,false);if(source.isEmpty()){var legacy=receipts.legacy(a,id);if(legacy.isPresent()){loans.authorize(a,"VIEW");return Optional.of(benefits(a,legacy.get(),legacy.get().rows()));}return groups.find(a,id);}loans.authorize(a,"VIEW");var r=source.get();return Optional.of(benefits(a,r,receipts.rows(a,id)));}
     @Transactional(readOnly=true)
-    public LoanReceipt export(AppUserPrincipal a,UUID id){ordinary.requireExport(a);loans.authorize(a,"EXPORT");var receipt=find(a,id).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));if(receipt.group()!=null||hasSharedBenefits(receipt))groups.authorize(a,"EXPORT");return receipt;}
-    public boolean canReverse(AppUserPrincipal a,LoanReceipt receipt){return receipt.group()==null&&!hasSharedBenefits(receipt)?available(a,"REVERSE"):groups.available(a,"REVERSE");}
+    public LoanReceipt export(AppUserPrincipal a,UUID id){ordinary.requireExport(a);loans.authorize(a,"EXPORT");var receipt=find(a,id).orElseThrow(()->new AccessDeniedException("Receipt unavailable"));if(receipt.group()!=null||hasSharedBenefits(receipt)||loans.jointGroupReceipt(a,receipt.header().clientId()))groups.authorize(a,"EXPORT");return receipt;}
+    public boolean canReverse(AppUserPrincipal a,LoanReceipt receipt){return receipt.group()==null&&!hasSharedBenefits(receipt)&&!loans.jointGroupReceipt(a,receipt.header().clientId())?available(a,"REVERSE"):groups.available(a,"REVERSE")&&available(a,"REVERSE");}
     @Transactional(readOnly=true)
     public List<Choice> choices(AppUserPrincipal a,String category,UUID client,String search,int page){authorize(a,"POST");return category.equals("loans")?loans.repaymentLoans(a,client,search,page):loans.choices(a,switch(category){case "clients"->"ledger-clients";case "interest"->"interest";default->throw new Invalid("","filter");},search,page);}
     @Transactional(readOnly=true)

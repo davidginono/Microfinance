@@ -8,7 +8,7 @@
 
 <c:url value="/finance/clients/onboarding/contact-check" var="contactCheckUrl"/>
 <form:form data-contact-check-url="${contactCheckUrl}" data-contact-client-id="${client.id}" id="client-onboarding-form" method="post" enctype="${formKind=='document' or formKind=='create'?'multipart/form-data':'application/x-www-form-urlencoded'}" modelAttribute="${modelName}" cssClass="kyc-client-form" data-accounting-dirty-form="true" data-onboarding-form="${formKind}" data-workspace-submit="recover" data-workspace-return="client-onboarding-form" data-preserve-submit-command="true">
-    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/>
+    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/><form:hidden path="requestKey"/><c:if test="${formKind=='create'}"><form:hidden path="enrollGroupId" /></c:if>
 
     <c:choose><c:when test="${formKind=='create' or formKind=='profile'}">
 <c:set var="identityReadOnly" value="${not empty client and client.staffUser}"/><c:set var="profileValues" value="${formKind=='create'?createForm.profile:profileForm.profile}"/>

@@ -1,18 +1,13 @@
 package com.sacco.mvp.accounting.loans;
 
-import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.grouplending.dto.GroupLendingDtos.*;
-import com.sacco.mvp.grouplending.repository.GroupLendingRepository;
 import com.sacco.mvp.grouplending.service.GroupLendingService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.springframework.context.annotation.*;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
-import tools.jackson.databind.ObjectMapper;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
@@ -25,7 +20,7 @@ import static org.mockito.Mockito.*;
 class GroupLendingPostgresTest {
     final LoanRecordingPostgresTest fixture=new LoanRecordingPostgresTest();
     GroupLendingService groups;
-    @BeforeAll void start(){fixture.context=new AnnotationConfigApplicationContext(Config.class);fixture.jdbc=fixture.context.getBean(JdbcTemplate.class);groups=fixture.context.getBean(GroupLendingService.class);}
+    @BeforeAll void start(){fixture.start();groups=fixture.context.getBean(GroupLendingService.class);}
     @AfterAll void stop(){fixture.stop();}
     @BeforeEach void setup(){fixture.fixture();}
     GroupForm form(){var f=new GroupForm();f.setName("Synthetic trading group");f.setEvidence("Synthetic identity documents");return f;}
@@ -101,10 +96,5 @@ class GroupLendingPostgresTest {
             """,UUID.randomUUID(),group,fixture.institution,foreign,LoanRecordingPostgresTest.TODAY,fixture.actor.getMemberId(),UUID.randomUUID()))
             .isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThat(groups.detail(fixture.actor,group).members()).isZero();
-    }
-    @Configuration(proxyBeanMethods=false) @Import(LoanRecordingPostgresTest.Config.class)
-    static class Config {
-        @Bean GroupLendingRepository groupRepository(JdbcTemplate jdbc){return new GroupLendingRepository(jdbc);}
-        @Bean GroupLendingService groupService(GroupLendingRepository repo,GeneralLedgerService access,AuditService audit,ApplicationClock clock,ObjectMapper json){return new GroupLendingService(repo,access,audit,clock,json);}
     }
 }

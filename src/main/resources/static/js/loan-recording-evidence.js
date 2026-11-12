@@ -239,7 +239,7 @@
             form.addEventListener('submit', bindUploads);
             async function product(changed) {
                 var id = form.elements.productId.value, sequence = ++productVersion;
-                var draft = form.querySelector('[data-recording-draft]'); if (draft) draft.disabled = form.elements.loanMode.value !== 'CONFIGURED' || clientSelect?.selectedOptions[0]?.dataset.clientKind !== 'PROVISIONAL';
+                var draft = form.querySelector('[data-recording-draft]'); if (draft) draft.disabled = form.elements.loanFor?.value!=='GROUP'&&(form.elements.loanMode.value !== 'CONFIGURED' || clientSelect?.selectedOptions[0]?.dataset.clientKind !== 'PROVISIONAL');
                 error.hidden = true;
                 if (form.elements.loanMode.value !== 'CONFIGURED' || !id) {
                     requirements = []; documentRequirements(); root.querySelector('[data-evidence-fields]').replaceChildren();
@@ -274,7 +274,7 @@
                     });
                 } catch (_) { if (sequence === productVersion) fail(); }
             }
-            clientSelect?.addEventListener('change',function () { var draft=form.querySelector('[data-recording-draft]');if(draft)draft.disabled=form.elements.loanMode.value!=='CONFIGURED'||clientSelect?.selectedOptions[0]?.dataset.clientKind!=='PROVISIONAL'; });
+            clientSelect?.addEventListener('change',function () { var draft=form.querySelector('[data-recording-draft]');if(draft)draft.disabled=form.elements.loanFor?.value!=='GROUP'&&(form.elements.loanMode.value!=='CONFIGURED'||clientSelect?.selectedOptions[0]?.dataset.clientKind!=='PROVISIONAL'); });
             form.elements.productId.addEventListener('change',function () { product(true); });
             form.elements.loanMode.addEventListener('change',function () { product(true); });
             form.addEventListener('loan:quote',function (event) {

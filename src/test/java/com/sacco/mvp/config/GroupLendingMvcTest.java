@@ -38,7 +38,7 @@ class GroupLendingMvcTest {
     @Test void creationBindsOnlyGroupFieldsAndDerivesScopeFromActor()throws Exception{
         when(groups.create(eq(actor),any())).thenReturn(id);
         mvc.perform(post("/finance/groups").with(user(actor)).with(csrf()).param("name","Test group").param("evidence","Identity evidence").param("saccoId","FOREIGN").param("stationId","FOREIGN").param("status","ACTIVE"))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/groups"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/groups/"+id))
             .andExpect(flash().attribute("successMessageCode","group.created"));
         verify(groups).create(eq(actor),argThat(f->f.getName().equals("Test group") && f.getLegalForm().equals("INFORMAL")));
     }
@@ -68,8 +68,9 @@ class GroupLendingMvcTest {
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean GroupLendingService groups(){return mock(GroupLendingService.class);}
+        @Bean com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups(){var service=mock(com.sacco.mvp.grouplending.service.SimpleGroupLoanService.class);when(service.setup(any(),any())).thenAnswer(i->new com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.Setup(i.getArgument(1),0,"Test group",null,"",null,"","","","",List.of()));return service;}
         @Bean ApplicationClock clock(){var c=mock(ApplicationClock.class);when(c.today()).thenReturn(LocalDate.of(2026,10,23));return c;}
         @Bean ResourceBundleMessageSource messageSource(){var m=new ResourceBundleMessageSource();m.setBasename("messages");m.setDefaultEncoding("UTF-8");return m;}
-        @Bean GroupLendingController controller(GroupLendingService service,ApplicationClock clock){return new GroupLendingController(service,clock);}
+        @Bean GroupLendingController controller(GroupLendingService service,ApplicationClock clock){return new GroupLendingController(service,simpleGroups(),clock);}
     }
 }

@@ -41,8 +41,9 @@ public class ManagementReportRepository {
     }
     public List<Choice> clients(AppUserPrincipal a,String search,int page,UUID selected) {
         return jdbc.query("""
-          select id,member_no,full_name from members where sacco_id=:institution and station_id=:branch and is_member
-           and (cast(:id as uuid) is null or id=:id) and strpos(lower(member_no||' '||full_name),:search)>0 order by member_no,id limit 26 offset :offset
+          select b.party_id,b.member_no,b.full_name from loan_borrower_directory b left join members m on m.id=b.client_id and m.sacco_id=b.sacco_id
+          where b.sacco_id=:institution and ((b.kind='CLIENT' and m.station_id=:branch and m.is_member) or (b.kind<>'CLIENT' and b.group_station_id=:branch))
+           and (cast(:id as uuid) is null or b.party_id=:id) and strpos(lower(b.member_no||' '||b.full_name),:search)>0 order by b.member_no,b.party_id limit 26 offset :offset
           """,parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25).addValue("id",selected,java.sql.Types.OTHER),
           this::choice);
     }
@@ -67,14 +68,14 @@ public class ManagementReportRepository {
         long excluded=kind==Kind.DAILY_COLLECTIONS?jdbc.queryForObject("""
             select count(*) from loan_repayment_transactions t
             join loan_applications a on a.id=t.loan_application_id and a.sacco_id=t.sacco_id and a.station_id=t.station_id
-            join members m on m.id=a.applicant_member_id and m.sacco_id=a.sacco_id
+            join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id
             where t.sacco_id=:institution and t.station_id=:branch and t.posted_at<=:cutoff and t.payment_date between :from and :through
             and (cast(:clientId as uuid) is null or m.id=:clientId)
             and not exists(select 1 from accountant_loan_post p where p.transaction_id=t.id and p.state='POSTED' and p.recorded_at<=:cutoff
               and (not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
                 or exists(select 1 from accountant_loan_receipt_row x join accountant_loan_receipt r on r.id=x.receipt_id
                   where x.posting_id=p.id and r.posted_at<=:cutoff)))
-            """,m,Long.class):kind==Kind.CASHBOOK?0:jdbc.queryForObject(source+" select (select count(*) from exposure where not complete)+(select coalesce(sum(excluded),0) from missing)"+(Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind)?"+(select count(*) from exposure e join cohort c using(loan_application_id) left join lifecycle x using(loan_application_id) where e.complete and (c.application_client is null"+(kind==Kind.EXPECTED_REPAYMENTS?" or x.written_off<>0 or x.cancelled<>0":"")+"))":""),m,Long.class);
+            """,m,Long.class):kind==Kind.CASHBOOK?0:jdbc.queryForObject(source+" select (select count(*) from exposure where not complete)+(select coalesce(sum(excluded),0) from missing)"+(Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind)?"+(select count(*) from exposure e join cohort c using(loan_application_id) left join lifecycle x using(loan_application_id) where e.complete and ((c.application_client is null and not exists(select 1 from loan_borrower_contact b where b.loan_id=c.loan_application_id and b.sacco_id=c.sacco_id and b.station_id=c.station_id))"+(kind==Kind.EXPECTED_REPAYMENTS?" or x.written_off<>0 or x.cancelled<>0":"")+"))":""),m,Long.class);
         if(loan && excluded>0 && ((Number)total.get("count")).longValue()==0)money.forEach(key->total.put(key,null));
         return new Data(rows,groups,totals(total,money),((Number)total.get("count")).longValue(),excluded);
     }
@@ -93,7 +94,7 @@ public class ManagementReportRepository {
           left join gl_activity ac on ac.id=tc.activity_id and ac.sacco_id=tc.sacco_id
           where v.sacco_id=:institution and v.station_id=:branch and v.type='RECEIPT' and v.posted_at<=:cutoff and v.effective_date between :from and :through
           union all
-          select r.id,r.sacco_id,r.station_id,r.effective_date,r.posted_at,r.number,r.reference,r.party,r.money_account_id,r.posted_by,r.client_id,
+          select r.id,r.sacco_id,r.station_id,r.effective_date,r.posted_at,r.number,r.reference,r.party,r.money_account_id,r.posted_by,r.borrower_party_id,
             x.line_no*2+part.n,x.description,null::text,null::text,'@loan',part.component,a.loan_id,r.client_number,m.phone,
             case when r.reverses_id is null then 0 else part.amount end,
             case when r.reverses_id is null then part.amount else 0 end
@@ -102,14 +103,14 @@ public class ManagementReportRepository {
           join loan_applications a on a.id=p.loan_id and a.sacco_id=p.sacco_id and a.station_id=p.station_id
           cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount)) part(n,component,amount)
           join gl_journal j on j.id=p.journal_id and j.sacco_id=p.sacco_id and j.station_id=p.station_id and j.state='POSTED' and j.posted_at<=:cutoff
-          join members m on m.id=r.client_id and m.sacco_id=r.sacco_id
+          join loan_borrower_contact m on m.loan_id=a.id and m.id=r.borrower_party_id and m.sacco_id=r.sacco_id and m.station_id=r.station_id
           where r.sacco_id=:institution and r.station_id=:branch and r.posted_at<=:cutoff and r.effective_date between :from and :through and part.amount>0
           union all
-          select p.id,p.sacco_id,p.station_id,p.effective_date,p.recorded_at,p.reference,p.reference,m.full_name,p.money_account_id,p.actor_id,a.applicant_member_id,
+          select p.id,p.sacco_id,p.station_id,p.effective_date,p.recorded_at,p.reference,p.reference,m.full_name,p.money_account_id,p.actor_id,m.id,
             part.n,p.notes,null::text,null::text,'@loan',part.component,a.loan_id,m.member_no,m.phone,
             case when p.kind='REVERSAL' then part.amount else 0 end,case when p.kind='PAYMENT' then part.amount else 0 end
           from accountant_loan_post p join loan_applications a on a.id=p.loan_id and a.sacco_id=p.sacco_id and a.station_id=p.station_id
-          join members m on m.id=a.applicant_member_id and m.sacco_id=p.sacco_id
+          join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=p.sacco_id and m.station_id=p.station_id
           join gl_journal j on j.id=p.journal_id and j.sacco_id=p.sacco_id and j.station_id=p.station_id and j.state='POSTED' and j.posted_at<=:cutoff
           cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount)) part(n,component,amount)
           where p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
@@ -142,18 +143,18 @@ public class ManagementReportRepository {
           left join loan_adjustment_decision ad on ad.journal_id=j.id
           left join loan_adjustment_request q on q.id=ad.request_id and q.sacco_id=j.sacco_id and q.station_id=j.station_id
           left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
-          left join members m on m.id=a.applicant_member_id and m.sacco_id=j.sacco_id
+          left join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=j.sacco_id and m.station_id=j.station_id
           left join accountant_loan_receipt_row x on x.posting_id=p.id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
             and j.effective_date between :from and :through
             and (b.id in(select id from cash_range) or (not :bounded and b.purpose in ('CASH','BANK','MOBILE_MONEY')))
-            and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.client_id,m.id)=:clientId)
+            and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.borrower_party_id,m.id)=:clientId)
         )
         """;
     private static final String CLIENT_JOINS="""
         join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch
-        join members m on m.id=a.applicant_member_id and m.sacco_id=a.sacco_id
+        join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id
         left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id
         """;
     private static final String CLIENT_FILTER="""
@@ -240,6 +241,6 @@ public class ManagementReportRepository {
         values.put("overdue","e.overdue_principal+e.overdue_interest");
         values.put("referenceProvision","round(e.principal*(case when e.dpd<=30 then 0 when e.dpd<=90 then .10 when e.dpd<=180 then .30 when e.dpd<=365 then .50 else 1 end),2)");
         String money=values.entrySet().stream().map(v->"case when e.complete then "+v.getValue()+" else null end as \""+v.getKey()+"\"").reduce((x,y)->x+","+y).orElseThrow();
-        return LoanPortfolioReportRepository.SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join members m on m.id=a.applicant_member_id and m.sacco_id=a.sacco_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where (cast(:clientId as uuid) is null or m.id=:clientId) and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)"+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
+        return LoanPortfolioReportRepository.SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where (cast(:clientId as uuid) is null or m.id=:clientId) and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)"+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
     }
 }

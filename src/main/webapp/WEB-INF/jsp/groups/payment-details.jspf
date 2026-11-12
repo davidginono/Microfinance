@@ -1,0 +1,11 @@
+<sec:authorize access="@access.has(principal,'GROUP_LENDING_UPDATE')">
+<c:url value="/finance/groups/${group.id}/payment-details" var="groupPaymentUrl" />
+<form:form modelAttribute="groupSetupForm" method="post" action="${groupPaymentUrl}" cssClass="accounting-create-form" data-workspace-submit="recover">
+<form:hidden path="expectedVersion" />
+<section class="erp-resource-section"><h2><spring:message code="simpleGroup.leaderAndAccount" /></h2><div class="accounting-grid erp-panel-body">
+<label><spring:message code="simpleGroup.leader" /><form:select path="leaderId" cssClass="aws-control"><option value=""><spring:message code="voucher.choose" /></option><c:forEach items="${groupSetup.people}" var="person"><form:option value="${person.id}"><c:out value="${person.name}" /></form:option></c:forEach></form:select></label>
+<label><spring:message code="common.type" /><form:select path="destinationType" cssClass="aws-control"><form:option value="BANK_ACCOUNT"><spring:message code="simpleGroup.bank" /></form:option><form:option value="MOBILE_MONEY"><spring:message code="simpleGroup.mobile" /></form:option></form:select></label>
+<c:forEach items="${['provider','holder','identifier','evidence']}" var="field"><label><spring:message code="simpleGroup.${field}" /><form:input path="${field}" maxlength="${field=='evidence'?500:field=='provider'?120:160}" cssClass="aws-control" /></label></c:forEach>
+<label class="aws-settings-checkbox-row"><form:checkbox path="checked" cssClass="aws-settings-checkbox" /><span><spring:message code="simpleGroup.accountChecked" /></span></label>
+</div></section><div class="accounting-actions accounting-form-actions"><form:errors path="*" element="p" cssClass="coa-error" /><button type="submit" class="app-btn btn-launch"><spring:message code="simpleGroup.saveChanges" text="Save changes" /></button></div>
+</form:form></sec:authorize>

@@ -60,6 +60,7 @@ public class GroupLendingService {
         check(f.getOffice()!=null && Set.of("MEMBER","CHAIRPERSON","SECRETARY","TREASURER").contains(f.getOffice()),"form");
         String hash=hash(List.of(group,f));groups.lockRequest(a,f.getRequestKey());var retry=groups.retry(a,f.getRequestKey(),hash,true);if(retry.isPresent())return retry.get();
         var current=groups.group(a,group,true);check("ACTIVE".equals(current.status()),"inactive");check(groups.client(a,f.getClientId()),"client");
+        check(current.members()<50,"members");
         check(!groups.overlaps(a,group,f.getClientId(),f.getStartsOn()),"membership");
         UUID id=groups.addMember(a,group,f,hash,clock.now());event(a,group,"GROUP_MEMBER_ADDED",Map.of("membership",id,"client",f.getClientId()));return id;
     }

@@ -31,12 +31,20 @@ public class LoanRecordingService {
         String kyc=loans.kycError(id,actor.getSaccoId(),actor.getStationId(),clock.today());
         if(kyc!=null)throw new IllegalArgumentException(kyc);
         var files=attachments.parse(loan.getAttachmentsJson());
-        check((loan.getApplicantSignatureVerifiedAt()!=null&&loan.getApplicantSignatureText()!=null&&!loan.getApplicantSignatureText().isBlank())||files.stream().anyMatch(f->"SIGNED_APPLICATION".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id),"signedApplication");
+        check((loan.getApplicantSignatureVerifiedAt()!=null&&loan.getApplicantSignatureText()!=null&&!loan.getApplicantSignatureText().isBlank())||files.stream().anyMatch(f->"SIGNED_APPLICATION".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||simpleGroups.simple(actor,id),"signedApplication");
         if(loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0) {
-            if(loan.getApplicantMemberId()==null)check(records.personalGuaranteesReady(actor,id),"personalGuarantees");
+            if(loan.getApplicantMemberId()==null)check(simpleGroups.simple(actor,id)?simpleGroups.guaranteesReady(actor,id):records.personalGuaranteesReady(actor,id),"personalGuarantees");
             else check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
         }
     }
+    @Transactional public void withdrawGroup(AppUserPrincipal a,UUID id,UUID key,String state,String terms,String reason){
+        authorize(a,"CREATE");accounting.requireActor(a,"GROUP_LENDING_UPDATE");check(key!=null,"request");text(reason,500,true);
+        var loan=records.groupLoan(a,id,true);check("WITHDRAWN".equals(loan.status())||loan.status().equals(state)&&loan.termsHash().equals(terms),"changed");records.withdrawGroup(a,loan,key,reason,clock.now());event(a,id,"GROUP_APPLICATION_WITHDRAWN",Map.of("reason",reason.strip(),"request",key));
+    }
+    @Transactional(readOnly=true) public boolean groupWithdrawalAvailable(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.groupWithdrawalAvailable(a,id);}
+    @Transactional(readOnly=true) public boolean jointGroupReceipt(AppUserPrincipal a,UUID party){authorize(a,"VIEW");return simpleGroups.partyContract(a,party);}
+    @Transactional(readOnly=true) public boolean retiredGroup(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.retiredGroup(a,id);}
+    @Transactional(readOnly=true) public boolean retiredGroupForFunding(AppUserPrincipal a,UUID id){accounting.requireActor(a,"DISBURSEMENT_QUEUE_VIEW");return records.retiredGroup(a,id);}
     private final LoanRecordingRepository records;
     private final LoanApplicationRepository loans;
     private final LoanProductSettingRepository products;
@@ -55,10 +63,11 @@ public class LoanRecordingService {
     private final com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService repaymentPolicies;
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges;
     private final LoanProductAccountService productAccounts;
-    private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
     private final com.sacco.mvp.grouplending.service.GroupSharedLoanService sharedLoans;
     private final com.sacco.mvp.grouplending.service.SharedCreditExposureService sharedCredit;
+    private final com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups;
     private final LoanRecordingEvidenceService evidence;
+    private final org.springframework.transaction.PlatformTransactionManager transactions;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
     @Transactional(readOnly=true)
@@ -214,27 +223,30 @@ public class LoanRecordingService {
         return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),scheduleRows(result,null),tenure(f).unit(),tenure(f).value());
     }
     @Transactional(readOnly=true)
-    public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");validateRecord(f);check(records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);
+    public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");boolean group="GROUP".equals(f.getLoanFor());validateRecord(f,group);check(group||records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);if(group)simpleGroups.prepare(a,f,product,result,false);
         return new Quote(product.getDisplayName(),product.getInterestRate(),product.getInterestMethod().name(),product.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),List.of(),tenure(f).unit(),tenure(f).value());}
     @Transactional
     public UUID save(AppUserPrincipal a,RecordForm f){return save(a,f,List.of());}
     @Transactional
     public UUID save(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files){
+        check("INDIVIDUAL".equals(f.getLoanFor()),"request");
         return saveInternal(a,f,files,null,null);
     }
-    /** Called only by the organization origination use case, in the same transaction as its source link. */
-    @Transactional
-    public UUID saveOrganization(AppUserPrincipal a,RecordForm f,UUID borrowerParty,String payoutSnapshot){
-        check(f!=null && f.getClientId()==null && f.getTopUpSourceLoanId()==null && "CONFIGURED".equals(f.getLoanMode()) && borrowerParty!=null && payoutSnapshot!=null,"request");
-        authorize(a,"CREATE");check(records.organizationParty(a,borrowerParty),"client");
-        return saveInternal(a,f,List.of(),borrowerParty,payoutSnapshot);
-    }
-    /** Source, joint obligors and conserved allocations must commit with this application. */
-    @Transactional
-    public UUID saveShared(AppUserPrincipal a,RecordForm f,UUID borrowerParty){
-        check(f!=null && f.getClientId()==null && f.getTopUpSourceLoanId()==null && "CONFIGURED".equals(f.getLoanMode()) && borrowerParty!=null,"request");
-        authorize(a,"CREATE");check(records.sharedParty(a,borrowerParty),"client");
-        return saveInternal(a,f,List.of(),borrowerParty,"{\"available\":false}");
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    public UUID saveGroup(AppUserPrincipal a,RecordForm input,List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement){
+        authorize(a,"CREATE");check(input!=null&&"GROUP".equals(input.getLoanFor()),"request");
+        var f=json.convertValue(input,RecordForm.class);f.setGroupAgreementChecksum(null);f.setGroupRequestHash(null);validateRecord(f,true);validateFiles(files);
+        var fingerprints=new ArrayList<String>();
+        try{for(var file:files)if(!file.isEmpty())fingerprints.add("ATTACHMENT/"+file.getOriginalFilename()+"/"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file.getBytes())));
+            if(agreement!=null&&!agreement.isEmpty()){check(agreement.getSize()<=10*1024*1024,"attachments");fingerprints.add("AGREEMENT/"+agreement.getOriginalFilename()+"/"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(agreement.getBytes())));}
+        }catch(java.io.IOException|java.security.NoSuchAlgorithmException e){throw new IllegalArgumentException("simpleGroup.error.document",e);}
+        f.setGroupRequestHash(simpleGroups.fingerprint(a,f,fingerprints));var prior=simpleGroups.completedRetry(a,f);if(prior.isPresent())return prior.get();
+        var recovered=simpleGroups.draftFiles(a,f,files,agreement);var paper=simpleGroups.validatePaper(a,recovered.agreement());f.setGroupAgreementChecksum(paper.checksum());
+        var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);tx.setTimeout(30);
+        return tx.execute(status->{var retry=simpleGroups.retry(a,f);if(retry.isPresent())return retry.get();
+            var p=product(a,f);var prepared=simpleGroups.prepare(a,f,p,calculate(f,p),true);UUID draft=f.getApplicationId();int version=f.getExpectedVersion();f.setApplicationId(null);
+            UUID id=saveInternal(a,f,recovered.files(),prepared.party(),prepared.destination());simpleGroups.record(a,id,prepared,f,paper);simpleGroups.recordGuarantors(a,id,f,p);
+            if(draft!=null){f.setApplicationId(draft);f.setExpectedVersion(version);simpleGroups.consumeDraft(a,f);}return id;});
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
         validateFiles(files);
@@ -261,6 +273,7 @@ public class LoanRecordingService {
             }
         }
         var chargePlan=charges.recordingQuote(a,f,product,borrowerParty==null);
+        if("GROUP".equals(f.getLoanFor())&&!chargePlan.supported())throw new IllegalArgumentException("simpleGroup.error.charges");
         var now=clock.now();
         var storedForm=json.convertValue(f,RecordForm.class);
         var insuranceTerm=chargePlan.terms().stream().filter(t->t.kind().equals("INSURANCE")).findFirst();
@@ -304,16 +317,9 @@ public class LoanRecordingService {
         String clientKycError=loans.kycError(id,a.getSaccoId(),a.getStationId(),clock.today());
         if(clientKycError!=null)throw new IllegalArgumentException(clientKycError);
         if(chargePlan.supported())charges.freeze(a,id,chargePlan);
-        if(borrowerParty!=null && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
+        if(borrowerParty!=null && !"GROUP".equals(f.getLoanFor()) && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
         loans.saveAndFlush(loan);
         event(a,id,"LOAN_APPLICATION_RECORDED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
-    }
-    /** Personal guarantees precede the product-selected review path. */
-    @Transactional public void startGuaranteedGroupReview(AppUserPrincipal a,UUID id){
-        authorize(a,"CREATE");accounting.requireActor(a,"GROUP_LENDING_SUBMIT");records.record(a,id,false);var loan=loans.findForDisbursement(id).orElseThrow();
-        check(loan.getApplicantMemberId()==null && loan.getRequiredGuarantors()!=null && loan.getRequiredGuarantors()>0 && records.personalGuaranteesReady(a,id),"personalGuarantees");
-        if(loan.getStatus()!=LoanStatus.AWAITING_GUARANTORS)return;
-        loan.setStatus(LoanStatus.RECORDED);loans.saveAndFlush(loan);event(a,id,"PERSONAL_GUARANTEES_RECORDED",Map.of("status",loan.getStatus().name()));
     }
     @Transactional(readOnly=true)
     public Detail detail(AppUserPrincipal a,UUID id){
@@ -351,13 +357,13 @@ public class LoanRecordingService {
     public Posting disburse(AppUserPrincipal a,PostForm f,List<org.springframework.web.multipart.MultipartFile> files){
         validateFiles(files);
         accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");validatePost(f);String hash=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
-        organizationFunding.lock(a,f.getLoanId());
         sharedLoans.lock(a,f.getLoanId());
         var source=records.topUpSource(a,f.getLoanId());
         if(source.isPresent())records.lockTopUpPair(a,source.get(),f.getLoanId());
         var record=records.record(a,f.getLoanId(),true);var loan=loans.findForDisbursement(f.getLoanId()).orElseThrow();check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");
+        check(!records.retiredGroup(a,f.getLoanId()),"simpleGroupRetired");
         if(a.getMemberId().equals(loan.getApplicantMemberId()))throw new IllegalArgumentException("staffClient.error.ownLoan");
-        if(loan.getApplicantMemberId()==null)check(Boolean.TRUE.equals(f.getOrganizationAccepted())||Boolean.TRUE.equals(f.getSharedAccepted()),"organizationFundingPending");
+        if(loan.getApplicantMemberId()==null)check(simpleGroups.simpleForFunding(a,loan.getId()),"simpleGroupRetired");
         check(allowedTeller(loan,a.getMemberId()),"customTeller");
         String kycError=loans.kycError(loan.getId(),a.getSaccoId(),a.getStationId(),clock.today());
         if(kycError!=null)throw new IllegalArgumentException(kycError);
@@ -367,6 +373,7 @@ public class LoanRecordingService {
         if(Boolean.TRUE.equals(policy.get("disbursementProofRequired")))check(files.stream().anyMatch(file->!file.isEmpty()),"attachments");
         check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");LocalDate first=f.getFirstPaymentDate()!=null?f.getFirstPaymentDate():loan.getFirstRepaymentDate();
         check(first!=null,"date");
+        if(loan.getApplicantMemberId()==null)check(Objects.equals(first,loan.getFirstRepaymentDate()),"terms");
         check(!f.getEffectiveDate().isBefore(((java.sql.Date)record.get("application_date")).toLocalDate()) && first.isAfter(f.getEffectiveDate()),"date");
         UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
         var pendingCharges=charges.pending(loan);
@@ -397,7 +404,7 @@ public class LoanRecordingService {
         UUID id=UUID.randomUUID(),journal=UUID.randomUUID();var now=clock.now();
         if(settlement==null)records.journal(a,journal,id,f,hash,period,deductions.signum()>0?"LOAN_CHARGE_FUNDING":"DISBURSEMENT",null,now);
         else records.topUpJournal(a,id,journal,f,hash,period,null,now);
-        if(loan.getApplicantMemberId()==null&&!sharedLoans.execute(a,f,id,journal,first,deductions))organizationFunding.execute(a,f,id,journal,first,deductions);
+        if(loan.getApplicantMemberId()==null)check(simpleGroups.fund(a,loan.getId(),id,journal,f.getEffectiveDate()),"simpleGroupRetired");
         records.ticket(a,id,"DISBURSEMENT",f,hash,journal,null,money,principal,null,now);
         var schedule=schedules.buildSchedule(loan,f.getEffectiveDate(),first,loan.getRepaymentFrequency(),null,f.getReference(),f.getNotes());
         loan.setFirstRepaymentDate(first);
@@ -425,7 +432,7 @@ public class LoanRecordingService {
     @Transactional
     public Posting repay(AppUserPrincipal a,PostForm f){
         authorize(a,"POST");validatePost(f);var policy=repaymentPolicies.effective(a,f.getEffectiveDate(),false);String hash=hash(f);records.lockRequest(a,f.getRequestKey());var prior=records.postRequest(a,f.getRequestKey(),hash);if(prior.isPresent())return prior.get();
-        records.record(a,f.getLoanId(),true);UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
+        records.record(a,f.getLoanId(),true);simpleGroups.payment(a,f.getLoanId(),f.getSharedPayer());UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
         var linked=productAccounts.required(a,f.getLoanId());UUID principalId=records.principalAccount(f.getLoanId());check(principalId.equals(linked.principalId()),"productPrincipalMismatch");check(f.getPrincipalAccountId()==null || principalId.equals(f.getPrincipalAccountId()),"account");
         check(f.getInterestAccountId()==null || linked.interestId().equals(f.getInterestAccountId()),"account");
         var principal=records.account(a,principalId,"PRINCIPAL");var money=records.account(a,f.getMoneyAccountId(),"MONEY");
@@ -472,7 +479,7 @@ public class LoanRecordingService {
         var receipt=original.transactionId()==null?null:repayments.reverseRecorded(original.loanId(),original.transactionId(),a,key,reason.strip(),date);
         loans.flush();
         records.lines(a,journal,raw);records.finish(id,receipt==null?null:receipt.id(),original.principal(),original.interest(),records.loan(a,original.loanId(),clock.today()).outstandingPrincipal(),original.charges());
-        sharedLoans.reverse(a,original.loanId(),original.id(),id);records.postJournal(a,journal,now);
+        simpleGroups.correction(a,original.loanId());sharedLoans.reverse(a,original.loanId(),original.id(),id);records.postJournal(a,journal,now);
         event(a,id,"LOAN_REPAYMENT_REVERSED",Map.of("original",originalId));return records.posting(a,id);
     }
     public record LoanExport(Detail detail,List<Posting> payments,com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan charges) { public LoanExport(Detail detail,List<Posting> payments){this(detail,payments,new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan(null,"","",List.of(),true,""));} }

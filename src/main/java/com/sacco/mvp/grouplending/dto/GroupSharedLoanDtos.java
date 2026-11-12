@@ -1,14 +1,10 @@
 package com.sacco.mvp.grouplending.dto;
 
-import com.sacco.mvp.service.PaymentDetailsService.PaymentDetailsView;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.*;
 
 public final class GroupSharedLoanDtos {
     private GroupSharedLoanDtos() {}
-    public record Payout(UUID client,String number,String name,BigDecimal amount,PaymentDetailsView destination) {}
-    public record Funding(UUID cycle,String hash,BigDecimal principal,BigDecimal net,LocalDate firstPaymentDate,boolean ready,List<Payout> payouts) {}
     public record Balance(UUID client,String number,String name,BigDecimal principal,BigDecimal interest,BigDecimal charges,
         BigDecimal paidPrincipal,BigDecimal paidInterest,BigDecimal paidCharges,BigDecimal excludedInterest,BigDecimal waivedInterest,BigDecimal writtenOff,boolean fundingReversed,boolean known) {
         public Balance(UUID client,String number,String name,BigDecimal principal,BigDecimal interest,BigDecimal charges,BigDecimal paidPrincipal,BigDecimal paidInterest,BigDecimal paidCharges,BigDecimal excludedInterest,BigDecimal waivedInterest,boolean fundingReversed,boolean known){this(client,number,name,principal,interest,charges,paidPrincipal,paidInterest,paidCharges,excludedInterest,waivedInterest,new BigDecimal("0.00"),fundingReversed,known);}

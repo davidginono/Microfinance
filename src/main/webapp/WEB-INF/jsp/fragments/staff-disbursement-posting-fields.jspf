@@ -1,7 +1,7 @@
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page pageEncoding="UTF-8" %>
 <link rel="stylesheet" href="<c:url value='/css/loan-recording.css' />" />
-<spring:message code="common.choose" text="Choose" var="chooseLabel" />
+<spring:message code="voucher.choose" var="chooseLabel" />
 <c:if test="${not empty topUpUnavailable}"><div class="md:col-span-2 loan-error-summary" role="alert"><spring:message code="${topUpUnavailable}" /></div></c:if>
 <c:if test="${not empty topUpQuote}">
 <div class="md:col-span-2 loan-topup-summary" data-ui-loading-region data-topup-summary data-topup-posting data-confirmation="<spring:message code='recording.topUp.confirm' />" data-source-number="${fn:escapeXml(topUpQuote.sourceNumber)}" data-quote-url="<c:url value='/disbursement/loan-applications/${app.id}/top-up-quote' />" data-error="<spring:message code='recording.error.topUpUnavailable' />" aria-live="polite">

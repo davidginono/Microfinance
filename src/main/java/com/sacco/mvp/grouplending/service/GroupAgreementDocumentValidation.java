@@ -1,6 +1,5 @@
 package com.sacco.mvp.grouplending.service;
 
-import com.sacco.mvp.grouplending.dto.GroupOrganizationDocumentDtos.DocumentForm;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.*;
 import java.io.IOException;
@@ -9,16 +8,6 @@ import java.util.*;
 /** Shared bounded validation of institution-supplied agreement PDFs; no persistence or authorization. */
 final class GroupAgreementDocumentValidation {
     private GroupAgreementDocumentValidation() {}
-    static void validate(DocumentForm f){
-        check(f!=null&&f.getDocumentRequestKey()!=null&&f.isDocumentChecked(),"documentChecked");
-        check(Set.of("EN","SW","BOTH").contains(Objects.toString(f.getDocumentLanguage(),"")),"documentFields");
-        f.setDocumentReference(text(f.getDocumentReference(),500,true));f.setInstitutionAddress(text(f.getInstitutionAddress(),500,true));
-        f.setContactPhone(text(f.getContactPhone(),80,false));f.setComplaintPhone(text(f.getComplaintPhone(),80,false));
-        f.setContactEmail(email(f.getContactEmail()));f.setComplaintEmail(email(f.getComplaintEmail()));f.setComplaintAddress(text(f.getComplaintAddress(),500,false));
-        check(!f.getContactPhone().isEmpty()||!f.getContactEmail().isEmpty(),"documentContacts");check(!f.getComplaintPhone().isEmpty()||!f.getComplaintEmail().isEmpty(),"documentContacts");
-    }
-    private static String email(String s){s=text(s,160,false);check(s.isEmpty()||s.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"),"documentContacts");return s;}
-    private static String text(String s,int max,boolean required){check(s!=null&&s.length()<=max&&s.chars().noneMatch(Character::isISOControl)&&(!required||!s.isBlank()),"documentFields");return s.strip();}
     static int pages(byte[] bytes){
         try(var pdf=Loader.loadPDF(bytes)){
             check(!pdf.isEncrypted()&&pdf.getNumberOfPages()>=1&&pdf.getNumberOfPages()<=50,"documentPdf");

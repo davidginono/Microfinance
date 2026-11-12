@@ -73,7 +73,7 @@ public class LoanGroupApprovalService {
         var r=records.groupRequest(a,loan).orElse(null);
         if(r==null)return new GroupReview(null,List.of(),List.of(),0,false,false);
         var plan=steps(records.groupSteps(a,r.rule()));var decisions=records.groupDecisions(r);int step=next(plan,decisions);
-        boolean eligible="SUBMITTED".equals(l.status())&&r.termsHash().equals(l.termsHash())&&step<plan.size()
+        boolean eligible=!records.retiredGroup(a,loan)&&"SUBMITTED".equals(l.status())&&r.termsHash().equals(l.termsHash())&&step<plan.size()
             &&independent(a,l,r,decisions)&&currentGroups(a).contains(plan.get(step).group());
         return new GroupReview(r,plan,decisions,step,eligible&&a.getClaims().contains("LOAN_RECORDING_APPROVE"),eligible&&a.getClaims().contains("LOAN_RECORDING_REJECT"));
     }
@@ -81,6 +81,7 @@ public class LoanGroupApprovalService {
     public void submit(AppUserPrincipal a,UUID loan,UUID key) {
         access.requireActor(a,"LOAN_RECORDING_CREATE");require(key!=null,"request");
         var l=records.groupLoan(a,loan,true);var previous=records.groupRequest(a,loan);
+        require(!records.retiredGroup(a,loan),"retired");
         if(previous.isPresent()&&previous.get().id().equals(key)) {
             require(previous.get().maker().equals(a.getMemberId())&&previous.get().termsHash().equals(l.termsHash()),"retry");return;
         }
@@ -102,6 +103,7 @@ public class LoanGroupApprovalService {
         require(Set.of("APPROVE","REJECT").contains(decision),"decision");access.requireActor(a,"LOAN_RECORDING_"+decision);
         access.requireActor(a,"LOAN_RECORDING_VIEW");text(reason);text(evidence);require(key!=null,"request");
         var l=records.groupLoan(a,loan,true);var r=records.groupRequest(a,loan).orElseThrow(()->invalid("state"));
+        require(!records.retiredGroup(a,loan),"retired");
         require(r.id().equals(request),"changed");var decisions=records.groupDecisions(r);
         var retry=decisions.stream().filter(d->d.id().equals(key)).findFirst();
         if(retry.isPresent()) {var d=retry.get();require(d.actor().equals(a.getMemberId())&&d.decision().equals(decision)&&d.reason().equals(reason.strip())&&d.evidence().equals(evidence.strip()),"retry");return;}

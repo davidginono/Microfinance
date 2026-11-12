@@ -76,8 +76,7 @@ public class DisbursementController {
     private final com.sacco.mvp.service.ArchivedLoanDeletionService archivedLoanDeletionService;
     private final ManagerService managerService;
     private final com.sacco.mvp.accounting.loans.service.LoanRecordingService loanRecordingService;
-    private final com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
-    private final com.sacco.mvp.grouplending.service.GroupSharedLoanService sharedLoans;
+    private final com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups;
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
     private final LoanPresentationService loanPresentationService;
@@ -94,6 +93,7 @@ public class DisbursementController {
     private final AccessControlService access;
     private final ApplicationClock applicationClock;
 
+    @GetMapping("/loan-applications/{id}/group-agreement") public org.springframework.http.ResponseEntity<byte[]> groupAgreement(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id){return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).contentType(org.springframework.http.MediaType.APPLICATION_PDF).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox").header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=group-agreement.pdf").body(simpleGroups.fundingDocument(a,id));}
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
         ManagerService.ManagerDashboard dashboard = managerService.dashboard(principal.getSaccoId(), principal.getStationId());
@@ -319,7 +319,7 @@ public class DisbursementController {
         List<LoanApplication> activeApplicantLoans = managerService.activeApplicantLoans(
             app.getId(), principal.getSaccoId(), principal.getStationId());
 
-        model.addAttribute("app", app);
+        model.addAttribute("app", app);model.addAttribute("disbursementToday",applicationClock.today());
         var tenureData=app.getFinancialSnapshot()==null?Map.<String,Object>of():objectMapper.readValue(app.getFinancialSnapshot(),new TypeReference<Map<String,Object>>(){});
         var loanTenure=com.sacco.mvp.service.LoanTenure.fromSnapshot(tenureData,app.getTenorMonths());
         model.addAttribute("loanTenure",loanTenure);
@@ -395,11 +395,10 @@ public class DisbursementController {
         boolean recordedApplication=loanRecordingService.recordedForStaff(principal,app.getId());
         model.addAttribute("recordedLoanApplication",recordedApplication);
         if(!model.containsAttribute("disbursementRequestKey"))model.addAttribute("disbursementRequestKey",UUID.randomUUID());
-        var organizationContext=app.getApplicantMemberId()==null?organizationFunding.context(principal,id).orElse(null):null;
-        model.addAttribute("organizationFunding",organizationContext);
-        var sharedContext=app.getApplicantMemberId()==null?sharedLoans.funding(principal,id).orElse(null):null;
-        model.addAttribute("sharedFunding",sharedContext);
-        boolean organizationFundingPending = app.getApplicantMemberId()==null && app.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT && (organizationContext==null || !organizationContext.ready()) && (sharedContext==null || !sharedContext.ready());
+        var groupContract=app.getApplicantMemberId()==null?simpleGroups.fundingContract(principal,id).orElse(null):null;
+        model.addAttribute("simpleGroup",groupContract);model.addAttribute("groupAgreementBase","/disbursement/loan-applications");
+        boolean retiredGroup=loanRecordingService.retiredGroupForFunding(principal,id);model.addAttribute("retiredGroupApplication",retiredGroup);
+        boolean organizationFundingPending=app.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT&&(retiredGroup||app.getApplicantMemberId()==null&&groupContract==null);
         model.addAttribute("organizationFundingPending",organizationFundingPending);
         boolean canDisburseLoan = !organizationFundingPending && (app.getApplicantMemberId()!=null || access.has(principal,"GROUP_LENDING_EXECUTE")) && access.has(principal, "DISBURSEMENT_QUEUE_DISBURSE") && (!recordedApplication || loanRecordingService.allowedTeller(app,principal.getMemberId()));
         if(recordedApplication && canDisburseLoan) {
@@ -424,7 +423,7 @@ public class DisbursementController {
         model.addAttribute("allowPaymentSync", true);
         model.addAttribute("allowDefaultedPaymentRecheck", canDisburseLoan);
         addReviewDisplayAttributes(model, app);
-        return "manager/detail";
+        return "disbursement/detail";
     }
 
     @GetMapping("/loan-applications/{id}/applicant-financial-status")
@@ -484,12 +483,6 @@ public class DisbursementController {
                            @RequestParam(required = false) Long settlementChargeSequence,
                            @RequestParam(required = false) String settlementEvidence,
                            @RequestParam(defaultValue = "false") boolean settlementConfirmed,
-                           @RequestParam(required = false) String organizationPacketHash,
-                           @RequestParam(defaultValue = "false") boolean organizationAccepted,
-                           @RequestParam(required = false) String sharedPacketHash,
-                           @RequestParam(defaultValue = "false") boolean sharedAccepted,
-                           @RequestParam(defaultValue = "false") boolean sharedPayoutsConfirmed,
-                           @RequestParam(required = false) List<String> sharedPayoutReferences,
                            @RequestParam(required = false) List<MultipartFile> attachments,
                            RedirectAttributes ra) {
         try {
@@ -500,8 +493,6 @@ public class DisbursementController {
             if(loanRecordingService.recordedForStaff(principal,id)) {
                 var form=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.PostForm();
                 form.setRequestKey(requestKey);form.setLoanId(id);form.setEffectiveDate(disbursementDate);form.setFirstPaymentDate(firstRepaymentDate);
-                if(application.getApplicantMemberId()==null){form.setOrganizationPacketHash(organizationPacketHash);form.setOrganizationAccepted(organizationAccepted);}
-                if(sharedPacketHash!=null){form.setSharedPacketHash(sharedPacketHash);form.setSharedAccepted(sharedAccepted);form.setSharedPayoutsConfirmed(sharedPayoutsConfirmed);form.setSharedPayoutReferences(sharedPayoutReferences);}
                 form.setAmount(application.getAmount());form.setMoneyAccountId(moneyAccountId);form.setPrincipalAccountId(principalAccountId);
                 form.setInterestAccountId(interestAccountId);form.setSettlementSequence(settlementSequence);form.setSettlementPrincipal(settlementPrincipal);form.setSettlementInterest(settlementInterest);form.setSettlementCharges(settlementCharges);form.setSettlementChargeSequence(settlementChargeSequence);form.setEvidence(settlementEvidence==null?"":settlementEvidence);
                 if(application.getTopUpSourceLoanId()!=null && !settlementConfirmed)throw new IllegalArgumentException("recording.error.topUpChanged");
@@ -527,11 +518,10 @@ public class DisbursementController {
             ra.addFlashAttribute("message", message("recording.disbursedSuccess"));
             return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage()!=null && (ex.getMessage().startsWith("kyc.error.") || ex.getMessage().startsWith("credit.error.") || ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("charges.error."))?message(ex.getMessage()):ex.getMessage());
+            ra.addFlashAttribute("error", ex.getMessage()!=null && (ex.getMessage().startsWith("simpleGroup.error.") || ex.getMessage().startsWith("kyc.error.") || ex.getMessage().startsWith("credit.error.") || ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("charges.error."))?message(ex.getMessage()):ex.getMessage());
             ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);ra.addFlashAttribute("postingInterestAccountId",interestAccountId);ra.addFlashAttribute("postingSettlementEvidence",settlementEvidence);
             ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
             ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);
-            ra.addFlashAttribute("postingSharedPayoutReferences",sharedPayoutReferences);
         } catch(org.springframework.dao.DataIntegrityViolationException ex){ra.addFlashAttribute("error",message("recording.error.duplicate"));}
         return "redirect:/disbursement/loan-applications/" + id;
     }

@@ -18,22 +18,9 @@ import java.util.*;
 public class GroupSharedLoanService {
     private final GroupSharedLoanRepository shared;
     private final GeneralLedgerService access;
-    private final MemberDirectoryService members;
     private final ApplicationClock clock;
     private final AuditService audit;
-    @Transactional(readOnly=true) public Optional<Funding> funding(AppUserPrincipal a,UUID loan){access.requireActor(a,"DISBURSEMENT_QUEUE_VIEW");return shared.funding(a,loan);}
     @Transactional(propagation=Propagation.MANDATORY) public void lock(AppUserPrincipal a,UUID loan){access.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");shared.lock(a,loan);}
-    @Transactional(propagation=Propagation.MANDATORY) public boolean execute(AppUserPrincipal a,PostForm form,UUID posting,UUID journal,LocalDate first,BigDecimal deductions){
-        if(!shared.shared(a,form.getLoanId()))return false;
-        access.requireActor(a,"GROUP_LENDING_EXECUTE");var f=shared.funding(a,form.getLoanId()).orElseThrow();
-        check(f.ready()&&Boolean.TRUE.equals(form.getSharedAccepted())&&Objects.equals(f.hash(),form.getSharedPacketHash()),"sharedFunding");
-        check(Objects.equals(first,f.firstPaymentDate())&&f.principal().compareTo(form.getAmount())==0&&f.net().compareTo(form.getAmount().subtract(deductions))==0,"sharedTerms");
-        var refs=form.getSharedPayoutReferences();check(Boolean.TRUE.equals(form.getSharedPayoutsConfirmed())&&refs!=null&&refs.size()==f.payouts().size(),"sharedTransfers");
-        var unique=new HashSet<String>();for(var reference:refs){check(reference!=null&&!reference.isBlank()&&reference.length()<=100&&reference.chars().noneMatch(Character::isISOControl)&&unique.add(reference.strip()),"sharedTransfers");}
-        var actor=members.find(a.getMemberId()).orElseThrow();check(actor.getSignatureText()!=null&&!actor.getSignatureText().isBlank(),"organizationSignature");
-        shared.execute(a,f,form.getLoanId(),posting,journal,refs,clock.now());
-        audit.logEvent("GROUP_LENDING",f.cycle(),"SHARED_LENDER_SIGNED",a.getMemberId(),AuditEventStatus.SUCCESS,"Complete shared funding","GROUP_CYCLE",f.cycle().toString(),a.getSaccoId(),a.getStationId(),Map.of("loan",form.getLoanId(),"posting",posting,"packet",f.hash()));return true;
-    }
     @Transactional(readOnly=true) public List<Balance> balances(AppUserPrincipal a,UUID loan){access.requireActor(a,"GROUP_LENDING_VIEW");access.requireActor(a,"LOAN_RECORDING_VIEW");return shared.balances(a,loan);}
     @Transactional(propagation=Propagation.MANDATORY) public void payment(AppUserPrincipal a,UUID loan,Posting posting,String payer){
         if(!shared.shared(a,loan))return;access.requireActor(a,"GROUP_LENDING_POST");

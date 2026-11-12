@@ -28,7 +28,7 @@ class StaffLoanDisbursementTest {
     @Mock GeneralLedgerService accounting;
     @Mock LoanRepaymentLedgerService repayments;
     @Mock ApplicationClock clock;
-    @Mock com.sacco.mvp.grouplending.service.GroupOrganizationFundingService organizationFunding;
+    @Mock com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups;
     @Mock com.sacco.mvp.grouplending.service.GroupSharedLoanService sharedLoans;
     @Spy ObjectMapper json = JsonMapper.builder().findAndAddModules().build();
     @InjectMocks LoanRecordingService service;

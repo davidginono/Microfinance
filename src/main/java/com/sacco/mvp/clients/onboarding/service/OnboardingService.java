@@ -30,6 +30,7 @@ public class OnboardingService {
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
     public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","monthlyIncome","monthlyExpenses","monthlyDebtRepayments","employerName","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
     private final OnboardingRepository records;
+    private final com.sacco.mvp.grouplending.service.GroupLendingService groups;
     private final GeneralLedgerService access;
     private final MemberRegistrationService registration;
     private final StoredUploadStorageService uploads;
@@ -79,7 +80,7 @@ public class OnboardingService {
     @Transactional(readOnly=true) public boolean duplicate(AppUserPrincipal a,UUID client) {var r=latest(a,client);return r.isPresent()&&!identity(r.get().profile()).isBlank()&&records.duplicate(a.getSaccoId(),identity(r.get().profile()),client);}
 
     public UUID create(AppUserPrincipal a,CreateForm f) {
-        authorize(a,"CREATE");check(f.getDocuments()!=null&&f.getDocuments().size()<=DocumentForm.MAX_FILES,"uploadLimit");
+        authorize(a,"CREATE");var enrollment=f.getEnrollGroupId()!=null?f.getEnrollGroupId():f.getProfile()==null?null:f.getProfile().getGroupId();if(enrollment!=null)groups.authorize(a,"UPDATE");check(f.getDocuments()!=null&&f.getDocuments().size()<=DocumentForm.MAX_FILES,"uploadLimit");
         var documents=new ArrayList<PreparedCreationDocument>();long bytes=0;
         for(var document:f.getDocuments()) {
             check(document!=null,"file");if(document.getFile()==null||document.getFile().isEmpty())continue;
@@ -97,6 +98,7 @@ public class OnboardingService {
     private UUID create(AppUserPrincipal a,CreateForm f,List<PreparedCreationDocument> documents) {
         authorize(a,"CREATE");check(f.getProfile()!=null,"profile");text(f.getName(),255,"name",true);text(f.getEmail(),255,"email",false);
         check(f.getName().strip().split("\\s+").length>=2,"name");check(f.getEmail().isBlank()||f.getEmail().matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+"),"email");
+        if(f.getEnrollGroupId()!=null){check(f.getProfile().getGroupId()==null||f.getEnrollGroupId().equals(f.getProfile().getGroupId()),"group");f.getProfile().setGroupId(f.getEnrollGroupId());}
         boolean structured=!f.getProfile().getFirstName().isBlank()||!f.getProfile().getLastName().isBlank();if(structured)names(f.getProfile());
         try {String phone=TanzaniaPhoneNumber.normalizeRequired(f.getPhone());f.setPhone(phone);if(structured)f.getProfile().setPhone(phone);}catch(IllegalStateException e){throw invalid("phone");}
         String hash=documents.isEmpty()?hash(f):hash(List.of(f,documents.stream().map(d->List.of(d.metadata().getCategory(),Objects.toString(d.metadata().getExpiresOn(),""),d.content().name(),d.checksum())).toList()));var old=retry(a,"client_onboarding_creation",f.getRequestKey(),hash);if(old.isPresent())return records.created(old.get());
@@ -113,6 +115,8 @@ public class OnboardingService {
                 records.document(a,client,c.revisionId(),id,upload.getId(),metadata,hash(List.of(client,metadata,document.checksum())),clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");
             }
         }
+        var groupId=f.getEnrollGroupId()!=null?f.getEnrollGroupId():f.getProfile().getGroupId();
+        if(groupId!=null){var membership=new com.sacco.mvp.grouplending.dto.GroupLendingDtos.MemberForm();membership.setClientId(client);membership.setStartsOn(today());membership.setEvidence("Staff registration / "+f.getRequestKey());membership.setRequestKey(UUID.nameUUIDFromBytes((f.getRequestKey()+"/group").getBytes(StandardCharsets.UTF_8)));groups.addMember(a,groupId,membership);}
         return client;
     }
     @Transactional(readOnly=true) public ProfileForm profileForm(AppUserPrincipal a,UUID id) {

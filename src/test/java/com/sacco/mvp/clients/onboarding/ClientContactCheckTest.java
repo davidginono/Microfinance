@@ -17,7 +17,7 @@ class ClientContactCheckTest {
     final MemberRepository members=mock(MemberRepository.class);
     final GeneralLedgerService access=mock(GeneralLedgerService.class);
     final MemberRegistrationService registration=new MemberRegistrationService(null,members,null,null,null);
-    final OnboardingService service=new OnboardingService(mock(OnboardingRepository.class), access, registration, null, null, null, null, null);
+    final OnboardingService service=new OnboardingService(mock(OnboardingRepository.class), mock(com.sacco.mvp.grouplending.service.GroupLendingService.class), access, registration, null, null, null, null, null);
     final AppUserPrincipal actor=actor(EnumSet.allOf(UserClaim.class));
     AppUserPrincipal actor(Set<UserClaim> claims) {return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),claims);}
 

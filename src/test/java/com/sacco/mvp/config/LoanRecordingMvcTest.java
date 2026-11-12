@@ -28,8 +28,9 @@ class LoanRecordingMvcTest {
     @Autowired WebApplicationContext context;
     @Autowired LoanRecordingService service;
     @Autowired com.sacco.mvp.clients.applications.service.ClientApplicationService applications;
+    @Autowired com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups;
     MockMvc mvc;AppUserPrincipal actor;
-    @BeforeEach void setup(){reset(service,applications);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
+    @BeforeEach void setup(){reset(service,applications,simpleGroups);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));}
     @Test void legacyStaffPagesRedirectToTheAccountantWorkspaceForBothClaimSets() throws Exception {
         var onboardingOnly=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.CLIENT_ONBOARDING_VIEW,UserClaim.CLIENT_ONBOARDING_UPDATE));
         var client=UUID.randomUUID();var application=UUID.randomUUID();
@@ -221,6 +222,27 @@ class LoanRecordingMvcTest {
             && f.getApplicationDetails().getGuarantors().getFirst().getClientId()==null),any());
         mvc.perform(get("/finance/loan-recording/evidence/choices/guarantors").with(user(actor))).andExpect(status().isNotFound());
     }
+    @Test void individualIsTheDefaultAndAGroupLoadsItsWholeRoster()throws Exception{
+        mvc.perform(get("/finance/loan-records/new").with(user(actor))).andExpect(status().isOk()).andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("loanFor",org.hamcrest.Matchers.is("INDIVIDUAL"))));
+        UUID group=UUID.randomUUID();var setup=new com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.Setup(group,7,"Five clients",UUID.randomUUID(),"Asha","BANK_ACCOUNT","Bank","Group","ACCOUNT","Checked",List.of(new com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.Person(UUID.randomUUID(),"C1","Asha"),new com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.Person(UUID.randomUUID(),"C2","Juma")));
+        when(simpleGroups.setup(actor,group)).thenReturn(setup);
+        mvc.perform(get("/finance/loan-records/new").param("groupId",group.toString()).with(user(actor))).andExpect(status().isOk()).andExpect(model().attribute("groupSetup",setup)).andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("loanFor",org.hamcrest.Matchers.is("GROUP"))));
+    }
+    @Test void groupSubmissionBindsEvidenceButIgnoresForgedContractAndGuarantorLinks()throws Exception{
+        UUID loan=UUID.randomUUID(),group=UUID.randomUUID(),person=UUID.randomUUID();when(service.saveGroup(eq(actor),any(),anyList(),any())).thenReturn(loan);
+        var paper=new MockMultipartFile("groupAgreement","signed.pdf","application/pdf","%PDF fixture".getBytes());
+        mvc.perform(multipart("/finance/loan-records").file(paper).with(user(actor)).with(csrf()).param("loanFor","GROUP").param("groupApplication.groupId",group.toString()).param("groupApplication.expectedVersion","7").param("groupApplication.signers[0].clientId",person.toString()).param("groupApplication.signers[0].signedOn","2026-11-12").param("groupApplication.signers[0].incomeSource","Income 1").param("groupApplication.signers[0].evidence","Budget 1").param("groupApplication.checked","true").param("groupAgreementChecksum","forged").param("groupRequestHash","forged").param("applicationDetails.guarantors[0].clientId",person.toString()).param("applicationDetails.guarantors[0].clientNumber","C7"))
+            .andExpect(redirectedUrl("/finance/loan-records/"+loan));
+        verify(service).saveGroup(eq(actor),argThat(f->f.getGroupAgreementChecksum()==null&&f.getGroupRequestHash()==null&&f.getGroupApplication().getExpectedVersion()==7&&f.getGroupApplication().getSigners().getFirst().getClientId().equals(person)&&f.getApplicationDetails().getGuarantors().getFirst().getClientId()==null),anyList(),eq(paper));
+        mvc.perform(multipart("/finance/loan-records").with(user(actor)).param("loanFor","GROUP")).andExpect(status().isForbidden());
+    }
+    @Test void retiredGroupCommandsHaveNoOperationalHandlers()throws Exception{
+        for(var url:List.of("/finance/groups/policies","/finance/groups/policies/new","/finance/groups/"+UUID.randomUUID()+"/authorities","/finance/group-cycles/"+UUID.randomUUID()+"/submit","/finance/group-coverage")){
+            mvc.perform(get(url).with(user(actor))).andExpect(status().is4xxClientError());
+            mvc.perform(post(url).with(user(actor)).with(csrf())).andExpect(status().is4xxClientError());
+        }
+        verifyNoInteractions(simpleGroups,service);
+    }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}
         @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService charges(){return mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}
@@ -228,8 +250,9 @@ class LoanRecordingMvcTest {
         @Bean com.sacco.mvp.clients.applications.service.ClientApplicationService applications(){return mock(com.sacco.mvp.clients.applications.service.ClientApplicationService.class);}
 
         @Bean com.sacco.mvp.clients.applications.controller.ClientApplicationController historyController(com.sacco.mvp.clients.applications.service.ClientApplicationService applications){return new com.sacco.mvp.clients.applications.controller.ClientApplicationController(applications,new org.springframework.context.support.StaticMessageSource());}
+        @Bean com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups(){return mock(com.sacco.mvp.grouplending.service.SimpleGroupLoanService.class);}
         @Bean LoanRecordingService service(){return mock(LoanRecordingService.class);}
         @Bean com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals(){return mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class);}
-        @Bean LoanRecordingController controller(LoanRecordingService service,com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals){return new LoanRecordingController(service,approvals,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));}
+        @Bean LoanRecordingController controller(LoanRecordingService service,com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals,com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups){return new LoanRecordingController(simpleGroups,service,approvals,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));}
     }
 }

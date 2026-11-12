@@ -24,6 +24,12 @@ public final class LoanRecordingDtos {
     public record ChargeField(String code,String percentage,String amount) {}
     public record ChargeQuote(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan plan,List<ChargeField> fields) {}
     @Data public static class RecordForm {
+        private String loanFor="INDIVIDUAL";
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private String groupAgreementChecksum;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private String groupRequestHash;
+        private com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.ApplicationForm groupApplication=new com.sacco.mvp.grouplending.dto.SimpleGroupLoanDtos.ApplicationForm();
         /** Internal group-origination evidence; deliberately excluded from every browser binder. */
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private com.sacco.mvp.grouplending.dto.GroupDisclosureDtos.Snapshot groupDisclosure;
@@ -72,6 +78,9 @@ public final class LoanRecordingDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String insuranceEvidence;
     }
     @Data public static class ApplicationDetails {
+        /** Server-only source values for validating each joint borrower against the product schema. */
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        private List<Map<String,String>> groupClientValues=new ArrayList<>();
         /** Frozen source revision; never accepted from the recording form. */
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.LoanProfile clientProfile;
@@ -86,13 +95,7 @@ public final class LoanRecordingDtos {
         private boolean declarationAccepted;
     }
     @Data public static class PostForm {
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String sharedPacketHash;
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private Boolean sharedAccepted;
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private Boolean sharedPayoutsConfirmed;
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private List<String> sharedPayoutReferences;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String sharedPayer;
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String organizationPacketHash;
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private Boolean organizationAccepted;
         private UUID requestKey = UUID.randomUUID();
         private UUID loanId;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate firstPaymentDate;

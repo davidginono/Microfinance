@@ -22,7 +22,7 @@ public class OnboardingController {
     private static final String ROOT="/finance/clients/onboarding";
     private final OnboardingService service;
 
-    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(DocumentForm.MAX_FILES);b.setAllowedFields(fields("requestKey","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","documents[*].category","documents[*].expiresOn","documents[*].file"));}
+    @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(DocumentForm.MAX_FILES);b.setAllowedFields(fields("requestKey","enrollGroupId","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","documents[*].category","documents[*].expiresOn","documents[*].file"));}
     @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","expectedSequence","action","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","profile.legalHoldReference"));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
     @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","checksConfirmed","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","checkedOn");}
@@ -38,15 +38,15 @@ public class OnboardingController {
     @GetMapping public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="number_asc") String sort,Model m) {
         m.addAttribute("records",service.clients(a,search,state,page,sort));m.addAttribute("search",search);m.addAttribute("state",state);m.addAttribute("sort",sort);return "onboarding/register";
     }
-    @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,Model m) {
-        service.authorize(a,"CREATE");m.addAttribute("createForm",new CreateForm());return form(m,"create");
+    @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID groupId,Model m) {
+        service.authorize(a,"CREATE");var f=new CreateForm();f.setEnrollGroupId(groupId);f.getProfile().setGroupId(groupId);m.addAttribute("createForm",f);return form(m,"create");
     }
     @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute("createForm") CreateForm f,BindingResult errors,@RequestParam(defaultValue="CREATE") String action,Model m,RedirectAttributes flash) {
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
             if(!action.equals("CREATE"))throw new IllegalArgumentException("kyc.error.action");
             UUID id=service.create(a,f);
-            flash.addFlashAttribute("provisionalClientCreated",true);
-            return "redirect:"+ROOT+"/"+id;
+            flash.addFlashAttribute("provisionalClientCreated",true);if(f.getEnrollGroupId()!=null)flash.addFlashAttribute("successMessageCode","simpleGroup.clientAdded");
+            return f.getEnrollGroupId()==null?"redirect:"+ROOT+"/"+id:"redirect:/finance/groups/"+f.getEnrollGroupId();
         }catch(IllegalArgumentException e){reject(errors,e);}catch(org.springframework.dao.DataIntegrityViolationException e){errors.reject("kyc.error.registration");}
         return form(m,"create");
     }

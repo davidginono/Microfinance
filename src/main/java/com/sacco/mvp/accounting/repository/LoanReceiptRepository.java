@@ -26,7 +26,7 @@ public class LoanReceiptRepository {
         p.amount total,1 transaction_count,null::uuid journal_id,p.actor_id posted_by,u.full_name posted_by_name,
         p.recorded_at posted_at,p.reverses_id,(select x.id from accountant_loan_post x where x.reverses_id=p.id) reversed_by,
         i.sacco_name institution_name,coalesce(nullif(s.address_location,''),p.station_id) branch_name,
-        p.id posting_id,p.loan_id,a.loan_id loan_number,p.amount,p.principal_amount,p.interest_amount,p.principal_balance,
+        p.id posting_id,p.loan_id,a.borrower_party_id,a.loan_id loan_number,p.amount,p.principal_amount,p.interest_amount,p.principal_balance,
         p.money_account_name,p.principal_account_name,p.interest_account_name,coalesce((select t1.receivable_account_name from loan_charge_event e join loan_charge_term t1 on t1.id=e.term_id where e.posting_id=p.id limit 1),'') charge_account,1 line_no
         from accountant_loan_post p join loan_repayment_transactions t on t.id=p.transaction_id
         join loan_applications a on a.id=p.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id join members u on u.id=p.actor_id
@@ -66,20 +66,20 @@ public class LoanReceiptRepository {
         return jdbc.query("""
             with receipts as not materialized (
               select id,sacco_id,station_id,number,request_key,effective_date,party,reference,description,evidence,money_account_id,
-              total,transaction_count,journal_id,posted_by,posted_at,reverses_id from accounting_voucher where type='RECEIPT' and sacco_id=? and station_id=?
+              total,transaction_count,journal_id,posted_by,posted_at,reverses_id,client_id as borrower_party_id,client_number from accounting_voucher where type='RECEIPT' and sacco_id=? and station_id=?
               union all
               select id,sacco_id,station_id,number,request_key,effective_date,party,reference,description,evidence,money_account_id,
-              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id from accountant_loan_receipt r where sacco_id=? and station_id=? and ? and (? or not exists(select 1 from loan_borrower_party b where b.id=r.borrower_party_id and b.kind='JOINT_GROUP'))
+              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id,borrower_party_id,client_number from accountant_loan_receipt r where sacco_id=? and station_id=? and ? and (? or not exists(select 1 from loan_borrower_party b where b.id=r.borrower_party_id and b.kind='JOINT_GROUP'))
               union all
               select p.id,p.sacco_id,p.station_id,t.receipt_reference,p.request_key,p.effective_date,m.full_name,p.reference,p.notes,p.evidence,p.money_account_id,
-              p.amount,1,null::uuid,p.actor_id,p.recorded_at,p.reverses_id from accountant_loan_post p
+              p.amount,1,null::uuid,p.actor_id,p.recorded_at,p.reverses_id,l.borrower_party_id,m.member_no from accountant_loan_post p
               join loan_repayment_transactions t on t.id=p.transaction_id join loan_applications l on l.id=p.loan_id join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id
               where p.sacco_id=? and p.station_id=? and ? and (? or m.kind<>'JOINT_GROUP') and p.kind in ('PAYMENT','REVERSAL')
               and not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
               and not exists(select 1 from lending_group_receipt_loan x where x.posting_id=p.id)
               union all
               select id,sacco_id,station_id,number,request_key,effective_date,remitter,reference,description,evidence,money_account_id,
-              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id from lending_group_receipt where sacco_id=? and station_id=? and ?
+              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id,null::uuid,null::text from lending_group_receipt where sacco_id=? and station_id=? and ?
             ), all_receipts as (
               select v.*,m.full_name posted_by_name,i.sacco_name institution_name,
               coalesce(nullif(s.address_location,''),v.station_id) branch_name,
@@ -93,5 +93,5 @@ public class LoanReceiptRepository {
             """+" order by "+order+" limit ? offset ?",(r,n)->header(r),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeGroups,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
     private LoanReceiptRow row(ResultSet r)throws SQLException{return new LoanReceiptRow(r.getInt("line_no"),r.getObject("posting_id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("description"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getBigDecimal("principal_balance"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("reference"),r.getBigDecimal("amount").subtract(r.getBigDecimal("principal_amount")).subtract(r.getBigDecimal("interest_amount")).signum()>0?r.getString("charge_account"):"");}
-    private Voucher header(ResultSet r)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.RECEIPT,r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of());}
+    private Voucher header(ResultSet r)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.RECEIPT,r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("borrower_party_id",UUID.class),r.getString("client_number"));}
 }

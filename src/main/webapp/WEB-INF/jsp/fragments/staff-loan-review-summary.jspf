@@ -38,17 +38,19 @@
         <div class="loan-hero-with-photo">
             <dl class="erp-detail-facts">
                 <div>
-                    <dt><spring:message code="loan.applicationId" text="Loan Application ID" /></dt>
-                    <dd><c:out value="${reviewApplicationId}" /></dd>
+                    <dt><spring:message code="${recordedLoanApplication?'loan.loanId':'loan.applicationId'}" /></dt>
+                    <dd><c:out value="${recordedLoanApplication and not empty reviewDisbursedLoanId?reviewDisbursedLoanId:reviewApplicationId}" /></dd>
                 </div>
                 <div>
                     <dt><c:choose><c:when test="${not empty borrower and not borrower.person}"><spring:message code="group.code" /></c:when><c:otherwise><spring:message code="member.memberNo" /></c:otherwise></c:choose></dt>
                     <dd><c:out value="${empty reviewApplicantMemberNo ? '-' : reviewApplicantMemberNo}" /></dd>
                 </div>
+                <c:if test="${not recordedLoanApplication}">
                 <div>
                     <dt><spring:message code="loan.loanId" text="Loan ID" /></dt>
                     <dd><c:out value="${empty reviewDisbursedLoanId ? '-' : reviewDisbursedLoanId}" /></dd>
                 </div>
+                </c:if>
                 <div>
                     <dt><spring:message code="common.status" text="Status" /></dt>
                     <dd>

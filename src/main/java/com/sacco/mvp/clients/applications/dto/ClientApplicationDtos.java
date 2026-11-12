@@ -24,6 +24,11 @@ public final class ClientApplicationDtos {
         private boolean declarationAccepted;
     }
     @Data public static class Guarantor {
+        private String clientNumber="";
+        private BigDecimal guaranteeBudget;
+        private String guaranteeEvidence="";
+        @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+        private java.time.LocalDate signedOn;
         // Retained for historical client-linked guarantors. New recording uses fullName.
         private UUID clientId;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)

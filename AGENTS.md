@@ -78,7 +78,7 @@ Default local URL:
 - Staff client recording:
   - `src/main/java/com/sacco/mvp/clients/onboarding/service/OnboardingService.java`
 - Group signed papers:
-  - `src/main/java/com/sacco/mvp/grouplending/service/GroupPaperService.java`
+  - `src/main/java/com/sacco/mvp/grouplending/service/SimpleGroupLoanService.java`
 - Admin:
   - `src/main/java/com/sacco/mvp/web/AdminController.java`
   - `src/main/java/com/sacco/mvp/service/AdminService.java`
@@ -121,7 +121,7 @@ Default local URL:
 - Customized loans are a loan type, not a user-created product. Their only advance configuration is the branch approval workflow. Staff enter each loan’s rate/amount, tenure, frequency and supported charges during recording; do not expose product creation, pricing, limits or other product settings for this type. The existing internal product reference remains only for loan/approval foreign-key compatibility.
 - New loan approval plans are versioned by institution, branch and product. Freeze the plan and assessed terms on submission; check current staff permissions and group membership at each decision. Exclude the recorder, submitter, borrower, shared borrowers and authorized company representatives. One person may decide only once per review round.
 - Configure product loan approvals inside Create Loan Product and Edit Loan Product, with ordered user groups and approval counts. Do not add a standalone product approval configuration page or sidebar link. Keep Customised Loan Configuration under Configurations & Controls as an approval-only form, sharing the approval fields without exposing product settings. Staff access pages must not reference retired borrower acknowledgement fields.
-- Keep new group lending available through staff recording. Record actual signed PDFs, named signers, dates, references and language through `GroupPaperService`. Never fabricate online openings, client OTPs or digital signatures. Preserve historical digital evidence and the separate organization authority, liability, payout and personal-guarantee safeguards.
+- New group lending uses the simple staff-recorded joint contract in `docs/simple-group-loans.md`: one roster, leader, checked group account, signed agreement and parent loan balance. Record actual PDFs, named signers, dates, references and language through `SimpleGroupLoanService`. Never fabricate online openings, client OTPs or digital signatures. Old group-rule, borrowing-authority, cycle and coverage workspaces are retired. Preserve their historical evidence and funded monetary servicing only; legacy unfunded applications cannot proceed and may be explicitly withdrawn and recreated.
 - Profile recording does not establish verification. Independent evidence checks and configured KYC gates remain mandatory. Employee numbers are recorded by authorized staff without granting client login access.
 - Approval moves no money. Funding remains a separate authorized accounting transaction. Payment corrections may restore an already-funded loan's active status without creating a fresh loan approval or rewriting its contract.
 - `V154__staff_only_accounting.sql` and `V155__staff_recorded_group_papers.sql` preserve client identities and financial/audit history. Apply deployment migrations with a verified backup; use isolated temporary databases for migration tests. See `docs/staff-only-accounting.md`.
@@ -251,7 +251,7 @@ After workflow or UI changes, validate as applicable:
   - `/finance/clients/onboarding`
   - `/finance/loan-records`
   - Create Loan Product and Edit Loan Product → Approval Workflow
-  - record-specific group review and signed-paper routes
+  - record-specific staff review, group agreement and loan-history routes
 - Admin:
   - `/admin/dashboard`
   - `/admin/users`

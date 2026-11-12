@@ -93,6 +93,7 @@ public final class OnboardingDtos {
         private String action="DRAFT";
     }
     @Data public static class CreateForm {
+        private UUID enrollGroupId;
         private UUID requestKey=UUID.randomUUID();
         private String name="", phone="", email="";
         private ClientProfile profile=new ClientProfile();

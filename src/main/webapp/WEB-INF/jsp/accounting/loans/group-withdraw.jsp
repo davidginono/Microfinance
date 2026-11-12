@@ -1,0 +1,11 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ include file="support.jspf" %>
+<nav class="erp-page-path"><a href="<c:url value='/finance/loan-records/${withdrawLoan.id}' />"><spring:message code="recording.loanDetails" /></a><span>›</span><span aria-current="page"><spring:message code="simpleGroup.withdraw" /></span></nav>
+<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="simpleGroup.withdraw" /></h1></div>
+<c:url value="/finance/loan-records/${withdrawLoan.id}/withdraw" var="withdrawUrl" />
+<form action="${withdrawUrl}" method="post" class="accounting-create-form" data-resource-form-page="true" data-workspace-submit="recover">
+<input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="requestKey" value="<c:out value='${requestKey}' />" /><input type="hidden" name="state" value="<c:out value='${withdrawLoan.status}' />" /><input type="hidden" name="terms" value="<c:out value='${withdrawLoan.termsHash}' />" />
+<section class="erp-resource-section"><h2><spring:message code="recording.loanDetails" /></h2><div class="erp-panel-body"><dl class="erp-detail-facts"><div><dt><spring:message code="simpleGroup.loanId" text="Loan ID" /></dt><dd><c:out value="${withdrawLoan.number}" /></dd></div><div><dt><spring:message code="simpleGroup.group" /></dt><dd><c:out value="${withdrawLoan.clientName}" /></dd></div><div><dt><spring:message code="recording.principal" /> (TZS)</dt><dd><c:out value="${withdrawLoan.amount}" /></dd></div></dl><label><spring:message code="simpleGroup.reason" /><textarea name="reason" required maxlength="500" class="aws-control"><c:out value="${reason}" /></textarea></label></div></section>
+<c:if test="${not empty withdrawError}"><p class="coa-error" role="alert"><spring:message code="${withdrawError}" /></p></c:if>
+<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records/${withdrawLoan.id}' />"><spring:message code="common.cancel" /></a><button type="submit" class="app-btn btn-launch"><spring:message code="simpleGroup.withdraw" /></button></div>
+</form><%@ include file="../accounting-form-support.jspf" %><%@ include file="../../fragments/footer.jspf" %>

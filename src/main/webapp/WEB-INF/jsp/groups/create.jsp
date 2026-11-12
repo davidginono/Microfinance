@@ -9,7 +9,6 @@
 <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" element="p" cssClass="coa-error" /></div>
 <section class="accounting-form accounting-create-card"><h2><spring:message code="group.details" /></h2><div class="loan-flow-panel-body"><div class="accounting-grid">
 <label><spring:message code="group.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /></label>
-<label><spring:message code="group.legalForm" /><form:select path="legalForm" cssClass="aws-control"><c:forEach items="${['INFORMAL','REGISTERED_GROUP','ORGANIZATION']}" var="kind"><form:option value="${kind}"><spring:message code="group.legalForm.${kind}" /></form:option></c:forEach></form:select></label>
 <label><spring:message code="group.evidence" /><form:input path="evidence" cssClass="aws-control" maxlength="500" required="required" /></label>
 </div></div></section><div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/groups' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" type="submit"><spring:message code="group.create" /></button></div>
 </form:form></div><%@ include file="../accounting/accounting-form-support.jspf" %><%@ include file="../fragments/footer.jspf" %>
