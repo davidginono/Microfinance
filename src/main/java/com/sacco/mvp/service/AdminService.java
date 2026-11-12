@@ -80,10 +80,12 @@ public class AdminService {
     private final ApplicationClock applicationClock;
     private final com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
     private final com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService prepaymentService;
+    private final com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService groupApprovals;
 
     @Transactional
     public void configurePrepayment(String institution,com.sacco.mvp.security.AppUserPrincipal actor,UUID productId,LoanPrepaymentTerms terms,String reason){
         var product=loanProductSettingRepository.findByIdAndSaccoId(productId,institution).orElseThrow(()->new IllegalArgumentException("prepayment.error.unavailable"));
+        if (product.isCustomRecordingConfiguration()) throw new IllegalArgumentException("prepayment.error.unavailable");
         prepaymentService.configure(product,actor,terms,reason);
     }
 
@@ -660,7 +662,7 @@ public class AdminService {
     public LoanProductSetting loanProduct(String saccoId, UUID productId) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
-        if (!saccoId.equals(product.getSaccoId()) || product.getProductStatus() == LoanProductStatus.RETIRED) {
+        if (!saccoId.equals(product.getSaccoId()) || product.isCustomRecordingConfiguration() || product.getProductStatus() == LoanProductStatus.RETIRED) {
             throw new IllegalArgumentException("Loan product not found in this SACCO");
         }
         return product;
@@ -776,7 +778,7 @@ public class AdminService {
                                   Integer maximumActiveLoans) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
-        if (!saccoId.equals(product.getSaccoId())) {
+        if (!saccoId.equals(product.getSaccoId()) || product.isCustomRecordingConfiguration()) {
             throw new IllegalArgumentException("Loan product not found in this SACCO");
         }
 
@@ -828,7 +830,7 @@ public class AdminService {
     public void archiveLoanProduct(String saccoId, UUID adminId, UUID productId) {
         LoanProductSetting product = loanProductSettingRepository.findById(productId)
             .orElseThrow(() -> new IllegalArgumentException("Loan product not found"));
-        if (!saccoId.equals(product.getSaccoId())) {
+        if (!saccoId.equals(product.getSaccoId()) || product.isCustomRecordingConfiguration()) {
             throw new IllegalArgumentException("Loan product not found in this SACCO");
         }
         Map<String, Object> before = snapshotProduct(product);
@@ -3047,7 +3049,11 @@ public class AdminService {
                                                 boolean guarantorMinSavingsCheckRequired,
                                                 BigDecimal guarantorMinimumSavings,
                                                 LoanProductStatus productStatus,
-                                                Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId) {
+                                                Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,
+                                                com.sacco.mvp.security.AppUserPrincipal actor,
+                                                com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval) {
+        if (actor == null || !saccoId.equals(actor.getSaccoId()) || !adminId.equals(actor.getMemberId()))
+            throw new org.springframework.security.access.AccessDeniedException("Product scope mismatch");
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
@@ -3055,11 +3061,14 @@ public class AdminService {
 
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         loanProductSettingRepository.save(product);
+        if (approval != null && (!approval.getGroups().isEmpty() || !approval.getApprovals().isEmpty())) {
+            loanProductSettingRepository.flush();
+            approval.setProductId(product.getId());
+            approval.setExpectedRevision(0);
+            groupApprovals.saveRule(actor, approval);
+        }
         return product;
     }
 
-    public java.util.Optional<LoanProductSetting> customisedLoanConfiguration(String saccoId) {
-        return loanProductSettingRepository.findBySaccoIdAndCustomRecordingConfigurationTrue(saccoId);
-    }
 
 }

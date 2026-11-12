@@ -15,7 +15,7 @@
     </div>
 
 <div class="product-config-page-actions">
-    <a href="/admin/settings-controls?section=loan" class="app-btn btn-neutral"><spring:message code="admin.workspace.backProducts" /></a>
+    <a href="<c:url value='/admin/settings-controls'><c:param name='section' value='loan' /></c:url>" class="app-btn btn-neutral"><spring:message code="admin.workspace.backProducts" /></a>
     <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.title" /></a>
     <form action="/admin/settings-controls/loan-products/${product.id}/delete"
           method="post"
@@ -63,6 +63,7 @@
                 <span><strong><spring:message code="recording.attachments" /></strong></span>
             </button>
 
+            <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')"><button type="button" data-product-config-nav="workflow"><span><strong><spring:message code="admin.settings.workflow.title" /></strong></span></button></sec:authorize>
         </nav>
     </section>
 
@@ -281,6 +282,18 @@
                 </div>
     </div>
         </form>
+        <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
+        <section class="product-builder-section product-config-step" data-product-config-step="workflow">
+            <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
+            <div class="product-builder-section-body" data-product-config-panel hidden>
+                <form method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/approval' />" data-workspace-submit="recover" data-product-approval-form>
+                    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+                    <%@ include file="../fragments/loan-product-approval-fields.jspf" %>
+                    <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_CONFIGURE')"><div class="accounting-actions"><button class="app-btn btn-launch"><spring:message code="common.save" /></button></div></sec:authorize>
+                </form>
+            </div>
+        </section>
+        </sec:authorize>
 </div>
 </div>
 

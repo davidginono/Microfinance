@@ -538,6 +538,8 @@
                 if (activeIndex < 0) {
                     activeIndex = 0;
                 }
+                const productActions = workspace.querySelector('.product-config-actionbar');
+                if (productActions) productActions.hidden = steps[activeIndex].getAttribute('data-product-config-step') === 'workflow';
 
                 steps.forEach((step, index) => {
                     const active = index === activeIndex;
@@ -648,7 +650,8 @@
             });
 
             const firstServerError = form.querySelector('.field-error-input, [aria-invalid="true"]');
-            let initialKey = firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
+            let initialKey = workspace.querySelector('[data-product-approval-form] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'workflow'
+                ? 'workflow' : firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
             if (!initialKey && storageKey) {
                 try {
                     initialKey = window.sessionStorage.getItem(storageKey);

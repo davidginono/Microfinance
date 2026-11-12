@@ -90,7 +90,7 @@
             return;
         }
         const currentPath = window.location.pathname || '/';
-        const currentSearch = window.location.search || '';
+        const currentParams = new URLSearchParams(window.location.search);
         const links = Array.from(navigation.querySelectorAll('a[href]'));
         let bestMatch = null;
         let bestScore = -1;
@@ -110,8 +110,8 @@
             if (exactPath) {
                 score += 10000;
             }
-            if (target.search && target.search === currentSearch) {
-                score += 20000;
+            if (target.search && Array.from(target.searchParams).every(([key, value]) => currentParams.get(key) === value)) {
+                score += 20000 + Array.from(target.searchParams).length;
             } else if (target.search) {
                 score -= 1000;
             }
@@ -121,6 +121,10 @@
             }
         });
         if (bestMatch) {
+            links.forEach(function (link) {
+                link.classList.remove('shell-nav-active');
+                link.removeAttribute('aria-current');
+            });
             bestMatch.classList.add('shell-nav-active');
             bestMatch.setAttribute('aria-current', 'page');
         }

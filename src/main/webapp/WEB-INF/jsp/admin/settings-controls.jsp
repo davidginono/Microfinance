@@ -9,10 +9,11 @@
 <%@ include file="../fragments/admin-workspace-support.jspf" %>
 
 
-<c:set var="creatingLoanProduct" value="${settingsSection eq 'loan' and (param.task eq 'create' or openProductModalKey eq 'create-product')}" />
+<c:set var="customLoanConfiguration" value="${settingsSection eq 'loan' and param.custom eq 'true'}" />
+<c:set var="creatingLoanProduct" value="${settingsSection eq 'loan' and not customLoanConfiguration and (param.task eq 'create' or openProductModalKey eq 'create-product')}" />
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.settings.breadcrumb" text="Admin Tools / Settings & Controls" /><c:if test="${creatingLoanProduct}"> / <spring:message code="admin.settings.createLoanProduct" /></c:if></p>
-    <h1 class="erp-page-title"><c:choose><c:when test="${creatingLoanProduct}"><spring:message code="admin.settings.createLoanProduct" /></c:when><c:otherwise><spring:message code="admin.settings.title" /></c:otherwise></c:choose></h1>
+    <h1 class="erp-page-title"><c:choose><c:when test="${creatingLoanProduct}"><spring:message code="admin.settings.createLoanProduct" /></c:when><c:when test="${customLoanConfiguration}"><spring:message code="menu.admin.settings.customisedLoan" /></c:when><c:otherwise><spring:message code="admin.settings.title" /></c:otherwise></c:choose></h1>
 </div>
 
 <c:if test="${not empty openProductModalKey and not creatingLoanProduct}">
@@ -203,11 +204,25 @@
 </c:if>
 
 <c:if test="${settingsSection eq 'loan'}">
-    <c:if test="${customisedWorkflowSaved}"><p role="status"><spring:message code="customised.workflow.saved" /></p></c:if>
+    <sec:authorize access="@access.hasAny(principal,'LOAN_PRODUCTS_VIEW','APPROVAL_FLOW_VIEW')">
+    <c:if test="${customLoanConfiguration}">
+    <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
+      <section class="erp-panel">
+        <div class="erp-panel-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
+        <form method="post" action="<c:url value='/admin/settings-controls/custom-loan/approval' />" class="erp-panel-body">
+          <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+          <%@ include file="../fragments/loan-product-approval-fields.jspf" %>
+          <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_CONFIGURE')"><div class="aws-settings-footer"><button class="app-btn btn-launch"><spring:message code="common.save" /></button></div></sec:authorize>
+        </form>
+      </section>
+    </sec:authorize>
+    </c:if>
 
-    <c:if test="${not creatingLoanProduct}">
+    <c:if test="${not creatingLoanProduct and not customLoanConfiguration}">
     <section class="erp-table-wrap" data-resource-table="admin-loan-products" data-resource-split>
-      <div class="app-table-titlebar"><h2><spring:message code="admin.workspace.loanProducts" /> <span class="app-table-count">(${fn:length(products)})</span></h2><div class="app-table-toolbar"><a class="app-btn btn-launch" href="<c:url value='/admin/settings-controls?section=loan&amp;task=create' />"><spring:message code="admin.settings.loanProducts.add" /></a></div></div>
+      <div class="app-table-titlebar"><h2><spring:message code="admin.workspace.loanProducts" /> <span class="app-table-count">(${fn:length(products)})</span></h2><div class="app-table-toolbar">
+      <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/admin/settings-controls?section=loan&amp;task=create' />"><spring:message code="admin.settings.loanProducts.add" /></a></sec:authorize>
+      </div></div>
       <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr>
       <th data-table-order="name"><spring:message code="admin.settings.loanProducts.name" /></th><th data-table-order="status"><spring:message code="common.status" /></th><th data-table-order="minimum"><spring:message code="admin.settings.loanProducts.minimumAmount" /> (TZS)</th><th data-table-order="maximum"><spring:message code="admin.settings.loanProducts.maximumAmount" /> (TZS)</th><th data-table-order="interest"><spring:message code="admin.settings.loanProducts.annualInterestPercent" /></th><th data-table-order="method"><spring:message code="admin.settings.loanProducts.amountReturnMethod" /></th><th data-table-actions-header><spring:message code="common.actions" /></th></tr></thead><tbody>
       <c:forEach items="${products}" var="product"><tr id="loan-product-${product.id}" data-created-loan-product-target="${createdLoanProductId eq product.id}">
@@ -220,9 +235,10 @@
       <td><a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/edit' />"><spring:message code="admin.workspace.configureProduct" /></a></td></tr></c:forEach>
       <c:if test="${empty products}"><tr><td colspan="7"><spring:message code="admin.workspace.noProducts" /></td></tr></c:if>
       </tbody></table></div></section></c:if>
+    </sec:authorize>
 </c:if>
 
-<c:if test="${settingsSection eq 'loan'}">
+<c:if test="${settingsSection eq 'loan' and not customLoanConfiguration}">
     <div class="app-modal-overlay hidden"
          data-product-modal="application-fee">
         <div class="app-modal-panel max-w-2xl">
@@ -418,6 +434,12 @@
 
 
 
+                    <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
+                    <section class="product-builder-section">
+                        <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
+                        <div class="product-builder-section-body"><%@ include file="../fragments/loan-product-approval-fields.jspf" %></div>
+                    </section>
+                    </sec:authorize>
                     <div class="admin-form-actions">
                         <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls?section=loan' />"><spring:message code="common.cancel" /></a>
                         <button type="submit" class="app-btn btn-launch"><spring:message code="admin.settings.loanProducts.add" text="Add loan product" /></button>

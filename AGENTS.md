@@ -118,7 +118,9 @@ Default local URL:
 - Assignable groups are Super Administrator, Loan Officer, General Manager, Finance Manager, Chief Accountant, ICT Manager, Credit Officer, Accounts Clerk, Customer Care and Accounts Clerk 2. Super Administrator uses the separate platform login. Group assignment and explicit operation claims are separate; never grant new financial or approval claims during migration.
 - Clients remain scoped business records, including staff who also borrow. Do not create borrower credentials, registration, activation, acknowledgement, settings, application or guarantor self-service routes. Retired sessions must fail closed. `MEMBER`, old status/role identifiers and the constrained-false portal column exist only where stored data or frozen evidence requires compatibility.
 - Staff use their current assigned institution and branch directly. There is no institution-selection page or branch-switching action. Ignore old selection-session values and reject a stale principal after its live assignment changes.
+- Customized loans are a loan type, not a user-created product. Their only advance configuration is the branch approval workflow. Staff enter each loan’s rate/amount, tenure, frequency and supported charges during recording; do not expose product creation, pricing, limits or other product settings for this type. The existing internal product reference remains only for loan/approval foreign-key compatibility.
 - New loan approval plans are versioned by institution, branch and product. Freeze the plan and assessed terms on submission; check current staff permissions and group membership at each decision. Exclude the recorder, submitter, borrower, shared borrowers and authorized company representatives. One person may decide only once per review round.
+- Configure product loan approvals inside Create Loan Product and Edit Loan Product, with ordered user groups and approval counts. Do not add a standalone product approval configuration page or sidebar link. Keep Customised Loan Configuration under Configurations & Controls as an approval-only form, sharing the approval fields without exposing product settings. Staff access pages must not reference retired borrower acknowledgement fields.
 - Keep new group lending available through staff recording. Record actual signed PDFs, named signers, dates, references and language through `GroupPaperService`. Never fabricate online openings, client OTPs or digital signatures. Preserve historical digital evidence and the separate organization authority, liability, payout and personal-guarantee safeguards.
 - Profile recording does not establish verification. Independent evidence checks and configured KYC gates remain mandatory. Employee numbers are recorded by authorized staff without granting client login access.
 - Approval moves no money. Funding remains a separate authorized accounting transaction. Payment corrections may restore an already-funded loan's active status without creating a fresh loan approval or rewriting its contract.
@@ -242,7 +244,7 @@ After workflow or UI changes, validate as applicable:
 - Staff records:
   - `/finance/clients/onboarding`
   - `/finance/loan-records`
-  - `/finance/loan-records/rules`
+  - Create Loan Product and Edit Loan Product → Approval Workflow
   - record-specific group review and signed-paper routes
 - Admin:
   - `/admin/dashboard`

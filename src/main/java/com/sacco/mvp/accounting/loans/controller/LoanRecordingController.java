@@ -362,18 +362,6 @@ public class LoanRecordingController {
     private void context(String kind,Model model){model.addAttribute("kind",kind);model.addAttribute("createClaim",kind.equals("LOAN")?"LOAN_RECORDING_CREATE":kind.equals("DISBURSEMENT")?"LOAN_RECORDING_DISBURSE":"LOAN_RECORDING_POST");model.addAttribute("base",kind.equals("LOAN")?"/finance/loan-records":kind.equals("DISBURSEMENT")?"/finance/loan-disbursements":"/finance/loan-repayments");}
     private String error(RuntimeException e){return e.getMessage()!=null && (e.getMessage().startsWith("loanGroups.error.") || e.getMessage().startsWith("applications.error.") || e.getMessage().startsWith("kyc.error.") || e.getMessage().startsWith("credit.error.") || e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error.") || e.getMessage().startsWith("charges.error.") || e.getMessage().startsWith("prepayment.error."))?e.getMessage():"recording.error.terms";}
 
-    @InitBinder("groupRuleForm") public void groupRuleBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(10);b.setAllowedFields("productId","expectedRevision","groups[*]","approvals[*]");}
-    @PostMapping("/loan-records/rules/custom") public String customRules(@AuthenticationPrincipal AppUserPrincipal a){return "redirect:/finance/loan-records/rules?productId="+groupApprovals.customProduct(a);}
-    @GetMapping("/loan-records/rules") public String groupRules(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID productId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,Model m){
-        m.addAttribute("ruleProducts",groupApprovals.products(a,search,page));m.addAttribute("search",search);m.addAttribute("page",page);m.addAttribute("groupRuleForm",groupApprovals.rule(a,productId));m.addAttribute("userGroups",com.sacco.mvp.domain.Position.staffAssignableRoles().stream().filter(g->g!=com.sacco.mvp.domain.Position.ADMIN).toList());return "accounting/loans/group-rules";
-    }
-    @PreAuthorize("@access.has(principal, 'APPROVAL_FLOW_CONFIGURE') and @access.has(principal, 'APPROVAL_FLOW_VIEW')")
-    @PostMapping("/loan-records/rules") public String saveGroupRules(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute GroupRuleForm groupRuleForm,BindingResult errors,Model m,RedirectAttributes flash){
-        if(!errors.hasErrors())try{groupApprovals.saveRule(a,groupRuleForm);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/rules?productId="+groupRuleForm.getProductId();}catch(IllegalArgumentException e){errors.reject(error(e));}
-        if(groupRuleForm.getProductId()!=null)try{groupRuleForm.setProductName(groupApprovals.rule(a,groupRuleForm.getProductId()).getProductName());}catch(IllegalArgumentException ignored){}
-        m.addAttribute("ruleProducts",groupApprovals.products(a,"",0));m.addAttribute("search","");m.addAttribute("page",0);
-        m.addAttribute("userGroups",com.sacco.mvp.domain.Position.staffAssignableRoles().stream().filter(g->g!=com.sacco.mvp.domain.Position.ADMIN).toList());return "accounting/loans/group-rules";
-    }
     @GetMapping("/loan-records/{id}/review") public String groupReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){
         m.addAttribute("reviewLoan",groupApprovals.loan(a,id));m.addAttribute("groupReview",groupApprovals.review(a,id));m.addAttribute("loanId",id);m.addAttribute("requestKey",UUID.randomUUID());return "accounting/loans/group-review";
     }

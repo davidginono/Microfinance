@@ -107,11 +107,12 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private SmsUsageManagementService smsUsageManagementService;
     @Autowired private StationOtpSettingsService stationOtpSettingsService;
 
+    @Autowired private com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService groupApprovals;
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(productAccounts,adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
+        Mockito.reset(groupApprovals,productAccounts,adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
             platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService,
             stationOtpSettingsService);
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
@@ -129,6 +130,56 @@ class AdminControllerUserAccessSecurityTest {
         verify(productAccounts).choices("SACCO-01","INTEREST","Maendeleo",0,null);
         mockMvc.perform(get("/admin/settings-controls/loan-product-accounts/INTEREST").with(authentication(authenticationFor(principal(Set.of(UserClaim.LOAN_PRODUCTS_VIEW)))))).andExpect(status().isForbidden());
         Mockito.verifyNoMoreInteractions(productAccounts);
+    }
+
+    @Test void productWorkflowUsesThePathProductAndRequiresExplicitClaimsAndCsrf() throws Exception {
+        var actor=principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW,UserClaim.APPROVAL_FLOW_CONFIGURE));
+        var product=UUID.randomUUID();var url="/admin/settings-controls/loan-products/"+product+"/approval";
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor)))).andExpect(status().isForbidden());
+        mockMvc.perform(post(url).with(authentication(authenticationFor(principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW))))).with(csrf()))
+            .andExpect(status().isForbidden());
+        verify(groupApprovals,never()).saveRule(any(),any());
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor))).with(csrf())
+            .param("productId",UUID.randomUUID().toString()).param("expectedRevision","3")
+            .param("groups[0]","CREDIT_OFFICER").param("approvals[0]","2"))
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=workflow"));
+        verify(groupApprovals).saveRule(eq(actor),org.mockito.ArgumentMatchers.argThat(f -> product.equals(f.getProductId())
+            && f.getExpectedRevision()==3 && f.getGroups().equals(List.of(Position.CREDIT_OFFICER)) && f.getApprovals().equals(List.of(2))));
+        verify(adminService,never()).loanProduct(any(),any());
+    }
+
+    @Test void invalidWorkflowReturnsToTheProductWithItsEnteredGroups() throws Exception {
+        var actor=principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW,UserClaim.APPROVAL_FLOW_CONFIGURE));var id=UUID.randomUUID();
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        doThrow(new IllegalArgumentException("loanGroups.error.changed")).when(groupApprovals).saveRule(eq(actor),any());
+        mockMvc.perform(post("/admin/settings-controls/loan-products/"+id+"/approval").with(authentication(authenticationFor(actor))).with(csrf())
+            .param("groups[0]","ACCOUNTANT").param("approvals[0]","2").param("expectedRevision","1"))
+            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+id+"/edit?tab=workflow"))
+            .andExpect(flash().attribute("groupError","loanGroups.error.changed")).andExpect(flash().attributeExists("groupRuleForm"));
+    }
+
+    @Test void customWorkflowSavesWithoutProductCreationPermissionsAndRequiresCsrf() throws Exception {
+        var actor=principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW,UserClaim.APPROVAL_FLOW_CONFIGURE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        var url="/admin/settings-controls/custom-loan/approval";
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor)))).andExpect(status().isForbidden());
+        mockMvc.perform(post(url).with(authentication(authenticationFor(principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW))))).with(csrf())).andExpect(status().isForbidden());
+        verify(groupApprovals,never()).saveCustomRule(any(),any());
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor))).with(csrf())
+            .param("productId",UUID.randomUUID().toString()).param("groups[0]","CREDIT_OFFICER").param("approvals[0]","2"))
+            .andExpect(redirectedUrl("/admin/settings-controls?section=loan&custom=true"));
+        verify(groupApprovals).saveCustomRule(eq(actor),org.mockito.ArgumentMatchers.argThat(f -> f.getProductId()==null && f.getGroups().equals(List.of(Position.CREDIT_OFFICER))));
+        Mockito.verifyNoInteractions(adminService);
+    }
+
+    @Test void customWorkflowOpensWithoutLoadingOrCreatingProducts() throws Exception {
+        var actor=principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        when(groupApprovals.customRule(actor)).thenReturn(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm());
+        mockMvc.perform(get("/admin/settings-controls").param("section","loan").param("custom","true").with(authentication(authenticationFor(actor))))
+            .andExpect(status().isOk()).andExpect(model().attributeExists("groupRuleForm","userGroups"));
+        Mockito.verifyNoInteractions(adminService);
     }
 
     @Test
@@ -549,7 +600,7 @@ class AdminControllerUserAccessSecurityTest {
         LoanProductSetting createdProduct = LoanProductSetting.builder().id(productId).build();
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
-        when(adminService.createLoanProductTenure("SACCO-01",principal.getMemberId(),null,"School Fees Booster","Created product",5,new BigDecimal("0"),new BigDecimal("500000"),2,new BigDecimal("3.000000"),false,new BigDecimal("15000"),new BigDecimal("0.015000"),new BigDecimal("0.000000"),new BigDecimal("0.100000"),InterestMethod.FLAT_RATE,1,12,true,false,false,false,false,false,null,LoanProductStatus.ACTIVE,2,"MONTHS",null,null)).thenReturn(createdProduct);
+        when(adminService.createLoanProductTenure(eq("SACCO-01"),eq(principal.getMemberId()),eq(null),eq("School Fees Booster"),eq("Created product"),eq(5),eq(new BigDecimal("0")),eq(new BigDecimal("500000")),eq(2),eq(new BigDecimal("3.000000")),eq(false),eq(new BigDecimal("15000")),eq(new BigDecimal("0.015000")),eq(new BigDecimal("0.000000")),eq(new BigDecimal("0.100000")),eq(InterestMethod.FLAT_RATE),eq(1),eq(12),eq(true),eq(false),eq(false),eq(false),eq(false),eq(false),eq(null),eq(LoanProductStatus.ACTIVE),eq(2),eq("MONTHS"),eq(null),eq(null),eq(principal),any(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm.class))).thenReturn(createdProduct);
 
         mockMvc.perform(post("/admin/settings-controls/loan-products")
                 .param("modalKey", "create-product")
@@ -585,7 +636,7 @@ class AdminControllerUserAccessSecurityTest {
         AppUserPrincipal principal = principal(Set.of(UserClaim.LOAN_PRODUCTS_CREATE));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
 
-        org.mockito.Mockito.doThrow(new IllegalStateException("Minimum amount is invalid.")).when(adminService).createLoanProductTenure(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doThrow(new IllegalStateException("Minimum amount is invalid.")).when(adminService).createLoanProductTenure(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.anyBoolean(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
         mockMvc.perform(post("/admin/settings-controls/loan-products")
                 .param("modalKey", "create-product")
                 .param("productName", "School Fees Booster")
@@ -960,7 +1011,8 @@ class AdminControllerUserAccessSecurityTest {
                 platformSupportContactSettingsService,
                 platformEmailSettingsService,
                 platformSmsGatewaySettingsService,
-                new org.springframework.context.support.ResourceBundleMessageSource() {{setBasename("messages");setDefaultEncoding("UTF-8");}}
+                new org.springframework.context.support.ResourceBundleMessageSource() {{setBasename("messages");setDefaultEncoding("UTF-8");}},
+                groupApprovals()
             );
         }
 
@@ -994,6 +1046,7 @@ class AdminControllerUserAccessSecurityTest {
             return new RequestContextListener();
         }
 
+        @Bean com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService groupApprovals() { return Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class); }
         @Bean AdminService adminService() { return Mockito.mock(AdminService.class); }
         @Bean AdminScopeService adminScopeService() { return Mockito.mock(AdminScopeService.class); }
         @Bean SaccoRegistryService saccoRegistryService() { return Mockito.mock(SaccoRegistryService.class); }

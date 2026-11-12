@@ -77,6 +77,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AdminServiceTest {
+    private final com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService groupApprovals = org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class);
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"daniel.manager"})
@@ -275,7 +276,8 @@ class AdminServiceTest {
             nameSignatureService,
             applicationClock,
             org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanProductAccountService.class),
-            org.mockito.Mockito.mock(com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService.class)
+            org.mockito.Mockito.mock(com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService.class),
+            groupApprovals
         );
     }
 
@@ -421,6 +423,25 @@ class AdminServiceTest {
         assertThat(member.getActiveStaffRolesResolved()).contains(Position.MANAGER,Position.FINANCE_MANAGER);
         assertThat(issuedInvitationCount.get()).isZero();
 
+    }
+
+    @Test void creatingProductSavesTheInitialWorkflowForTheGeneratedProduct() {
+        var actor = new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01")
+            .stationId("ST-1").position(Position.ICT_MANAGER).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),
+            Set.of(UserClaim.LOAN_PRODUCTS_CREATE,UserClaim.APPROVAL_FLOW_CONFIGURE));
+        var approval = new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm();
+        var suppliedProduct=UUID.randomUUID();approval.setProductId(suppliedProduct);approval.setExpectedRevision(99);
+        approval.setGroups(List.of(Position.CREDIT_OFFICER));approval.setApprovals(List.of(2));
+        when(loanProductSettingRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"WORKFLOW","Workflow Loan","Staff approval",1,
+            new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,
+            BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval);
+        assertThat(approval.getProductId()).isEqualTo(product.getId()).isNotEqualTo(suppliedProduct);
+        assertThat(approval.getExpectedRevision()).isZero();
+        verify(groupApprovals).saveRule(actor,approval);
+        assertThat(product.getMinTenure()).isEqualTo(1);
+        assertThat(product.getMaxTenure()).isEqualTo(12);
     }
 
     @org.junit.jupiter.params.ParameterizedTest

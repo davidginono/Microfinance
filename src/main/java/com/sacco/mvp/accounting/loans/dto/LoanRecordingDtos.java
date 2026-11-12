@@ -13,7 +13,6 @@ public final class LoanRecordingDtos {
     @Data public static class GroupRuleForm {
         private UUID productId;
         private int expectedRevision;
-        private String productName;
         private List<Position> groups=new ArrayList<>();
         private List<Integer> approvals=new ArrayList<>();
     }

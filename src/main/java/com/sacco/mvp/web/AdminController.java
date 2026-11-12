@@ -1,6 +1,8 @@
 package com.sacco.mvp.web;
 
 import com.sacco.mvp.domain.MemberStatus;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm;
+import com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.InterestMethod;
 import com.sacco.mvp.domain.LoanProductSetting;
@@ -100,6 +102,52 @@ public class AdminController {
     private final PlatformEmailSettingsService platformEmailSettingsService;
     private final PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
     private final org.springframework.context.MessageSource messages;
+    private final LoanGroupApprovalService groupApprovals;
+
+    @InitBinder("groupRuleForm")
+    public void approvalBinder(org.springframework.web.bind.WebDataBinder binder) {
+        binder.setAutoGrowCollectionLimit(10);
+        binder.setAllowedFields("expectedRevision", "groups[*]", "approvals[*]");
+    }
+
+    private void productApproval(AppUserPrincipal actor, UUID product, Model model) {
+        if (!actor.getClaims().contains(UserClaim.APPROVAL_FLOW_VIEW.name())) return;
+        if (!model.containsAttribute("groupRuleForm")) model.addAttribute("groupRuleForm", groupApprovals.rule(actor, product));
+        model.addAttribute("userGroups", Position.staffAssignableRoles().stream().filter(g -> g != Position.ADMIN).toList());
+    }
+
+    @PostMapping("/settings-controls/custom-loan/approval")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'APPROVAL_FLOW_VIEW') and @access.has(principal, 'APPROVAL_FLOW_CONFIGURE')")
+    public String saveCustomApproval(@AuthenticationPrincipal AppUserPrincipal actor,
+            @ModelAttribute("groupRuleForm") GroupRuleForm form, org.springframework.validation.BindingResult errors,
+            RedirectAttributes flash) {
+        try {
+            if (errors.hasErrors()) throw new IllegalArgumentException("loanGroups.error.steps");
+            groupApprovals.saveCustomRule(actor,form);
+            flash.addFlashAttribute("message", messages.getMessage("recording.saved", null, org.springframework.context.i18n.LocaleContextHolder.getLocale()));
+        } catch (IllegalArgumentException ex) {
+            flash.addFlashAttribute("groupRuleForm",form);
+            flash.addFlashAttribute("groupError",ex.getMessage().startsWith("loanGroups.error.") ? ex.getMessage() : "loanGroups.error.steps");
+        }
+        return "redirect:/admin/settings-controls?section=loan&custom=true";
+    }
+
+    @PostMapping("/settings-controls/loan-products/{id}/approval")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'APPROVAL_FLOW_VIEW') and @access.has(principal, 'APPROVAL_FLOW_CONFIGURE')")
+    public String saveProductApproval(@AuthenticationPrincipal AppUserPrincipal actor, @PathVariable UUID id,
+            @ModelAttribute("groupRuleForm") GroupRuleForm form, org.springframework.validation.BindingResult errors,
+            RedirectAttributes flash) {
+        form.setProductId(id);
+        try {
+            if (errors.hasErrors()) throw new IllegalArgumentException("loanGroups.error.steps");
+            groupApprovals.saveRule(actor, form);
+            flash.addFlashAttribute("message", messages.getMessage("recording.saved", null, org.springframework.context.i18n.LocaleContextHolder.getLocale()));
+        } catch (IllegalArgumentException ex) {
+            flash.addFlashAttribute("groupRuleForm", form);
+            flash.addFlashAttribute("groupError", ex.getMessage().startsWith("loanGroups.error.") ? ex.getMessage() : "loanGroups.error.steps");
+        }
+        return "redirect:/admin/settings-controls/loan-products/" + id + "/edit?tab=workflow";
+    }
 
     @GetMapping("/dashboard")
     @PreAuthorize("@access.canAccessAdminArea(principal) and @access.has(principal, 'ADMIN_DASHBOARD_VIEW')")
@@ -1085,13 +1133,20 @@ public class AdminController {
     public String loanProducts(@AuthenticationPrincipal AppUserPrincipal principal,
                                @RequestParam(required = false, defaultValue = "loan") String section,
                                @RequestParam(required = false) String modal,
+                               @RequestParam(defaultValue = "false") boolean custom,
                                Model model) {
+        if (custom) {
+            if (!principal.getClaims().contains(UserClaim.APPROVAL_FLOW_VIEW.name())) throw new org.springframework.security.access.AccessDeniedException("Approval view required");
+            model.addAttribute("settingsSection","loan");
+            if (!model.containsAttribute("groupRuleForm")) model.addAttribute("groupRuleForm",groupApprovals.customRule(principal));
+            model.addAttribute("userGroups",Position.staffAssignableRoles().stream().filter(g -> g != Position.ADMIN).toList());
+            return "admin/settings-controls";
+        }
         String saccoId = adminScopeService.currentSaccoId(principal);
         List<LoanProductSetting> products = adminService.loanProducts(saccoId);
         model.addAttribute("products", products);
         model.addAttribute("requiredAttachmentsByProductId", requiredAttachmentService.activeByProduct(
             products.stream().map(LoanProductSetting::getId).toList()));
-        model.addAttribute("customisedLoanConfiguration", adminService.customisedLoanConfiguration(saccoId).orElse(null));
         model.addAttribute("products", products.stream().filter(p -> !p.isCustomRecordingConfiguration()).toList());
         var settings = adminService.settings(saccoId);
         var stationPolicy = adminService.stationQualificationPolicy(saccoId, adminScopeService.currentStationId(principal)).orElse(null);
@@ -1117,6 +1172,7 @@ public class AdminController {
         model.addAttribute("settingsSection", normalizeSettingsSection(section));
         model.addAttribute("openProductModalKey", normalizeLoanSettingsModalKey(modal));
         model.addAttribute("suppressToastMessages", normalizeLoanSettingsModalKey(modal) != null);
+        productApproval(principal, null, model);
         return "admin/settings-controls";
     }
 
@@ -1185,7 +1241,7 @@ public class AdminController {
     }
 
     @GetMapping("/settings-controls/loan-products/{id}/edit")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_VIEW')")
+    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.hasAny(principal, 'LOAN_PRODUCTS_VIEW', 'APPROVAL_FLOW_VIEW')")
     public String editLoanProduct(@PathVariable UUID id,
                                   @AuthenticationPrincipal AppUserPrincipal principal,
                                   Model model) {
@@ -1198,6 +1254,7 @@ public class AdminController {
         model.addAttribute("requiredAttachments", requiredAttachmentService.activeForProduct(id));
         model.addAttribute("requiredAttachmentsByProductId", Map.of(id, requiredAttachmentService.activeForProduct(id)));
         model.addAttribute("suppressToastMessages", true);
+        productApproval(principal, id, model);
         return "admin/loan-product-edit";
     }
 
@@ -1253,6 +1310,8 @@ public class AdminController {
     @PostMapping({"/loan-products", "/settings-controls/loan-products"})
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_CREATE')")
     public String createLoanProduct(@AuthenticationPrincipal AppUserPrincipal principal,
+                                              @ModelAttribute("groupRuleForm") GroupRuleForm groupRuleForm,
+                                              org.springframework.validation.BindingResult groupErrors,
                                               @RequestParam(required = false) String productCode,
                                               @RequestParam(required = false) String productName,
                                               @RequestParam(required = false) String productDescription,
@@ -1290,6 +1349,7 @@ public class AdminController {
                                               RedirectAttributes ra) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
+                if (groupErrors.hasErrors()) throw new IllegalArgumentException("loanGroups.error.steps");
                 LoanProductSetting product = adminService.createLoanProductTenure(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
@@ -1318,7 +1378,7 @@ public class AdminController {
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus,
-                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId
+                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm
             );
             requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Loan product created successfully.");
@@ -1327,6 +1387,7 @@ public class AdminController {
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
             attachLoanProductFormDraft(ra, request);
+            if (ex.getMessage().startsWith("loanGroups.error.")) ra.addFlashAttribute("groupError", ex.getMessage());
         }
         return loanSettingsRedirect(resolvedModalKey);
     }

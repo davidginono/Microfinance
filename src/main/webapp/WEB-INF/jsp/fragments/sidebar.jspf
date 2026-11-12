@@ -234,7 +234,7 @@
             </c:if>
 
             <c:if test="${staffWorkspace}">
-                <sec:authorize access="@access.isAdminScope(principal)" var="settingsAdminScope" />
+                <sec:authorize access="@access.hasAny(principal, 'WORKSPACE_SETTINGS_VIEW', 'LOAN_PRODUCTS_VIEW', 'APPROVAL_FLOW_VIEW')" var="settingsAdminScope" />
                 <c:if test="${settingsAdminScope and not isPlatformAdminIdentity}">
                         <c:set var="adminSettingsActive" value="${fn:startsWith(requestUri, '/admin/settings-controls') or requestUri eq '/admin/loan-products'}" />
                         <div class="shell-sidebar-group space-y-1">
@@ -250,11 +250,17 @@
                                 </svg>
                             </button>
                             <div id="adminSettingsPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                                <a href="/admin/settings-controls?section=loan" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section ne 'board' and param.section ne 'guarantor' and param.section ne 'language' and param.section ne 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.loanProducts" text="Loan Products" /></a>
-
+                                <sec:authorize access="@access.hasAny(principal,'LOAN_PRODUCTS_VIEW','APPROVAL_FLOW_VIEW')">
+                                <a href="/admin/settings-controls?section=loan" class="shell-sidebar-subitem ${((requestUri eq '/admin/settings-controls' and (empty param.section or param.section eq 'loan') and param.custom ne 'true') or requestUri eq '/admin/loan-products' or (fn:startsWith(requestUri, '/admin/settings-controls/loan-products/'))) ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.settings.loanProducts" /></a>
+                                <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
+                                <a href="/admin/settings-controls?section=loan&amp;custom=true" class="shell-sidebar-subitem ${(requestUri eq '/admin/settings-controls' and param.custom eq 'true') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.settings.customisedLoan" /></a>
+                                </sec:authorize>
+                                </sec:authorize>
+                                <sec:authorize access="@access.has(principal,'WORKSPACE_SETTINGS_VIEW')">
                                 <a href="/admin/settings-controls?section=guarantor" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'guarantor' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.applicantGuarantor" text="Applicant & Guarantor Settings" /></a>
                                 <a href="/admin/settings-controls?section=otp" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'otp' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="admin.settings.otp.title" text="OTP Delivery" /></a>
                                 <a href="/admin/settings-controls?section=language" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/admin/settings-controls' and param.section eq 'language' ? 'bg-white text-cyan-800 ring-1 ring-cyan-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.admin.settings.languagePreference" text="Language Preference" /></a>
+                                </sec:authorize>
                             </div>
                         </div>
                 </c:if>

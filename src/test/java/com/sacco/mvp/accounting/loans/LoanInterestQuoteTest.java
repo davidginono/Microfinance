@@ -19,6 +19,16 @@ class LoanInterestQuoteTest {
     private final LoanRecordingService service=new LoanRecordingService(null,null,products,null,null,null,guard,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null);
     @org.junit.jupiter.api.BeforeEach void configuredCustomWorkflow(){when(products.findBySaccoIdAndCustomRecordingConfigurationTrue(any())).thenReturn(Optional.of(LoanProductSetting.builder().id(UUID.randomUUID()).saccoId("I1").productName("Customised loan").customRecordingConfiguration(true).active(true).productStatus(LoanProductStatus.ACTIVE).build()));}
     private RecordForm custom(){var f=new RecordForm();f.setLoanMode("CUSTOM");f.setPrincipal(new BigDecimal("1000.00"));f.setInterestPercent(new BigDecimal("12"));f.setTenureValue(6);return f;}
+    @Test void customTermsIgnoreStoredProductPricingAndLimits(){
+        var reference=LoanProductSetting.builder().id(UUID.randomUUID()).customRecordingConfiguration(true).active(true).productStatus(LoanProductStatus.ACTIVE)
+            .interestRate(new BigDecimal("0.99")).minimumAmount(new BigDecimal("50000")).maximumAmount(new BigDecimal("60000"))
+            .minRepaymentMonths(12).maxRepaymentMonths(24).build();
+        when(products.findBySaccoIdAndCustomRecordingConfigurationTrue(any())).thenReturn(Optional.of(reference));
+        var f=custom();f.setInterestPercent(new BigDecimal("17.125"));
+        assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("171.25");
+        f.setInterestEntry("AMOUNT");f.setInterestAmount(new BigDecimal("8.19"));
+        assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("8.19");
+    }
     @Test void recorderCanChooseWholeLoanAnnualOrAmountInterest(){
         var f=custom();assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("120.00");
         f.setInterestBasis("ANNUAL");assertThat(service.interestQuote(actor,f).interest()).isEqualByComparingTo("60.00");

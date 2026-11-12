@@ -24,7 +24,8 @@ class LoanGroupApprovalTest {
     final AuditService audit=mock(AuditService.class);
     final ApplicationClock clock=mock(ApplicationClock.class);
     final LoanRecordingService recording=mock(LoanRecordingService.class);
-    final LoanGroupApprovalService service=new LoanGroupApprovalService(records,access,members,audit,clock,JsonMapper.builder().build(),recording,mock(SaccoConfigurationService.class));
+    final SaccoConfigurationService products=mock(SaccoConfigurationService.class);
+    final LoanGroupApprovalService service=new LoanGroupApprovalService(records,access,members,audit,clock,JsonMapper.builder().build(),recording,products);
     final UUID loan=UUID.randomUUID(),product=UUID.randomUUID(),client=UUID.randomUUID(),recorder=UUID.randomUUID(),maker=UUID.randomUUID(),rule=UUID.randomUUID();
     final GroupRequest request=new GroupRequest(UUID.randomUUID(),loan,rule,maker,1,"hash","RECORDED");
     final List<GroupDecision> decisions=new ArrayList<>();
@@ -45,6 +46,19 @@ class LoanGroupApprovalTest {
         return new AppUserPrincipal(m,EnumSet.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT));
     }
     void decide(AppUserPrincipal p,String decision){service.decide(p,loan,request.id(),UUID.randomUUID(),decision,"Reviewed signed terms","Signed evidence REF-1");}
+    @Test void customWorkflowUsesInstitutionReferenceAndExistingVersionChecks(){
+        var p=person(UUID.randomUUID(),Position.ICT_MANAGER);
+        when(products.ensureCustomApprovalReference("I1")).thenReturn(product);
+        when(records.filterProduct(p,product)).thenReturn(Optional.of(mock(Choice.class)));
+        var form=new GroupRuleForm();form.setProductId(UUID.randomUUID());form.getGroups().add(Position.CREDIT_OFFICER);form.getApprovals().add(2);
+        service.saveCustomRule(p,form);
+        assertThat(form.getProductId()).isEqualTo(product);
+        verify(records).groupRule(eq(p),argThat(r->r.product().equals(product)&&r.revision()==1),any());
+        verify(access).requireActor(p,"APPROVAL_FLOW_VIEW");
+        verify(access,never()).requireActor(p,"LOAN_PRODUCTS_CREATE");
+        when(records.groupRule(p,product)).thenReturn(Optional.of(new GroupRule(rule,product,1,"[]")));
+        assertThatThrownBy(()->service.saveCustomRule(p,form)).hasMessage("loanGroups.error.changed");
+    }
     @Test void approvalRequiresEveryDistinctPersonInOrderAndNeverPostsMoney(){
         var first=person(UUID.randomUUID(),Position.CREDIT_OFFICER);var second=person(UUID.randomUUID(),Position.CREDIT_OFFICER);var manager=person(UUID.randomUUID(),Position.MANAGER);
         assertThatThrownBy(()->decide(manager,"APPROVE")).isInstanceOf(AccessDeniedException.class);

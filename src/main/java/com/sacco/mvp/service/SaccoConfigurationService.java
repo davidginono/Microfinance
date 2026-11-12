@@ -18,12 +18,19 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class SaccoConfigurationService {
+    @Transactional(readOnly=true)
+    public UUID customApprovalReference(String institution) {
+        return loanProductSettingRepository.findBySaccoIdAndCustomRecordingConfigurationTrue(institution)
+            .map(LoanProductSetting::getId).orElse(null);
+    }
+
+    // Compatibility reference for existing loan/rule foreign keys, never a configurable product.
     @Transactional
-    public java.util.UUID customRecordingProduct(String institution) {
+    public UUID ensureCustomApprovalReference(String institution) {
         loanProductSettingRepository.lockCustomRecording(institution);
         return loanProductSettingRepository.findBySaccoIdAndCustomRecordingConfigurationTrue(institution).map(LoanProductSetting::getId).orElseGet(()->{
             var now=java.time.OffsetDateTime.now();var id=java.util.UUID.randomUUID();
-            return loanProductSettingRepository.save(LoanProductSetting.builder().id(id).saccoId(institution).loanType(LoanType.CUSTOMIZED_LOAN)
+            return loanProductSettingRepository.saveAndFlush(LoanProductSetting.builder().id(id).saccoId(institution).loanType(LoanType.CUSTOMIZED_LOAN)
                 .customRecordingConfiguration(true).productCode("CUSTOM-"+id.toString().substring(0,8)).productName("Custom loan")
                 .guarantorsRequired(0).applicationFee(java.math.BigDecimal.ZERO).insuranceRate(java.math.BigDecimal.ZERO).processingFeeRate(java.math.BigDecimal.ZERO)
                 .interestRate(java.math.BigDecimal.ZERO).interestMethod(com.sacco.mvp.domain.InterestMethod.FLAT_RATE).repaymentFrequency(com.sacco.mvp.domain.RepaymentFrequency.MONTHLY)

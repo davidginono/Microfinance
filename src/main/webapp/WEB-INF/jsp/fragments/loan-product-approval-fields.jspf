@@ -1,0 +1,19 @@
+<%@ page pageEncoding="UTF-8" %>
+<sec:authorize access="@access.has(principal,'APPROVAL_FLOW_CONFIGURE')" var="canConfigureLoanApproval" />
+<input type="hidden" name="expectedRevision" value="${empty groupRuleForm ? 0 : groupRuleForm.expectedRevision}" />
+<div class="erp-table-scroll">
+    <table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="editor">
+        <thead><tr><th>#</th><th><spring:message code="loanGroups.group" /></th><th><spring:message code="loanGroups.count" /></th></tr></thead>
+        <tbody><c:forEach begin="0" end="9" var="approvalStep">
+            <tr><td>${approvalStep + 1}</td><td>
+                <select class="aws-control" name="groups[${approvalStep}]" ${canConfigureLoanApproval ? '' : 'disabled'} aria-label="<spring:message code='loanGroups.group' /> ${approvalStep + 1}">
+                    <option value="">—</option>
+                    <c:forEach items="${userGroups}" var="approvalGroup"><option value="${approvalGroup}" ${not empty groupRuleForm and groupRuleForm.groups.size() > approvalStep and groupRuleForm.groups[approvalStep] == approvalGroup ? 'selected' : ''}><spring:message code="userGroup.${approvalGroup}" /></option></c:forEach>
+                </select>
+            </td><td>
+                <input class="aws-control" type="number" name="approvals[${approvalStep}]" min="1" max="10" value="${not empty groupRuleForm and groupRuleForm.approvals.size() > approvalStep ? groupRuleForm.approvals[approvalStep] : 1}" ${canConfigureLoanApproval ? '' : 'disabled'} aria-label="<spring:message code='loanGroups.count' /> ${approvalStep + 1}" />
+            </td></tr>
+        </c:forEach></tbody>
+    </table>
+</div>
+<c:if test="${not empty groupError}"><div class="console-message" data-message-type="error" role="alert"><spring:message code="${groupError}" /></div></c:if>

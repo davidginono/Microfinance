@@ -24,21 +24,25 @@ public class LoanGroupApprovalService {
     private final ObjectMapper json;
     private final LoanRecordingService recording;
     private final SaccoConfigurationService products;
-    @Transactional public UUID customProduct(AppUserPrincipal a){
-        access.requireActor(a,"APPROVAL_FLOW_CONFIGURE");access.requireActor(a,"LOAN_PRODUCTS_CREATE");
-        UUID product=products.customRecordingProduct(a.getSaccoId());event(a,product,"CUSTOM_RECORDING_SETUP",Map.of("product",product));return product;
+    @Transactional(readOnly=true)
+    public GroupRuleForm customRule(AppUserPrincipal a) {
+        access.requireActor(a,"APPROVAL_FLOW_VIEW");
+        return rule(a,products.customApprovalReference(a.getSaccoId()));
+    }
+    @Transactional
+    public void saveCustomRule(AppUserPrincipal a,GroupRuleForm form) {
+        access.requireActor(a,"APPROVAL_FLOW_VIEW");access.requireActor(a,"APPROVAL_FLOW_CONFIGURE");
+        form.setProductId(products.ensureCustomApprovalReference(a.getSaccoId()));
+        saveRule(a,form);
     }
     @Transactional(readOnly=true)
     public GroupLoan loan(AppUserPrincipal a,UUID id){access.requireActor(a,"LOAN_RECORDING_VIEW");return records.groupLoan(a,id,false);}
-    @Transactional(readOnly=true)
-    public List<Choice> products(AppUserPrincipal a,String search,int page){access.requireActor(a,"APPROVAL_FLOW_VIEW");require(search!=null&&search.length()<=100&&page>=0&&page<=10000,"product");return records.filterProducts(a,search,page);}
-
     @Transactional(readOnly=true)
     public GroupRuleForm rule(AppUserPrincipal a,UUID product) {
         access.requireActor(a,"APPROVAL_FLOW_VIEW");
         var f=new GroupRuleForm();f.setProductId(product);
         if(product!=null) {
-            f.setProductName(records.filterProduct(a,product).orElseThrow(()->invalid("product")).label());
+            records.filterProduct(a,product).orElseThrow(()->invalid("product"));
             records.groupRule(a,product).ifPresent(r->{f.setExpectedRevision(r.revision());for(var s:steps(r.steps())){f.getGroups().add(s.group());f.getApprovals().add(s.approvals());}});
         }
         return f;
