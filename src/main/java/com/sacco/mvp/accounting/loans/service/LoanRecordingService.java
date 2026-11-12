@@ -249,8 +249,7 @@ public class LoanRecordingService {
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
         if(borrowerParty==null && product.isAffordabilityCheckRequired()) {
-            check(f.getIncome()!=null && f.getIncome().signum()>0 && f.getOtherDebt()!=null,"clientCashFlow");
-            check(f.getExpenses()!=null,"amount");
+            check(f.getIncome()!=null && f.getIncome().signum()>0 && f.getExpenses()!=null && f.getOtherDebt()!=null,"clientCashFlow");
         }
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
         if(shared.active()>0){

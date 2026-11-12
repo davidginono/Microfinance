@@ -10,6 +10,8 @@ public final class OnboardingDtos {
     public record Page<T>(List<T> rows, int page, boolean hasNext) {}
     public record ContactCheck(boolean valid, boolean exists) {}
     public record LoanProfile(UUID revisionId, java.math.BigDecimal monthlyIncome,
+                              @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                              java.math.BigDecimal monthlyExpenses,
                               java.math.BigDecimal monthlyDebtRepayments, String businessName,
                               String businessType, String activity, String incomeSource, String employerName) {}
     public record ProfileDraft(String profile,UUID actor,String institution,String branch,UUID requestKey) implements java.io.Serializable {}
@@ -47,7 +49,7 @@ public final class OnboardingDtos {
         private String postalAddress="", city="", ward="", villageStreet="", nearbyPlace="";
         private Boolean hasBusiness;
         private String businessName="", businessType="", businessTin="", businessLicence="", businessLocation="", businessWard="", businessCity="", otherIncomeSources="";
-        private java.math.BigDecimal dailySales, dailyExpenditure, monthlyIncome, monthlyDebtRepayments;
+        private java.math.BigDecimal dailySales, dailyExpenditure, monthlyIncome, monthlyExpenses, monthlyDebtRepayments;
         private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
         private String bankName="", bankAccountName="", bankAccountNumber="";
         private String employeeNumber;

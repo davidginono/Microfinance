@@ -54,7 +54,7 @@ public class OnboardingRepository {
             order by r.sequence desc limit 1
             """,(r,n)->{
                 var p=json.readValue(r.getString("profile"),Profile.class);
-                return new LoanProfile(r.getObject("id",UUID.class),p.getMonthlyIncome(),p.getMonthlyDebtRepayments(),
+                return new LoanProfile(r.getObject("id",UUID.class),p.getMonthlyIncome(),p.getMonthlyExpenses(),p.getMonthlyDebtRepayments(),
                     p.getBusinessName(),p.getBusinessType(),p.getActivity(),p.getSourceOfFunds(),p.getEmployerName());
             },client,actor.getSaccoId(),actor.getStationId()).stream().findFirst();
     }

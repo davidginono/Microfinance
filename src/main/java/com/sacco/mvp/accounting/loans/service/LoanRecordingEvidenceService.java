@@ -28,7 +28,7 @@ public class LoanRecordingEvidenceService {
 
     public void applyClientProfile(AppUserPrincipal actor,RecordForm form) {
         var profile=onboarding.loanProfile(actor,form.getClientId());
-        form.setIncome(profile.monthlyIncome());form.setOtherDebt(profile.monthlyDebtRepayments());
+        form.setIncome(profile.monthlyIncome());form.setExpenses(profile.monthlyExpenses());form.setOtherDebt(profile.monthlyDebtRepayments());
         form.setBusiness(java.util.stream.Stream.of(profile.businessName(),profile.employerName(),profile.businessType())
             .filter(value->value!=null&&!value.isBlank()).collect(java.util.stream.Collectors.joining(" / ")));
         form.setInformationSource(profile.revisionId()==null?"UNAVAILABLE":"DECLARED");
@@ -126,10 +126,10 @@ public class LoanRecordingEvidenceService {
             if(!details.getCollateral().isEmpty() && details.getCollateral().stream().allMatch(asset->asset.getEstimatedValue()!=null))
                 values.put("collateralEstimatedValue",details.getCollateral().stream().map(ClientApplicationDtos.Collateral::getEstimatedValue).reduce(BigDecimal.ZERO,BigDecimal::add).toPlainString());
             values.keySet().retainAll(allowed);
-            for(var field:formFields)if(field.isRequired() && Set.of("monthlyIncome","otherDebtRepayments",
+            for(var field:formFields)if(field.isRequired() && Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments",
                 "businessOrEmployerName","businessOrEmploymentType","incomeSource").contains(field.getName())) {
                 checkField(values.get(field.getName())!=null&&!values.get(field.getName()).isBlank(),"clientId",
-                    Set.of("monthlyIncome","otherDebtRepayments").contains(field.getName())?"clientCashFlow":"clientBusiness");
+                    Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments").contains(field.getName())?"clientCashFlow":"clientBusiness");
             }
             schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(values,product.getFormSchema()));
         } else check(details.getFields().isEmpty(),"details");

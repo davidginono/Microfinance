@@ -28,7 +28,7 @@ public class OnboardingService {
     public static final Set<String> DOCUMENT_CATEGORIES=Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT","PROFILE_PHOTO","SPOUSE_PHOTO");
     private static final List<String> SELF_EVIDENCE=List.of("IDENTITY","ADDRESS","ACTIVITY");
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
-    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","monthlyIncome","monthlyDebtRepayments","employerName","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
+    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","monthlyIncome","monthlyExpenses","monthlyDebtRepayments","employerName","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
     private final OnboardingRepository records;
     private final GeneralLedgerService access;
     private final MemberRegistrationService registration;
@@ -47,7 +47,7 @@ public class OnboardingService {
     public LoanProfile loanProfile(AppUserPrincipal actor,UUID client) {
         access.requireActor(actor,"LOAN_RECORDING_CREATE");
         records.client(actor,client,today());
-        return records.loanProfile(actor,client).orElse(new LoanProfile(null,null,null,"","","","",""));
+        return records.loanProfile(actor,client).orElse(new LoanProfile(null,null,null,null,"","","","",""));
     }
     @Transactional(readOnly=true) public ContactCheck checkContact(AppUserPrincipal a,UUID client,String field,String value) {
         authorize(a,client==null?"CREATE":"UPDATE");
@@ -263,7 +263,7 @@ public class OnboardingService {
         var fields=new LinkedHashMap<String,String>();fields.put("employerName",p.getEmployerName());fields.put("familiarName",p.getFamiliarName());fields.put("postalAddress",p.getPostalAddress());fields.put("city",p.getCity());fields.put("ward",p.getWard());fields.put("villageStreet",p.getVillageStreet());fields.put("nearbyPlace",p.getNearbyPlace());fields.put("businessName",p.getBusinessName());fields.put("businessType",p.getBusinessType());fields.put("businessLocation",p.getBusinessLocation());fields.put("businessWard",p.getBusinessWard());fields.put("businessCity",p.getBusinessCity());fields.put("spouseName",p.getSpouseName());fields.put("spouseRelationship",p.getSpouseRelationship());fields.put("spouseWork",p.getSpouseWork());fields.put("spouseWorkLocation",p.getSpouseWorkLocation());fields.put("bankName",p.getBankName());fields.put("bankAccountName",p.getBankAccountName());
         fields.forEach((field,value)->text(value,255,field,false));text(p.getBusinessTin(),50,"businessTin",false);text(p.getBusinessLicence(),100,"businessLicence",false);text(p.getOtherIncomeSources(),1000,"otherIncomeSources",false);
         text(p.getBankAccountNumber(),80,"bankAccountNumber",false);check(p.getBankAccountNumber().isBlank()||p.getBankAccountNumber().matches("[A-Za-z0-9 /._-]+"),"bankAccountNumber");
-        money(p.getDailySales(),"dailySales");money(p.getDailyExpenditure(),"dailyExpenditure");money(p.getMonthlyIncome(),"monthlyIncome");money(p.getMonthlyDebtRepayments(),"monthlyDebtRepayments");text(p.getSpousePhone(),32,"spousePhone",false);
+        money(p.getDailySales(),"dailySales");money(p.getDailyExpenditure(),"dailyExpenditure");money(p.getMonthlyIncome(),"monthlyIncome");money(p.getMonthlyExpenses(),"monthlyExpenses");money(p.getMonthlyDebtRepayments(),"monthlyDebtRepayments");text(p.getSpousePhone(),32,"spousePhone",false);
         if(!p.getSpousePhone().isBlank())try{p.setSpousePhone(TanzaniaPhoneNumber.normalizeRequired(p.getSpousePhone()));}catch(IllegalStateException e){throw invalid("spousePhone");}
         if(complete) {
             text(p.getFullName(),255,"name",true);
