@@ -1,0 +1,6 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:if test="${not empty savedApplicationDocuments}"><ul class="recording-saved-files">
+<c:forEach items="${savedApplicationDocuments}" var="file" varStatus="index"><c:if test="${file.documentPurpose == recordingPhotoPurpose or (recordingPhotoPurpose == 'OTHER' and file.documentPurpose != 'GUARANTOR_PHOTO' and file.documentPurpose != 'COLLATERAL_PHOTO')}"><li>
+<a class="resource-table-id-link" href="<c:url value='/finance/loan-records/applications/${recordForm.applicationId}/documents/${file.id}'/>" data-download-action="true"><c:out value="${empty file.documentTitle?file.originalName:file.documentTitle}"/></a>
+<button type="submit" form="recording-remove-${index.index}" formnovalidate class="app-btn btn-neutral"><spring:message code="applications.remove"/></button>
+</li></c:if></c:forEach></ul></c:if>

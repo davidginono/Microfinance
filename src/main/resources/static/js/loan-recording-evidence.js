@@ -75,6 +75,7 @@
             function reindex(list) {
                 list.querySelectorAll('[data-repeat-row]').forEach(function (row, index) {
                     row.querySelectorAll('input,select,textarea').forEach(function (control) {
+                        if (control.matches('[data-document-field],[data-row-photos]')) return;
                         if (control.dataset.field) control.name = 'applicationDetails.' + list.dataset.repeatList + '[' + index + '].' + control.dataset.field;
                         else if (control.name) control.name = control.name.replace(/\[\d+\]/, '[' + index + ']');
                         if (!control.id) control.id = 'recording-evidence-control-' + (++nextFieldId);
@@ -83,14 +84,20 @@
                     });
                 });
             }
+            function placeAdd(list, button) {
+                var actions = list.lastElementChild?.querySelector('.recording-item-actions');
+                if (actions) actions.append(button);
+                else list.after(button);
+            }
             root.querySelectorAll('[data-repeat-list]').forEach(reindex);
             root.querySelectorAll('[data-add-row]').forEach(function (button) {
                 var kind = button.dataset.addRow, list = root.querySelector('[data-repeat-list="' + kind + '"]');
                 button.disabled = list.children.length >= 20;
+                placeAdd(list, button);
                 button.addEventListener('click', function () {
                     if (list.children.length >= 20) return;
                     list.append(root.querySelector('[data-row-template="' + kind + '"]').content.cloneNode(true));
-                    reindex(list);
+                    reindex(list); placeAdd(list, button);
                     list.lastElementChild.dispatchEvent(new Event('loan:choices-added',{bubbles:true}));
                     (list.lastElementChild.querySelector('.neo-select-button') || list.lastElementChild.querySelector('input,select'))?.focus();
                     button.disabled = list.children.length >= 20;
@@ -102,8 +109,11 @@
                 if (!button) return;
                 var list = button.closest('[data-repeat-list]'), row = button.closest('[data-repeat-row]');
                 var next = row.nextElementSibling || row.previousElementSibling;
-                row.remove(); reindex(list);
                 var add = root.querySelector('[data-add-row="' + list.dataset.repeatList + '"]');
+                list.after(add);
+                uploads.filter(upload => row.contains(upload.row)).forEach(removeUpload);
+                row.remove(); reindex(list); bindUploads();
+                placeAdd(list, add);
                 add.disabled = false;
                 (next?.querySelector('[data-remove-row]') || add).focus();
                 form.dispatchEvent(new Event('change',{bubbles:true}));
@@ -123,25 +133,86 @@
                 files.files = selection.files;
                 files.setCustomValidity(uploads.length > 10 ? root.dataset.uploadLimit : '');
             }
-            files.addEventListener('change', function () {
-                Array.from(files.files).forEach(function (file) {
-                    if (uploads.some(function (upload) { return upload.file.name === file.name && upload.file.size === file.size && upload.file.lastModified === file.lastModified; })) return;
-                    documentList.append(root.querySelector('[data-evidence-document-template]').content.cloneNode(true));
-                    var row = documentList.lastElementChild; row.querySelector('[data-evidence-filename]').textContent = file.name;
-                    row.querySelector('[data-document-field="documentNames"]').value = file.name.slice(0,120);
-                    row.querySelector('[data-document-field="documentTypes"]').value = 'OTHER';
-                    var upload = {file: file, row: row}; uploads.push(upload);
-                    row.querySelector('[data-remove-upload]').addEventListener('click', function () {
-                        var index = uploads.indexOf(upload);
-                        uploads.splice(index,1); row.remove(); bindUploads();
-                        (uploads[Math.min(index, uploads.length - 1)]?.row.querySelector('[data-remove-upload]') || files).focus();
+            function removeUpload(upload) {
+                uploads.splice(uploads.indexOf(upload),1);
+                if (upload.preview) URL.revokeObjectURL(upload.preview);
+                upload.row.remove();
+            }
+            function addUploads(selection, owner) {
+                var photo = !!owner, target = photo ? owner.querySelector('[data-row-photo-list]') : documentList;
+                var picker = photo ? owner.querySelector('[data-row-photos]') : files;
+                var kind = photo ? owner.closest('[data-repeat-list]').dataset.repeatList : '';
+                var type = kind === 'guarantors' ? 'GUARANTOR_PHOTO' : 'COLLATERAL_PHOTO';
+                var selected = Array.from(selection);
+                var message = '';
+                if (uploads.length + selected.length > 10) message = root.dataset.uploadLimit;
+                if (photo && selected.some(file => !/\.(png|jpe?g)$/i.test(file.name) || !['image/png','image/jpeg'].includes(file.type) || file.size > 5*1024*1024))
+                    message = owner.querySelector('.attachment-dropzone-help').textContent;
+                var localError = picker.closest('.recording-row-photos')?.querySelector('[data-photo-error]');
+                if (message) {
+                    if (photo && !localError) {
+                        localError = document.createElement('p'); localError.dataset.photoError = ''; localError.className = 'coa-error';
+                        localError.setAttribute('role','alert'); picker.closest('.recording-row-photos').append(localError);
+                    }
+                    if (localError) localError.textContent = message;
+                    else { error.textContent = message; error.hidden = false; }
+                    syncFiles(); return;
+                }
+                localError?.remove();
+                selected.forEach(function (file) {
+                    if (uploads.some(upload => upload.owner === owner && upload.file.name === file.name && upload.file.size === file.size && upload.file.lastModified === file.lastModified)) return;
+                    target.append(root.querySelector('[data-evidence-document-template]').content.cloneNode(true));
+                    var row = target.lastElementChild;
+                    row.querySelector('[data-evidence-filename]').textContent = file.name;
+                    var title = row.querySelector('[data-document-field="documentNames"]');
+                    var subject = photo ? (kind === 'guarantors' ? owner.querySelector('[data-choice-select]')?.selectedOptions[0]?.textContent : owner.querySelector('[name$=".itemName"]')?.value) : '';
+                    title.value = ((subject ? subject.trim() + ' - ' : '') + file.name).slice(0,120);
+                    row.querySelector('[data-document-field="documentTypes"]').value = photo ? type : 'OTHER';
+                    var upload = {file:file, row:row, owner:owner}; uploads.push(upload);
+                    if (photo) {
+                        row.classList.add('recording-photo-token');
+                        row.querySelectorAll('[data-document-field]').forEach(control => { control.closest('label').hidden = true; });
+                        var size = document.createElement('span'); size.className = 'recording-photo-size';
+                        size.textContent = new Intl.NumberFormat(document.documentElement.lang || 'en',{maximumFractionDigits:1}).format(file.size/1024) + ' KB';
+                        row.querySelector('[data-evidence-filename]').append(size);
+                        if (URL.createObjectURL) {
+                            upload.preview = URL.createObjectURL(file);
+                            var image = document.createElement('img'); image.src = upload.preview; image.alt = ''; image.className = 'recording-photo-thumbnail';
+                            row.prepend(image);
+                        }
+                    }
+                    var remove = row.querySelector('[data-remove-upload]');
+                    remove.setAttribute('aria-label',remove.textContent.trim() + ' ' + file.name);
+                    remove.addEventListener('click', function () {
+                        removeUpload(upload); bindUploads(); picker.focus();
                         files.dispatchEvent(new Event('input',{bubbles:true}));
                     });
                 });
                 bindUploads(); documentRequirements();
+                form.dispatchEvent(new Event('change',{bubbles:true}));
+            }
+            files.addEventListener('change', function () { addUploads(files.files,null); });
+            root.addEventListener('change', function (event) {
+                if (!event.target.matches('[data-row-photos]')) return;
+                addUploads(event.target.files,event.target.closest('[data-repeat-row]'));
+                event.target.value = '';
             });
+            root.addEventListener('dragover', function (event) {
+                if (event.target.closest('.recording-row-photos .attachment-dropzone')) event.preventDefault();
+            });
+            root.addEventListener('drop', function (event) {
+                var zone = event.target.closest('.recording-row-photos .attachment-dropzone');
+                if (!zone) return;
+                event.preventDefault(); addUploads(event.dataTransfer.files,zone.closest('[data-repeat-row]'));
+            });
+            window.addEventListener('pagehide', () => uploads.forEach(upload => {if(upload.preview) URL.revokeObjectURL(upload.preview);}), {once:true});
             function bindUploads() {
                 uploads.forEach(function (upload,index) {
+                    if (upload.owner) {
+                        var choice = upload.owner.querySelector('[data-choice-select]');
+                        var subject = choice ? (choice.value ? choice.selectedOptions[0]?.textContent : '') : upload.owner.querySelector('[name$=".itemName"]')?.value;
+                        upload.row.querySelector('[data-document-field="documentNames"]').value = ((subject ? subject.trim() + ' - ' : '') + upload.file.name).slice(0,120);
+                    }
                     upload.row.querySelectorAll('[data-document-field]').forEach(function (control) {
                         control.name = 'applicationDetails.' + control.dataset.documentField + '[' + index + ']';
                         if (!control.id) control.id = 'recording-document-' + (++nextFieldId);
@@ -150,6 +221,7 @@
                 });
                 syncFiles();
             }
+            form.addEventListener('submit', bindUploads);
             async function product(changed) {
                 var id = form.elements.productId.value, sequence = ++productVersion;
                 var draft = form.querySelector('[data-recording-draft]'); if (draft) draft.disabled = form.elements.loanMode.value !== 'CONFIGURED' || clientSelect?.selectedOptions[0]?.dataset.clientKind !== 'PROVISIONAL';

@@ -249,8 +249,8 @@ test('the recording wizard validates each step and preserves fields and uploads'
       <section id="guarantors" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Guarantors</h2></section>
       <section id="collateral" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Collateral</h2><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
       <section id="documents" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Attachments</h2><input type="file" name="attachments"><div data-evidence-documents></div></section>
-      <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName"></div><button type="button" data-remove-row>Remove</button></div></template>
-      <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
+      <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName"></div><div class="recording-row-photos"><label class="attachment-dropzone"><input type="file" data-row-photos><span class="attachment-dropzone-help">Choose a photo</span></label><div data-row-photo-list></div></div><div class="recording-item-actions"><button type="button" data-remove-row>Remove</button></div></div></template>
+      <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option><option>COLLATERAL_PHOTO</option></select></label><label><select data-document-field="requiredAttachmentIds"><option value=""></option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
       <div data-evidence-error hidden></div><div data-evidence-requirements></div>
     </div><button type="button" data-recording-previous hidden>Previous</button><button type="button" data-recording-next hidden>Next</button>
     <button type="submit" data-recording-submit>Save</button></form>`, {runScripts:'outside-only'});
@@ -279,6 +279,7 @@ test('the recording wizard validates each step and preserves fields and uploads'
     next.click();
     assert.equal(steps[2].getAttribute('aria-current'),'step');
     d.querySelector('[data-add-row]').click();
+    assert.ok(d.querySelector('[data-repeat-row] .recording-item-actions [data-add-row]'));
     d.querySelector('[data-field]').value = 'Motorcycle';
     d.querySelector('[data-add-row]').click();
     const first = d.querySelector('[data-remove-row]');
@@ -314,5 +315,27 @@ test('the recording wizard validates each step and preserves fields and uploads'
     save.form.addEventListener('submit', event => {event.preventDefault(); submitter = event.submitter;});
     title.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
     assert.equal(submitter,save);
+    const photoPicker = d.querySelector('[data-row-photos]');
+    Object.defineProperty(photoPicker,'files',{value:[],writable:true});
+    photoPicker.files = [new w.File(['photo'],'bike.png',{type:'image/png'})];
+    photoPicker.dispatchEvent(new w.Event('change',{bubbles:true}));
+    assert.equal(d.querySelector('[data-row-photo-list] [data-document-field="documentTypes"]').value,'COLLATERAL_PHOTO');
+    assert.equal(d.querySelector('[data-row-photo-list] [data-document-field="documentNames"]').value,'Bicycle - bike.png');
+    assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf','bike.png']);
+    photoPicker.files = [new w.File(['bad'],'script.svg',{type:'image/svg+xml'})];
+    photoPicker.dispatchEvent(new w.Event('change',{bubbles:true}));
+    assert.ok(d.querySelector('[data-photo-error]'));
+    assert.equal(input.files.length,2);
+    d.querySelector('[data-row-photo-list] [data-remove-upload]').click();
+    assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf']);
+    photoPicker.files = [new w.File(['photo'],'bike.jpg',{type:'image/jpeg'})];
+    photoPicker.dispatchEvent(new w.Event('change',{bubbles:true}));
+    d.querySelector('[data-remove-row]').click();
+    assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf']);
+    assert.equal(d.querySelector('[data-document-field="documentNames"]').name,'applicationDetails.documentNames[0]');
+    assert.ok(d.querySelector('[data-add-row]'));
+    d.querySelector('[data-add-row]').click();
+    assert.ok(d.querySelector('[data-repeat-row] .recording-item-actions [data-add-row]'));
+
   } finally {dom.window.close();}
 });

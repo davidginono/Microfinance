@@ -46,3 +46,5 @@ The [2024 fees guidelines](https://bot.go.tz/Publications/Acts%2C%20Regulations%
 ## Verification
 
 Targeted unit tests cover decimal annuity results, exact principal reconciliation, zero-interest final cents, large values, weekly normalization/counts, tenure-proportional flat interest, invalid cash flow, missing repayment, protected declarations, snapshot tampering, date anchoring, and disbursement term mismatches. Full build and rendered verification results are recorded in the conversion gap checklist after completion.
+
+Guarantor recording uses the selected client, relationship, business, location and phone. Collateral recording uses item name, number, type, description and phone. Each entry accepts PNG/JPEG photos through the existing named attachment flow; saved photos are grouped by purpose and retain their download/removal permissions. Removed collateral owner, location and valuation fields remain in historical DTO snapshots only; the recording binder no longer accepts them. Existing product assessment requirements remain enforced.

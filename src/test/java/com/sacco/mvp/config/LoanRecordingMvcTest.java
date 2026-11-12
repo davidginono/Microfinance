@@ -129,12 +129,21 @@ class LoanRecordingMvcTest {
     }
     @Test void recordingCannotOverrideCashFlowOrItsProfileSource() throws Exception {
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
+            .param("applicationDetails.collateral[0].itemName","Bicycle")
+            .param("applicationDetails.collateral[0].owner","Forged owner")
+            .param("applicationDetails.collateral[0].location","Forged location")
+            .param("applicationDetails.collateral[0].estimatedValue","999999999")
             .param("principal","invalid").param("income","999999999").param("otherDebt","0").param("expenses","0")
             .param("applicationDetails.clientProfile.revisionId",UUID.randomUUID().toString()))
             .andExpect(view().name("accounting/loans/record-form"))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("income",org.hamcrest.Matchers.nullValue())))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("otherDebt",org.hamcrest.Matchers.nullValue())))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("expenses",org.hamcrest.Matchers.nullValue())))
+            .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("applicationDetails",
+                org.hamcrest.Matchers.hasProperty("collateral",org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.allOf(
+                    org.hamcrest.Matchers.hasProperty("owner",org.hamcrest.Matchers.is("")),
+                    org.hamcrest.Matchers.hasProperty("location",org.hamcrest.Matchers.is("")),
+                    org.hamcrest.Matchers.hasProperty("estimatedValue",org.hamcrest.Matchers.nullValue())))))))
             .andExpect(model().attribute("recordForm",org.hamcrest.Matchers.hasProperty("applicationDetails",
                 org.hamcrest.Matchers.hasProperty("clientProfile",org.hamcrest.Matchers.nullValue()))));
     }

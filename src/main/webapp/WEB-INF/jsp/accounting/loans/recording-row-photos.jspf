@@ -1,0 +1,5 @@
+<%@ page pageEncoding="UTF-8" %>
+<div class="recording-row-photos">
+<label class="attachment-dropzone"><input type="file" multiple accept=".png,.jpg,.jpeg" class="attachment-dropzone-input" data-row-photos/><span class="attachment-dropzone-main"><span class="attachment-dropzone-copy"><span class="attachment-dropzone-title"><spring:message code="kyc.addPhoto"/></span><span class="attachment-dropzone-help"><spring:message code="kyc.error.photoFile"/></span></span><span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.choose"/></span></span></label>
+<div data-row-photo-list class="recording-photo-list" aria-live="polite"></div>
+</div>
