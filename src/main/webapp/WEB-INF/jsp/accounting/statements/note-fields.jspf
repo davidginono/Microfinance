@@ -1,0 +1,10 @@
+<div class="fs-fields">
+<label><spring:message code="fs.note" /><input class="aws-control" type="number" name="notes[${rowIndex}].number" value="<c:out value='${row.number}' />" min="1" max="999" required /></label>
+<label><spring:message code="fs.setup.basis" /><select class="aws-control" name="notes[${rowIndex}].basis"><c:forTokens items="BALANCE,MOVEMENT,NARRATIVE" delims="," var="basis"><option value="${basis}" ${row.basis==basis?'selected':''}><spring:message code="fs.noteBasis.${basis}" /></option></c:forTokens></select></label>
+<label><spring:message code="fs.setup.title" /><input class="aws-control" name="notes[${rowIndex}].title" value="<c:out value='${row.title}' />" maxlength="150" required /></label>
+<label><spring:message code="fs.setup.titleSw" /><input class="aws-control" name="notes[${rowIndex}].titleSw" value="<c:out value='${row.titleSw}' />" maxlength="150" /></label>
+<label class="fs-full fs-setup-check"><span><input type="checkbox" name="notes[${rowIndex}].includeProfit" value="true" ${row.includeProfit?'checked':''} /><spring:message code="fs.setup.noteProfit" /></span></label>
+<label class="fs-full"><spring:message code="fs.setup.accounts" /><input class="aws-control" name="notes[${rowIndex}].accounts" value="<c:out value='${row.accounts}' />" maxlength="20000" aria-describedby="fs-account-hint" /></label>
+<label><spring:message code="fs.setup.text" /><textarea class="aws-control" name="notes[${rowIndex}].text" maxlength="5000" rows="4"><c:out value="${row.text}" /></textarea></label>
+<label><spring:message code="fs.setup.textSw" /><textarea class="aws-control" name="notes[${rowIndex}].textSw" maxlength="5000" rows="4"><c:out value="${row.textSw}" /></textarea></label>
+</div>

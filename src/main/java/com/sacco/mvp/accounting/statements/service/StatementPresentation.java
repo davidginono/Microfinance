@@ -32,12 +32,18 @@ public class StatementPresentation {
         }
         if(kind==Kind.EQUITY){
             columns.add(new Column(label("fs.description",locale),false,.28f));float width=.72f/(s.equityColumns().size()+1);
-            for(String c:s.equityColumns())columns.add(new Column(c.startsWith("account:")?c.substring(8):label(c,locale),true,width));columns.add(new Column(label("fs.equityTotal",locale),true,width));
-            for(var r:s.equity()){var cells=new ArrayList<Cell>();cells.add(cell(label(r.label(),locale)));for(String c:s.equityColumns())cells.add(cell(r.values().get(c)));cells.add(cell(r.total()));rows.add(new DisplayRow(cells,r.summary(),false,null));}
+            for(String c:s.equityColumns())columns.add(new Column(component(s,c,locale),true,width));columns.add(new Column(label("fs.equityTotal",locale),true,width));
+            if(s.version()>=3)rows.add(period(s.parameters().from(),s.parameters().through(),columns.size(),locale));
+            for(var r:s.equity()){var cells=new ArrayList<Cell>();cells.add(cell(movement(s,r.label(),locale)));for(String c:s.equityColumns())cells.add(cell(r.values().get(c)));cells.add(cell(r.total()));rows.add(new DisplayRow(cells,r.summary(),false,null));}
+            if(s.version()>=3&&s.previousEquity()!=null){rows.add(period(s.parameters().previousFrom(),s.parameters().previousThrough(),columns.size(),locale));for(var r:s.previousEquity()){var cells=new ArrayList<Cell>();cells.add(cell(movement(s,r.label(),locale)));for(String c:s.equityColumns())cells.add(cell(r.values().get(c)));cells.add(cell(r.total()));rows.add(new DisplayRow(cells,r.summary(),false,null));}}
             return new Document(title(s,kind,locale),"equity",columns,rows,-1,false);
         }
         for(var c:List.of(new Column(label("fs.account",locale),false,.12f),new Column(label("fs.description",locale),false,.40f),new Column(label("fs.notes",locale),false,.08f),new Column(label("fs.current",locale),true,.20f),new Column(label("fs.previous",locale),true,.20f)))columns.add(c);
-        if(kind==Kind.NOTES){
+        if(kind==Kind.NOTES&&s.version()>=3&&s.setup()!=null&&s.setup().version()>0){
+            columns.remove(2);columns.set(1,new Column(label("fs.description",locale),false,.48f));
+            configuredNotes(s,rows,base,locale);
+            return new Document(title(s,kind,locale),"statement",columns,rows,2,false);
+        }else if(kind==Kind.NOTES){
             var notes=new TreeMap<Integer,List<Balance>>();for(var b:s.balances())if(b.mapping()!=null&&b.mapping().note()>0)notes.computeIfAbsent(b.mapping().note(),k->new ArrayList<>()).add(b);
             for(var entry:notes.entrySet()){
                 rows.add(row(false,true,null,"",label("fs.note",locale)+" "+entry.getKey(),"","",""));
@@ -63,6 +69,30 @@ public class StatementPresentation {
             }
         }
         return new Document(title(s,kind,locale),"statement",columns,rows,3,kind==Kind.POSITION);
+    }
+    private String component(Snapshot s,String key,Locale locale){
+        if(key.startsWith("component:")&&s.setup()!=null){var c=s.setup().components().get(Integer.parseInt(key.substring(10)));return local(c.name(),c.nameSw(),locale);}
+        return key.startsWith("account:")?key.substring(8):label(key,locale);
+    }
+    private String movement(Snapshot s,String key,Locale locale){
+        if(key.startsWith("fs.movement.")&&s.setup()!=null){String category=key.substring(12);for(var c:s.setup().categories())if(c.category().name().equals(category)&&!c.name().isBlank())return local(c.name(),c.nameSw(),locale)+" ("+label(key,locale)+")";}
+        return label(key,locale);
+    }
+    private static String local(String en,String sw,Locale locale){return "sw".equals(locale.getLanguage())&&sw!=null&&!sw.isBlank()?sw:en;}
+    private DisplayRow period(java.time.LocalDate from,java.time.LocalDate through,int size,Locale locale){var cells=new ArrayList<Cell>();cells.add(cell(label("fs.period",locale)+" "+from.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu"))+" – "+through.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu"))));while(cells.size()<size)cells.add(cell(""));return new DisplayRow(cells,false,true,null);}
+    private void configuredNotes(Snapshot s,List<DisplayRow> rows,String base,Locale locale){
+        for(var note:s.setup().notes()){
+            rows.add(row(false,true,null,"",label("fs.note",locale)+" "+note.number()+" — "+local(note.title(),note.titleSw(),locale),"",""));
+            if(!note.basis().equals("NARRATIVE"))rows.add(row(false,false,null,"",label("fs.noteBasis."+note.basis(),locale),"",""));
+            BigDecimal current=BigDecimal.ZERO,previous=BigDecimal.ZERO;var ids=new HashSet<>(note.accounts());
+            for(var b:EquityStatementCalculator.incomeWithoutClosings(s.balances(),s.equityMovements()==null?List.of():s.equityMovements()))if(ids.contains(b.id())){int sign=Set.of("LIABILITY","EQUITY","INCOME").contains(b.type())?-1:1;boolean flow=note.basis().equals("MOVEMENT");BigDecimal c=(flow?b.movement():b.closing()).multiply(BigDecimal.valueOf(sign)),p=(flow?b.previousMovement():b.previousClosing()).multiply(BigDecimal.valueOf(sign));rows.add(row(false,false,s.parameters().institutionWide()?null:base+"/ledger/"+b.id(),b.code(),b.name(),c,p));current=current.add(c);previous=previous.add(p);}
+            if(note.includeProfit()){
+                BigDecimal c=BigDecimal.ZERO,p=BigDecimal.ZERO;for(var b:s.balances())if(Set.of("INCOME","EXPENSE").contains(b.type())){c=c.subtract(b.closing());p=p.subtract(b.previousClosing());}
+                rows.add(row(false,false,null,"",label("fs.untransferredEarnings",locale),c,p));current=current.add(c);previous=previous.add(p);
+            }
+            if(!note.basis().equals("NARRATIVE"))rows.add(row(true,false,null,"",label("fs.total",locale),current,previous));
+            String text=local(note.text(),note.textSw(),locale);for(int offset=0;offset<text.length();offset+=500)rows.add(row(false,false,null,"",text.substring(offset,Math.min(text.length(),offset+500)),"",""));
+        }
     }
     public DisplayRow row(boolean total,boolean heading,String details,Object... values){return new DisplayRow(Arrays.stream(values).map(this::cell).toList(),total,heading,details);}
     public Document ledger(Snapshot s,Balance b,List<Activity> activity,Locale locale){

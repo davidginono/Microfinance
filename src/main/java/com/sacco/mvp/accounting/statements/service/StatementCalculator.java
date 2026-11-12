@@ -10,6 +10,9 @@ public final class StatementCalculator {
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public record Result(List<Row> position,List<Row> income,List<Row> cash,List<String> equityColumns,List<EquityRow> equity,List<Check> checks) {}
     public static Result calculate(List<Balance> accounts,List<Cash> cashLines,Parameters p) {
+        return calculate(accounts,cashLines,p,true);
+    }
+    public static Result calculate(List<Balance> accounts,List<Cash> cashLines,Parameters p,boolean includeLegacyEquity) {
         var checks=new ArrayList<Check>();
         // The reset removed verified source-opening/reconciliation workflows. These numbers are recorded-ledger figures only.
         checks.add(new Check("coverage",null));
@@ -31,6 +34,7 @@ public final class StatementCalculator {
         difference(checks,"position",assets.subtract(liabilities).subtract(equity));
         difference(checks,"previousTrial",accounts.stream().map(Balance::previousClosing).reduce(ZERO,BigDecimal::add));
         var cash=cash(accounts,cashLines,p,checks);
+        if(!includeLegacyEquity)return new Result(List.copyOf(position),List.copyOf(income),List.copyOf(cash),List.of(),List.of(),List.copyOf(checks));
         var columns=new TreeSet<String>();accounts.stream().filter(a->"EQUITY".equals(a.type())).forEach(a->columns.add(component(a)));
         columns.add("fs.untransferredEarnings");
         if(columns.size()>10)throw new IllegalArgumentException("fs.error.equityColumns");

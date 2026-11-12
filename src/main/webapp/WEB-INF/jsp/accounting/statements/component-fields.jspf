@@ -1,0 +1,6 @@
+<div class="fs-fields">
+<label><spring:message code="fs.setup.name" /><input class="aws-control" name="components[${rowIndex}].name" value="<c:out value='${row.name}' />" maxlength="100" required /></label>
+<label><spring:message code="fs.setup.nameSw" /><input class="aws-control" name="components[${rowIndex}].nameSw" value="<c:out value='${row.nameSw}' />" maxlength="100" /></label>
+<label class="fs-full"><spring:message code="fs.setup.accounts" /><input class="aws-control" name="components[${rowIndex}].accounts" value="<c:out value='${row.accounts}' />" maxlength="20000" required aria-describedby="fs-account-hint" /></label>
+<label class="fs-full fs-setup-check"><span><input type="checkbox" name="components[${rowIndex}].retained" value="true" ${row.retained?'checked':''} /><spring:message code="fs.setup.retained" /></span></label>
+</div>

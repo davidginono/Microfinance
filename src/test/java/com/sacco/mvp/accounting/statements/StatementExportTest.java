@@ -38,7 +38,7 @@ class StatementExportTest {
             assertThat(found).isTrue();assertThat(book.getFontAt(0).getFontName()).isNotNull();assertThat(sheet.getRow(7).getLastCellNum()).isEqualTo((short)7);
         }
     }
-    @Test void investmentDetailsSelectTheExactMappedAccounts(){var s=snapshot();var line=s.position().stream().filter(r->!r.accounts().isEmpty()).findFirst().orElseThrow();var service=new StatementService(null,null,null,null,null,null,null);assertThat(service.selected(s,Kind.POSITION,line.key())).extracting(Balance::id).containsExactlyElementsOf(line.accounts());assertThatThrownBy(()->service.selected(s,Kind.POSITION,"foreign-line")).hasMessage("fs.error.selection");}
+    @Test void investmentDetailsSelectTheExactMappedAccounts(){var s=snapshot();var line=s.position().stream().filter(r->!r.accounts().isEmpty()).findFirst().orElseThrow();var service=new StatementService(null,null,null,null,null,null,null,null);assertThat(service.selected(s,Kind.POSITION,line.key())).extracting(Balance::id).containsExactlyElementsOf(line.accounts());assertThatThrownBy(()->service.selected(s,Kind.POSITION,"foreign-line")).hasMessage("fs.error.selection");}
     @Test void eachStatementExportsSeparatelyWithoutDetails()throws Exception {
         var s=snapshot();
         for(var kind:List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL)) {

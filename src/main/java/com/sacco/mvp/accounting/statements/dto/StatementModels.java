@@ -28,7 +28,14 @@ public final class StatementModels {
     public record Check(String key,BigDecimal difference) {}
     public record Snapshot(int version,UUID id,Parameters parameters,OffsetDateTime generatedAt,String institution,String branch,
                            String institutionName,String branchName,List<Balance> balances,List<Row> position,List<Row> income,
-                           List<Row> cashFlow,List<String> equityColumns,List<EquityRow> equity,List<Check> checks) {}
+                           List<Row> cashFlow,List<String> equityColumns,List<EquityRow> equity,List<Check> checks,
+                           StatementSetupModels.Setup setup,List<EquityRow> previousEquity,List<StatementSetupModels.Movement> equityMovements) {
+        public Snapshot(int version,UUID id,Parameters parameters,OffsetDateTime generatedAt,String institution,String branch,
+                        String institutionName,String branchName,List<Balance> balances,List<Row> position,List<Row> income,
+                        List<Row> cashFlow,List<String> equityColumns,List<EquityRow> equity,List<Check> checks) {
+            this(version,id,parameters,generatedAt,institution,branch,institutionName,branchName,balances,position,income,cashFlow,equityColumns,equity,checks,null,null,null);
+        }
+    }
     public record Run(UUID id,LocalDate from,LocalDate through,OffsetDateTime createdAt,boolean institutionWide,boolean saved,Snapshot snapshot) {}
     public record Activity(UUID journalId,LocalDate date,String accountNumber,String description,BigDecimal debit,BigDecimal credit,BigDecimal running,String sourceUrl) {}
 }

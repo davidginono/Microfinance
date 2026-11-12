@@ -20,3 +20,5 @@
 .fs-save-report{margin-left:auto}
 @media print{.fs-preview-footer,.fs-tab-status{display:none!important}}
 @media(max-width:767px){.fs-view-fields{flex-direction:row}.fs-workspace .fs-view-fields .fs-select-setting{flex:1 1 100%}}
+
+.fs-setup-row{min-width:0;border:1px solid #d5dbdb;padding:16px;margin:0 0 16px}.fs-setup-row legend{font-weight:600;padding:0 6px}.fs-setup-row>.app-btn{margin-top:12px}.fs-configure details.erp-panel>summary{padding:16px;cursor:pointer}.fs-configure details .erp-table-scroll{max-height:360px}.fs-setup-check{align-self:end}.fs-setup-check input{margin-right:8px}[data-equity-classify]{display:flex;flex-wrap:wrap;align-items:end;gap:8px;min-width:0;max-width:100%}[data-equity-classify] label{display:flex;flex-direction:column;gap:4px;min-width:0}[data-equity-classify] .aws-control{max-width:100%}@media(max-width:767px){[data-equity-classify] label{flex:1 1 180px}.fs-setup-row{padding:12px}}

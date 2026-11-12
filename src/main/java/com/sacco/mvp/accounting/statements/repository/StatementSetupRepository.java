@@ -1,0 +1,53 @@
+package com.sacco.mvp.accounting.statements.repository;
+
+import com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.*;
+import com.sacco.mvp.security.AppUserPrincipal;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+import java.util.*;
+
+@Repository @RequiredArgsConstructor
+public class StatementSetupRepository {
+    private final JdbcTemplate jdbc;
+    public Optional<StoredSetup> latest(String institution){return jdbc.query("select version,payload from statement_setup_version where sacco_id=? order by version desc limit 1",(r,n)->new StoredSetup(r.getInt(1),r.getString(2)),institution).stream().findFirst();}
+    public Optional<String> request(String institution,UUID key){return jdbc.query("select request_hash from statement_setup_version where sacco_id=? and request_key=?",(r,n)->r.getString(1),institution,key).stream().findFirst();}
+    public void lock(String key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","STATEMENT_SETUP/"+key);}
+    public void save(AppUserPrincipal a,Setup setup,String payload,UUID key,String hash,String reason){jdbc.update("insert into statement_setup_version(sacco_id,version,payload,request_key,request_hash,actor_id,reason) values(?,?,?,?,?,?,?)",a.getSaccoId(),setup.version(),payload,key,hash,a.getMemberId(),reason);}
+    public List<AccountChoice> accounts(String institution){return jdbc.query("select id,code,name,type from gl_account where sacco_id=? and kind<>'HEADING' order by code,id limit 2001",(r,n)->new AccountChoice(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4)),institution);}
+    public List<Journal> journals(AppUserPrincipal a,Parameters p,int page){return jdbc.query("""
+        select j.id,j.effective_date,j.source_reference reference,j.reason,totals.debit,totals.credit,coalesce(c.category,'UNCLASSIFIED') category,coalesce(c.version,0) version
+        from gl_journal j
+        join lateral(select sum(l.debit) debit,sum(l.credit) credit from gl_journal_line l
+          join gl_account a on a.id=l.account_id and a.sacco_id=l.sacco_id
+          where l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id and a.type='EQUITY'
+          having count(*)>0) totals on true
+        left join lateral(select category,version from statement_equity_classification c where c.journal_id=j.id
+          and c.sacco_id=j.sacco_id and c.station_id=j.station_id order by version desc limit 1)c on true
+        where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.effective_date between ? and ?
+        order by j.effective_date desc,j.id limit 31 offset ?
+        """,(r,n)->new Journal(r.getObject("id",UUID.class),r.getObject("effective_date",java.time.LocalDate.class),r.getString("reference"),r.getString("reason"),Category.valueOf(r.getString("category")),r.getInt("version"),r.getBigDecimal("debit"),r.getBigDecimal("credit")),a.getSaccoId(),a.getStationId(),p.from(),p.through(),page*30);}
+    public List<Movement> journal(AppUserPrincipal a,UUID id){return jdbc.query("""
+        select l.account_id,a.type,sum(l.debit) debit,sum(l.credit) credit from gl_journal j
+        join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
+        join gl_account a on a.id=l.account_id and a.sacco_id=l.sacco_id
+        where j.id=? and j.sacco_id=? and j.station_id=? and j.state='POSTED'
+        group by l.account_id,a.type order by l.account_id limit 2001
+        """,(r,n)->new Movement(r.getObject("account_id",UUID.class),Category.UNCLASSIFIED,false,r.getBigDecimal("debit"),r.getBigDecimal("credit")),id,a.getSaccoId(),a.getStationId());}
+    public int classificationVersion(AppUserPrincipal a,UUID id){return jdbc.queryForObject("select coalesce(max(version),0) from statement_equity_classification where sacco_id=? and station_id=? and journal_id=?",Integer.class,a.getSaccoId(),a.getStationId(),id);}
+    public boolean sameClassification(AppUserPrincipal a,UUID id,Category category,String reason){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from statement_equity_classification where sacco_id=? and station_id=? and journal_id=? and version=(select max(version) from statement_equity_classification where sacco_id=? and station_id=? and journal_id=?) and category=? and actor_id=? and reason=?)",Boolean.class,a.getSaccoId(),a.getStationId(),id,a.getSaccoId(),a.getStationId(),id,category.name(),a.getMemberId(),reason));}
+    public void classify(AppUserPrincipal a,UUID id,int version,Category category,String reason){jdbc.update("insert into statement_equity_classification(sacco_id,station_id,journal_id,version,category,actor_id,reason) values(?,?,?,?,?,?,?)",a.getSaccoId(),a.getStationId(),id,version,category.name(),a.getMemberId(),reason);}
+    public List<Movement> movements(UUID run,Parameters p){return jdbc.query("""
+        select l.account_id,coalesce(c.category,'UNCLASSIFIED') category,
+          period.previous,sum(l.debit) debit,sum(l.credit) credit
+        from statement_run_journal r join gl_journal j on j.id=r.journal_id
+        cross join (values(false),(true)) period(previous)
+        join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
+        join gl_account a on a.id=l.account_id and a.sacco_id=l.sacco_id
+        left join lateral(select category from statement_equity_classification c where c.journal_id=j.id
+          and c.sacco_id=j.sacco_id and c.station_id=j.station_id order by version desc limit 1)c on true
+        where r.run_id=? and ((not period.previous and j.effective_date between ? and ?) or (period.previous and j.effective_date between ? and ?)) and (a.type='EQUITY' or c.category='EARNINGS_TRANSFER' and a.type in ('INCOME','EXPENSE'))
+        group by l.account_id,c.category,previous order by l.account_id,c.category,previous limit 32001
+        """,(r,n)->new Movement(r.getObject("account_id",UUID.class),Category.valueOf(r.getString("category")),r.getBoolean("previous"),r.getBigDecimal("debit"),r.getBigDecimal("credit")),run,p.from(),p.through(),p.previousFrom(),p.previousThrough());}
+}

@@ -1,0 +1,5 @@
+<c:if test="${(saved or param.saved=='true') and empty errorKey}">
+ <div class="workspace-flashbar" data-workspace-flashbar><div class="app-notification-bar console-message" data-message-type="success" data-app-toast role="status" tabindex="-1">
+  <p data-toast-text><spring:message code="fs.setup.saved" /></p><button type="button" class="app-toast-close" data-feedback-dismiss aria-label="<spring:message code='form.notification.dismiss' />"><svg class="app-toast-close-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" fill="none" stroke="currentColor" stroke-width="2" /></svg></button>
+ </div></div>
+</c:if>

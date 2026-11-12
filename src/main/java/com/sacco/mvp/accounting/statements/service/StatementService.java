@@ -22,6 +22,7 @@ import static com.sacco.mvp.accounting.statements.dto.StatementModels.*;
 @Service @RequiredArgsConstructor
 public class StatementService {
     private final StatementRepository repository;
+    private final com.sacco.mvp.accounting.statements.repository.StatementSetupRepository setupRepository;
     private final GeneralLedgerService access;
     private final ObjectMapper mapper;
     private final ApplicationClock clock;
@@ -46,16 +47,33 @@ public class StatementService {
     private UUID capture(AppUserPrincipal a,Parameters p,UUID key){
         UUID id=UUID.randomUUID();var now=clock.now();repository.create(id,a,p,now,key);
         require(repository.capture(id,a,p,now)<=100000,"limit");var balances=repository.balances(id,a.getSaccoId(),p);require(balances.size()<=2000,"limit");
-        var cash=repository.cash(id,p);require(cash.size()<=20000,"limit");var calculated=StatementCalculator.calculate(balances,cash,p);var identity=repository.identity(a);
-        var snapshot=new Snapshot(2,id,p,now,a.getSaccoId(),a.getStationId(),identity[0],identity[1],balances,calculated.position(),calculated.income(),calculated.cash(),calculated.equityColumns(),calculated.equity(),calculated.checks());
+        var cash=repository.cash(id,p);require(cash.size()<=20000,"limit");var setup=setupRepository.latest(a.getSaccoId()).map(v->mapper.readValue(v.payload(),com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Setup.class)).orElse(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Setup.empty());
+        var accountIds=new HashSet<UUID>();balances.forEach(b->accountIds.add(b.id()));
+        require(setup.components().stream().allMatch(c->accountIds.containsAll(c.accounts()))&&setup.notes().stream().allMatch(n->accountIds.containsAll(n.accounts())),"setupAccounts");
+        var movements=setupRepository.movements(id,p);require(movements.size()<=32000,"limit");
+        balances=notes(balances,setup);
+        var calculated=StatementCalculator.calculate(EquityStatementCalculator.incomeWithoutClosings(balances,movements),cash,p,false);var identity=repository.identity(a);
+        var equity=EquityStatementCalculator.calculate(balances,movements,setup);var checks=new ArrayList<>(calculated.checks());checks.removeIf(c->c.key().equals("equity"));checks.addAll(equity.checks());
+        if(setup.notes().isEmpty())checks.add(new Check("notesSetup",null));
+        else {var familyNotes=new HashMap<UUID,Set<Integer>>();for(var b:balances)if(b.mapping()!=null&&b.mapping().groupId()!=null)familyNotes.computeIfAbsent(b.mapping().groupId(),k->new HashSet<>()).add(b.mapping().note());if(familyNotes.values().stream().anyMatch(n->n.size()>1&&n.stream().anyMatch(i->i>0)))checks.add(new Check("notesLinks",null));}
+
+        var snapshot=new Snapshot(3,id,p,now,a.getSaccoId(),a.getStationId(),identity[0],identity[1],balances,profitNote(calculated.position(),setup),calculated.income(),calculated.cash(),equity.columns(),equity.current(),List.copyOf(checks),setup,equity.previous(),List.copyOf(movements));
         String payload=mapper.writeValueAsString(snapshot);require(payload.length()<=8*1024*1024,"limit");repository.payload(id,payload,sha(payload.getBytes(StandardCharsets.UTF_8)));
         log(a,id,"PREVIEW");return id;
+    }
+    private static List<Row> profitNote(List<Row> rows,com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Setup setup){
+        int note=setup.notes().stream().filter(n->n.includeProfit()).mapToInt(n->n.number()).findFirst().orElse(0);
+        if(note==0)return rows;return rows.stream().map(r->r.key().equals("earnings")?new Row(r.key(),r.code(),r.label(),note,r.section(),r.accounts(),r.current(),r.previous(),r.total()):r).toList();
+    }
+    private static List<Balance> notes(List<Balance> balances,com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Setup setup){
+        if(setup.version()==0)return balances;var byAccount=new HashMap<UUID,Integer>();for(var n:setup.notes())for(UUID id:n.accounts())byAccount.put(id,n.number());
+        return balances.stream().map(b->{var m=b.mapping();if(m==null)return b;var mapping=new Mapping(m.accountId(),m.line(),m.section(),m.cashSection(),m.equityComponent(),byAccount.getOrDefault(b.id(),0),"",m.groupId(),m.groupCode());return new Balance(b.id(),b.code(),b.name(),b.type(),b.purpose(),mapping,b.opening(),b.debit(),b.credit(),b.closing(),b.previousOpening(),b.previousDebit(),b.previousCredit(),b.previousClosing());}).toList();
     }
     @Transactional(readOnly=true)
     public Run get(AppUserPrincipal a,UUID id){
         authorize(a,false);var stored=repository.find(id,a).orElseThrow(()->new AccessDeniedException("Statement unavailable"));authorize(a,stored.wide());
         if(stored.payload()==null||!sha(stored.payload().getBytes(StandardCharsets.UTF_8)).equals(stored.checksum()))throw new IllegalStateException("Statement integrity check failed");
-        var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require((snapshot.version()==1||snapshot.version()==2)&&snapshot.id().equals(id),"snapshot");
+        var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require((snapshot.version()==1||snapshot.version()==2||snapshot.version()==3)&&snapshot.id().equals(id),"snapshot");
         return new Run(id,stored.from(),stored.through(),stored.generated(),stored.wide(),stored.saved(),snapshot);
     }
     @Transactional(readOnly=true)
