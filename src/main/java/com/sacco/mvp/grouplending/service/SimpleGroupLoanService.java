@@ -28,19 +28,6 @@ public class SimpleGroupLoanService {
     private final java.util.concurrent.Semaphore paperValidation=new java.util.concurrent.Semaphore(2);
     private void authorize(AppUserPrincipal a,String action){access.requireActor(a,"GROUP_LENDING_"+action);}
     @Transactional(readOnly=true) public Setup setup(AppUserPrincipal a,UUID group){authorize(a,"VIEW");return records.setup(a,group,false);}
-    @Transactional(readOnly=true) public RecordingContext recordingContext(AppUserPrincipal a,UUID group){
-        authorize(a,"VIEW");access.requireActor(a,"LOAN_RECORDING_CREATE");var setup=records.setup(a,group,false);
-        var borrowers=new LinkedHashMap<UUID,BorrowerInput>();
-        for(var row:records.profiles(a,group,clock.today())) {
-            var profile=row.get("profile")==null?new Profile():json.readValue(row.get("profile").toString(),Profile.class);
-            var missing=new ArrayList<String>();
-            if(profile.getMonthlyIncome()==null||profile.getMonthlyIncome().signum()<=0)missing.add("monthlyIncome");
-            if(profile.getMonthlyExpenses()==null||profile.getMonthlyExpenses().signum()<0)missing.add("monthlyExpenses");
-            if(profile.getMonthlyDebtRepayments()==null||profile.getMonthlyDebtRepayments().signum()<0)missing.add("monthlyDebtRepayments");
-            borrowers.put((UUID)row.get("id"),new BorrowerInput(incomeDocument(row).isBlank(),missing));
-        }
-        return new RecordingContext(setup,borrowers);
-    }
     private String incomeDocument(Map<String,Object> row){return row.get("income_document")==null?"":"CLIENT_DOCUMENT:"+row.get("income_document");}
     @Transactional(readOnly=true) public boolean hasHistory(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_RECORDING_VIEW");access.requireActor(a,"LOAN_DOCUMENTS_VIEW");authorize(a,"VIEW");return records.hasHistory(a,loan);}
     @Transactional(readOnly=true) public com.sacco.mvp.grouplending.dto.GroupLendingDtos.Page<HistoricalDocument> history(AppUserPrincipal a,UUID loan,int page){access.requireActor(a,"LOAN_RECORDING_VIEW");access.requireActor(a,"LOAN_DOCUMENTS_VIEW");authorize(a,"VIEW");check(page>=0&&page<=10000,"request");boolean coverage=a.getClaims().contains("GROUP_COVERAGE_VIEW");if(coverage)access.requireActor(a,"GROUP_COVERAGE_VIEW");var rows=records.history(a,loan,page,coverage);return new com.sacco.mvp.grouplending.dto.GroupLendingDtos.Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
@@ -123,8 +110,6 @@ public class SimpleGroupLoanService {
             var locks=new HashSet<UUID>(memberIds);guarantees.forEach(x->locks.add(x.getClientId()));records.lockClients(a,locks.stream().sorted().toList());
         }
         var rows=records.profiles(a,s.groupId(),clock.today());check(rows.size()==s.people().size(),"members");
-        check(g.getSigners()!=null&&g.getSigners().size()<=50,"signatures");
-        var people=new HashMap<UUID,SignerForm>();for(var signer:g.getSigners()){check(signer!=null&&signer.getClientId()!=null&&people.put(signer.getClientId(),signer)==null,"signatures");}
         if(submitting)check(g.getSignedOn()!=null&&!g.getSignedOn().isAfter(clock.today())&&!g.getSignedOn().isBefore(f.getApplicationDate()),"signatures");
         check(g.getDebts()!=null&&g.getDebts().size()<=50,"budget");
         var externalByClient=new HashMap<UUID,BigDecimal>();var debtReferences=new HashSet<String>();BigDecimal externalDebt=BigDecimal.ZERO;
@@ -141,7 +126,7 @@ public class SimpleGroupLoanService {
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
         for(var row:rows){
             UUID id=(UUID)row.get("id");check(row.get("revision")!=null&&row.get("profile")!=null,"budget");
-            var profile=json.readValue(row.get("profile").toString(),Profile.class);var signer=people.get(id);
+            var profile=json.readValue(row.get("profile").toString(),Profile.class);
             if(row.get("kyc")!=null)throw new IllegalArgumentException(row.get("kyc").toString());
             var e=exposures.get(id);check(e!=null&&e.missingHistory()==0&&e.pendingApplications()==0,"history");
             check(e.activeLoans()==0||(product.isApplicationWithActiveLoanAllowed()&&(product.getMaximumActiveLoans()==null||e.activeLoans()<product.getMaximumActiveLoans())),"activeLoans");
@@ -152,10 +137,11 @@ public class SimpleGroupLoanService {
             var values=new LinkedHashMap<String,String>();values.put("monthlyIncome",i.toPlainString());values.put("monthlyExpenses",x.toPlainString());values.put("otherDebtRepayments",d.toPlainString());
             values.put("businessOrEmploymentType",profile.getActivity());values.put("businessOrEmployerName","Employment".equals(profile.getActivity())?profile.getEmployerName():profile.getBusinessName());values.put("incomeSource",profile.getSourceOfFunds());
             f.getApplicationDetails().getGroupClientValues().add(values);
-            String source=incomeDocument(row);if(source.isBlank())source=signer==null?"":Objects.toString(signer.getIncomeSource(),"");
+            String source=incomeDocument(row);
             // The profile revision is the provenance of the recorded cash flow, not proof of independent verification.
             String budgetEvidence="CLIENT_PROFILE:"+row.get("revision");
-            if(submitting){check(signer!=null,"signatures");text(source,200);check(sources.add(source.strip().toLowerCase(Locale.ROOT)),"incomeSource");}
+            if(source.isBlank())source=budgetEvidence;
+            if(submitting){text(source,200);check(sources.add(source.strip().toLowerCase(Locale.ROOT)),"incomeSource");}
             var ratio=product.getResolvedMaxRepaymentToDisposableIncomeRatio();check(ratio!=null&&ratio.signum()>0&&ratio.compareTo(BigDecimal.ONE)<=0,"budget");
             capacity=capacity.add(disposable.multiply(ratio).setScale(2,RoundingMode.DOWN));income=income.add(i);expenses=expenses.add(x);debt=debt.add(d);
             assessments.add(new Assessment(id,(UUID)row.get("revision"),Objects.toString(row.get("member_no")),Objects.toString(row.get("full_name")),i,x,d,source.strip(),budgetEvidence));
@@ -163,11 +149,10 @@ public class SimpleGroupLoanService {
         debt=records.monthlyDebt(a,s.groupId()).add(externalDebt);
         capacity=income.subtract(expenses).subtract(debt).multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,RoundingMode.DOWN);
         BigDecimal monthly=LoanAmortizationCalculator.monthlyEquivalent(quote.maximumInstallment(),product.getResolvedRepaymentFrequency());check(capacity.signum()>0&&monthly.compareTo(capacity)<=0,"affordability");
-        check(f.getFirstPaymentDate()!=null&&f.getFirstPaymentDate().isAfter(f.getApplicationDate()),"request");
-        if(submitting){check(g.isChecked()&&people.keySet().equals(new HashSet<>(ids)),"signatures");text(g.getReference(),500);check(Set.of("EN","SW").contains(g.getLanguage()),"signatures");
+        if(submitting){check(g.isChecked(),"signatures");text(g.getReference(),500);check(Set.of("EN","SW").contains(g.getLanguage()),"signatures");
 
         }
-        f.setIncome(income);f.setExpenses(expenses);f.setOtherDebt(debt);f.setBusiness(s.name());f.setInformationSource(submitting?"DOCUMENTED":"DECLARED");
+        f.setIncome(income);f.setExpenses(expenses);f.setOtherDebt(debt);f.setBusiness(s.name());f.setInformationSource(submitting&&assessments.stream().allMatch(x->x.source().startsWith("CLIENT_DOCUMENT:"))?"DOCUMENTED":"DECLARED");
         String destination=json.writeValueAsString(Map.of("available",true,"destinationType",s.destinationType(),"provider",s.provider(),"accountHolderName",s.holder(),"accountIdentifier",s.identifier(),"sourceLabel","SIGNED_GROUP_INSTRUCTION"));
         return new Prepared(submitting?records.party(a,s.groupId()):null,s,assessments,capacity,destination);
     }
@@ -210,12 +195,13 @@ public class SimpleGroupLoanService {
     private void event(AppUserPrincipal a,UUID id,String action){audit.logEvent("GROUP_LENDING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"GROUP",id.toString(),a.getSaccoId(),a.getStationId(),Map.of());}
     private static void money(BigDecimal n,boolean positive){check(n!=null&&n.scale()<=2&&n.precision()-n.scale()<=16&&(positive?n.signum()>0:n.signum()>=0),"budget");}
     private static void validateDraft(RecordForm f){
-        check(f.getGroupApplication().getSigners()!=null&&f.getGroupApplication().getSigners().size()<=50&&f.getGroupApplication().getDebts()!=null&&f.getGroupApplication().getDebts().size()<=50,"request");
+        f.setFirstPaymentDate(null);
+        check(f.getGroupApplication().getDebts()!=null&&f.getGroupApplication().getDebts().size()<=50,"request");
         for(var debt:f.getGroupApplication().getDebts()){check(debt!=null&&debt.getReference()!=null&&debt.getReference().length()<=200&&debt.getClientIds()!=null&&debt.getClientIds().size()<=50,"request");if(debt.getMonthlyPayment()!=null)money(debt.getMonthlyPayment(),true);}
         check(f.getPurpose()!=null&&f.getPurpose().length()<=500&&f.getNotes()!=null&&f.getNotes().length()<=500,"request");
         if(f.getPrincipal()!=null)money(f.getPrincipal(),true);
         var details=f.getApplicationDetails();if(details!=null){check(details.getFields()!=null&&details.getFields().size()<=100&&details.getGuarantors()!=null&&details.getGuarantors().size()<=20&&details.getCollateral()!=null&&details.getCollateral().size()<=20,"request");check(details.getFields().values().stream().allMatch(v->v!=null&&v.length()<=1000),"request");}
-        var g=f.getGroupApplication();check(g.getReference()!=null&&g.getReference().length()<=500,"request");for(var s:g.getSigners())check(s!=null&&s.getIncomeSource()!=null&&s.getIncomeSource().length()<=200,"request");
+        var g=f.getGroupApplication();check(g.getReference()!=null&&g.getReference().length()<=500,"request");
     }
     private static void text(String s,int max){check(s!=null&&!s.isBlank()&&s.length()<=max&&s.codePoints().noneMatch(Character::isISOControl),"request");}
     private static void check(boolean ok,String error){if(!ok)throw new IllegalArgumentException("simpleGroup.error."+error);}

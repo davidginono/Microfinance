@@ -373,7 +373,7 @@ public class LoanRecordingService {
         if(Boolean.TRUE.equals(policy.get("disbursementProofRequired")))check(files.stream().anyMatch(file->!file.isEmpty()),"attachments");
         check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");LocalDate first=f.getFirstPaymentDate()!=null?f.getFirstPaymentDate():loan.getFirstRepaymentDate();
         check(first!=null,"date");
-        if(loan.getApplicantMemberId()==null)check(Objects.equals(first,loan.getFirstRepaymentDate()),"terms");
+        if(loan.getApplicantMemberId()==null&&loan.getFirstRepaymentDate()!=null)check(Objects.equals(first,loan.getFirstRepaymentDate()),"terms");
         check(!f.getEffectiveDate().isBefore(((java.sql.Date)record.get("application_date")).toLocalDate()) && first.isAfter(f.getEffectiveDate()),"date");
         UUID period=periods.period(a.getSaccoId(),f.getEffectiveDate(),a.getMemberId(),clock.now());
         var pendingCharges=charges.pending(loan);
@@ -560,7 +560,7 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public List<Map<String,Object>> attachments(AppUserPrincipal a,UUID id){authorize(a,"VIEW");records.record(a,id,false);return attachments.parse(loans.findById(id).orElseThrow().getAttachmentsJson());}
     @Transactional(readOnly=true) public LoanAttachmentService.AttachmentResource attachment(AppUserPrincipal a,UUID id,String attachmentId){authorize(a,"VIEW");records.record(a,id,false);return attachments.load(id,attachmentId,loans.findById(id).orElseThrow().getAttachmentsJson());}
     private void validateRecord(RecordForm f){validateRecord(f,false);}
-    private void validateRecord(RecordForm f,boolean organization){check(f!=null && f.getRequestKey()!=null && (organization?f.getClientId()==null:f.getClientId()!=null) && ("CUSTOM".equals(f.getLoanMode()) || f.getProductId()!=null) && Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"request");money(f.getPrincipal());f.setRequestedPrincipal(f.getPrincipal());f.setMonths(tenure(f).compatibilityMonths());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
+    private void validateRecord(RecordForm f,boolean organization){if(f!=null&&organization)f.setFirstPaymentDate(null);check(f!=null && f.getRequestKey()!=null && (organization?f.getClientId()==null:f.getClientId()!=null) && ("CUSTOM".equals(f.getLoanMode()) || f.getProductId()!=null) && Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"request");money(f.getPrincipal());f.setRequestedPrincipal(f.getPrincipal());f.setMonths(tenure(f).compatibilityMonths());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
         if("CONFIGURED".equals(f.getLoanMode())){f.setInterestEntry("PERCENTAGE");f.setInterestBasis("ANNUAL");f.setInterestPercent(null);f.setInterestAmount(null);}
         check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
         check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getExpenses(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}

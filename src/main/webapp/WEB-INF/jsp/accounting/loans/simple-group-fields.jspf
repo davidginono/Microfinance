@@ -5,16 +5,7 @@
 <form:select path="groupApplication.groupId" id="simple-group" cssClass="aws-control" data-choice-select="true" data-searchable="true"><option value=""><spring:message code="voucher.choose" /></option><c:if test="${not empty groupSetup}"><form:option value="${groupSetup.groupId}"><c:out value="${groupSetup.name}" /></form:option></c:if></form:select><%@ include file="choice-search.jspf" %></div>
 <noscript><button type="submit" name="action" value="groupLoad" formnovalidate class="app-btn btn-neutral"><spring:message code="simpleGroup.load" /></button></noscript>
 <form:hidden path="groupApplication.expectedVersion" />
-<label><spring:message code="recording.firstPaymentDate" text="First payment date" /><form:input path="firstPaymentDate" type="date" cssClass="aws-control" /></label>
 <div data-group-load-error role="alert" hidden><spring:message code="simpleGroup.error.load" /><button type="button" class="app-btn btn-neutral" data-group-retry><spring:message code="simpleGroup.retry" text="Retry" /></button></div>
-<div data-group-profile-labels hidden><c:forEach items="${['monthlyIncome','monthlyExpenses','monthlyDebtRepayments']}" var="key"><span data-profile-label="${key}"><spring:message code="kyc.field.${key}" /></span></c:forEach></div>
-<div data-group-roster aria-live="polite">
-<c:if test="${not empty groupSetup}"><p><spring:message code="simpleGroup.leader" />: <c:out value="${groupSetup.leader}" /></p><p><c:out value="${groupSetup.holder}" /> &middot; <c:out value="${groupSetup.provider}" /> &middot; <c:out value="${groupSetup.identifier}" /></p>
-<c:forEach items="${groupSetup.people}" var="person" varStatus="i"><div class="simple-group-borrower"><span><c:out value="${person.number}" /> &middot; <c:out value="${person.name}" /></span><form:hidden path="groupApplication.signers[${i.index}].clientId" />
-<c:set var="borrowerInput" value="${groupBorrowerInputs[person.id]}" />
-<c:if test="${not empty borrowerInput.missingProfileFields}"><p class="coa-error"><spring:message code="simpleGroup.profileMissing" /> <c:forEach items="${borrowerInput.missingProfileFields}" var="key" varStatus="field"><c:if test="${not field.first}">, </c:if><spring:message code="kyc.field.${key}" /></c:forEach></p></c:if>
-<c:if test="${borrowerInput.incomeEvidenceMissing}"><label><spring:message code="simpleGroup.incomeSource" /><form:input path="groupApplication.signers[${i.index}].incomeSource" maxlength="200" cssClass="aws-control" /></label></c:if></div></c:forEach></c:if>
-</div>
 <details data-group-debts><summary><spring:message code="simpleGroup.otherDebts" /></summary>
 <p><spring:message code="simpleGroup.debtHelp" /></p><div data-group-debt-list>
 <c:forEach items="${recordForm.groupApplication.debts}" var="debt" varStatus="d"><div class="loan-form-grid" data-group-debt>
