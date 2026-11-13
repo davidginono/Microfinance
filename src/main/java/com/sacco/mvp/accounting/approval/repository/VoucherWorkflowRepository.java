@@ -16,6 +16,35 @@ import java.util.*;
 
 @Repository @RequiredArgsConstructor
 public class VoucherWorkflowRepository {
+    public List<com.sacco.mvp.staffoffice.dto.OfficeWork.Task> officeWork(AppUserPrincipal a,List<String> types,List<String> roles,
+            boolean review,String search,String sort,int page) {
+        String order=switch(sort) {case "oldest"->"w.created_at,w.id";case "number"->"w.number,w.id";case "number_desc"->"w.number desc,w.id desc";default->"w.created_at desc,w.id desc";};
+        String eligibility=review ? """
+            w.approval='INITIATED' and w.owner_id<>:actor and w.stage<jsonb_array_length(w.stages)
+            and (w.stages->w.stage->>'claim') in (:claims)
+            and ((w.stages->w.stage->>'role') in (:roles) or
+                (w.stages->w.stage->>'role' is null and (w.stages->w.stage->>'memberId' is null
+                    or w.stages->w.stage->>'memberId'=:actorText)))
+            and not exists(select 1 from voucher_workflow_history h where h.workflow_id=w.id
+                and h.round=w.round and h.actor_id=:actor and h.action='APPROVE')
+            """ : "w.owner_id=:actor";
+        var params=new org.springframework.jdbc.core.namedparam.MapSqlParameterSource()
+            .addValue("institution",a.getSaccoId()).addValue("branch",a.getStationId()).addValue("actor",a.getMemberId())
+            .addValue("actorText",a.getMemberId().toString()).addValue("types",types)
+            .addValue("roles",roles.isEmpty()?List.of("__NONE__"):roles).addValue("claims",a.getClaims())
+            .addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25);
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+            select w.id,w.number,w.title,w.approval,w.validation,w.posting,w.total from voucher_workflow w
+            where w.sacco_id=:institution and w.station_id=:branch and w.type in (:types)
+            and w.posting not in ('POSTING','POSTED') and (
+            """+eligibility+") and (strpos(lower(w.number),:search)>0 or strpos(lower(w.title),:search)>0) order by "+order+" limit 26 offset :offset",
+            params,(r,n)->new com.sacco.mvp.staffoffice.dto.OfficeWork.Task(r.getString("number"),r.getString("title"),
+                review?"office.readyReview":r.getString("approval").equals("INITIATED")?"office.waitingReview":
+                    r.getString("posting").equals("FAILED")?"approval.status.FAILED":
+                    Set.of("NOT_REQUIRED","WORKFLOW_APPROVED","MANUALLY_APPROVED").contains(r.getString("approval"))&&r.getString("validation").equals("VALIDATED")
+                        ?"approval.status.READY":"approval.status."+r.getString("approval"),
+                r.getBigDecimal("total"),"/finance/approval/"+r.getObject("id",UUID.class)));
+    }
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     public void policyLock(AppUserPrincipal a, boolean exclusive) {

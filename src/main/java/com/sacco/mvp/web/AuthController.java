@@ -225,12 +225,14 @@ public class AuthController {
                 .orElseThrow(() -> new IllegalStateException("No active staff account matches that email address."));
             ensureSaccoAccessAllowed(user);
             emailOtpService.consumeOtp(normalizedEmail, EmailOtpPurpose.STAFF_LOGIN, otpCode);
-            signInPrincipal(new AppUserPrincipal(user,userClaimService.effectiveClaims(user.getId(), user.getActiveStaffRolesResolved(), user.isMemberAccess())), request);
+            var principal=new AppUserPrincipal(user,userClaimService.effectiveClaims(user.getId(), user.getActiveStaffRolesResolved(), user.isMemberAccess()));
+            signInPrincipal(principal, request);
             auditIdentityEvent(user.getId(), "LOGIN", "Login", "STAFF", "Staff " + displayStaffNo(user),
                 user.getSaccoId(), user.getStationId(), Map.of("method", "OTP", "staffNo", displayStaffNo(user)));
+            var saved=new org.springframework.security.web.savedrequest.HttpSessionRequestCache().getRequest(request,null);
             return ResponseEntity.ok(Map.of(
                 "valid", true,
-                "redirectUrl", WorkspaceLanding.staffDashboard(user)
+                "redirectUrl", WorkspaceLanding.afterLogin(principal,saved==null?null:saved.getRedirectUrl())
             ));
         } catch (IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of(

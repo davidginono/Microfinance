@@ -97,6 +97,35 @@ public class LoanRecordingRepository {
     public boolean personalGuaranteesReady(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select coalesce(lending_personal_guarantees_ready(id),false) from loan_applications where id=? and sacco_id=? and station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     public boolean recordedGuarantees(AppUserPrincipal a,UUID id,int required){return Boolean.TRUE.equals(jdbc.queryForObject("select count(distinct g.guarantor_member_id)>=? from guarantor_requests g join loan_applications l on l.id=g.loan_application_id where l.id=? and l.sacco_id=? and l.station_id=? and g.status='APPROVED'",Boolean.class,required,id,a.getSaccoId(),a.getStationId()));}
     private final JdbcTemplate jdbc;
+
+    public List<com.sacco.mvp.staffoffice.dto.OfficeWork.Task> officeReviews(AppUserPrincipal a,com.sacco.mvp.domain.Position group,String search,String sort,int page) {
+        String order=switch(sort) {case "oldest"->"l.created_at,l.id";case "number"->"coalesce(l.loan_id,l.application_number::text),l.id";case "number_desc"->"coalesce(l.loan_id,l.application_number::text) desc,l.id desc";default->"l.created_at desc,l.id desc";};
+        return jdbc.query("""
+            select l.id,coalesce(l.loan_id,l.application_number::text) number,b.full_name,l.amount
+            from loan_applications l
+            join loan_borrower_directory b on b.party_id=l.borrower_party_id and b.sacco_id=l.sacco_id
+            left join accountant_loan_record recorded on recorded.loan_id=l.id
+            join lateral(select * from loan_group_request r where r.loan_id=l.id and r.sacco_id=l.sacco_id
+                and r.station_id=l.station_id order by r.round desc limit 1) request on true
+            join loan_group_rule rule on rule.id=request.rule_id and rule.sacco_id=l.sacco_id and rule.station_id=l.station_id
+            join lateral(select step.value from jsonb_array_elements(rule.steps) with ordinality step(value,n)
+                where (select count(*) from loan_group_decision d where d.request_id=request.id and d.step=step.n-1
+                    and d.decision='APPROVE') < (step.value->>'approvals')::int
+                order by step.n limit 1) current_step on true
+            where l.sacco_id=? and l.station_id=? and l.status='SUBMITTED'
+                and request.terms_hash=loan_group_terms(l) and not retired_group_application(l.id)
+                and current_step.value->>'group'=?
+                and l.applicant_member_id is distinct from ?::uuid and recorded.actor_id is distinct from ?::uuid
+                and request.maker_id<>?::uuid and not loan_group_related(l.id,?::uuid)
+                and not exists(select 1 from loan_group_decision d where d.request_id=request.id
+                    and (d.decision='REJECT' or d.actor_id=?::uuid))
+                and (strpos(lower(coalesce(l.loan_id,l.application_number::text)),?)>0 or strpos(lower(b.full_name),?)>0)
+            """+" order by "+order+" limit 26 offset ?",
+            (r,n)->new com.sacco.mvp.staffoffice.dto.OfficeWork.Task(r.getString("number"),r.getString("full_name"),
+                "office.readyReview",r.getBigDecimal("amount"),"/finance/loan-records/"+r.getObject("id",UUID.class)+"/review"),
+            a.getSaccoId(),a.getStationId(),group.name(),a.getMemberId(),a.getMemberId(),a.getMemberId(),a.getMemberId(),a.getMemberId(),
+            search.toLowerCase(Locale.ROOT),search.toLowerCase(Locale.ROOT),page*25);
+    }
     private static final String LOANS="""
         select coalesce(c.outstanding,0) charges,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.party_id client_id,m.full_name,m.member_no,r.product_name,r.application_date,r.requested_principal,
         a.amount,a.status,(m.kind='CLIENT' and a.top_up_source_loan_id is null and a.status='DISBURSED' and coalesce(l.principal-l.principal_paid,0)>0 and coalesce((select loan_top_up_enabled from sacco_settings where sacco_id=a.sacco_id),true) and not exists(select 1 from loan_applications child where child.top_up_source_loan_id=a.id and child.status not in ('WITHDRAWN','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED','DISBURSEMENT_REVERSED','PAID'))) topup_eligible,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,

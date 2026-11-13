@@ -42,6 +42,8 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new com.sacco.mvp.staffoffice.controller.OfficeNavigation())
+            .addPathPatterns("/finance/**","/disbursement/**","/admin/**","/reports/**","/staff/analytics");
         var loginLocale=new org.springframework.web.servlet.i18n.LocaleChangeInterceptor();
         loginLocale.setParamName("lang");loginLocale.setHttpMethods("GET");
         registry.addInterceptor(loginLocale).addPathPatterns("/","/login","/system-admin/login");

@@ -586,6 +586,15 @@ public class LoanRecordingService {
         return records.recorded(actor,loan);
     }
     @Transactional(readOnly=true)
+    public com.sacco.mvp.staffoffice.dto.OfficeWork.Page officeFunding(AppUserPrincipal actor,String search,String sort,int page) {
+        accounting.requireActor(actor,actor.getClaims().contains("DISBURSEMENT_QUEUE_DISBURSE")?"DISBURSEMENT_QUEUE_DISBURSE":"DISBURSEMENT_QUEUE_VIEW");
+        var filter=new Filter(search,null,null,"READY_FOR_DISBURSEMENT",sort.equals("number")?"number_asc":sort,page,null);
+        filter(filter,false);
+        var rows=records.loans(actor,filter,clock.today(),26,page*25);
+        return new com.sacco.mvp.staffoffice.dto.OfficeWork.Page(rows.stream().limit(25).map(r->new com.sacco.mvp.staffoffice.dto.OfficeWork.Task(
+            r.number(),r.client(),"recording.status."+r.status(),r.principal(),"/disbursement/loan-applications/"+r.id())).toList(),page,rows.size()>25);
+    }
+    @Transactional(readOnly=true)
     public boolean allowedTeller(LoanApplication loan,UUID actor) {
         var policy=schedules.parseSummary(loan.getPolicySnapshot());
         if("GROUP_REVIEW_V1".equals(policy.get("recordingWorkflowVersion")))return true;

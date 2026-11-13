@@ -26,6 +26,12 @@ public class CurrentUserModelAdvice {
     private final PlatformSupportContactSettingsService platformSupportContactSettingsService;
     private final ObjectFactory<HttpServletRequest> requestFactory;
 
+    @ModelAttribute("staffOffices")
+    public java.util.List<com.sacco.mvp.staffoffice.model.StaffOffice> staffOffices(@AuthenticationPrincipal AppUserPrincipal principal) {
+        return principal==null || !principal.isStaffSession() || isJsonRequest() ? java.util.List.of()
+            : com.sacco.mvp.staffoffice.model.StaffOffice.assigned(principal.getStaffRoles());
+    }
+
     @ModelAttribute("currentMember")
     public CurrentUserView currentMember(@AuthenticationPrincipal AppUserPrincipal principal) {
         if (principal == null) {

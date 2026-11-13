@@ -81,6 +81,16 @@ class PasswordLoginIsolationTest {
             var filter = context.getBean(SecurityFilterChain.class).getFilters().stream()
                 .filter(UsernamePasswordAuthenticationFilter.class::isInstance).findFirst().orElseThrow();
             AuthenticationManager manager = (AuthenticationManager) ReflectionTestUtils.getField(filter, "authenticationManager");
+            var success=(org.springframework.security.web.authentication.AuthenticationSuccessHandler)ReflectionTestUtils.getField(filter,"successHandler");
+            for(var office:com.sacco.mvp.staffoffice.model.StaffOffice.values()) {
+                var staff=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").staffNo("NEW-STAFF")
+                    .fullName("New staff").position(office.getGroup()).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build();
+                var principal=new AppUserPrincipal(staff,java.util.Set.of());
+                var request=new MockHttpServletRequest("POST","/login");request.setParameter("loginType","staff-password");
+                var response=new org.springframework.mock.web.MockHttpServletResponse();
+                success.onAuthenticationSuccess(request,response,new UsernamePasswordAuthenticationToken(principal,null,List.of()));
+                assertThat(response.getRedirectedUrl()).isEqualTo(office.getDashboard());
+            }
 
             assertThatThrownBy(() -> login(manager, "", "dual.user")).isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "", "dual@example.com")).isInstanceOf(AuthenticationException.class);

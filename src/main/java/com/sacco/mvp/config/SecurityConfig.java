@@ -211,7 +211,7 @@ public class SecurityConfig {
                         principal, staffPasswordLogin, isSuperAdmin, isMinorAdmin, stationOtpSettingsService);
                     if (requireLoginMfa) {
                         if (principal != null) {
-                            String landing = savedTarget == null ? WorkspaceLanding.authenticatedDefault(principal) : savedTarget;
+                            String landing = WorkspaceLanding.afterLogin(principal,savedTarget);
                             try {
                                 staffMfaService.startChallenge(principal, landing, loginType, request);
                             } catch (IllegalStateException ex) {
@@ -233,7 +233,7 @@ public class SecurityConfig {
 
                     if (savedTarget != null) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Password login", null);
-                        response.sendRedirect(savedTarget);
+                        response.sendRedirect(WorkspaceLanding.afterLogin(principal,savedTarget));
                         return;
                     }
 
@@ -330,7 +330,7 @@ public class SecurityConfig {
                     String savedTarget = savedRequestTarget(request);
                     if (savedTarget != null) {
                         auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);
-                        response.sendRedirect(savedTarget);
+                        response.sendRedirect(WorkspaceLanding.afterLogin(principal,savedTarget));
                         return;
                     }
                     auditLogin(auditService, null, principal, AuditEventStatus.SUCCESS, "Google SSO", null);

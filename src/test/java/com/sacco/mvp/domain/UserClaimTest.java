@@ -9,11 +9,12 @@ class UserClaimTest {
         var groupClaims=java.util.Arrays.stream(UserClaim.values()).filter(c->c.getFeature()==AccessFeature.GROUP_LENDING).toList();
         assertThat(groupClaims).hasSize(9);
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()),true)).doesNotContainAnyElementsOf(groupClaims);
-        assertThat(UserClaim.matrixRows()).anyMatch(row->row.feature()==AccessFeature.GROUP_LENDING && row.claimsByAction().size()==9);
+        assertThat(UserClaim.matrixRows()).anyMatch(row->row.feature()==AccessFeature.GROUP_LENDING
+            && row.claimsByAction().size()==groupClaims.stream().filter(UserClaim::isAvailable).count());
         var member=Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B").position(Position.ACCOUNTANT)
             .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
         var actor=new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.GROUP_LENDING_VIEW));
-        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(actor)).isEqualTo("/finance/groups");
+        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(actor)).isEqualTo("/staff/offices/chief-accountant/dashboard");
     }
     @Test
     void obsoleteReportClaimsKeepIdentifiersButCannotBeAssignedOrLoaded() {
@@ -76,7 +77,7 @@ class UserClaimTest {
         var member = Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B")
             .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
         var principal = new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.ACCOUNTING_JOURNALS_VIEW));
-        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(principal)).isEqualTo("/finance/approval");
+        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(principal)).isEqualTo("/staff/offices/chief-accountant/dashboard");
     }
 
     @Test

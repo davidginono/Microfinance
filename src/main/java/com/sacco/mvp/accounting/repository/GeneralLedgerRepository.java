@@ -119,6 +119,14 @@ public class GeneralLedgerRepository {
         jdbc.update("insert into gl_account_approval_policy values(?,?,?,?,?,?,?,?,?)",institution,p.version(),p.createAutomatic(),p.updateAutomatic(),p.deactivateAutomatic(),p.reactivateAutomatic(),reason,actor,now);
     }
     private static final String VERSION_SELECT="select v.*,m.full_name creator_name,r.full_name reviewer_name from gl_account_version v join members m on m.id=v.creator_id left join members r on r.id=v.reviewer_id";
+    public List<com.sacco.mvp.staffoffice.dto.OfficeWork.Task> officeVersions(String institution,String branch,UUID actor,boolean review,String search,String sort,int page) {
+        String order=switch(sort){case "oldest"->"v.created_at,v.id";case "number"->"v.snapshot->>'code',v.id";case "number_desc"->"v.snapshot->>'code' desc,v.id desc";default->"v.created_at desc,v.id desc";};
+        return jdbc.query("select v.id,v.snapshot->>'code' code,v.snapshot->>'name' name,v.state from gl_account_version v where v.sacco_id=? and v.station_id=? and "
+            +(review?"v.state='PENDING' and v.creator_id<>?":"v.state='DRAFT' and v.creator_id=?")
+            +" and (strpos(lower(v.snapshot->>'code'),?)>0 or strpos(lower(v.snapshot->>'name'),?)>0) order by "+order+" limit 26 offset ?",
+            (r,n)->new com.sacco.mvp.staffoffice.dto.OfficeWork.Task(r.getString("code"),r.getString("name"),"coav.state."+r.getString("state"),null,
+                "/finance/accounts/versions/"+r.getObject("id",UUID.class)),institution,branch,actor,search.toLowerCase(java.util.Locale.ROOT),search.toLowerCase(java.util.Locale.ROOT),page*25);
+    }
     public Optional<Version> version(String institution,UUID id) {
         return jdbc.query(VERSION_SELECT+" where v.sacco_id=? and v.id=?",this::version,institution,id).stream().findFirst();
     }

@@ -6,16 +6,16 @@
 
 
 <c:choose>
-    <c:when test="${isPlatformAdminIdentity or not empty adminScope}">
+    <c:when test="${isPlatformAdminIdentity}">
         <c:set var="profileWorkspaceHome" value="/admin/dashboard" />
         <c:set var="profileWorkspaceLabel" value="Admin Tools" />
     </c:when>
-    <c:when test="${not empty staffDashboardHref}">
-        <c:set var="profileWorkspaceHome" value="${staffDashboardHref}" />
+    <c:when test="${not empty staffOffices}">
+        <c:set var="profileWorkspaceHome" value="${staffOffices[0].dashboard}" />
         <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
     </c:when>
     <c:otherwise>
-        <c:set var="profileWorkspaceHome" value="/staff/analytics" />
+        <c:set var="profileWorkspaceHome" value="/staff/dashboard" />
         <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
     </c:otherwise>
 </c:choose>

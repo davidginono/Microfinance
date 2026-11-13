@@ -47,8 +47,7 @@
 
             <c:if test="${staffWorkspace}">
                 <sec:authorize access="@access.isAdminScope(principal)">
-                    <c:choose>
-                        <c:when test="${isPlatformAdminIdentity}">
+                    <c:if test="${isPlatformAdminIdentity}">
                         <c:set var="platformSaccosActive" value="${requestUri eq '/admin/saccos' or (fn:startsWith(requestUri, '/admin/saccos/') and requestUri ne '/admin/saccos/registry' and not fn:startsWith(requestUri, '/admin/saccos/minor-admins'))}" />
                         <c:set var="platformSettingsActive" value="${fn:startsWith(requestUri, '/admin/platform-settings')}" />
                         <c:set var="saccoRegistryActive" value="${requestUri eq '/admin/saccos/registry' or requestUri eq '/admin/saccos/new' or fn:startsWith(requestUri, '/admin/saccos/minor-admins')}" />
@@ -105,130 +104,20 @@
                             <span class="inline-flex h-7 w-7 items-center justify-center border ${fn:startsWith(requestUri, '/admin/incidents') ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 012 0v1.07A7.002 7.002 0 0117 10a7 7 0 11-14 0 7.002 7.002 0 016-6.93V2zm1 4a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z"/></svg></span>
                             <spring:message code="menu.admin.incidents" text="Incidents" />
                         </a>
-                    </c:when>
-                    <c:otherwise>
-                        <div class="shell-sidebar-nav-heading"><span>Overview</span></div>
-                        <a href="/admin/dashboard" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/dashboard' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3l7 4v6l-7 4-7-4V7l7-4z"/></svg></span>
-                            <spring:message code="admin.dashboard.title" text="Admin Dashboard" />
-                        </a>
-                        <div class="shell-sidebar-nav-heading"><span>Administration</span></div>
-                        <a href="/admin/messages" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${(fn:startsWith(requestUri, '/admin/messages') or fn:startsWith(requestUri, '/admin/incidents')) ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${(fn:startsWith(requestUri, '/admin/messages') or fn:startsWith(requestUri, '/admin/incidents')) ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 012 0v1.07A7.002 7.002 0 0117 10a7 7 0 11-14 0 7.002 7.002 0 016-6.93V2zm1 4a1 1 0 00-1 1v4a1 1 0 102 0V7a1 1 0 00-1-1z"/></svg></span>
-                            Incidents
-                        </a>
-                        <a href="/admin/users" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/users' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/users' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 8a7 7 0 1114 0H3z"/></svg></span>
-                            <spring:message code="menu.admin.usersRoles" text="Users & Roles" />
-                        </a>
-                        <a href="/admin/saccos" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/saccos' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/saccos' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2l8 4v8l-8 4-8-4V6l8-4zm0 2.236L4 7v6l6 3 6-3V7l-6-2.764z"/></svg></span>
-                            <spring:message code="menu.admin.stationRegistry" text="Branch Registry" />
-                        </a>
-                        <a href="/admin/outbox" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/outbox' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h14v4H3V3zm0 6h14v8H3V9zm3 2v4h2v-4H6z"/></svg></span>
-                            <spring:message code="menu.admin.outboxMonitor" text="Outbox Monitor" />
-                        </a>
-                        <a href="/admin/sms-usage" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/sms-usage' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M3 4a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H9.5L5 18v-4a2 2 0 01-2-2V4zm3 2v1.5h8V6H6zm0 3v1.5h6V9H6z"/></svg></span>
-                            SMS Usage
-                        </a>
-                        <a href="/admin/events" class="group flex items-center gap-3 border px-3 py-2.5 text-sm font-semibold transition ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${requestUri eq '/admin/events' ? 'border-cyan-200 bg-cyan-100 text-cyan-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V8.414A2 2 0 0016.414 7L13 3.586A2 2 0 0011.586 3H5z"/></svg></span>
-                            <spring:message code="menu.admin.eventLog" text="Event Log" />
-                        </a>
-                        </c:otherwise>
-                    </c:choose>
+                    </c:if>
                 </sec:authorize>
             </c:if>
 
             <c:if test="${staffWorkspace}">
-                <sec:authorize access="@access.staffDashboardAccess(principal)" var="showUnifiedStaffDashboard" /><c:if test="${showUnifiedStaffDashboard}">
-                <div class="px-3 pb-1 pt-3">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="menu.reviewPanels" text="Review Panels" /></p>
-                </div>
-                <c:set var="showStaffAnalyticsPanel" value="false" />
-                <sec:authorize access="@authz.staffAnalyticsAccess(principal)">
-                    <c:set var="showStaffAnalyticsPanel" value="true" />
-                </sec:authorize>
-                <c:set var="staffDashboardHref" value="/staff/dashboard" />
-                <c:set var="staffDashboardActive" value="${requestUri eq staffDashboardHref}" />
-                <c:set var="staffReportsActive" value="${requestUri eq '/staff/analytics'}" />
-                <div class="shell-sidebar-group space-y-1">
-                    <a href="${staffDashboardHref}"
-                       class="shell-review-panel-link group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${staffDashboardActive ? 'shell-nav-active border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-white hover:text-slate-900'}">
-                        <span class="inline-flex h-7 w-7 items-center justify-center border ${staffDashboardActive ? 'border-slate-300 bg-slate-100 text-sacco-ink' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3a1 1 0 011-1h2a1 1 0 011 1v14H4a1 1 0 01-1-1V3zm5 6a1 1 0 011-1h2a1 1 0 011 1v8H8V9zm5-4a1 1 0 011-1h2a1 1 0 011 1v12h-4V5z"/></svg></span>
-                        <span class="min-w-0 flex-1">
-                            <spring:message code="menu.staffDashboard" text="Staff Dashboard" />
-                        </span>
-                    </a>
-                </div>
-                <c:if test="${showStaffAnalyticsPanel}">
-                    <div class="shell-sidebar-group space-y-1">
-                        <a href="/staff/analytics"
-                           class="shell-review-panel-link group flex w-full items-center gap-3 border px-3 pb-4 pt-3 text-left text-sm font-semibold transition ${staffReportsActive ? 'shell-nav-active border-slate-300 bg-white text-sacco-ink shadow-sm' : 'border-slate-200 bg-transparent text-slate-700 hover:bg-white hover:text-slate-900'}">
-                            <span class="inline-flex h-7 w-7 items-center justify-center border ${staffReportsActive ? 'border-slate-300 bg-slate-100 text-sacco-ink' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V7.414A1 1 0 0016.707 6L14 3.293A1 1 0 0013.293 3H4zm2 9h2v3H6v-3zm3-4h2v7H9V8zm3 2h2v5h-2v-5z"/></svg></span>
-                            <span class="min-w-0 flex-1 leading-5">
-                                <spring:message code="menu.staffReportsAnalytics" text="Staff Reports and Analytics" />
-                            </span>
-                        </a>
-                    </div>
-                </c:if>
-
-            </c:if>
-
-
+                <%@ include file="staff-offices.jspf" %>
 
             <sec:authorize access="@access.hasAny(principal, 'GROUP_LENDING_VIEW', 'LOAN_RECORDING_VIEW', 'LOAN_ADJUSTMENTS_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'VOUCHER_WORKSPACE_VIEW', 'VOUCHER_RULE_VIEW', 'ACCOUNTING_ACCOUNT_RULES_VIEW', 'PAYROLL_DEDUCTIONS_VIEW', 'APPROVAL_FLOW_VIEW')">
-                <sec:authorize access="@access.has(principal, 'VOUCHER_WORKSPACE_VIEW')">
-                <c:set var="accountantOfficeActive" value="${(fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration'))}" />
-                <div class="px-3 pb-1 pt-3">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.accountant" text="Accountant" /></p>
-                </div>
-                <div class="shell-sidebar-group space-y-1">
-                    <button type="button"
-                            id="accountantOfficeToggle"
-                            class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${accountantOfficeActive ? 'border-teal-200 bg-teal-50 text-teal-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-teal-800'}"
-                            aria-expanded="true" data-menu-active="${accountantOfficeActive ? 'true' : 'false'}"
-                            aria-controls="accountantOfficePanel">
-                        <span class="inline-flex h-7 w-7 items-center justify-center border ${accountantOfficeActive ? 'border-teal-200 bg-teal-100 text-teal-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12l-3-1.5L10 16l-3-1.5L4 16V4z"/></svg></span>
-                        <span class="min-w-0 flex-1"><spring:message code="menu.accountantOffice" text="Accountant Office" /></span>
-                        <svg id="accountantOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${accountantOfficeActive ? 'text-teal-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                    <div id="accountantOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-    <sec:authorize access="@access.has(principal, 'VOUCHER_WORKSPACE_VIEW')"><a href="<c:url value='/finance/approval' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.workspace" /></a></sec:authorize>
-
-                    </div>
-                </div>
-                </sec:authorize>
                 <%@ include file="finance-navigation.jspf" %>
             </sec:authorize>
             <sec:authorize access="@access.canAccessDisbursementArea(principal)">
-                <c:set var="disbursementOfficeActive" value="${fn:startsWith(requestUri, '/disbursement')}" />
-                <div class="px-3 pb-1 pt-3">
-                    <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><spring:message code="role.disbursement" text="Disbursement" /></p>
-                </div>
-                <div class="shell-sidebar-group space-y-1">
-                    <button type="button"
-                            id="disbursementOfficeToggle"
-                            class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${disbursementOfficeActive ? 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-sm' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-emerald-800'}"
-                            aria-expanded="true" data-menu-active="${disbursementOfficeActive ? 'true' : 'false'}"
-                            aria-controls="disbursementOfficePanel">
-                        <span class="inline-flex h-7 w-7 items-center justify-center border ${disbursementOfficeActive ? 'border-emerald-200 bg-emerald-100 text-emerald-700' : 'border-slate-200 bg-white text-slate-500'}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M3 5h14v3H3V5zm1 5h12v5H4v-5zm2 1.5v2h4v-2H6z"/></svg></span>
-                        <span class="min-w-0 flex-1"><spring:message code="menu.disbursementOffice" text="Disbursement Office" /></span>
-                        <svg id="disbursementOfficeChevron" xmlns="http://www.w3.org/2000/svg" class="rotate-180 h-4 w-4 transition-transform duration-200 ${disbursementOfficeActive ? 'text-emerald-700' : 'text-slate-400'}" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.512a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                    <div id="disbursementOfficePanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
-                        <a href="/disbursement/dashboard" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/disbursement/dashboard' ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementDashboard" text="Disbursement Dashboard" /></a>
-                        <a href="/disbursement/loan-applications?filter=READY_FOR_DISBURSEMENT" class="block px-3 py-2 text-sm font-semibold transition ${fn:startsWith(requestUri, '/disbursement/loan-applications') ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementQueue" text="Disbursement Queue" /></a>
-                        <a href="/disbursement/archive" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/disbursement/archive' ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementArchive" text="Disbursement Archive" /></a>
-                        <a href="/disbursement/reports" class="block px-3 py-2 text-sm font-semibold transition ${requestUri eq '/disbursement/reports' ? 'bg-white text-emerald-800 ring-1 ring-emerald-100 shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"><spring:message code="menu.disbursementReports" text="Disbursement Reports" /></a>
-                    </div>
-                </div>
+                <div class="shell-sidebar-nav-heading"><span><spring:message code="office.funding" /></span></div>
+                <a href="<c:url value='/disbursement/loan-applications' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/disbursement/loan-applications') ? 'shell-nav-active' : ''}"><spring:message code="menu.disbursementQueue" /></a>
+                <a href="<c:url value='/disbursement/archive' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq '/disbursement/archive' ? 'shell-nav-active' : ''}"><spring:message code="menu.disbursementArchive" /></a>
             </sec:authorize>
                 <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_VIEW')"><a href="<c:url value='/finance/clients/onboarding'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/clients/onboarding')?'shell-nav-active':''}"><spring:message code="kyc.title"/></a></sec:authorize>
             </c:if>
@@ -372,3 +261,4 @@
 <main id="main-content" class="app-main shell-main box-border" tabindex="-1">
     <script>window.WorkspaceNavigation?.prepare(document.getElementById('main-content'));</script>
     <div class="shell-content-frame mx-auto min-w-0 space-y-4">
+        <%@ include file="office-return.jspf" %>

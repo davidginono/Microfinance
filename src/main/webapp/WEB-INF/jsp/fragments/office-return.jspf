@@ -1,0 +1,6 @@
+<c:if test="${not empty officeReturnContext}">
+    <nav class="erp-page-path" data-office-return><a href="<c:url value='${officeReturnContext.href}' />"><spring:message code="${officeReturnContext.labelKey}" /></a>
+        <template data-office-return-fields><c:forEach items="${officeReturnContext.parameters}" var="field"><input type="hidden" name="<c:out value='${field.key}' />" value="<c:out value='${field.value}' />" /></c:forEach></template>
+    </nav>
+    <script src="<c:url value='/js/staff-office.js' />" defer></script>
+</c:if>

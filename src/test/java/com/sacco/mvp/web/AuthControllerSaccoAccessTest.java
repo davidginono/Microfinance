@@ -104,6 +104,16 @@ class AuthControllerSaccoAccessTest {
     private AuthController controller() {
         return new AuthController(saccoRegistryService,emailOtpService,memberDirectoryService,userClaimService,adminScopeService,passwordEncoder,auditService);
     }
+    @Test void staffOtpUsesAssignedOfficesWithNoProfileOrOperationalClaims() {
+        for(var office:com.sacco.mvp.staffoffice.model.StaffOffice.values()) {
+            var staff=staff(office.getGroup());staff.setStaffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE);
+            when(memberDirectoryService.findByEmail(staff.getEmail())).thenReturn(Optional.of(staff));
+            when(userClaimService.effectiveClaims(staff.getId(),staff.getActiveStaffRolesResolved(),false)).thenReturn(java.util.Set.of());
+            var response=controller().verifyStaffLoginOtp(staff.getEmail(),"123456",new MockHttpServletRequest());
+            assertThat(response.getBody()).containsEntry("valid",true).containsEntry("redirectUrl",office.getDashboard());
+        }
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 
     private Member member(boolean memberAccess) {
         return Member.builder()

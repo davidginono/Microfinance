@@ -29,6 +29,25 @@ public class VoucherWorkflowService {
     private final UserClaimService claims;
 
     public void authorize(AppUserPrincipal a,String claim) {gate.authorize(a,claim);}
+    @Transactional(readOnly=true)
+    public com.sacco.mvp.staffoffice.dto.OfficeWork.Page officeWork(AppUserPrincipal a,com.sacco.mvp.staffoffice.model.StaffOffice office,
+            boolean review,String search,String sort,int page) {
+        authorize(a,"VOUCHER_WORKSPACE_VIEW");
+        require(search!=null&&search.length()<=100&&page>=0&&page<=10000&&Set.of("newest","oldest","number","number_desc").contains(sort),"input");
+        var member=members.find(a.getMemberId()).orElseThrow(()->new AccessDeniedException("Staff assignment unavailable"));
+        if(!com.sacco.mvp.staffoffice.model.StaffOffice.assigned(member.getActiveStaffRolesResolved()).contains(office))
+            throw new AccessDeniedException("Current office assignment required");
+        var live=EnumSet.noneOf(UserClaim.class);
+        claims.effectiveClaims(member.getId(),member.getActiveStaffRolesResolved(),false).stream()
+            .filter(c->a.getClaims().contains(c.name())).forEach(live::add);
+        var effective=new AppUserPrincipal(member,live);
+        var types=Arrays.stream(Type.values()).filter(t->a.getClaims().contains(t==Type.JOURNAL?"ACCOUNTING_JOURNALS_VIEW":"ACCOUNTING_BUSINESS_VIEW")).toList();
+        if(types.isEmpty())throw new AccessDeniedException("Voucher type unavailable");
+        for(var type:types)vouchers.authorize(a,type,"VIEW");
+        var roles=office.getAliases().stream().filter(member.getActiveStaffRolesResolved()::contains).map(Enum::name).toList();
+        var rows=repository.officeWork(effective,types.stream().map(Enum::name).toList(),roles,review,search,sort,page);
+        return new com.sacco.mvp.staffoffice.dto.OfficeWork.Page(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
     private void viewAccess(AppUserPrincipal a,Type type) {authorize(a,"VOUCHER_WORKSPACE_VIEW");vouchers.authorize(a,type,"VIEW");}
     @Transactional(readOnly=true)
     public Page list(AppUserPrincipal a,Type type,String search,String category,String sort,int page,int size) {

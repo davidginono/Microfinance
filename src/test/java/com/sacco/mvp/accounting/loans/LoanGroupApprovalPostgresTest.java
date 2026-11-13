@@ -49,6 +49,32 @@ class LoanGroupApprovalPostgresTest {
     UUID submit(){UUID key=UUID.randomUUID();service.submit(f.actor,loan,key);return key;}
     void decide(AppUserPrincipal p,UUID request,String decision){service.decide(p,loan,request,UUID.randomUUID(),decision,"Synthetic independent paper review","Synthetic paper reference");}
     String status(){return f.jdbc.queryForObject("select status from loan_applications where id=?",String.class,loan);}
+    List<String> queue(AppUserPrincipal actor,Position group) {
+        return service.officeReviews(actor,group,"","number",0).rows().stream().map(com.sacco.mvp.staffoffice.dto.OfficeWork.Task::href).toList();
+    }
+    @Test void officeQueueUsesFrozenOrderedGroupsAndExcludesPeopleWhoAlreadyDecided() {
+        var request=submit();rule(1,1);
+        String href="/finance/loan-records/"+loan+"/review";
+        assertThat(queue(first,Position.ACCOUNTANT)).contains(href);
+        assertThat(queue(manager,Position.MANAGER)).isEmpty();
+        decide(first,request,"APPROVE");
+        assertThat(queue(first,Position.ACCOUNTANT)).isEmpty();
+        assertThat(queue(second,Position.ACCOUNTANT)).contains(href);
+        assertThat(queue(manager,Position.MANAGER)).isEmpty();
+        decide(second,request,"APPROVE");
+        assertThat(queue(manager,Position.MANAGER)).contains(href);
+        decide(manager,request,"APPROVE");
+        assertThat(queue(manager,Position.MANAGER)).isEmpty();
+    }
+    @Test void officeQueueFollowsTheLatestRoundAndNeverReturnsAnotherBranch() {
+        var request=submit();decide(first,request,"REJECT");
+        assertThat(queue(second,Position.ACCOUNTANT)).isEmpty();
+        submit();assertThat(queue(second,Position.ACCOUNTANT)).hasSize(1);
+        var repository=new LoanRecordingRepository(f.jdbc);
+        assertThat(repository.officeReviews(f.operator("B2"),Position.ACCOUNTANT,"","number",0)).isEmpty();
+        assertThatThrownBy(()->queue(first,Position.MANAGER)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.officeReviews(first,Position.ACCOUNTANT,"","number",10001)).isInstanceOf(IllegalArgumentException.class);
+    }
     int count(String table){return f.jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Integer.class,f.institution);}
     @Test void staffRecordedIndividualApplicationUsesItsSignedPaperAndTheSameIndependentGroups(){
         var form=individual();form.setApplicationDetails(new ApplicationDetails());form.getApplicationDetails().setDocumentTypes(List.of("SIGNED_APPLICATION"));form.getApplicationDetails().setDocumentNames(List.of("Synthetic signed application"));

@@ -229,8 +229,6 @@ public class StaffMfaController {
         if (completion == null || completion.principal() == null) {
             return "/";
         }
-        return completion.landing() != null && !completion.landing().isBlank()
-            ? completion.landing()
-            : WorkspaceLanding.authenticatedDefault(completion.principal());
+        return WorkspaceLanding.afterLogin(completion.principal(),completion.landing());
     }
 }

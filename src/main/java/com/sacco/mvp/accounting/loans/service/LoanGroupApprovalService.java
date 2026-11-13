@@ -24,6 +24,17 @@ public class LoanGroupApprovalService {
     private final ObjectMapper json;
     private final LoanRecordingService recording;
     private final SaccoConfigurationService products;
+
+    @Transactional(readOnly=true)
+    public com.sacco.mvp.staffoffice.dto.OfficeWork.Page officeReviews(AppUserPrincipal a,Position group,String search,String sort,int page) {
+        access.requireActor(a,"LOAN_RECORDING_VIEW");
+        if(a.getClaims().contains("LOAN_RECORDING_APPROVE"))access.requireActor(a,"LOAN_RECORDING_APPROVE");
+        else access.requireActor(a,"LOAN_RECORDING_REJECT");
+        require(search!=null&&search.length()<=100&&page>=0&&page<=10000&&Set.of("newest","oldest","number","number_desc").contains(sort),"filter");
+        if(!currentGroups(a).contains(group))throw new AccessDeniedException("Current approval group required");
+        var rows=records.officeReviews(a,group,search,sort,page);
+        return new com.sacco.mvp.staffoffice.dto.OfficeWork.Page(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
     @Transactional(readOnly=true)
     public GroupRuleForm customRule(AppUserPrincipal a) {
         access.requireActor(a,"APPROVAL_FLOW_VIEW");

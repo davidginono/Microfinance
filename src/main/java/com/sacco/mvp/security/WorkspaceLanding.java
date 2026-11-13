@@ -1,73 +1,35 @@
 package com.sacco.mvp.security;
 
-import com.sacco.mvp.domain.Member;
-import com.sacco.mvp.domain.UserClaim;
+import com.sacco.mvp.domain.Position;
+import com.sacco.mvp.staffoffice.model.StaffOffice;
+import java.util.Collection;
 
 public final class WorkspaceLanding {
-    private WorkspaceLanding() {
-    }
-
-    public static String staffDashboard(Member member) {
-        if (member == null) {
-            return "/login";
-        }
-        return staffDashboard(UserClaim.defaultClaims(member.getActiveStaffRolesResolved(), member.isMemberAccess()));
-    }
-
+    private WorkspaceLanding() {}
     public static String staffDashboard(AppUserPrincipal principal) {
-        if (principal == null) {
-            return "/login";
-        }
-        if (hasClaim(principal, UserClaim.ADMIN_DASHBOARD_VIEW)) {
-            return "/admin/dashboard";
-        }
-        String landing = staffDashboard(principal.getClaims());
-        if (landing != null) {
-            return landing;
-        }
-        return "/profile";
+        return principal==null || !principal.isStaffSession() ? "/login" : staffDashboard(principal.getStaffRoles());
     }
-
-    public static String authenticatedDefault(AppUserPrincipal principal) {
-        if (principal == null) {
-            return "/login";
-        }
-        if (principal.isStaffSession()) {
-            return staffDashboard(principal);
-        }
-        return "/login";
+    private static String staffDashboard(Collection<Position> roles) {
+        if(roles.contains(Position.ADMIN)) return "/admin/dashboard";
+        return StaffOffice.assigned(roles).stream().findFirst().map(StaffOffice::getDashboard).orElse("/staff/dashboard");
     }
-
-    private static String staffDashboard(java.util.Collection<?> claims) {
-        if (hasClaim(claims, UserClaim.LOAN_RECORDING_VIEW)) return "/finance/loan-records";
-        if (hasClaim(claims, UserClaim.DISBURSEMENT_QUEUE_VIEW) || hasClaim(claims, UserClaim.DISBURSEMENT_QUEUE_DISBURSE)) {
-            return "/disbursement/dashboard";
-        }
-        if (hasClaim(claims, UserClaim.VOUCHER_WORKSPACE_VIEW)) {
-            return "/finance/approval";
-        }
-        if (hasClaim(claims, UserClaim.VOUCHER_RULE_VIEW)) {
-            return "/finance/approval/configuration";
-        }
-        if (hasClaim(claims, UserClaim.GROUP_LENDING_VIEW)) {
-            return "/finance/groups";
-        }
-        if(hasClaim(claims,UserClaim.CLIENT_ONBOARDING_VIEW))return "/finance/clients/onboarding";
-        if(hasClaim(claims,UserClaim.GUARANTOR_CAPACITY_VIEW))return "/finance/credit/guarantors";
-        if(hasClaim(claims,UserClaim.COLLATERAL_VIEW))return "/finance/credit/collateral";
-        if(hasClaim(claims,UserClaim.COLLECTIONS_VIEW))return "/finance/credit/collections";
-        if(hasClaim(claims,UserClaim.CREDIT_CONTROLS_VIEW))return "/finance/credit/policy";
-        return null;
-    }
-
-    private static boolean hasClaim(AppUserPrincipal principal, UserClaim claim) {
-        return principal.getClaims() != null && principal.getClaims().contains(claim.name());
-    }
-
-    private static boolean hasClaim(java.util.Collection<?> claims, UserClaim claim) {
-        if (claims == null || claim == null) {
-            return false;
-        }
-        return claims.contains(claim) || claims.contains(claim.name());
+    public static String authenticatedDefault(AppUserPrincipal principal) { return staffDashboard(principal); }
+    public static String afterLogin(AppUserPrincipal principal,String savedTarget) {
+        String fallback=authenticatedDefault(principal);
+        if(principal==null||!principal.isStaffSession()||savedTarget==null||savedTarget.isBlank()||savedTarget.startsWith("//"))return fallback;
+        try {
+            var uri=java.net.URI.create(savedTarget);String path=uri.getPath();
+            if(path==null||!path.startsWith("/")||path.startsWith("//")||path.indexOf('\\')>=0)return fallback;
+            for(String retired:java.util.List.of("/app","/manager","/accountant","/chairperson","/board","/credit-committee","/loan-officer","/select-sacco"))
+                if(path.equals(retired)||path.startsWith(retired+"/"))return fallback;
+            if(path.startsWith("/staff/offices/")) {
+                var parts=path.substring("/staff/offices/".length()).split("/");
+                var office=parts.length==2?StaffOffice.fromSlug(parts[0]).orElse(null):null;
+                if(office==null||!StaffOffice.assigned(principal.getStaffRoles()).contains(office)
+                    ||!java.util.Set.of("dashboard","queue","reports").contains(parts[1]))return fallback;
+            }
+            // Saved requests are returned on this application. Destination services still check claims and record scope.
+            return uri.getRawPath()+(uri.getRawQuery()==null?"":"?"+uri.getRawQuery());
+        }catch(IllegalArgumentException invalid){return fallback;}
     }
 }

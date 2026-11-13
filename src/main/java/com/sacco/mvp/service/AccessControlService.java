@@ -137,9 +137,7 @@ public class AccessControlService {
         return isStaffSession(principal) && notPlatformIdentity(principal)
             && principal.getSaccoId()!=null && !principal.getSaccoId().isBlank()
             && principal.getStationId()!=null && !principal.getStationId().isBlank()
-            && (has(principal,UserClaim.LOAN_RECORDING_VIEW) || has(principal,UserClaim.DISBURSEMENT_QUEUE_VIEW) || hasAny(principal, UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
-                UserClaim.ACCOUNTING_BUSINESS_CREATE, UserClaim.ACCOUNTING_JOURNALS_CREATE)
-                || (isWorkspaceAdminScope(principal) && has(principal, UserClaim.ADMIN_DASHBOARD_VIEW)));
+            && !com.sacco.mvp.staffoffice.model.StaffOffice.assigned(principal.getStaffRoles()).isEmpty();
     }
 
     public boolean canAccessDisbursementArea(AppUserPrincipal principal) {

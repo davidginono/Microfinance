@@ -26,10 +26,9 @@ class DashboardWorkServiceTest {
     final DashboardWorkService service=new DashboardWorkService(repository,new AccessControlService(),vouchers,voucherAccess,clock);
     @BeforeEach void setup(){when(clock.now()).thenReturn(now);}
     AppUserPrincipal actor(Position role,String branch,boolean staff,UserClaim... claims){return (staff ? new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(role).memberAccount(!staff).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims))) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId(branch).position(role).memberAccount(!staff).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),new HashSet<>(List.of(claims))));}
-    @Test void missingScopeAndUnrelatedClaimsCannotReadCounts(){
-        for(var a:List.of(actor(Position.ACCOUNTANT,null,true,UserClaim.ACCOUNTANT_QUEUE_VIEW),actor(Position.ACCOUNTANT,"B1",true))){
-            assertThatThrownBy(()->service.read(a,0,BigDecimal.ZERO)).isInstanceOf(AccessDeniedException.class);
-        }
+    @Test void missingScopeIsDeniedAndAnEmptyAssignmentReadsNoBusinessCounts(){
+        assertThatThrownBy(()->service.read(actor(Position.ACCOUNTANT,null,true,UserClaim.ACCOUNTANT_QUEUE_VIEW),0,BigDecimal.ZERO)).isInstanceOf(AccessDeniedException.class);
+        assertThat(service.read(actor(Position.ACCOUNTANT,"B1",true),0,BigDecimal.ZERO).infolets()).isEmpty();
         verifyNoInteractions(repository,vouchers,voucherAccess);
     }
     @Test void invalidAndExtremeDisplayFiltersFailBeforePersistence(){
@@ -47,7 +46,7 @@ class DashboardWorkServiceTest {
     }
     @Test void boardCountsRetainTheReviewerAndStageScope(){
         var a=actor(Position.BOARD,"B1",true,UserClaim.BOARD_QUEUE_VIEW);
-        assertThatThrownBy(()->service.read(a,0,BigDecimal.ZERO)).isInstanceOf(AccessDeniedException.class);
+        assertThat(service.read(a,0,BigDecimal.ZERO).infolets()).isEmpty();
         verifyNoInteractions(repository);
 
     }

@@ -1,0 +1,7 @@
+/* Empty rows must remain readable at the leading edge of wide office tables. */
+.aws-console [data-resource-table^="staff-office-"] .erp-table tbody tr:not(.app-loading-row) > td[colspan]:only-child {
+    text-align: left !important;
+}
+[data-resource-table^="staff-office-"] .office-amount {
+    font-variant-numeric: tabular-nums;
+}

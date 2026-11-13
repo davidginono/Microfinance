@@ -50,7 +50,7 @@
             </div>
         </div>
     </sec:authorize>
-    <sec:authorize access="@access.hasAny(principal, 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'VOUCHER_RULE_VIEW')">
+    <sec:authorize access="@access.hasAny(principal, 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'VOUCHER_RULE_VIEW', 'VOUCHER_WORKSPACE_VIEW')">
         <c:set var="financeVouchersActive" value="${fn:startsWith(requestUri, '/finance/vouchers/new') or fn:startsWith(requestUri, '/finance/vouchers/receipts') or fn:startsWith(requestUri, '/finance/vouchers/payments') or fn:startsWith(requestUri, '/finance/vouchers/journals') or fn:startsWith(requestUri, '/finance/approval/configuration')}" />
         <div class="shell-sidebar-group space-y-1">
             <button type="button" id="financeVouchersToggle" aria-controls="financeVouchersPanel" aria-expanded="true" data-menu-active="${financeVouchersActive}" class="group flex w-full items-center gap-3 border px-3 py-2.5 text-left text-sm font-semibold transition ${financeVouchersActive ? 'shell-nav-active' : ''}">
@@ -59,6 +59,7 @@
                 <svg id="financeVouchersChevron" class="rotate-180 h-4 w-4 transition-transform duration-200" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="m5 7 5 5 5-5H5z" /></svg>
             </button>
             <div id="financeVouchersPanel" class="mt-1 space-y-1 border border-slate-200 bg-slate-50/70 px-2 py-2 shadow-inner">
+                <sec:authorize access="@access.has(principal, 'VOUCHER_WORKSPACE_VIEW')"><a href="<c:url value='/finance/approval' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval') and not fn:startsWith(requestUri, '/finance/approval/configuration') ? 'shell-nav-active' : ''}"><spring:message code="approval.workspace" /></a></sec:authorize>
                 <sec:authorize access="@access.has(principal, 'VOUCHER_RULE_VIEW')"><a href="<c:url value='/finance/approval/configuration' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/finance/approval/configuration')?'shell-nav-active':''}"><spring:message code="approval.configuration" /></a></sec:authorize>
                 <sec:authorize access="@access.has(principal, 'ACCOUNTING_BUSINESS_VIEW')">
                     <a href="<c:url value='/finance/vouchers/receipts' />" class="group flex items-center gap-2.5 border px-2.5 py-2 text-[0.95rem] font-semibold transition lg:gap-3 lg:px-3 lg:py-2.5 lg:text-sm ${fn:startsWith(requestUri, '/finance/vouchers/receipts') ? 'shell-nav-active border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900'}"><spring:message code="voucher.register.RECEIPT" /></a>
