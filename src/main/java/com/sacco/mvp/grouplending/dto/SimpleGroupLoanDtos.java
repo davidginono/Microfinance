@@ -20,7 +20,7 @@ public final class SimpleGroupLoanDtos {
         private UUID groupId;
         private int expectedVersion;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate signedOn;
-        private boolean checked;
+        private boolean checked,removeAgreement;
         private List<ExternalDebt> debts=new ArrayList<>();
     }
     @Data public static class ExternalDebt {

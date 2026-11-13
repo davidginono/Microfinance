@@ -8,11 +8,36 @@
             var kind=form.elements.loanFor, panel=form.querySelector('[data-simple-group-fields]'), select=form.querySelector('#simple-group');
             if(!kind||!panel||!select)return;
             var error=form.querySelector('[data-group-load-error]'), pending, request=0;
+            var agreement=form.elements.groupAgreement, agreementBox=form.querySelector('[data-group-agreement-upload]');
+            function renderAgreement() {
+                if(!agreementBox)return;
+                var file=agreement.files[0], list=agreementBox.querySelector('[data-group-agreement-selected]');
+                var message=file&&(!/\.pdf$/i.test(file.name)||file.size>10*1024*1024)?agreement.dataset.error:'';
+                agreement.setCustomValidity(message);
+                var localError=agreementBox.querySelector('[data-group-agreement-error]');localError.textContent=message;localError.hidden=!message;
+                list.replaceChildren();
+                agreementBox.querySelectorAll('[data-group-agreement-saved]').forEach(function(row){row.hidden=!!file||form.elements['groupApplication.removeAgreement'].value==='true';});
+                if(!file)return;
+                list.append(agreementBox.querySelector('[data-group-agreement-template]').content.cloneNode(true));
+                list.querySelector('[data-group-agreement-name]').textContent=file.name;
+                list.querySelector('[data-group-agreement-size]').textContent=new Intl.NumberFormat(document.documentElement.lang||'en',{maximumFractionDigits:1}).format(file.size/1024)+' KB';
+                var remove=list.querySelector('[data-remove-group-agreement]');remove.setAttribute('aria-label',remove.dataset.removeLabel+' '+file.name);
+            }
+            function clearAgreement() {
+                agreement.value='';
+                if(agreementBox){form.elements['groupApplication.removeAgreement'].value='true';renderAgreement();}
+                agreement.dispatchEvent(new Event('input',{bubbles:true}));
+            }
+            if(agreementBox){
+                agreement.addEventListener('change',renderAgreement);
+                agreementBox.addEventListener('click',function(event){if(event.target.closest('[data-remove-group-agreement]')){clearAgreement();agreement.focus();}});
+                renderAgreement();
+            }
             function toggle() {
                 var group=kind.value==='GROUP';
                 form.querySelectorAll('[data-individual-loan]').forEach(function (node) {node.hidden=group;node.querySelectorAll('input,select,textarea').forEach(function (field) {field.disabled=group;});});
                 panel.hidden=!group;panel.querySelectorAll('input,select,textarea,button').forEach(function (field) {field.disabled=!group;});
-                form.querySelectorAll('[data-group-guarantee], [data-group-confirmation]').forEach(function(node){node.hidden=!group;node.querySelectorAll('input').forEach(function(field){field.disabled=!group;});});
+                form.querySelectorAll('[data-group-guarantee], [data-group-confirmation], [data-group-agreement-upload]').forEach(function(node){node.hidden=!group;node.querySelectorAll('input,button').forEach(function(field){field.disabled=!group;});});
                 form.querySelectorAll('[data-repeat-list="guarantors"] [name$=".fullName"]').forEach(function(field){field.closest('.loan-form-grid > div').hidden=group;field.disabled=group;});
                 var draft=form.querySelector('[data-recording-draft]');if(group&&draft)draft.disabled=false;
             }
@@ -25,8 +50,8 @@
                 debts.replaceChildren();
                 panel.removeAttribute('aria-busy');
                 form.elements['groupApplication.expectedVersion'].value='';
+                form.elements['groupApplication.checked'].checked=false;clearAgreement();
                 if(!select.value)return;
-                form.elements['groupApplication.checked'].checked=false;form.elements.groupAgreement.value='';
                 pending=new AbortController();panel.setAttribute('aria-busy','true');
                 try {
                     var response=await fetch(form.dataset.groupRoot+'/'+encodeURIComponent(select.value),{credentials:'same-origin',headers:{Accept:'application/json'},signal:pending.signal});

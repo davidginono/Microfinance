@@ -17,6 +17,7 @@
 </section>
 <section class="accounting-section recording-evidence-panel" data-validation-step id="recording-panel-attachments" aria-labelledby="recording-heading-attachments">
 <h2 id="recording-heading-attachments" tabindex="-1" data-recording-step-heading><c:out value="${recordingAttachmentsLabel}" /></h2>
+<%@ include file="group-agreement-upload.jspf" %>
 <%@ include file="attachments.jspf" %>
 <c:set var="recordingPhotoPurpose" value="OTHER"/><%@ include file="recording-saved-files.jspf" %>
 

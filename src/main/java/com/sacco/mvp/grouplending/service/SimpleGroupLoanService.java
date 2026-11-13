@@ -39,6 +39,7 @@ public class SimpleGroupLoanService {
     @Transactional public UUID saveDraft(AppUserPrincipal a,RecordForm f,List<MultipartFile> files,MultipartFile agreement){
         access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(f!=null&&f.getGroupApplication()!=null&&f.getGroupApplication().getGroupId()!=null,"request");records.setup(a,f.getGroupApplication().getGroupId(),true);var stored=f.getApplicationId()==null?new ArrayList<DraftFile>():new ArrayList<>(Arrays.asList(json.readValue(records.draftFiles(a,f.getApplicationId()),DraftFile[].class)));
         if(f.getApplicationId()!=null&&!sameMaterial(readForm(records.draft(a,f.getApplicationId(),true).data()),f))stored.removeIf(x->x.agreement()||"GUARANTOR_CONSENT".equals(x.purpose()));
+        if(f.getGroupApplication().isRemoveAgreement())stored.removeIf(DraftFile::agreement);
         appendFiles(stored,f,files,agreement);f.setGroupRequestHash(draftFileHash(stored));UUID id=persistDraft(a,f);records.draftFiles(a,id,json.writeValueAsString(stored));event(a,id,"GROUP_DRAFT_SAVED");return id;
     }
     private String draftFileHash(List<DraftFile> files){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(json.writeValueAsBytes(files)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
@@ -55,7 +56,7 @@ public class SimpleGroupLoanService {
         var stored=Arrays.asList(json.readValue(records.draftFiles(a,f.getApplicationId()),DraftFile[].class));var result=new ArrayList<MultipartFile>();var details=f.getApplicationDetails();
         if(details==null){details=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ApplicationDetails();f.setApplicationDetails(details);}
         var names=new ArrayList<String>();var types=new ArrayList<String>();var requirements=new ArrayList<String>();
-        for(var upload:stored)if(upload.agreement()){if(agreement==null||agreement.isEmpty())agreement=new SavedFile(upload);}else{result.add(new SavedFile(upload));names.add(upload.title());types.add(upload.purpose());requirements.add(upload.requirement());}
+        for(var upload:stored)if(upload.agreement()){if(!f.getGroupApplication().isRemoveAgreement()&&(agreement==null||agreement.isEmpty()))agreement=new SavedFile(upload);}else{result.add(new SavedFile(upload));names.add(upload.title());types.add(upload.purpose());requirements.add(upload.requirement());}
         result.addAll(files);names.addAll(details.getDocumentNames());types.addAll(details.getDocumentTypes());requirements.addAll(details.getRequiredAttachmentIds());details.setDocumentNames(names);details.setDocumentTypes(types);details.setRequiredAttachmentIds(requirements);
         check(result.size()<=10,"document");return new DraftFiles(result,agreement);
     }
@@ -65,7 +66,7 @@ public class SimpleGroupLoanService {
     private tools.jackson.databind.JsonNode material(RecordForm form){
         var tree=(tools.jackson.databind.node.ObjectNode)json.valueToTree(form);
         for(String key:List.of("applicationId","expectedVersion","requestKey","groupAgreementChecksum","groupRequestHash","notes"))tree.remove(key);
-        if(tree.get("groupApplication") instanceof tools.jackson.databind.node.ObjectNode group)group.remove("checked");
+        if(tree.get("groupApplication") instanceof tools.jackson.databind.node.ObjectNode group){group.remove("checked");group.remove("removeAgreement");}
         if(tree.get("applicationDetails") instanceof tools.jackson.databind.node.ObjectNode details)for(String key:List.of("documentNames","documentTypes","requiredAttachmentIds"))details.remove(key);
         return tree;
     }
@@ -80,7 +81,7 @@ public class SimpleGroupLoanService {
             if(dates.size()==1&&!dates.contains(""))form.getGroupApplication().setSignedOn(LocalDate.parse(dates.iterator().next()));}
         return form;
     }
-    @Transactional(readOnly=true) public RecordForm draft(AppUserPrincipal a,UUID id){access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");var d=records.draft(a,id,false);var f=readForm(d.data());f.setApplicationId(id);f.setExpectedVersion(d.version());f.getGroupApplication().setChecked(false);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setDocumentNames(new ArrayList<>());f.getApplicationDetails().setDocumentTypes(new ArrayList<>());f.getApplicationDetails().setRequiredAttachmentIds(new ArrayList<>());}return f;}
+    @Transactional(readOnly=true) public RecordForm draft(AppUserPrincipal a,UUID id){access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");var d=records.draft(a,id,false);var f=readForm(d.data());f.setApplicationId(id);f.setExpectedVersion(d.version());f.getGroupApplication().setChecked(false);f.getGroupApplication().setRemoveAgreement(false);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setDocumentNames(new ArrayList<>());f.getApplicationDetails().setDocumentTypes(new ArrayList<>());f.getApplicationDetails().setRequiredAttachmentIds(new ArrayList<>());}return f;}
     @Transactional(readOnly=true) public com.sacco.mvp.grouplending.dto.GroupLendingDtos.Page<DraftSummary> drafts(AppUserPrincipal a,UUID group,int page){access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(page>=0&&page<=10000,"request");records.setup(a,group,false);var rows=records.drafts(a,group,page);return new com.sacco.mvp.grouplending.dto.GroupLendingDtos.Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
     @Transactional public void consumeDraft(AppUserPrincipal a,RecordForm f){if(f.getApplicationId()!=null)records.consumeDraft(a,f.getApplicationId(),f.getExpectedVersion());}
     @Transactional public void configure(AppUserPrincipal a,UUID group,SetupForm f){

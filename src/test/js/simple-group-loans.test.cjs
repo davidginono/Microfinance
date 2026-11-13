@@ -7,17 +7,22 @@ function setup() {
   const dom = new JSDOM(`<form data-simple-group data-group-root="/finance/loan-recording/groups">
     <select name="loanFor"><option>GROUP</option><option>INDIVIDUAL</option></select><div data-individual-loan><input name="clientId"></div>
     <div data-simple-group-fields><select id="simple-group"><option value="">Choose</option><option value="g1">Group 1</option><option value="g2">Group 2</option></select>
-    <input name="groupApplication.expectedVersion"><input type="date" name="groupApplication.signedOn"><input type="file" name="groupAgreement">
+    <input name="groupApplication.expectedVersion"><input type="date" name="groupApplication.signedOn">
     <p data-group-load-error hidden><button type="button" data-group-retry>Retry</button></p>
     <details data-group-debts><div data-group-debt-list></div><button type="button" data-add-group-debt>Add debt</button><template data-group-debt-template><div data-group-debt><input data-debt-field="reference"><select data-debt-field="clientIds" multiple></select><button type="button" data-remove-group-debt>Remove</button></div></template></details></div>
     <section id="recording-panel-collateral"><div data-group-confirmation><p>Group responsibility</p><input type="checkbox" name="groupApplication.checked" required></div></section>
+    <section id="recording-panel-attachments"><div data-group-agreement-upload><input type="hidden" name="groupApplication.removeAgreement" value="false"><label><input type="file" name="groupAgreement" data-error="Choose a PDF up to 10 MB"></label><p data-group-agreement-error hidden></p><div data-group-agreement-selected></div><template data-group-agreement-template><div><span data-group-agreement-name></span><span data-group-agreement-size></span><button type="button" data-remove-group-agreement data-remove-label="Remove"><svg><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></template></div><input type="file" name="attachments" multiple></section>
     <button type="button" data-recording-draft>Save draft</button></form>`,{runScripts:'outside-only'});
   const w=dom.window, form=w.document.querySelector('form');
   const context={setup:{version:7,leader:'Asha',holder:'Group',provider:'Bank',identifier:'123',people:[{id:'c1',number:'C1',name:'Asha'},{id:'c2',number:'C2',name:'Juma'}]},borrowers:{c1:{incomeEvidenceMissing:false,missingProfileFields:[]},c2:{incomeEvidenceMissing:true,missingProfileFields:['monthlyExpenses']}}};
   w.WorkspaceNavigation={onReady:fn=>fn(w.document)};w.fetch=async()=>({ok:true,json:async()=>context});w.eval(source);
+  const agreement=form.elements.groupAgreement;let selectedFiles=[];
+  Object.defineProperty(agreement,'files',{get:()=>selectedFiles,set:files=>{selectedFiles=Array.from(files);}});
+  Object.defineProperty(agreement,'value',{get:()=>selectedFiles.length?'C:\\fakepath\\'+selectedFiles[0].name:'',set:value=>{if(value==='')selectedFiles=[];}});
+  function choose(file){agreement.files=[file];agreement.dispatchEvent(new w.Event('change',{bubbles:true}));}
   const select=w.document.querySelector('#simple-group');
   async function load(){select.value='g1';select.dispatchEvent(new w.Event('change',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,0));}
-  return {dom,w,form,select,context,load};
+  return {dom,w,form,select,context,load,choose};
 }
 test('group selection keeps names, financial details and income references out of recording',async()=>{
   const s=setup();await s.load();
@@ -46,4 +51,23 @@ test('changing the selected group clears confirmation at the end of Collateral',
   const s=setup();const checkbox=s.form.elements['groupApplication.checked'];checkbox.checked=true;
   assert.equal(checkbox.closest('section').id,'recording-panel-collateral');await s.load();
   assert.equal(checkbox.checked,false);assert.equal(checkbox.required,true);s.dom.window.close();
+});
+
+test('the agreement stays in Attachments across steps and the X clears the native file input',()=>{
+  const s=setup(),file=new s.w.File(['%PDF- synthetic'],'signed-group.pdf',{type:'application/pdf'});s.choose(file);
+  assert.equal(s.form.elements.groupAgreement.closest('section').id,'recording-panel-attachments');
+  assert.match(s.form.querySelector('[data-group-agreement-selected]').textContent,/signed-group.pdf/);
+  const remove=s.form.querySelector('[data-group-agreement-selected] [data-remove-group-agreement]');assert.equal(remove.getAttribute('aria-label'),'Remove signed-group.pdf');assert.ok(remove.querySelector('svg'));
+  s.form.elements.loanFor.value='INDIVIDUAL';s.form.elements.loanFor.dispatchEvent(new s.w.Event('change',{bubbles:true}));assert.equal(s.form.elements.groupAgreement.disabled,true);
+  s.form.elements.loanFor.value='GROUP';s.form.elements.loanFor.dispatchEvent(new s.w.Event('change',{bubbles:true}));assert.equal(s.form.elements.groupAgreement.files[0],file);
+  remove.click();assert.equal(s.form.elements.groupAgreement.files.length,0);assert.equal(s.form.querySelector('[data-group-agreement-selected]').children.length,0);assert.equal(s.form.elements['groupApplication.removeAgreement'].value,'true');
+  assert.equal(s.form.elements.attachments.files.length,0);s.dom.window.close();
+});
+test('invalid agreement selections can be removed or replaced without blocking a corrected file',()=>{
+  const s=setup();s.choose(new s.w.File(['bad'],'image.png',{type:'image/png'}));assert.equal(s.form.elements.groupAgreement.validity.customError,true);assert.equal(s.form.querySelector('[data-group-agreement-error]').hidden,false);
+  s.form.querySelector('[data-group-agreement-selected] [data-remove-group-agreement]').click();assert.equal(s.form.elements.groupAgreement.validity.valid,true);
+  s.choose(new s.w.File(['%PDF good'],'good.pdf',{type:'application/pdf'}));assert.equal(s.form.elements.groupAgreement.validity.valid,true);assert.equal(s.form.querySelector('[data-group-agreement-error]').hidden,true);s.dom.window.close();
+});
+test('changing groups clears the agreement token and marks any saved agreement for removal',async()=>{
+  const s=setup();s.choose(new s.w.File(['%PDF'],'signed.pdf',{type:'application/pdf'}));await s.load();assert.equal(s.form.elements.groupAgreement.files.length,0);assert.equal(s.form.querySelector('[data-group-agreement-selected]').children.length,0);assert.equal(s.form.elements['groupApplication.removeAgreement'].value,'true');s.dom.window.close();
 });

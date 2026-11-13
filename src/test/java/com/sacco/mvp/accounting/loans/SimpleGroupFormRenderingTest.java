@@ -64,9 +64,11 @@ class SimpleGroupFormRenderingTest {
                 assertThat(entry).contains("2026-11-12","groupAgreement");
                 String loan=entry.substring(0,entry.indexOf("id=\"recording-panel-guarantors\""));
                 String collateral=entry.substring(entry.indexOf("id=\"recording-panel-collateral\""),entry.indexOf("id=\"recording-panel-attachments\""));
-                assertThat(loan).doesNotContain("groupApplication.checked",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)));
+                assertThat(loan).doesNotContain("groupAgreement","groupApplication.checked",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)));
                 assertThat(collateral).contains("data-group-confirmation","name=\"groupApplication.checked\"",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)),messages.getMessage("simpleGroup.checked",null,Locale.forLanguageTag(language)));
                 assertThat(collateral.indexOf("data-group-confirmation")).isGreaterThan(collateral.indexOf("data-add-row=\"collateral\""));
+                String attachments=entry.substring(entry.indexOf("id=\"recording-panel-attachments\""));
+                assertThat(attachments).contains("name=\"groupAgreement\"","attachment-dropzone-input","data-group-agreement-selected","data-remove-group-agreement","M6 6l12 12M18 6L6 18");
                 assertThat(body).contains("Historical budget reference").doesNotContain("CLIENT_PROFILE:");
             }
         }finally{tomcat.stop();tomcat.destroy();spring.close();}
