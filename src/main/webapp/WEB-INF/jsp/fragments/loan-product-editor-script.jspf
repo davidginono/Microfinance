@@ -293,14 +293,17 @@
         });
         function requiredAttachmentRow(name, maxSizeMb) {
             const row = document.createElement('div');
-            row.className = 'grid gap-2 rounded border border-slate-200 bg-slate-50 p-2 sm:grid-cols-[minmax(0,1fr)_8rem_auto]';
+            row.className = 'product-required-attachment-row';
             row.setAttribute('data-required-attachment-row', 'true');
             row.innerHTML =
-                '<label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Name' +
+                '<label><spring:message code="applications.documentName" javaScriptEscape="true" />' +
                 '<input name="requiredAttachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>' +
-                '<label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">Max MB' +
+                '<label><spring:message code="chairperson.maximumFileSize" javaScriptEscape="true" />' +
                 '<input name="requiredAttachmentMaxSizeMb" type="number" min="0.01" max="100" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>' +
-                '<button type="button" class="app-btn btn-neutral self-end" data-remove-required-attachment>Remove</button>';
+                '<button type="button" class="app-btn btn-neutral erp-icon-btn erp-form-row-action" data-remove-required-attachment><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12" /></svg></button>';
+            const remove = row.querySelector('[data-remove-required-attachment]');
+            remove.setAttribute('aria-label', '<spring:message code="applications.remove" javaScriptEscape="true" />');
+            remove.title = remove.getAttribute('aria-label');
             row.querySelector('[name="requiredAttachmentName"]').value = name || '';
             row.querySelector('[name="requiredAttachmentMaxSizeMb"]').value = maxSizeMb || '5.00';
             return row;

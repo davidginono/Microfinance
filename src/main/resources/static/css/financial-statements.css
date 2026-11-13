@@ -22,7 +22,6 @@
 @media(max-width:767px){.fs-view-fields{flex-direction:row}.fs-workspace .fs-view-fields .fs-select-setting{flex:1 1 100%}}
 
 .fs-configure [data-statement-setup]{display:grid;gap:20px;min-width:0}
-.aws-console .fs-configure .erp-panel-body{padding:20px!important}
 .fs-setup-row{min-width:0;border:1px solid #d5dbdb;padding:20px;margin:0 0 20px}
 .fs-setup-row legend{font-weight:600;padding:0 6px}
 .fs-setup-row:last-child{margin-bottom:0}
@@ -31,4 +30,4 @@
 .fs-setup-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:16px}
 .fs-setup-actions .erp-icon-btn{flex:0 0 36px;width:36px;min-width:36px;height:36px;padding:0}
 .fs-setup-actions .erp-icon-btn svg{width:16px;height:16px}
-.fs-configure details.erp-panel>summary{padding:16px;cursor:pointer}.fs-configure details .erp-table-scroll{max-height:360px}.fs-setup-check{align-self:end}.fs-setup-check input{margin-right:8px}[data-equity-classify]{display:flex;flex-wrap:wrap;align-items:end;gap:8px;min-width:0;max-width:100%}[data-equity-classify] label{display:flex;flex-direction:column;gap:4px;min-width:0}[data-equity-classify] .aws-control{max-width:100%}@media(max-width:767px){[data-equity-classify] label{flex:1 1 180px}.aws-console .fs-configure .erp-panel-body{padding:16px!important}.fs-setup-row{padding:16px}}
+.fs-configure details.erp-panel>summary{padding:16px;cursor:pointer}.fs-configure details .erp-table-scroll{max-height:360px}.fs-setup-check{align-self:end}.fs-setup-check input{margin-right:8px}[data-equity-classify]{display:flex;flex-wrap:wrap;align-items:end;gap:8px;min-width:0;max-width:100%}[data-equity-classify] label{display:flex;flex-direction:column;gap:4px;min-width:0}[data-equity-classify] .aws-control{max-width:100%}@media(max-width:767px){[data-equity-classify] label{flex:1 1 180px}.fs-setup-row{padding:16px}}

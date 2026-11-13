@@ -29,6 +29,18 @@
 }
 .aws-console .loan-application-create-page {background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important;}
 .aws-console .loan-flow-panel-body {padding:20px;}
+/* Form bodies share readable padding; dashboard and table canvases keep their own density. */
+.aws-console :is(form.erp-panel-body,form .erp-panel-body:not(.resource-table-surface-body),.erp-panel-body:has(> form),.profile-page-body) {padding:20px!important;}
+.aws-console form:has(> .erp-panel) {display:grid;gap:20px;min-width:0;}
+.aws-console .erp-form-row-tools {display:flex;align-items:center;flex-wrap:wrap;gap:8px;}
+.aws-console .app-btn.erp-form-row-action {display:inline-flex;align-items:center;justify-content:center;flex:0 0 36px;width:36px;min-width:36px;max-width:36px;height:36px;min-height:36px;padding:0!important;}
+.aws-console .erp-form-row-action svg {width:16px;height:16px;flex:none;}
+.aws-console [data-required-attachments-panel] {grid-column:1/-1;min-width:0;}
+.aws-console [data-required-attachments-list] {display:grid;gap:20px;margin-top:16px;min-width:0;}
+.aws-console .product-required-attachment-row {display:flex;flex-flow:row wrap;align-items:flex-end;gap:12px;padding:16px;border:1px solid #d5dbdb;min-width:0;}
+.aws-console .product-required-attachment-row > label {display:flex;flex-direction:column;gap:5px;flex:1 1 16rem;min-width:0;}
+.aws-console .product-required-attachment-row > label:nth-child(2) {flex:0 1 8rem;}
+
 .aws-console .erp-resource-heading {
     margin:0;padding:16px 20px;background:#fafafa;border-bottom:1px solid #eaeded;
     font-size:16px;line-height:24px;font-weight:700;
@@ -102,6 +114,8 @@
     .aws-console main .aws-filter-toolbar .app-btn {white-space:nowrap;flex:none;}
 }
 @media(max-width:767px) {
+    .aws-console :is(form.erp-panel-body,form .erp-panel-body:not(.resource-table-surface-body),.erp-panel-body:has(> form),.profile-page-body) {padding:16px!important;}
+
     .aws-console .erp-form-wrap:not(.aws-filter-toolbar):not(.erp-filter-form),
     .aws-console .loan-flow-panel-body {padding:16px;}
     .aws-console .erp-panel-header,.aws-console .loan-flow-panel-heading {padding:12px 16px!important;}

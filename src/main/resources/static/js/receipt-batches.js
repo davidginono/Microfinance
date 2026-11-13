@@ -60,6 +60,12 @@ function initializeReceiptBatches() {
     const editable = () => canEdit && !busy() && summary?.batch.state !== 'COMPLETED';
     const input = (type, value, label, change) => {const n = el('input',null,'aws-control');n.type = type;n.value = value ?? '';n.setAttribute('aria-label',label);n.addEventListener(type === 'number' || type === 'text' ? 'input' : 'change',change);return n;};
     const button = (label, action, cls = 'app-btn btn-neutral') => {const b = el('button',label,cls);b.type = 'button';b.addEventListener('click',action);return b;};
+    function removeTransactionButton(action) {
+        const label = t('removeTransaction'), control = button(null,action,'app-btn btn-neutral erp-icon-btn erp-form-row-action');
+        control.setAttribute('aria-label',label);control.title = label;
+        control.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12" /></svg>';
+        return control;
+    }
     function selectControl(value, label, category, client, change, issue, auto = false) {
         const s = el('select',null,'aws-control');s.setAttribute('aria-label',label);s.add(new Option(t('choose'),''));
         if(value?.id){s.add(new Option(value.label || value.id,value.id));s.value = value.id;}
@@ -217,7 +223,7 @@ function initializeReceiptBatches() {
         const evidence = input('text',item.form.evidence,t('evidence'),()=>{item.form.evidence = evidence.value;mark(item);});evidence.maxLength = 500;cells[7].append(evidence);bindField(item,'evidence',evidence,cells[7]);
         const mapping = el('p',null,'batch-mapping');item.mapping = mapping;detailCell.append(mapping);
         if(item.form.rows.length>1){const table = el('table',null,'erp-table batch-transactions'), head = el('thead'), hr = el('tr'), tb = el('tbody');for(const label of ['loan','balances','amount','transaction'])hr.append(el('th',t(label)));head.append(hr);table.append(head,tb);detailCell.append(table);
-            item.form.rows.forEach((row,index)=>{const r = el('tr'), c = ['loan','balances','amount','transaction'].map(label=>{const cell = el('td');cell.dataset.label = t(label);r.append(cell);return cell;});loanPicker(row,c[0],c[1]);amountInput(row,c[2]);c[3].append(button(t('removeTransaction'),()=>{item.form.rows.splice(index,1);mark(item);rerender();}));tb.append(r);});
+            item.form.rows.forEach((row,index)=>{const r = el('tr'), c = ['loan','balances','amount','transaction'].map(label=>{const cell = el('td');cell.dataset.label = t(label);r.append(cell);return cell;});loanPicker(row,c[0],c[1]);amountInput(row,c[2]);c[3].append(removeTransactionButton(()=>{item.form.rows.splice(index,1);mark(item);rerender();}));tb.append(r);});
         }
         const actions = el('div',null,'batch-detail-actions');actions.append(button(t('addTransaction'),()=>{if(item.form.rows.length>=50)return;item.form.rows.push({loanId:null,amount:null,description:''});item.expanded = true;mark(item);rerender();}));actions.append(button(t('removeReceipt'),async()=>{try{clearTimeout(item.timer);if(item.saving)await item.saving;if(item.persisted)await api(url + '/items/' + item.id + '?version=' + item.version,'DELETE');dirty.delete(item.id);rows.delete(item.id);await load();}catch(error){globalError(error.message);}}));detailCell.append(actions);
         if(!editable() || editor.dataset.payrollSealed === 'true' || item.state === 'POSTED'){tr.querySelectorAll('input,select').forEach(n=>n.disabled = true);details.querySelectorAll('input,select,button').forEach(n=>n.disabled = true);}
