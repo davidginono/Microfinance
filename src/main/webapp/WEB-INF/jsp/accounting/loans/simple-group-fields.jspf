@@ -1,3 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
 <div data-simple-group-fields ${recordForm.loanFor!='GROUP'?'hidden':''}>
 <c:url value="/finance/loan-recording/groups" var="simpleGroupsUrl" />
 <div data-loan-choice data-choice-url="${simpleGroupsUrl}"><label for="simple-group"><spring:message code="simpleGroup.group" /></label>
@@ -6,12 +7,13 @@
 <form:hidden path="groupApplication.expectedVersion" />
 <label><spring:message code="recording.firstPaymentDate" text="First payment date" /><form:input path="firstPaymentDate" type="date" cssClass="aws-control" /></label>
 <div data-group-load-error role="alert" hidden><spring:message code="simpleGroup.error.load" /><button type="button" class="app-btn btn-neutral" data-group-retry><spring:message code="simpleGroup.retry" text="Retry" /></button></div>
+<div data-group-profile-labels hidden><c:forEach items="${['monthlyIncome','monthlyExpenses','monthlyDebtRepayments']}" var="key"><span data-profile-label="${key}"><spring:message code="kyc.field.${key}" /></span></c:forEach></div>
 <div data-group-roster aria-live="polite">
 <c:if test="${not empty groupSetup}"><p><spring:message code="simpleGroup.leader" />: <c:out value="${groupSetup.leader}" /></p><p><c:out value="${groupSetup.holder}" /> &middot; <c:out value="${groupSetup.provider}" /> &middot; <c:out value="${groupSetup.identifier}" /></p>
 <c:forEach items="${groupSetup.people}" var="person" varStatus="i"><div class="simple-group-borrower"><span><c:out value="${person.number}" /> &middot; <c:out value="${person.name}" /></span><form:hidden path="groupApplication.signers[${i.index}].clientId" />
-<label><spring:message code="simpleGroup.signedOn" /><form:input path="groupApplication.signers[${i.index}].signedOn" type="date" cssClass="aws-control" /></label>
-<label><spring:message code="simpleGroup.incomeSource" /><form:input path="groupApplication.signers[${i.index}].incomeSource" maxlength="200" cssClass="aws-control" /></label>
-<label><spring:message code="simpleGroup.budgetEvidence" /><form:input path="groupApplication.signers[${i.index}].evidence" maxlength="500" cssClass="aws-control" /></label></div></c:forEach></c:if>
+<c:set var="borrowerInput" value="${groupBorrowerInputs[person.id]}" />
+<c:if test="${not empty borrowerInput.missingProfileFields}"><p class="coa-error"><spring:message code="simpleGroup.profileMissing" /> <c:forEach items="${borrowerInput.missingProfileFields}" var="key" varStatus="field"><c:if test="${not field.first}">, </c:if><spring:message code="kyc.field.${key}" /></c:forEach></p></c:if>
+<c:if test="${borrowerInput.incomeEvidenceMissing}"><label><spring:message code="simpleGroup.incomeSource" /><form:input path="groupApplication.signers[${i.index}].incomeSource" maxlength="200" cssClass="aws-control" /></label></c:if></div></c:forEach></c:if>
 </div>
 <details data-group-debts><summary><spring:message code="simpleGroup.otherDebts" /></summary>
 <p><spring:message code="simpleGroup.debtHelp" /></p><div data-group-debt-list>
@@ -23,7 +25,7 @@
 <button type="button" class="app-btn btn-neutral" data-add-group-debt><spring:message code="simpleGroup.addDebt" /></button>
 <template data-group-debt-template><div class="loan-form-grid" data-group-debt><label><spring:message code="simpleGroup.debtReference" /><input data-debt-field="reference" class="aws-control" maxlength="200" /></label><label><spring:message code="simpleGroup.debtPayment" /><input data-debt-field="monthlyPayment" class="aws-control" type="number" step="0.01" min="0.01" /></label><label><spring:message code="simpleGroup.debtBorrowers" /><select data-debt-field="clientIds" class="aws-control simple-group-debt-clients" multiple size="4"><c:forEach items="${groupSetup.people}" var="person"><option value="${person.id}"><c:out value="${person.number}" /> &middot; <c:out value="${person.name}" /></option></c:forEach></select></label><button type="button" class="app-btn btn-neutral erp-icon-btn erp-form-row-action" data-remove-group-debt aria-label="<spring:message code='simpleGroup.remove' />" title="<spring:message code='simpleGroup.remove' />"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12" /></svg></button></div></template>
 </details>
-<div class="accounting-grid"><label><spring:message code="simpleGroup.agreementReference" /><form:input path="groupApplication.reference" maxlength="500" cssClass="aws-control" /></label>
+<div class="accounting-grid"><label><spring:message code="simpleGroup.signedOn" /><form:input path="groupApplication.signedOn" type="date" cssClass="aws-control" /></label><label><spring:message code="simpleGroup.agreementReference" /><form:input path="groupApplication.reference" maxlength="500" cssClass="aws-control" /></label>
 <label><spring:message code="simpleGroup.language" /><form:select path="groupApplication.language" cssClass="aws-control"><form:option value="SW">Kiswahili</form:option><form:option value="EN">English</form:option></form:select></label>
 <label><spring:message code="simpleGroup.agreement" /><input type="file" name="groupAgreement" accept="application/pdf,.pdf" class="aws-control" /></label></div>
 <sec:authorize access="@access.has(principal,'LOAN_DOCUMENTS_VIEW') and @access.has(principal,'LOAN_DOCUMENTS_EXPORT')"><c:forEach items="${groupDraftDocuments}" var="file"><p><a href="<c:url value='/finance/group-loan-drafts/${recordForm.applicationId}/files/${file.id}' />"><c:out value="${file.displayName}" /></a></p></c:forEach></sec:authorize>

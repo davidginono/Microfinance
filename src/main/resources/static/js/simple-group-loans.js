@@ -20,7 +20,7 @@
             function field(row,index,name,label,type,value) {
                 var wrapper=type==='hidden'?row:text('label',label,row), input=document.createElement('input');
                 input.name='groupApplication.signers['+index+'].'+name;input.type=type;input.className='aws-control';input.value=value||'';
-                if(type==='text')input.maxLength=name==='incomeSource'?200:500;
+                if(type==='text')input.maxLength=200;
                 wrapper.append(input);
             }
             var debts=form.querySelector('[data-group-debt-list]'),debtTemplate=form.querySelector('[data-group-debt-template]');
@@ -35,12 +35,14 @@
                 pending=new AbortController();roster.setAttribute('aria-busy','true');
                 try {
                     var response=await fetch(form.dataset.groupRoot+'/'+encodeURIComponent(select.value),{credentials:'same-origin',headers:{Accept:'application/json'},signal:pending.signal});
-                    if(!response.ok)throw new Error('group');var data=await response.json();if(sequence!==request)return;
+                    if(!response.ok)throw new Error('group');var context=await response.json();if(sequence!==request)return;var data=context.setup;
                     form.elements['groupApplication.expectedVersion'].value=data.version;
                     text('p',form.dataset.leaderLabel+': '+(data.leader||''),roster);
                     text('p',[data.holder,data.provider,data.identifier].filter(Boolean).join(' · '),roster);
                     var options=debtTemplate.content.querySelector('select');options.replaceChildren();data.people.forEach(function(person){options.add(new Option(person.number+' · '+person.name,person.id));});
-                    data.people.forEach(function (person,index) {var row=text('div','',roster);row.className='simple-group-borrower';text('span',person.number+' · '+person.name,row);field(row,index,'clientId','','hidden',person.id);field(row,index,'signedOn',form.dataset.signedLabel,'date','');field(row,index,'incomeSource',form.dataset.sourceLabel,'text','');field(row,index,'evidence',form.dataset.evidenceLabel,'text','');});
+                    data.people.forEach(function (person,index) {var row=text('div','',roster);row.className='simple-group-borrower';text('span',person.number+' · '+person.name,row);field(row,index,'clientId','','hidden',person.id);var missing=context.borrowers[person.id];
+                        if(missing.missingProfileFields.length){var labels=missing.missingProfileFields.map(function(key){return form.querySelector('[data-profile-label="'+key+'"]').textContent;});text('p',form.dataset.profileMissing+' '+labels.join(', '),row).className='coa-error';}
+                        if(missing.incomeEvidenceMissing)field(row,index,'incomeSource',form.dataset.sourceLabel,'text','');});
                 } catch (failure) {if(failure.name!=='AbortError'&&sequence===request)error.hidden=false;}
                 finally {if(sequence===request)roster.removeAttribute('aria-busy');}
             }

@@ -19,14 +19,15 @@ public final class SimpleGroupLoanDtos {
         private UUID groupId;
         private int expectedVersion;
         private String reference="",language="SW";
+        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate signedOn;
         private boolean checked;
         private List<SignerForm> signers=new ArrayList<>();
         private List<ExternalDebt> debts=new ArrayList<>();
     }
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)
     @Data public static class SignerForm {
         private UUID clientId;
-        private String incomeSource="",evidence="";
-        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate signedOn;
+        private String incomeSource="";
     }
     @Data public static class ExternalDebt {
         private String reference="";
@@ -35,6 +36,8 @@ public final class SimpleGroupLoanDtos {
     }
     public record Exposure(int activeLoans,int riskLoans,int guaranteeCount,BigDecimal monthlyDebt,BigDecimal reserved,int missingHistory,int pendingApplications) {}
     public record Person(UUID id,String number,String name) {}
+    public record BorrowerInput(boolean incomeEvidenceMissing,List<String> missingProfileFields) {}
+    public record RecordingContext(Setup setup,Map<UUID,BorrowerInput> borrowers) {}
     public record Setup(UUID groupId,int version,String name,UUID leaderId,String leader,
         String destinationType,String provider,String holder,String identifier,String evidence,List<Person> people) {}
     public record Assessment(UUID clientId,UUID profileRevision,String number,String name,BigDecimal income,BigDecimal expenses,

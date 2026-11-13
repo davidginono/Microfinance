@@ -74,9 +74,8 @@
 .loan-form-grid > [data-simple-group-fields] { grid-column: 1 / -1; min-width: 0; }
 [data-group-roster] { overflow-wrap: anywhere; }
 
-.simple-group-borrower { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 16px 0; min-width: 0; }
+.simple-group-borrower { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 16px 0; min-width: 0; }
 .simple-group-borrower > span { grid-column: 1 / -1; font-weight: 600; }
-@media (max-width: 767px) { .simple-group-borrower { grid-template-columns: minmax(0, 1fr); } }
 
 [data-group-debt-list]{display:grid;gap:20px;margin:16px 0}
 [data-group-debt]{padding:16px;border:1px solid #d5dbdb;align-items:end}

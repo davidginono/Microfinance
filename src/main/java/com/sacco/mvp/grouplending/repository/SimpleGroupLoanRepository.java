@@ -98,13 +98,25 @@ public class SimpleGroupLoanRepository {
     }
     public List<Map<String,Object>> profiles(AppUserPrincipal a,UUID group,LocalDate day) {
         return jdbc.queryForList("""
-            select m.id,m.member_no,m.full_name,r.id revision,r.profile,case when coalesce((select kyc_required from lending_credit_policy where sacco_id=m.sacco_id and station_id=m.station_id order by revision desc limit 1),false) then client_kyc_error(m.id,?,?,?) end kyc
+            select m.id,m.member_no,m.full_name,r.id revision,r.profile,doc.sha256 income_document,
+              case when coalesce((select kyc_required from lending_credit_policy where sacco_id=m.sacco_id and station_id=m.station_id order by revision desc limit 1),false) then client_kyc_error(m.id,?,?,?) end kyc
             from lending_group_member gm join members m on m.id=gm.client_id
-            left join lateral(select id,profile from client_onboarding_revision where client_id=m.id and sacco_id=m.sacco_id
+            left join lateral(select id,profile,mode,sequence from client_onboarding_revision where client_id=m.id and sacco_id=m.sacco_id
               and station_id=m.station_id and mode<>'DRAFT' order by sequence desc limit 1) r on true
+            left join lateral (
+              select u.sha256,d.expires_on from client_onboarding_document d join stored_uploads u on u.id=d.upload_id
+              where d.client_id=m.id and d.sacco_id=m.sacco_id and d.station_id=m.station_id and d.category='ACTIVITY'
+                and ((r.mode='RECORDED' and d.sequence<=(select max(h.sequence) from client_onboarding_document_link x
+                      join client_onboarding_document h on h.id=x.document_id where x.revision_id=r.id))
+                  or (r.mode='SUBMITTED' and exists(select 1 from client_onboarding_document_link x where x.revision_id=r.id and x.document_id=d.id)))
+                and not exists(select 1 from client_onboarding_document_removal removal join client_onboarding_revision removed_at on removed_at.id=removal.revision_id
+                  where removal.document_id=d.id and removed_at.sequence<=r.sequence)
+              order by d.sequence desc limit 1
+            ) doc on doc.expires_on is null or doc.expires_on>=?
             where gm.group_id=? and gm.sacco_id=? and gm.station_id=? and gm.ends_on is null and gm.starts_on<=?
+              and m.sacco_id=gm.sacco_id and m.station_id=gm.station_id
             order by m.id limit 51
-            """,a.getSaccoId(),a.getStationId(),day,group,a.getSaccoId(),a.getStationId(),day);
+            """,a.getSaccoId(),a.getStationId(),day,day,group,a.getSaccoId(),a.getStationId(),day);
     }
     public void lockClients(AppUserPrincipal a,List<UUID> clients){if(clients.isEmpty()||clients.size()>70)throw new IllegalArgumentException("simpleGroup.error.members");var args=new ArrayList<Object>(List.of(a.getSaccoId(),a.getStationId()));args.addAll(clients);jdbc.queryForList("select lending_guarantor_capacity_lock(x.id,?,?) from (values "+String.join(",",Collections.nCopies(clients.size(),"(?::uuid)"))+")x(id) order by x.id",args.toArray());}
     public java.math.BigDecimal monthlyDebt(AppUserPrincipal a,UUID group){
@@ -123,8 +135,7 @@ public class SimpleGroupLoanRepository {
             values(?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?,(select loan_group_terms(l) from loan_applications l where id=?),?)
             """,loan,p.setup().groupId(),a.getSaccoId(),a.getStationId(),p.setup().leaderId(),p.setup().version(),snapshot,
             f.getReference().strip(),f.getLanguage(),filename,pdf,a.getMemberId(),now,loan,requestHash);
-        var signed=new HashMap<UUID,LocalDate>();f.getSigners().forEach(s->signed.put(s.getClientId(),s.getSignedOn()));
-        var rows=new ArrayList<Object[]>();for(var person:p.assessments())rows.add(new Object[]{loan,person.clientId(),person.number(),person.name(),signed.get(person.clientId()),person.income(),person.expenses(),person.debt(),person.source(),person.evidence(),person.profileRevision()});
+        var rows=new ArrayList<Object[]>();for(var person:p.assessments())rows.add(new Object[]{loan,person.clientId(),person.number(),person.name(),f.getSignedOn(),person.income(),person.expenses(),person.debt(),person.source(),person.evidence(),person.profileRevision()});
         jdbc.batchUpdate("insert into staff_group_borrower(loan_id,client_id,client_number,client_name,signed_on,income,expenses,debt,income_source,evidence,profile_revision) values(?,?,?,?,?,?,?,?,?,?,?)",rows);
     }
     public boolean partyContract(AppUserPrincipal a,UUID party){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from staff_group_loan c join loan_applications l on l.id=c.loan_id where l.borrower_party_id=? and c.sacco_id=? and c.station_id=? and l.sacco_id=c.sacco_id and l.station_id=c.station_id)",Boolean.class,party,a.getSaccoId(),a.getStationId()));}
