@@ -7,6 +7,10 @@
 <form:form modelAttribute="recordForm" action="${saveUrl}" method="post" enctype="multipart/form-data" data-loan-form="true" data-simple-group="true" data-group-root="${pageContext.request.contextPath}/finance/loan-recording/groups" data-resource-form-page="true" data-workspace-submit="recover" data-workspace-field-errors="true" cssClass="accounting-create-form"><form:hidden path="requestKey" /><form:hidden path="applicationId"/><form:hidden path="expectedVersion"/><c:if test="${not empty recordForm.topUpSourceLoanId}"><form:hidden path="topUpSourceLoanId" /><form:hidden path="clientId" /></c:if>
 <spring:message code="recording.attachments.help" var="recordingAttachmentHelp" />
 <spring:message code="applications.add" var="recordingAddLabel" />
+<spring:message code="applications.guarantors" var="recordingGuarantorsLabel" />
+<spring:message code="simpleGroup.extraGuarantors" var="recordingExtraGuarantorsLabel" />
+<spring:message code="recording.addGuarantor" text="${recordingAddLabel}" var="recordingAddGuarantorLabel" />
+<spring:message code="simpleGroup.addExtraGuarantor" var="recordingAddExtraGuarantorLabel" />
 <spring:message code="applications.documents" var="recordingDocumentsLabel" />
 <spring:message code="recording.attachmentsTab" text="${recordingDocumentsLabel}" var="recordingAttachmentsLabel" />
 <div class="recording-application-evidence" data-recording-evidence data-root="<c:url value='/finance/loan-recording/evidence'/>" data-error="<spring:message code='applications.error.details'/>" data-upload-limit="<spring:message code='recording.attachmentLimit' text='${recordingAttachmentHelp}' htmlEscape='true'/>" data-select-placeholder="<c:out value='${chooseLabel}' />">
@@ -19,6 +23,7 @@
     <c:choose>
         <c:when test="${step=='attachments'}"><c:out value="${recordingAttachmentsLabel}" /></c:when>
         <c:when test="${step=='loan'}"><spring:message code="recording.loanDetails" /></c:when>
+        <c:when test="${step=='guarantors'}"><span data-guarantor-label data-individual-label="<c:out value='${recordingGuarantorsLabel}'/>" data-group-label="<c:out value='${recordingExtraGuarantorsLabel}'/>"><c:out value="${recordForm.loanFor=='GROUP'?recordingExtraGuarantorsLabel:recordingGuarantorsLabel}" /></span></c:when>
         <c:otherwise><spring:message code="applications.${step}" /></c:otherwise>
     </c:choose>
     </span>

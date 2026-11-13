@@ -8,14 +8,25 @@
         const next = form.querySelector('[data-recording-next]');
         const submit = form.querySelector('[data-recording-submit]');
         const last = panels.length - 1;
-        let active = 0, reached = 0;
+        const guarantors = panels.find(panel => panel.querySelector('[data-repeat-list="guarantors"]'));
+        let active = 0, reached = 0, requiredGuarantors = null;
+
+        function skipped(index) {
+            return !!guarantors && panels[index] === guarantors && form.elements.loanFor?.value === 'GROUP'
+                && (form.elements.loanMode.value === 'CUSTOM' || requiredGuarantors === 0);
+        }
 
         function show(index, focus = true) {
             active = index;
             reached = Math.max(reached, index);
             panels.forEach((panel, i) => { panel.hidden = i !== index; });
+            let number = 0;
             buttons.forEach((button, i) => {
-                button.disabled = i > reached;
+                const omit = skipped(i);
+                (button.closest('li') || button).hidden = omit;
+                const counter = button.querySelector('.recording-step-number');
+                if (counter && !omit) counter.textContent = ++number;
+                button.disabled = omit || i > reached;
                 if (i === index) button.setAttribute('aria-current', 'step');
                 else button.removeAttribute('aria-current');
             });
@@ -30,7 +41,9 @@
         }
 
         function go(index) {
+            if (index < 0 || index > last || skipped(index)) return;
             for (let step = active; step < index; step++) {
+                if (skipped(step)) continue;
                 const invalid = [...panels[step].querySelectorAll('input,select,textarea')]
                     .filter(control => control.willValidate && !control.validity.valid);
                 if (invalid.length) {
@@ -42,24 +55,51 @@
             show(index);
         }
 
+        function move(direction) {
+            let index = active + direction;
+            while (skipped(index)) index += direction;
+            go(index);
+        }
+
+        function updateSteps() {
+            if (guarantors) {
+                const omit = skipped(panels.indexOf(guarantors));
+                guarantors.disabled = omit;
+                guarantors.dataset.recordingSkipped = String(omit);
+            }
+            root.querySelectorAll('[data-guarantor-label]').forEach(label => {
+                label.textContent = form.elements.loanFor?.value === 'GROUP' ? label.dataset.groupLabel : label.dataset.individualLabel;
+            });
+            if (skipped(active)) show(active + 1);
+            else show(active, false);
+        }
+
         buttons.forEach((button, index) => button.addEventListener('click', () => go(index)));
-        panels.forEach((panel, index) => panel.addEventListener('validation:reveal', () => show(index, false)));
-        previous.addEventListener('click', () => go(active - 1));
-        next.addEventListener('click', () => go(active + 1));
+        panels.forEach((panel, index) => panel.addEventListener('validation:reveal', () => {if (!skipped(index)) show(index, false);}));
+        previous.addEventListener('click', () => move(-1));
+        next.addEventListener('click', () => move(1));
+        form.addEventListener('recording:product', event => {
+            const count = event.detail?.guarantors;
+            requiredGuarantors = Number.isInteger(count) && count >= 0 ? count : null;
+            updateSteps();
+        });
+        form.addEventListener('change', event => {
+            if (['loanFor','loanMode','productId'].includes(event.target.name)) updateSteps();
+        });
         form.addEventListener('keydown', event => {
             if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented
                 || !panels[active].contains(event.target)
                 || !event.target.matches('input:not([type="hidden"],[type="checkbox"],[type="radio"],[type="file"],[type="button"],[type="submit"])')) return;
             event.preventDefault();
             if (active === last) form.requestSubmit(submit);
-            else go(active + 1);
+            else move(1);
         });
         form.addEventListener('submit', event => {
             if (event.submitter !== submit || active === last) return;
             event.preventDefault();
-            go(active + 1);
+            move(1);
         });
-        show(0, false);
+        updateSteps();
         nav.hidden = false;
         root.classList.add('recording-wizard-ready');
     }
@@ -142,11 +182,14 @@
             }
             var files = form.querySelector('input[type="file"][name="attachments"]');
             var uploads = [], documentList = root.querySelector('[data-evidence-documents]');
+            function activeUploads() {
+                return uploads.filter(upload => !upload.owner?.closest('[data-recording-skipped="true"]'));
+            }
             function syncFiles() {
                 var selection = new DataTransfer();
-                uploads.forEach(function (upload) { selection.items.add(upload.file); });
+                activeUploads().forEach(function (upload) { selection.items.add(upload.file); });
                 files.files = selection.files;
-                files.setCustomValidity(uploads.length > 10 ? root.dataset.uploadLimit : '');
+                files.setCustomValidity(activeUploads().length > 10 ? root.dataset.uploadLimit : '');
             }
             function removeUpload(upload) {
                 uploads.splice(uploads.indexOf(upload),1);
@@ -160,7 +203,7 @@
                 var type = kind === 'guarantors' ? 'GUARANTOR_PHOTO' : 'COLLATERAL_PHOTO';
                 var selected = Array.from(selection);
                 var message = '';
-                if (uploads.length + selected.length > 10) message = root.dataset.uploadLimit;
+                if (activeUploads().length + selected.length > 10) message = root.dataset.uploadLimit;
                 if (photo && selected.some(file => !/\.(png|jpe?g)$/i.test(file.name) || !['image/png','image/jpeg'].includes(file.type) || file.size > 5*1024*1024))
                     message = owner.querySelector('.attachment-dropzone-help').textContent;
                 var localError = picker.closest('.recording-row-photos')?.querySelector('[data-photo-error]');
@@ -223,7 +266,7 @@
             window.addEventListener('pagehide', () => uploads.forEach(upload => {if(upload.preview) URL.revokeObjectURL(upload.preview);}), {once:true});
             function bindUploads() {
                 root.querySelectorAll('[data-repeat-list]').forEach(reindex);
-                uploads.forEach(function (upload,index) {
+                activeUploads().forEach(function (upload,index) {
                     if (upload.owner) {
                         var subject = upload.owner.querySelector('[data-field="fullName"],[data-field="itemName"]')?.value;
                         upload.row.querySelector('[data-document-field="documentNames"]').value = ((subject ? subject.trim() + ' - ' : '') + upload.file.name).slice(0,120);
@@ -237,8 +280,13 @@
                 syncFiles();
             }
             form.addEventListener('submit', bindUploads);
+            form.addEventListener('recording:product', bindUploads);
+            form.addEventListener('change', event => {
+                if (['loanFor','loanMode'].includes(event.target.name)) bindUploads();
+            });
             async function product(changed) {
                 var id = form.elements.productId.value, sequence = ++productVersion;
+                form.dispatchEvent(new CustomEvent('recording:product',{detail:null}));
                 var draft = form.querySelector('[data-recording-draft]'); if (draft) draft.disabled = form.elements.loanFor?.value!=='GROUP'&&(form.elements.loanMode.value !== 'CONFIGURED' || clientSelect?.selectedOptions[0]?.dataset.clientKind !== 'PROVISIONAL');
                 error.hidden = true;
                 if (form.elements.loanMode.value !== 'CONFIGURED' || !id) {
@@ -249,6 +297,7 @@
                     var response = await fetch(endpoint + '/product/' + encodeURIComponent(id),{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'}});
                     if (!response.ok || response.redirected) throw new Error();
                     var data = await response.json(); if (sequence !== productVersion) return;
+                    form.dispatchEvent(new CustomEvent('recording:product',{detail:data.product}));
                     requirements = data.requirements; documentRequirements();
                     root.querySelector('[data-evidence-requirements]').textContent = requirements.map(function (item) { return item.name + ' (' + item.maxSizeMb + ' MB)'; }).join(', ');
                     if (!changed) return;
