@@ -26,7 +26,6 @@ import java.util.*;
 public class OnboardingService {
     public static final Set<String> IDENTITY_TYPES=Set.of("NATIONAL_ID","PASSPORT","VOTER_ID","DRIVING_LICENCE","OTHER");
     public static final Set<String> DOCUMENT_CATEGORIES=Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT","PROFILE_PHOTO","SPOUSE_PHOTO");
-    private static final List<String> SELF_EVIDENCE=List.of("IDENTITY","ADDRESS","ACTIVITY");
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
     public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","monthlyIncome","monthlyExpenses","monthlyDebtRepayments","employerName","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
     private final OnboardingRepository records;
@@ -154,7 +153,7 @@ public class OnboardingService {
         }
         registration.employeeNumber(a,client,p.getEmployeeNumber());
         identityFields(p,c);p.setGroupName(p.getGroupId()==null?"":records.group(a,p.getGroupId()).orElseThrow(()->invalid("groupId")).label());
-        p.setFullName(c.name());p.setPhone(c.phone());p.setEmail(c.email());p.setClientNumber(c.number());validate(p,false);
+        p.setFullName(c.name());p.setPhone(c.phone());p.setEmail(c.email());p.setClientNumber(c.number());validate(p);
         if("RECORDED".equals(f.getAction()))check(c.phone()!=null&&c.phone().matches("255[0-9]{9}"),"phone");
         UUID id=UUID.randomUUID();records.revision(a,client,id,c.sequence()+1,f.getAction(),p,identity(p),f.getRequestKey(),hash,clock.now());records.copyDocuments(a,client,c.revisionId(),id);
         event(a,client,"CLIENT_KYC_"+f.getAction());return id;
@@ -176,34 +175,6 @@ public class OnboardingService {
             var usage=records.uploadUsage(a,client);check(usage.files()<DocumentForm.MAX_FILES&&usage.bytes()+content.bytes().length<=DocumentForm.MAX_TOTAL_BYTES,"uploadLimit");
             records.document(a,client,c.revisionId(),id,upload.getId(),f,hash,clock.now());event(a,client,"CLIENT_KYC_DOCUMENT");return id;
         });
-    }
-    @Transactional(timeout=20)
-    public UUID review(AppUserPrincipal a,UUID client,ReviewForm f) {
-        authorize(a,"REVIEW");records.client(a,client,today());
-        // A combined confirmation is equivalent to all five checks on an older form.
-        if ("VERIFY".equals(f.getKind()) && f.isChecksConfirmed()) f.confirmChecks();
-        check(f.getRequestKey()!=null,"request");
-        records.lock("client_onboarding_decision/"+a.getSaccoId()+"/"+a.getStationId()+"/"+f.getRequestKey());
-        var old=records.retryReview(a,client,f);if(old.isPresent())return old.get();
-        // Retired inputs cannot imply that screening was completed.
-        f.setScreening("UNAVAILABLE");f.setScreeningReference("");f.setPolicyReference("");f.setReviewDue(null);
-        String hash=hash(List.of(client,f));
-        records.lock(client);var c=records.client(a,client,today());check(f.getRevisionId()!=null&&f.getRevisionId().equals(c.revisionId()),"changed");
-        check(Set.of("VERIFY","RETURN","REJECT","REVOKE").contains(f.getKind()),"action");
-        check(f.getKind().equals("REVOKE")?Set.of("VERIFY","EXPIRED","STALE").contains(c.state()):Set.of("SUBMITTED","RECORDED").contains(c.state()),"state");
-        text(f.getReason(),1000,"reason",true);
-        text(f.getClientMessage(),1000,"clientMessage",Set.of("RETURN","REJECT","REVOKE").contains(f.getKind()));
-        var r=records.latest(a,client).orElseThrow();
-        if(f.getKind().equals("VERIFY")) {
-            check(!client.equals(a.getMemberId())&&!r.maker().equals(a.getMemberId())&&!records.contributed(r.id(),a.getMemberId()),"independent");
-            validate(r.profile(),true);checkDocuments(r.profile(),records.documents(r.id()));
-            check(Objects.equals(c.name(),r.profile().getFullName())&&Objects.equals(c.phone(),r.profile().getPhone())&&Objects.equals(c.email(),r.profile().getEmail()),"contactChanged");
-            check(f.isIdentityChecked()&&f.isAddressChecked()&&f.isActivityChecked()&&f.isContactChecked()&&f.isDuplicatesChecked(),"checks");
-            check(f.getCheckedOn()!=null&&!f.getCheckedOn().isAfter(today())&&!f.getCheckedOn().isBefore(r.recordedAt().toLocalDate()),"checkedOn");
-            String identity=identity(r.profile());records.lock("CLIENT_IDENTITY/"+a.getSaccoId()+"/"+identity);check(!records.duplicate(a.getSaccoId(),identity,client),"duplicate");
-        }
-        UUID id=UUID.randomUUID();records.decision(a,client,id,f,hash,clock.now());
-        event(a,client,"CLIENT_KYC_"+f.getKind());return id;
     }
     @Transactional(timeout=15)
     public Download download(AppUserPrincipal a,UUID client,UUID document) {
@@ -236,25 +207,7 @@ public class OnboardingService {
         text(p.getFirstName(),80,"firstName",true);text(p.getLastName(),80,"lastName",true);text(p.getMiddleName(),80,"middleName",false);
         check(p.getFirstName().strip().matches("\\S+")&&p.getLastName().strip().matches("\\S+")&&(p.getMiddleName().isBlank()||p.getMiddleName().strip().matches("\\S+")),"nameParts");
     }
-    private void checkDocuments(Profile p,List<Document> documents) {
-        var requirements=evidenceRequirements(documents,today());
-        check(requirements.stream().noneMatch(r->"missing".equals(r.status()))
-            && (p.isSelfService()||documents.stream().anyMatch(d->"CONSENT".equals(d.category()))),"documents");
-        check(requirements.stream().noneMatch(r->"expired".equals(r.status())),"documentExpiry");
-    }
-    private List<EvidenceRequirement> evidenceRequirements(List<Document> documents,LocalDate date) {
-        var statusByCategory=new LinkedHashMap<String,String>();
-        SELF_EVIDENCE.forEach(category->statusByCategory.put(category,"missing"));
-        for (Document document:documents) {
-            if (document.expiresOn()!=null && document.expiresOn().isBefore(date)) {
-                statusByCategory.put(document.category(),"expired");
-            } else if (statusByCategory.containsKey(document.category())) {
-                statusByCategory.put(document.category(),"added");
-            }
-        }
-        return statusByCategory.entrySet().stream().map(entry->new EvidenceRequirement(entry.getKey(),entry.getValue())).toList();
-    }
-    private void validate(Profile p,boolean complete) {
+    private void validate(Profile p) {
         if(Boolean.FALSE.equals(p.getHasBusiness())) {
             p.setBusinessName("");p.setBusinessType("");p.setBusinessTin("");p.setBusinessLicence("");p.setBusinessLocation("");p.setBusinessWard("");p.setBusinessCity("");p.setDailySales(null);p.setDailyExpenditure(null);
         }
@@ -269,24 +222,16 @@ public class OnboardingService {
         text(p.getBankAccountNumber(),80,"bankAccountNumber",false);check(p.getBankAccountNumber().isBlank()||p.getBankAccountNumber().matches("[A-Za-z0-9 /._-]+"),"bankAccountNumber");
         money(p.getDailySales(),"dailySales");money(p.getDailyExpenditure(),"dailyExpenditure");money(p.getMonthlyIncome(),"monthlyIncome");money(p.getMonthlyExpenses(),"monthlyExpenses");money(p.getMonthlyDebtRepayments(),"monthlyDebtRepayments");text(p.getSpousePhone(),32,"spousePhone",false);
         if(!p.getSpousePhone().isBlank())try{p.setSpousePhone(TanzaniaPhoneNumber.normalizeRequired(p.getSpousePhone()));}catch(IllegalStateException e){throw invalid("spousePhone");}
-        if(complete) {
-            text(p.getFullName(),255,"name",true);
-            check(p.getPhone()!=null&&p.getPhone().matches("255[0-9]{9}"),"phone");
-        }
-        text(p.getIdentityType(),30,"identityType",complete);check(p.getIdentityType().isEmpty()||IDENTITY_TYPES.contains(p.getIdentityType()),"identityType");
-        text(p.getIssuingCountry(),2,"issuingCountry",complete);check(p.getIssuingCountry().isEmpty()||Arrays.asList(Locale.getISOCountries()).contains(p.getIssuingCountry()),"issuingCountry");
-        text(p.getIdentityNumber(),64,"identityNumber",complete);check(p.getIdentityNumber().isEmpty()||p.getIdentityNumber().matches("[A-Za-z0-9 /-]{4,64}"),"identityNumber");
-        check(p.getBirthDate()==null?!complete:!p.getBirthDate().isAfter(today())&&p.getBirthDate().getYear()>=1901,"birthDate");
+        text(p.getIdentityType(),30,"identityType",false);check(p.getIdentityType().isEmpty()||IDENTITY_TYPES.contains(p.getIdentityType()),"identityType");
+        text(p.getIssuingCountry(),2,"issuingCountry",false);check(p.getIssuingCountry().isEmpty()||Arrays.asList(Locale.getISOCountries()).contains(p.getIssuingCountry()),"issuingCountry");
+        text(p.getIdentityNumber(),64,"identityNumber",false);check(p.getIdentityNumber().isEmpty()||p.getIdentityNumber().matches("[A-Za-z0-9 /-]{4,64}"),"identityNumber");
+        check(p.getBirthDate()==null||!p.getBirthDate().isAfter(today())&&p.getBirthDate().getYear()>=1901,"birthDate");
         check(!(p.isIdentityNoExpiry()&&p.getIdentityExpiresOn()!=null),"identityExpiry");
-        if(complete)check(p.isIdentityNoExpiry()||(p.getIdentityExpiresOn()!=null&&!p.getIdentityExpiresOn().isBefore(today())),"identityExpiry");
-        text(p.getAddress(),1000,"address",complete);text(p.getActivity(),1000,"activity",complete);text(p.getActivityAddress(),1000,"activityAddress",complete);text(p.getSourceOfFunds(),1000,"sourceOfFunds",complete);
-        text(p.getNoticeVersion(),100,"noticeVersion",complete);text(p.getConsentReference(),1000,"consentReference",complete);text(p.getLawfulBasis(),30,"lawfulBasis",complete);
+        text(p.getAddress(),1000,"address",false);text(p.getActivity(),1000,"activity",false);text(p.getActivityAddress(),1000,"activityAddress",false);text(p.getSourceOfFunds(),1000,"sourceOfFunds",false);
+        text(p.getNoticeVersion(),100,"noticeVersion",false);text(p.getConsentReference(),1000,"consentReference",false);text(p.getLawfulBasis(),30,"lawfulBasis",false);
         check(p.getLawfulBasis().isEmpty()||Set.of("CONSENT","CONTRACT","LEGAL_OBLIGATION").contains(p.getLawfulBasis()),"lawfulBasis");
-        check(p.getConsentOn()==null?!complete:!p.getConsentOn().isAfter(today())&&p.getConsentOn().getYear()>=1901,"consentOn");
-        boolean standard=Notice.STANDARD_ID.equals(p.getNoticeId());
-        text(p.getRetentionReference(),500,"retentionReference",complete&&!standard);text(p.getLegalHoldReference(),500,"legalHoldReference",false);
-        if(complete&&!standard)check(p.getRetentionReviewOn()!=null&&!p.getRetentionReviewOn().isBefore(today()),"retentionReviewOn");
-        if(complete&&p.isSelfService())check(p.isNoticeAcknowledged()&&p.isDeclarationAccepted()&&p.getAcknowledgedAt()!=null&&p.getNoticeId()!=null&&!p.getNoticeEnglish().isBlank()&&!p.getNoticeKiswahili().isBlank(),"acknowledgement");
+        check(p.getConsentOn()==null||!p.getConsentOn().isAfter(today())&&p.getConsentOn().getYear()>=1901,"consentOn");
+        text(p.getRetentionReference(),500,"retentionReference",false);text(p.getLegalHoldReference(),500,"legalHoldReference",false);
     }
     private void money(java.math.BigDecimal value,String field) {check(value==null||value.signum()>=0&&value.scale()<=2&&value.compareTo(new java.math.BigDecimal("9999999999999999.99"))<=0,field);}
     private Download prepare(MultipartFile f) {

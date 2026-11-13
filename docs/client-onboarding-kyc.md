@@ -1,5 +1,7 @@
 # Client onboarding and KYC
 
+13 November 2026: Staff client recording and details no longer include a review, verification, return, rejection or revocation action. The recording preview is Summary. The review route, request DTO, write services and form handlers are removed. `CLIENT_ONBOARDING_REVIEW` remains only as an unavailable historical identifier, with no access-matrix action or effective permission. Existing decisions, profile versions, documents and audit records remain read-only history. Saving a profile does not create verification evidence; existing configured lending KYC gates remain in force. The earlier workflow descriptions below are historical.
+
 31 October 2026: [Provisional registration](provisional-client-registration.md) supersedes the earlier assisted-number/password behavior below. Both channels now use automatic client numbers; assisted records have no portal access until verified registration activation. Loan-request drafts are available during onboarding.
 
 Implementation date: 27 October 2026. This implements the individual-client operational workflow in G01 of the research audit. Existing registration and client identifiers remain in place. Registration, an OTP, a signature label and a loan estimate do not establish verified KYC.

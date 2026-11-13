@@ -4,8 +4,7 @@
 <div class="erp-page-header erp-detail-header" data-aws-page-header>
 <h1 class="erp-page-title"><spring:message code="kyc.details"/></h1>
 <c:if test="${not historical}"><div class="accounting-actions" data-aws-action-pin="true">
-    <c:set var="showReview" value="${not empty reviewForm}"/>
-    <sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><a class="app-btn ${showReview?'btn-neutral':'btn-launch'}" href="<c:url value='/finance/loan-records/new'><c:param name='clientId' value='${client.id}'/></c:url>"><spring:message code="applications.create"/></a></sec:authorize>
+    <sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-records/new'><c:param name='clientId' value='${client.id}'/></c:url>"><spring:message code="applications.create"/></a></sec:authorize>
     <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT' or client.state=='RECORDED'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize>
 </div></c:if>
 </div>
@@ -34,19 +33,15 @@
     <%@ include file="documents.jspf" %>
     </div>
 </c:if>
-<div id="client-review" class="kyc-detail-group" data-detail-panel>
-<h2 class="sr-only"><spring:message code="${empty reviewForm and empty decisions?'kyc.history':'kyc.review'}"/></h2>
+<div id="client-history" class="kyc-detail-group" data-detail-panel>
+<h2 class="sr-only"><spring:message code="kyc.history"/></h2>
 <c:if test="${not empty revision}">
-    <c:forEach items="${decisions}" var="decision"><section class="erp-resource-section"><h2><spring:message code="kyc.review"/></h2><dl class="erp-detail-facts">
+    <c:forEach items="${decisions}" var="decision"><section class="erp-resource-section"><h2><spring:message code="kyc.field.decision"/></h2><dl class="erp-detail-facts">
         <div><dt><spring:message code="kyc.field.state"/></dt><dd><c:set var="onboardingStatusState" value="${decision.kind}"/><%@ include file="status.jspf" %></dd></div>
         <c:forEach items="${historical ? ['reason','clientMessage','screening','screeningReference','checkedOn','reviewDue','policyReference'] : ['reason','clientMessage','checkedOn']}" var="field"><div><dt><spring:message code="kyc.field.${field}"/></dt><dd><c:choose><c:when test="${field=='screening'}"><spring:message code="kyc.screening.${decision.screening}"/></c:when><c:otherwise><c:out value="${decision[field]}"/></c:otherwise></c:choose></dd></div></c:forEach>
         <div><dt><spring:message code="kyc.recordedBy"/></dt><dd><c:out value="${decision.actorName}"/> &#183; <c:out value="${appTime:display(decision.recordedAt)}"/></dd></div>
     </dl></section></c:forEach>
 </c:if>
-<c:if test="${not historical and showReview}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_REVIEW')">
-<c:url value="/finance/clients/onboarding/${client.id}/review" var="reviewUrl"/>
-<%@ include file="review-form.jspf" %>
-</sec:authorize></c:if>
 <section class="erp-resource-section"><h2><spring:message code="kyc.history"/></h2>
     <c:forEach items="${history.rows}" var="entry"><p><a class="resource-table-id-link" href="<c:url value='/finance/clients/onboarding/${client.id}/versions/${entry.sequence}'/>"><spring:message code="kyc.version"/> <c:out value="${entry.sequence}"/></a> &#183; <c:set var="onboardingStatusState" value="${entry.result}"/><%@ include file="status.jspf" %> &#183; <c:out value="${entry.actor}"/> &#183; <c:out value="${appTime:display(entry.recordedAt)}"/></p></c:forEach>
     <c:if test="${history.page>0}"><a href="?page=${history.page-1}"><spring:message code="common.previous"/></a></c:if>

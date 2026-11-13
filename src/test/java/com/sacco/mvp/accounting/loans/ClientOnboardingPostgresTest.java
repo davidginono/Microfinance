@@ -42,7 +42,6 @@ class ClientOnboardingPostgresTest {
     void documents(UUID client,UUID revision) {
         for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")){var form=new DocumentForm();form.setRevisionId(revision);form.setCategory(category);service.attach(f.actor,client,form,image());}
     }
-    ReviewForm decision(UUID revision){var form=new ReviewForm();form.setRevisionId(revision);form.setIdentityChecked(true);form.setAddressChecked(true);form.setActivityChecked(true);form.setContactChecked(true);form.setDuplicatesChecked(true);form.setReason("Synthetic independent evidence review");form.setClientMessage("Please provide a current address document.");form.setCheckedOn(day);return form;}
     void policy(){var controls=f.context.getBean(CreditControlService.class);var p=new PolicyForm();p.setExpectedRevision(controls.policy(f.actor).revision());p.setKycRequired(true);p.setReference("Synthetic approved branch KYC gate");p.setVerified(true);controls.configure(f.actor,p);}
     String gate(){return f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day);}
     UUID otherClient(String branch){var id=UUID.randomUUID();f.jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,phone,status,position,is_member,password_hash,client_portal_enabled,created_at) values(?,?,?,?,'Synthetic second client',?,'ACTIVE','MEMBER',true,'!NO_PORTAL_ACCESS',false,now())",id,f.institution,branch,id.toString(),phone());return id;}
@@ -76,18 +75,17 @@ class ClientOnboardingPostgresTest {
         form.getProfile().setMonthlyExpenses(null);form.getProfile().setMonthlyDebtRepayments(new java.math.BigDecimal("-1"));
         assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyDebtRepayments");
     }
-    @Test void recordedProfileNeedsAnIndependentEvidenceCheckAndNeverGainsLoginAccess() {
+    @Test void recordedProfilesStayUnverifiedWithoutCreatingReviewDecisionsOrLoginAccess() {
         var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());form.setAction("RECORDED");
         form.getProfile().setEmployeeNumber("EMP-1001");UUID draft=service.save(f.actor,f.client,form);
         documents(f.client,draft);var complete=service.profileForm(f.actor,f.client);complete.setAction("RECORDED");UUID revision=service.save(f.actor,f.client,complete);policy();
         assertThat(service.client(f.actor,f.client).state()).isEqualTo("RECORDED");
         assertThat(gate()).isNotNull();
         assertThat(f.jdbc.queryForObject("select employee_number from members where id=?",String.class,f.client)).isEqualTo("EMP-1001");
-        assertThatThrownBy(()->service.review(f.actor,f.client,decision(revision))).hasMessage("kyc.error.independent");
-        var reviewer=f.operator("B1");UUID checked=service.review(reviewer,f.client,decision(revision));
-        assertThat(checked).isNotNull();assertThat(service.client(reviewer,f.client).state()).isEqualTo("VERIFY");assertThat(gate()).isNull();
+        assertThat(service.decisions(f.actor,f.client)).isEmpty();
+        assertThat(f.jdbc.queryForObject("select count(*) from client_onboarding_decision where client_id=?",Integer.class,f.client)).isZero();
         assertThat(f.jdbc.queryForObject("select client_portal_enabled from members where id=?",Boolean.class,f.client)).isFalse();
-        assertThatThrownBy(()->service.review(f.operator("B2"),f.client,decision(revision))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.latest(f.operator("B2"),f.client)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void extendedAssistedProfileCreatesOneIdentityWithOptionalEmailAndPreservesItsNumberOnCorrection() {
         UUID group=group("B1");var form=new CreateForm();var p=form.getProfile();p.setFirstName("Synthetic");p.setLastName("Borrower");p.setPhone(phone());p.setMaritalStatus("MARRIED");p.setGender("FEMALE");p.setDependants(2);p.setGroupId(group);p.setCity("Synthetic city");p.setBusinessName("Synthetic shop");p.setBusinessTin("123-456-789");p.setDailySales(new java.math.BigDecimal("125000.50"));p.setDailyExpenditure(new java.math.BigDecimal("75000.25"));p.setSpouseName("Synthetic spouse");p.setSpousePhone("0712345678");p.setBankName("Synthetic bank");p.setBankAccountName("Synthetic Borrower");p.setBankAccountNumber("1234567890");

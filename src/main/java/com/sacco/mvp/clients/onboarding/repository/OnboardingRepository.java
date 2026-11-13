@@ -81,20 +81,6 @@ public class OnboardingRepository {
         if(!rows.getFirst().getValue().equals(hash))throw new IllegalArgumentException("kyc.error.retry");
         return Optional.of(rows.getFirst().getKey());
     }
-    public Optional<UUID> retryReview(AppUserPrincipal a,UUID client,ReviewForm f) {
-        var rows=jdbc.query("""
-            select id, actor_id=? and client_id=? and revision_id=? and kind=? and reason=?
-                and client_message=? and identity_checked=? and address_checked=? and activity_checked=?
-                and contact_checked=? and duplicates_checked=? and checked_on is not distinct from ?::date
-            from client_onboarding_decision where sacco_id=? and station_id=? and request_key=?
-            """,(r,n)->Map.entry(r.getObject(1,UUID.class),r.getBoolean(2)),
-            a.getMemberId(),client,f.getRevisionId(),f.getKind(),Objects.toString(f.getReason(),"").strip(),
-            Objects.toString(f.getClientMessage(),"").strip(),f.isIdentityChecked(),f.isAddressChecked(),f.isActivityChecked(),
-            f.isContactChecked(),f.isDuplicatesChecked(),f.getCheckedOn(),a.getSaccoId(),a.getStationId(),f.getRequestKey());
-        if(rows.isEmpty())return Optional.empty();
-        if(!rows.getFirst().getValue())throw new IllegalArgumentException("kyc.error.retry");
-        return Optional.of(rows.getFirst().getKey());
-    }
     public UUID created(UUID request) {return jdbc.queryForObject("select client_id from client_onboarding_creation where id=?",UUID.class,request);}
     public void creation(AppUserPrincipal a,UUID client,UUID id,UUID key,String hash,OffsetDateTime now) {
         jdbc.update("insert into client_onboarding_creation values(?,?,?,?,?,?,?,?)",id,client,a.getSaccoId(),a.getStationId(),key,hash,a.getMemberId(),now);
@@ -174,9 +160,6 @@ public class OnboardingRepository {
     public UUID upload(AppUserPrincipal a,UUID client,UUID document) {
         return jdbc.query("select upload_id from client_onboarding_document where id=? and client_id=? and sacco_id=? and station_id=?",(r,n)->r.getObject(1,UUID.class),document,client,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new AccessDeniedException("Document unavailable"));
     }
-    public boolean contributed(UUID revision,UUID actor) {
-        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from client_onboarding_document_link x join client_onboarding_document d on d.id=x.document_id where x.revision_id=? and d.actor_id=?)",Boolean.class,revision,actor));
-    }
     public boolean duplicate(String institution,String identity,UUID client) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
             select exists(select 1 from client_onboarding_identity where sacco_id=? and identity_key=? and client_id<>?)
@@ -184,9 +167,6 @@ public class OnboardingRepository {
                 and not exists(select 1 from client_onboarding_revision newer where newer.client_id=r.client_id and newer.sequence>r.sequence)
                 and not exists(select 1 from client_onboarding_decision d where d.revision_id=r.id and d.kind in('RETURN','REJECT','REVOKE')))
             """,Boolean.class,institution,identity,client,institution,identity,client));
-    }
-    public void decision(AppUserPrincipal a,UUID client,UUID id,ReviewForm f,String hash,OffsetDateTime now) {
-        jdbc.update("insert into client_onboarding_decision values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",id,f.getRevisionId(),client,a.getSaccoId(),a.getStationId(),f.getKind(),f.getReason().strip(),f.isIdentityChecked(),f.isAddressChecked(),f.isActivityChecked(),f.isContactChecked(),f.isDuplicatesChecked(),f.getScreening(),f.getScreeningReference().strip(),f.getCheckedOn(),f.getReviewDue(),f.getPolicyReference().strip(),f.getRequestKey(),hash,a.getMemberId(),now,f.getClientMessage().strip());
     }
     public Notice notice() {
         return jdbc.queryForObject("select * from client_onboarding_data_notice()",

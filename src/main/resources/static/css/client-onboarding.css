@@ -1,5 +1,4 @@
 .kyc-profile-fields { border: 0; margin: 0; padding: 0; min-width: 0; }
-.kyc-review-fields[hidden] { display: none; }
 
 .kyc-section-body { padding: 1rem; min-width: 0; overflow-wrap: anywhere; }
 .kyc-notice-text { white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -22,7 +21,6 @@
 .kyc-creation-uploads > .app-btn[hidden] { display: none; }
 [data-profile-creation-files] input[type="file"] { width: 100%; min-width: 0; }
 .kyc-form-fields { display: grid; gap: 16px; max-width: 728px; min-width: 0; }
-.kyc-review-fields { display: grid; gap: 16px; min-width: 0; }
 .kyc-field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .kyc-income-choices { border: 0; margin: 0; padding: 0; min-width: 0; }
 .kyc-income-choices legend { padding: 0; margin-bottom: 6px; font-size: 14px; line-height: 20px; font-weight: 700; }

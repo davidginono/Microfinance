@@ -17,7 +17,7 @@ class UserClaimTest {
     }
     @Test
     void obsoleteReportClaimsKeepIdentifiersButCannotBeAssignedOrLoaded() {
-        var retired = java.util.List.of(UserClaim.REPORT_TEMPLATE_DESIGN, UserClaim.REPORT_TEMPLATE_PUBLISH,
+        var retired = java.util.List.of(UserClaim.CLIENT_ONBOARDING_REVIEW, UserClaim.REPORT_TEMPLATE_DESIGN, UserClaim.REPORT_TEMPLATE_PUBLISH,
             UserClaim.REPORT_TEMPLATE_SHARE, UserClaim.REPORT_RUN, UserClaim.REPORT_EXPORT,
             UserClaim.REPORT_RUN_APPROVE, UserClaim.REPORT_JOBS_REVIEW, UserClaim.FINANCIAL_REPORTS_FINALIZE,
             UserClaim.ACCESS_MATRIX_VIEW, UserClaim.ACCESS_MATRIX_UPDATE, UserClaim.LOAN_DOCUMENTS_CREATE);

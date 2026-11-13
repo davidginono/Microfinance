@@ -3,7 +3,7 @@
           data-personal="<spring:message code='kyc.wizard.personal'/>"
           data-finances="<spring:message code='kyc.wizard.finances'/>"
           data-documents="<spring:message code="${publicProfileRegistration or formKind=='create' ? 'kyc.documents' : 'kyc.wizard.documents'}"/>"
-          data-review="<spring:message code="${formKind=='profile' ? 'resource.details.summary' : formKind=='create' ? 'kyc.review' : 'kyc.wizard.review'}"/>"
+          data-review="<spring:message code="${formKind=='profile' or formKind=='create' ? 'resource.details.summary' : 'kyc.wizard.review'}"/>"
           data-navigation="<spring:message code='kyc.wizard.navigation'/>"
           data-step="<spring:message code='kyc.wizard.step'/>"
           data-edit="<spring:message code='common.edit'/>"

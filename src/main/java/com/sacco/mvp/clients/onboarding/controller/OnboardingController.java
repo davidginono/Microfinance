@@ -25,7 +25,6 @@ public class OnboardingController {
     @InitBinder("createForm") void createBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(DocumentForm.MAX_FILES);b.setAllowedFields(fields("requestKey","enrollGroupId","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","documents[*].category","documents[*].expiresOn","documents[*].file"));}
     @InitBinder("profileForm") void profileBinder(WebDataBinder b) {b.setAllowedFields(fields("requestKey","expectedSequence","action","profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email","profile.legalHoldReference"));}
     @InitBinder("documentForm") void documentBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","category","expiresOn");}
-    @InitBinder("reviewForm") void reviewBinder(WebDataBinder b) {b.setAllowedFields("requestKey","revisionId","kind","reason","clientMessage","checksConfirmed","identityChecked","addressChecked","activityChecked","contactChecked","duplicatesChecked","checkedOn");}
 
     private static String[] fields(String... base) {return java.util.stream.Stream.concat(Arrays.stream(base),Arrays.stream(OnboardingService.PERSONAL_FIELDS).map(f->"profile."+f)).toArray(String[]::new);}
     @PostMapping("/contact-check") @ResponseBody public ResponseEntity<ContactCheck> contactCheck(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID clientId,@RequestParam String field,@RequestParam String value) {
@@ -52,10 +51,6 @@ public class OnboardingController {
     }
     @GetMapping("/{id}") public String details(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,Model m) {
         context(a,id,m);m.addAttribute("decisions",service.decisions(a,id));m.addAttribute("history",service.history(a,id,page));m.addAttribute("duplicate",service.duplicate(a,id));
-        var c=(Client)m.getAttribute("client");
-        if(a.getClaims().contains("CLIENT_ONBOARDING_REVIEW") && Set.of("RECORDED","SUBMITTED","VERIFY","EXPIRED","STALE").contains(c.state()) && !m.containsAttribute("reviewForm")) {
-            var f=new ReviewForm();f.setRevisionId(c.revisionId());f.setKind(Set.of("SUBMITTED","RECORDED").contains(c.state())?"VERIFY":"REVOKE");f.setCheckedOn(service.today());m.addAttribute("reviewForm",f);
-        }
         return "onboarding/details";
     }
     @GetMapping({"/{id}/loan","/{id}/loan/edit","/{id}/loan/products","/{id}/loan/continue"}) public String retiredLoan(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id) {
@@ -80,10 +75,6 @@ public class OnboardingController {
         service.authorize(a,"UPDATE");if(!errors.hasErrors())try{service.attach(a,id,f,file);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}
         context(a,id,m);return form(m,"document");
     }
-    @PostMapping("/{id}/review") public String review(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute("reviewForm") ReviewForm f,BindingResult errors,Model m) {
-        service.authorize(a,"REVIEW");if(!errors.hasErrors())try{service.review(a,id,f);return "redirect:"+ROOT+"/"+id;}catch(IllegalArgumentException e){reject(errors,e);}
-        return details(a,id,0,m);
-    }
     @GetMapping("/{id}/documents/{document}") public ResponseEntity<byte[]> download(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID document) {
         var file=service.download(a,id,document);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox")
@@ -97,10 +88,6 @@ public class OnboardingController {
     }
     private static void reject(BindingResult errors,IllegalArgumentException e) {
         String key=key(e);
-        if (errors.getObjectName().equals("reviewForm") && key.equals("kyc.error.checks")) {
-            errors.rejectValue("checksConfirmed",key);
-            return;
-        }
         if(Set.of("createForm","profileForm").contains(errors.getObjectName())) {
             String field=key.substring("kyc.error.".length());if(field.equals("identityExpiry"))field="identityExpiresOn";if(field.equals("nameParts")||field.equals("name"))field="firstName";
             if(Arrays.asList(fields("profile.firstName","profile.middleName","profile.lastName","profile.phone","profile.email")).contains("profile."+field)){errors.rejectValue("profile."+field,key);return;}

@@ -37,7 +37,6 @@ public final class OnboardingDtos {
     public record Notice(UUID id, String version, String english, String kiswahili) {
         public static final UUID STANDARD_ID=UUID.fromString("59bf1107-d9c1-44ca-a91f-e4b266123d3c");
     }
-    public record EvidenceRequirement(String category, String status) {}
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)
     @Data public static class ClientProfile {
         private String firstName="", middleName="", lastName="", phone="", email="";
@@ -111,20 +110,6 @@ public final class OnboardingDtos {
         private org.springframework.web.multipart.MultipartFile file;
     }
     public record GroupChoice(UUID id,String label) {}
-    @Data public static class ReviewForm {
-        private UUID requestKey=UUID.randomUUID();
-        private UUID revisionId;
-        private String kind="VERIFY", reason="", clientMessage="";
-        @com.fasterxml.jackson.annotation.JsonIgnore private String screening="UNAVAILABLE", screeningReference="", policyReference="";
-        private boolean identityChecked, addressChecked, activityChecked, contactChecked, duplicatesChecked;
-        @com.fasterxml.jackson.annotation.JsonIgnore private boolean checksConfirmed;
-        @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate checkedOn;
-        @com.fasterxml.jackson.annotation.JsonIgnore private LocalDate reviewDue;
-
-        public void confirmChecks() {
-            identityChecked = addressChecked = activityChecked = contactChecked = duplicatesChecked = true;
-        }
-    }
     @Data public static class DocumentForm {
         public static final int MAX_FILES=10, MAX_FILE_BYTES=1024*1024, MAX_TOTAL_BYTES=MAX_FILES*MAX_FILE_BYTES;
         private UUID requestKey=UUID.randomUUID();
