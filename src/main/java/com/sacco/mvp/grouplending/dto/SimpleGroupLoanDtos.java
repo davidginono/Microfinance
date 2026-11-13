@@ -19,7 +19,6 @@ public final class SimpleGroupLoanDtos {
     @Data public static class ApplicationForm {
         private UUID groupId;
         private int expectedVersion;
-        private String reference="",language="SW";
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate signedOn;
         private boolean checked;
         private List<ExternalDebt> debts=new ArrayList<>();

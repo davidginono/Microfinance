@@ -131,10 +131,10 @@ public class SimpleGroupLoanRepository {
     }
     public void contract(AppUserPrincipal a,UUID loan,Prepared p,ApplicationForm f,String requestHash,String snapshot,byte[] pdf,String filename,OffsetDateTime now) {
         jdbc.update("""
-            insert into staff_group_loan(loan_id,group_id,sacco_id,station_id,leader_id,group_version,snapshot,reference,language,filename,body,recorded_by,recorded_at,terms_hash,request_hash)
-            values(?,?,?,?,?,?,?::jsonb,?,?,?,?,?,?,(select loan_group_terms(l) from loan_applications l where id=?),?)
+            insert into staff_group_loan(loan_id,group_id,sacco_id,station_id,leader_id,group_version,snapshot,filename,body,recorded_by,recorded_at,terms_hash,request_hash)
+            values(?,?,?,?,?,?,?::jsonb,?,?,?,?,(select loan_group_terms(l) from loan_applications l where id=?),?)
             """,loan,p.setup().groupId(),a.getSaccoId(),a.getStationId(),p.setup().leaderId(),p.setup().version(),snapshot,
-            f.getReference().strip(),f.getLanguage(),filename,pdf,a.getMemberId(),now,loan,requestHash);
+            filename,pdf,a.getMemberId(),now,loan,requestHash);
         var rows=new ArrayList<Object[]>();for(var person:p.assessments())rows.add(new Object[]{loan,person.clientId(),person.number(),person.name(),f.getSignedOn(),person.income(),person.expenses(),person.debt(),person.source(),person.evidence(),person.profileRevision()});
         jdbc.batchUpdate("insert into staff_group_borrower(loan_id,client_id,client_number,client_name,signed_on,income,expenses,debt,income_source,evidence,profile_revision) values(?,?,?,?,?,?,?,?,?,?,?)",rows);
     }

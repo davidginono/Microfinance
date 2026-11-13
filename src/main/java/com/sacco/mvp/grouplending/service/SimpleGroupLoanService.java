@@ -149,7 +149,7 @@ public class SimpleGroupLoanService {
         debt=records.monthlyDebt(a,s.groupId()).add(externalDebt);
         capacity=income.subtract(expenses).subtract(debt).multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,RoundingMode.DOWN);
         BigDecimal monthly=LoanAmortizationCalculator.monthlyEquivalent(quote.maximumInstallment(),product.getResolvedRepaymentFrequency());check(capacity.signum()>0&&monthly.compareTo(capacity)<=0,"affordability");
-        if(submitting){check(g.isChecked(),"signatures");text(g.getReference(),500);check(Set.of("EN","SW").contains(g.getLanguage()),"signatures");
+        if(submitting){check(g.isChecked(),"signatures");
 
         }
         f.setIncome(income);f.setExpenses(expenses);f.setOtherDebt(debt);f.setBusiness(s.name());f.setInformationSource(submitting&&assessments.stream().allMatch(x->x.source().startsWith("CLIENT_DOCUMENT:"))?"DOCUMENTED":"DECLARED");
@@ -201,7 +201,6 @@ public class SimpleGroupLoanService {
         check(f.getPurpose()!=null&&f.getPurpose().length()<=500&&f.getNotes()!=null&&f.getNotes().length()<=500,"request");
         if(f.getPrincipal()!=null)money(f.getPrincipal(),true);
         var details=f.getApplicationDetails();if(details!=null){check(details.getFields()!=null&&details.getFields().size()<=100&&details.getGuarantors()!=null&&details.getGuarantors().size()<=20&&details.getCollateral()!=null&&details.getCollateral().size()<=20,"request");check(details.getFields().values().stream().allMatch(v->v!=null&&v.length()<=1000),"request");}
-        var g=f.getGroupApplication();check(g.getReference()!=null&&g.getReference().length()<=500,"request");
     }
     private static void text(String s,int max){check(s!=null&&!s.isBlank()&&s.length()<=max&&s.codePoints().noneMatch(Character::isISOControl),"request");}
     private static void check(boolean ok,String error){if(!ok)throw new IllegalArgumentException("simpleGroup.error."+error);}

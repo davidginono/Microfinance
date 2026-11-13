@@ -12,7 +12,7 @@
                 var group=kind.value==='GROUP';
                 form.querySelectorAll('[data-individual-loan]').forEach(function (node) {node.hidden=group;node.querySelectorAll('input,select,textarea').forEach(function (field) {field.disabled=group;});});
                 panel.hidden=!group;panel.querySelectorAll('input,select,textarea,button').forEach(function (field) {field.disabled=!group;});
-                form.querySelectorAll('[data-group-guarantee]').forEach(function(node){node.hidden=!group;node.querySelectorAll('input').forEach(function(field){field.disabled=!group;});});
+                form.querySelectorAll('[data-group-guarantee], [data-group-confirmation]').forEach(function(node){node.hidden=!group;node.querySelectorAll('input').forEach(function(field){field.disabled=!group;});});
                 form.querySelectorAll('[data-repeat-list="guarantors"] [name$=".fullName"]').forEach(function(field){field.closest('.loan-form-grid > div').hidden=group;field.disabled=group;});
                 var draft=form.querySelector('[data-recording-draft]');if(group&&draft)draft.disabled=false;
             }

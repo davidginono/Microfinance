@@ -43,7 +43,7 @@ class SimpleGroupLoanPostgresTest {
     void configure(String account){var current=service.setup(f.actor,group);var setup=new SetupForm();setup.setExpectedVersion(current.version());setup.setLeaderId(current.people().getFirst().id());setup.setDestinationType("BANK_ACCOUNT");setup.setProvider("Synthetic bank");setup.setHolder("Five borrowers group");setup.setIdentifier(account);setup.setEvidence("Checked signed group bank instruction");setup.setChecked(true);service.configure(f.actor,group,setup);}
     RecordForm application(){
         var form=f.form();form.setLoanFor("GROUP");form.setClientId(null);form.setApplicationDate(DAY);form.setPrincipal(new BigDecimal("5000000.00"));form.setTenureValue(10);
-        var application=form.getGroupApplication();var setup=service.setup(f.actor,group);application.setGroupId(group);application.setExpectedVersion(setup.version());application.setReference("SYNTHETIC-SIGNED-GROUP");application.setLanguage("EN");application.setChecked(true);application.setSignedOn(DAY);
+        var application=form.getGroupApplication();var setup=service.setup(f.actor,group);application.setGroupId(group);application.setExpectedVersion(setup.version());application.setChecked(true);application.setSignedOn(DAY);
         return form;
     }
     MockMultipartFile paper(){try(var pdf=new PDDocument();var out=new ByteArrayOutputStream()){pdf.addPage(new PDPage());pdf.save(out);return new MockMultipartFile("groupAgreement","synthetic-signed-group.pdf","application/pdf",out.toByteArray());}catch(Exception e){throw new AssertionError(e);}}
@@ -58,7 +58,10 @@ class SimpleGroupLoanPostgresTest {
     void nextDay(){var day=DAY.plusDays(2);var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(day);when(clock.now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
     Posting pay(UUID loan,String amount,String payer){var post=f.post(loan,amount,"P-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY.plusDays(2));post.setSharedPayer(payer);return f.service.repay(f.actor,post);}
     @Test void fivePeopleCreateOneLoanWithoutRulesAuthoritiesOrPersonalShares(){
-        UUID loan=record();assertThat(f.jdbc.queryForObject("select count(*) from staff_group_borrower where loan_id=?",Integer.class,loan)).isEqualTo(5);
+        UUID loan=record();
+        var agreement=f.jdbc.queryForMap("select reference,language,filename from staff_group_loan where loan_id=?",loan);
+        assertThat(agreement.get("reference")).isNull();assertThat(agreement.get("language")).isNull();assertThat(agreement.get("filename")).isEqualTo("synthetic-signed-group.pdf");
+        assertThat(f.jdbc.queryForObject("select count(*) from staff_group_borrower where loan_id=?",Integer.class,loan)).isEqualTo(5);
         assertThat(f.jdbc.queryForObject("select amount from loan_applications where id=?",BigDecimal.class,loan)).isEqualByComparingTo("5000000.00");
         assertThat(f.jdbc.queryForObject("select count(*) from lending_group_authority where sacco_id=?",Integer.class,f.institution)).isZero();
         assertThat(f.jdbc.queryForObject("select count(*) from lending_group_policy where sacco_id=?",Integer.class,f.institution)).isZero();

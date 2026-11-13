@@ -20,7 +20,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SimpleGroupFormRenderingTest {
     @TempDir Path temporary;
     @Test void compactRecordingAndReadOnlyEvidenceRenderInBothLanguages() throws Exception {
-        for(String name:List.of("simple-group-fields.jspf","simple-group-details.jspf","choice-search.jspf"))Files.copy(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans",name),temporary.resolve(name));
+        try(var fragments=Files.list(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans"))){
+            for(var file:fragments.filter(path->path.toString().endsWith(".jspf")).toList())Files.copy(file,temporary.resolve(file.getFileName()));
+        }
         String recording=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/record-form.jsp"));
         int labels=recording.indexOf("<form:form");
         String formOpening=recording.substring(labels,recording.indexOf("<form:hidden",labels));
@@ -31,7 +33,8 @@ class SimpleGroupFormRenderingTest {
             <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
             <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
             """+formOpening+"""
-            <%@ include file="simple-group-fields.jspf" %></form:form>
+            <div id="recording-panel-loan"><%@ include file="simple-group-fields.jspf" %></div>
+            <%@ include file="recording-evidence-panels.jspf" %></form:form>
             <!--details--><%@ include file="simple-group-details.jspf" %>
             """);
         var tomcat=new Tomcat();tomcat.setBaseDir(temporary.resolve("tomcat").toString());tomcat.setPort(0);tomcat.getConnector().setProperty("address","127.0.0.1");
@@ -56,9 +59,14 @@ class SimpleGroupFormRenderingTest {
                 var response=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/form")).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
                 assertThat(response.statusCode()).as(response.body()).isEqualTo(200);String body=response.body();
                 String entry=body.substring(0,body.indexOf("<!--details-->"));
-                assertThat(entry).doesNotContain("<spring:message","&lt;spring:message","firstPaymentDate",".incomeSource",".signers[","data-group-roster","simple-group-borrower","data-profile-label");
+                assertThat(entry).doesNotContain("<spring:message","&lt;spring:message","firstPaymentDate",".incomeSource",".signers[","data-group-roster","simple-group-borrower","data-profile-label","groupApplication.reference","groupApplication.language");
                 assertThat(entry.split("name=\"groupApplication.signedOn\"",-1)).hasSize(2);
-                assertThat(entry).contains("2026-11-12","groupApplication.reference","groupAgreement");
+                assertThat(entry).contains("2026-11-12","groupAgreement");
+                String loan=entry.substring(0,entry.indexOf("id=\"recording-panel-guarantors\""));
+                String collateral=entry.substring(entry.indexOf("id=\"recording-panel-collateral\""),entry.indexOf("id=\"recording-panel-attachments\""));
+                assertThat(loan).doesNotContain("groupApplication.checked",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)));
+                assertThat(collateral).contains("data-group-confirmation","name=\"groupApplication.checked\"",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)),messages.getMessage("simpleGroup.checked",null,Locale.forLanguageTag(language)));
+                assertThat(collateral.indexOf("data-group-confirmation")).isGreaterThan(collateral.indexOf("data-add-row=\"collateral\""));
                 assertThat(body).contains("Historical budget reference").doesNotContain("CLIENT_PROFILE:");
             }
         }finally{tomcat.stop();tomcat.destroy();spring.close();}
