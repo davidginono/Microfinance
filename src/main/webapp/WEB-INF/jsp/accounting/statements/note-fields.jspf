@@ -8,3 +8,6 @@
 <label><spring:message code="fs.setup.text" /><textarea class="aws-control" name="notes[${rowIndex}].text" maxlength="5000" rows="4"><c:out value="${row.text}" /></textarea></label>
 <label><spring:message code="fs.setup.textSw" /><textarea class="aws-control" name="notes[${rowIndex}].textSw" maxlength="5000" rows="4"><c:out value="${row.textSw}" /></textarea></label>
 </div>
+<div class="fs-setup-actions">
+<button type="button" class="app-btn btn-neutral erp-icon-btn" data-setup-remove aria-label="<spring:message code='fs.setup.remove' />" title="<spring:message code='fs.setup.remove' />"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+</div>

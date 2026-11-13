@@ -93,6 +93,8 @@ Do not stack routine information banners below a page heading or use success not
 - Resource filters show names/labels only in selected values and dropdown options, without code prefixes. Preserve the submitted IDs/codes and localized names; apply this at the option source so native and enhanced selects agree.
 - Group fields by identity, business/employment, cash flow, guarantors, collateral, and documents when relevant. Preserve field values and inline errors across failed submissions.
 - Arrange related controls with wrapping flex or responsive grid tracks and `min-width: 0`. Keep command buttons compact, allowing labels to wrap when necessary without clipping.
+- Repeated form sections need visible breathing room: use a parent grid/flex gap (normally 20px), 20px section-body padding (16px on mobile), and space between the legend, fields and row tools. Inspect the computed shared-shell styles: the legacy `.erp-panel-body` 10px `!important` padding can squeeze a new form even when its local CSS looks correct. Scope any needed correction to the affected form; retain compact controls and stack related fields when their actual container becomes narrow.
+- Repeated editable rows use compact arrow-up / arrow-down icons for ordering and an X for removal, grouped with an 8px gap. Use `erp-icon-btn`, localized `aria-label` and `title`, and decorative SVGs; retain visible labels for save/post and other financial commands. Apply the same markup to initial rows and add-row templates, and verify icons, keyboard focus, order and submitted field names after adding, moving and removing rows.
 
 ## AWS searchable selectors
 
@@ -145,6 +147,7 @@ The global page preloader has been removed. Same-origin workspace links, Create/
 - Check representative widths of 360px, 768px, 1366px, and 1920px, plus long institution/client names and both languages.
 - Only a table's scroll viewport may overflow horizontally. Page content, menus, dialogs, and toolbars must fit without clipped labels or overlapping actions.
 - Preserve the mobile sidebar, profile/notification dropdowns, visible focus, label associations, and touch-friendly controls. Keep the key loan context near the action at every width.
+- Inspect section spacing and field widths as well as page overflow: check panel-to-panel gaps, legend-to-field padding and row-tool separation, including long labels and dynamically added rows.
 - Capture rendered screenshots and exercise affected interactions when browser access is available. If the application cannot be run, report that visual verification is pending rather than claiming it passed.
 - JSP changes need runtime rendering checks; Java compilation alone does not prove JSP correctness. Keep any temporary screenshots or diagnostic helpers out of production commits.
 - For creation flows, also check invalid submissions, value preservation, optional-section errors, dirty Cancel/navigation, Escape and Tab behavior, repeated row add/remove, clean modal reopen, success/X return, and breadcrumb position after scrolling. Keep JSP fragments containing localized text or punctuation explicitly UTF-8.
