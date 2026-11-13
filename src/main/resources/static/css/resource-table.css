@@ -32,6 +32,10 @@
 .aws-console .resource-table-preferences-button { border:0 !important; border-left:1px solid #d5dbdb !important; border-radius:0 !important; background:transparent !important; padding:5px 8px 5px 12px; min-width:32px; min-height:28px; }
 .aws-console [data-resource-table] > .erp-table-scroll { width:100%; min-width:0; max-width:100%; overflow:auto; }
 .aws-console [data-resource-table] .erp-table { width:100%; }
+/* Center opted-in empty messages in the visible canvas of wide tables. */
+.aws-console [data-resource-table]>.erp-table-scroll:has(.resource-table-empty-message){container-type:inline-size}
+.aws-console [data-resource-table] .erp-table td:has(>.resource-table-empty-message){padding-inline:0!important}
+.resource-table-empty-message{position:sticky;left:0;display:block;width:100cqw;text-align:center;white-space:normal;overflow-wrap:anywhere}
 .aws-console [data-resource-table] .erp-table thead { background:#fafafa !important; }
 .aws-console [data-resource-table] .erp-table th { background:#fafafa !important; color:#545b64 !important; font-size:13px !important; font-weight:700; line-height:18px !important; height:auto; vertical-align:middle; text-transform:none; letter-spacing:normal; }
 .aws-console [data-resource-table].resource-table-compact .erp-table :is(th,td) { padding-top:6px !important; padding-bottom:6px !important; }
