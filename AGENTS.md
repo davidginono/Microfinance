@@ -129,18 +129,20 @@ Default local URL:
 
 ## Spring Boot Backend Skill
 
-- Read and follow the project-local [`springboot-1k-rps-optimization` skill](.agents/skills/springboot-1k-rps-optimization/SKILL.md) for backend implementation or review: controllers, services, DTOs, repositories, models, database queries/migrations, transactions, authorization, concurrency and performance.
+- Before every backend task, read and follow the project-local [`springboot-1k-rps-optimization` skill](.agents/skills/springboot-1k-rps-optimization/SKILL.md). This is mandatory for backend implementation, fixes, refactoring and review, including controllers, services, DTOs, repositories, models, database queries/migrations, transactions, authorization, concurrency and performance.
 - Keep feature-first Controller → Service → Repository → Model responsibilities, with DTOs at request/view boundaries. Only the owning service layer may call persistence; enforce institution, branch and record scope there.
 - Use bounded queries, exact decimal money, short transactions, explicit claims and tested idempotency/concurrency controls. Follow the skill's verification requirements for the affected work.
 - Treat 1,000 requests/second as a measured workload target. Document the workload, environment, latency/error criteria and results before claiming that capacity; compilation or correctness tests are not throughput evidence.
 
 ## Project UI Skills
 
-Read the relevant project-local skills before UI work:
+Before every UI task, read and follow both the project-local UI governance and UI style skills below. This is mandatory for UI implementation, fixes, restyling and review, including JSP, HTML, CSS, JavaScript, shared fragments and controller-backed page flows. Also read and follow the table skill whenever the task affects tables, registries, queues, reports or pagination:
 
-- `.agents/skills/microfinance-ui-governance/SKILL.md`: page flows, navigation, lending information, localization, and financial-action states.
-- `.agents/skills/microfinance-ui-style/SKILL.md`: shared ERP shell, controls, forms, modals, and responsive presentation.
-- `.agents/skills/microfinance-table-standard/SKILL.md`: client registries, review queues, repayment records, collections, reports, and pagination.
+- [`microfinance-ui-governance`](.agents/skills/microfinance-ui-governance/SKILL.md): page flows, navigation, lending information, localization, and financial-action states.
+- [`microfinance-ui-style`](.agents/skills/microfinance-ui-style/SKILL.md): shared ERP shell, controls, forms, modals, and responsive presentation.
+- [`microfinance-table-standard`](.agents/skills/microfinance-table-standard/SKILL.md): client registries, review queues, repayment records, collections, reports, and pagination.
+
+Tasks that affect both backend and UI must follow both sets of requirements. Use these project-local skills rather than a global skill with the same name or an old SACCO-specific skill.
 
 The root `SKILL.md` routes to these maintained instructions. These are the project-specific UI references for this repository; old SACCO-specific skills are not its domain or branding specification. Keep reusable shell patterns without importing SACCO savings, share, or membership assumptions.
 
