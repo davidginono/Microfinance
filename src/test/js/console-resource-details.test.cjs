@@ -10,6 +10,16 @@ async function setup(markup,query=''){
 }
 const sections='<section class="accounting-section"><h2>Summary</h2><dl class="erp-detail-facts"><div><dt>Loan</dt><dd>L001</dd></div></dl></section><section id="schedule" class="erp-table-wrap"><h2>Schedule</h2><input value="draft"><form method="post"><input name="_csrf" value="token"></form></section><section id="history" class="erp-table-wrap"><h2>History</h2><a href="/receipt">Receipt</a></section>';
 
+test('loan cards copy only selected identifiers while keeping facts and resource links intact',async()=>{
+ const {dom,w,d}=await setup('<div data-copy-policy="explicit"><dl class="erp-detail-facts"><div><dt>Loan ID</dt><dd data-copyable>L001</dd></div><div><dt>Principal</dt><dd>2,000,000.00</dd></div><div><dt>Due date</dt><dd>13/11/2026</dd></div><div><dt>Client</dt><dd><a href="/client/1">Client name</a></dd></div><div><dt>Status</dt><dd><span data-resource-status="SUBMITTED">Waiting for review</span></dd></div></dl></div>');
+ try{
+  assert.equal(d.querySelectorAll('.console-copy').length,1);assert.equal(d.querySelector('.console-copy').getAttribute('aria-label'),'Copy: Loan ID');
+  assert.equal(d.querySelector('a').getAttribute('href'),'/client/1');assert.equal(d.querySelector('a').classList.contains('console-resource-link'),true);
+  assert.match(d.body.textContent,/2,000,000.00/);assert.match(d.body.textContent,/13\/11\/2026/);
+  w.ConsoleResourceDetails.init();assert.equal(d.querySelectorAll('.console-copy').length,1);
+ }finally{dom.window.close();}
+});
+
 test('hub details keep every section visible and native forms intact despite an old tab URL',async()=>{
  const {dom,w,d}=await setup('<div class="accounting-workspace" data-resource-details-page="hub">'+sections+'</div>','?detailTab=history&historyPage=3');
  try {

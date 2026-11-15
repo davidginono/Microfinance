@@ -189,7 +189,7 @@ class LoanRecordingMvcTest {
         var id=UUID.randomUUID();var detail=mock(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Detail.class);
         when(service.detail(actor,id)).thenReturn(detail);when(detail.schedule()).thenReturn(List.of());
         var approvals=context.getBean(LoanGroupApprovalService.class);reset(approvals);
-        var review=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupReview(null,List.of(),List.of(),0,false,false);
+        var review=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupReview(null,List.of(),List.of(),0,false,false,false);
         when(approvals.review(actor,id)).thenReturn(review);
         mvc.perform(get("/finance/loan-records/"+id).with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/loans/details"))
             .andExpect(model().attribute("groupReview",review)).andExpect(model().attributeExists("reviewRequestKey"));

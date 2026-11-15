@@ -1,0 +1,33 @@
+<%@ page pageEncoding="UTF-8" %>
+<%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<section class="erp-table-wrap" data-resource-table="loan-record-guarantors" data-aws-table-region>
+    <div class="app-table-titlebar"><h2><spring:message code="applications.guarantors" /></h2></div>
+    <div class="erp-table-scroll" role="region" tabindex="0" aria-label="<spring:message code='applications.guarantors' />">
+        <table class="erp-table" data-table-sort-mode="local">
+            <thead><tr>
+                <th scope="col"><spring:message code="recording.guarantorName" /></th>
+                <th scope="col"><spring:message code="voucher.print.clientNumber" /></th>
+                <th scope="col"><spring:message code="applications.phone" /></th>
+                <th scope="col"><spring:message code="applications.relationship" /></th>
+                <th scope="col"><spring:message code="applications.business" /></th>
+                <th scope="col"><spring:message code="applications.location" /></th>
+                <th scope="col"><spring:message code="recording.guaranteeLimit" /> (TZS)</th>
+                <th scope="col"><spring:message code="simpleGroup.signedOn" /></th>
+                <th scope="col"><spring:message code="voucher.evidence" /></th>
+            </tr></thead>
+            <tbody><c:forEach items="${loanGuarantors}" var="guarantor">
+                <tr>
+                    <td><c:out value="${not empty guarantor.fullName ? guarantor.fullName : not empty guarantor.clientId ? loanGuarantorLabels[guarantor.clientId] : '—'}" default="—" /></td>
+                    <td><c:out value="${empty guarantor.clientNumber ? '—' : guarantor.clientNumber}" /></td>
+                    <td><c:out value="${empty guarantor.phone ? '—' : guarantor.phone}" /></td>
+                    <td><c:out value="${empty guarantor.relationship ? '—' : guarantor.relationship}" /></td>
+                    <td><c:out value="${empty guarantor.business ? '—' : guarantor.business}" /></td>
+                    <td><c:out value="${empty guarantor.location ? '—' : guarantor.location}" /></td>
+                    <td><c:choose><c:when test="${empty guarantor.guaranteeBudget}">—</c:when><c:otherwise><fmt:formatNumber value="${guarantor.guaranteeBudget}" minFractionDigits="2" maxFractionDigits="2" /></c:otherwise></c:choose></td>
+                    <td><c:out value="${empty guarantor.signedOn ? '—' : appTime:display(guarantor.signedOn)}" /></td>
+                    <td><c:out value="${empty guarantor.guaranteeEvidence ? '—' : guarantor.guaranteeEvidence}" /></td>
+                </tr>
+            </c:forEach><c:if test="${empty loanGuarantors}"><tr><td colspan="9"><spring:message code="recording.noGuarantors" /></td></tr></c:if></tbody>
+        </table>
+    </div>
+</section>

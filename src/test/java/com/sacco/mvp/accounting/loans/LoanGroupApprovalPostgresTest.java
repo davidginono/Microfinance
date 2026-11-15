@@ -33,6 +33,21 @@ class LoanGroupApprovalPostgresTest {
         f.context.registerBean(LoanGroupApprovalService.class,()->new LoanGroupApprovalService(new LoanRecordingRepository(f.jdbc),f.context.getBean(GeneralLedgerService.class),f.context.getBean(MemberDirectoryService.class),f.context.getBean(AuditService.class),f.context.getBean(ApplicationClock.class),f.context.getBean(tools.jackson.databind.ObjectMapper.class),f.service,mock(SaccoConfigurationService.class)));
         service=f.context.getBean(LoanGroupApprovalService.class);
     }
+    @Test void recorderAndReviewerCommandsStaySeparateInTheDatabase(){
+        assertThat(service.review(f.actor,loan).canSubmit()).isTrue();
+        assertThat(service.review(first,loan).canSubmit()).isFalse();
+        assertThatThrownBy(()->service.submit(first,loan,UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_request where loan_id=?",Integer.class,loan)).isZero();
+        UUID request=submit();
+        var member=f.context.getBean(MemberDirectoryService.class).find(first.getMemberId()).orElseThrow();
+        var reviewer=new AppUserPrincipal(member,EnumSet.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT));
+        assertThat(service.review(reviewer,loan).canApprove()).isTrue();assertThat(service.review(reviewer,loan).canSubmit()).isFalse();
+        assertThatThrownBy(()->service.decide(reviewer,loan,request,UUID.randomUUID(),"REJECT"," ","Paper reference")).hasMessage("loanGroups.error.reason");
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_decision where request_id=?",Integer.class,request)).isZero();
+        service.decide(reviewer,loan,request,UUID.randomUUID(),"APPROVE","Checked signed papers","Paper reference");
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_decision where request_id=?",Integer.class,request)).isEqualTo(1);
+        assertThat(status()).isEqualTo("SUBMITTED");
+    }
     @AfterAll void stop(){s.stop();}
     @BeforeEach void fixture(){s.fixture();first=reviewer(Position.ACCOUNTANT);second=reviewer(Position.ACCOUNTANT);manager=reviewer(Position.MANAGER);rule(0,2);loan=s.record();}
     RecordForm individual(){

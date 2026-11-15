@@ -82,16 +82,20 @@ public class LoanGroupApprovalService {
     public GroupReview review(AppUserPrincipal a,UUID loan) {
         access.requireActor(a,"LOAN_RECORDING_VIEW");var l=records.groupLoan(a,loan,false);
         var r=records.groupRequest(a,loan).orElse(null);
-        if(r==null)return new GroupReview(null,List.of(),List.of(),0,false,false);
+        boolean canSubmit=a.getClaims().contains("LOAN_RECORDING_CREATE")&&Objects.equals(a.getMemberId(),l.recorder())
+            &&Set.of("RECORDED","REJECTED").contains(l.status())&&!records.retiredGroup(a,loan);
+        if(r==null)return new GroupReview(null,List.of(),List.of(),0,false,false,canSubmit);
         var plan=steps(records.groupSteps(a,r.rule()));var decisions=records.groupDecisions(r);int step=next(plan,decisions);
         boolean eligible=!records.retiredGroup(a,loan)&&"SUBMITTED".equals(l.status())&&r.termsHash().equals(l.termsHash())&&step<plan.size()
             &&independent(a,l,r,decisions)&&currentGroups(a).contains(plan.get(step).group());
-        return new GroupReview(r,plan,decisions,step,eligible&&a.getClaims().contains("LOAN_RECORDING_APPROVE"),eligible&&a.getClaims().contains("LOAN_RECORDING_REJECT"));
+        return new GroupReview(r,plan,decisions,step,eligible&&a.getClaims().contains("LOAN_RECORDING_APPROVE"),eligible&&a.getClaims().contains("LOAN_RECORDING_REJECT"),canSubmit);
     }
     @Transactional
     public void submit(AppUserPrincipal a,UUID loan,UUID key) {
         access.requireActor(a,"LOAN_RECORDING_CREATE");require(key!=null,"request");
-        var l=records.groupLoan(a,loan,true);var previous=records.groupRequest(a,loan);
+        var l=records.groupLoan(a,loan,true);
+        if(!Objects.equals(l.recorder(),a.getMemberId()))throw new AccessDeniedException("Only the recorder may send this loan for review");
+        var previous=records.groupRequest(a,loan);
         require(!records.retiredGroup(a,loan),"retired");
         if(previous.isPresent()&&previous.get().id().equals(key)) {
             require(previous.get().maker().equals(a.getMemberId())&&previous.get().termsHash().equals(l.termsHash()),"retry");return;
@@ -112,7 +116,7 @@ public class LoanGroupApprovalService {
     @Transactional
     public void decide(AppUserPrincipal a,UUID loan,UUID request,UUID key,String decision,String reason,String evidence) {
         require(Set.of("APPROVE","REJECT").contains(decision),"decision");access.requireActor(a,"LOAN_RECORDING_"+decision);
-        access.requireActor(a,"LOAN_RECORDING_VIEW");text(reason);text(evidence);require(key!=null,"request");
+        access.requireActor(a,"LOAN_RECORDING_VIEW");text(reason,"reason");text(evidence,"evidence");require(key!=null,"request");
         var l=records.groupLoan(a,loan,true);var r=records.groupRequest(a,loan).orElseThrow(()->invalid("state"));
         require(!records.retiredGroup(a,loan),"retired");
         require(r.id().equals(request),"changed");var decisions=records.groupDecisions(r);
@@ -149,7 +153,7 @@ public class LoanGroupApprovalService {
         return false;
     }
     private void event(AppUserPrincipal a,UUID id,String action,Map<String,Object> details){audit.logEvent("LOAN",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"LOAN",id.toString(),a.getSaccoId(),a.getStationId(),details);}
-    private static void text(String value){require(value!=null&&!value.isBlank()&&value.length()<=500&&value.codePoints().noneMatch(Character::isISOControl),"evidence");}
+    private static void text(String value,String key){require(value!=null&&!value.isBlank()&&value.length()<=500&&value.codePoints().noneMatch(Character::isISOControl),key);}
     private static void require(boolean valid,String key){if(!valid)throw invalid(key);}
     private static IllegalArgumentException invalid(String key){return new IllegalArgumentException("loanGroups.error."+key);}
 }

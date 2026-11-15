@@ -53,8 +53,7 @@ public final class LoanChargeDtos {
         public BigDecimal getTotal(){return total();} public BigDecimal getDeductions(){return deductions();} public BigDecimal getSeparate(){return separate();}
     }
     public record Balance(UUID loanId,long sequence,BigDecimal assessed,BigDecimal collected,BigDecimal outstanding,LocalDate lastDate) {}
-    public record Movement(UUID id,UUID loanId,UUID termId,String kind,String chargeKind,BigDecimal amount,LocalDate date,UUID journalId,
-        UUID postingId,UUID reversesId,UUID actorId,String evidence,String reason) {}
+    public record Movement(UUID id,UUID loanId,UUID termId,String kind,BigDecimal amount,UUID journalId,UUID actorId) {}
     public record Summary(Plan plan,Balance balance,UUID assessmentJournal,UUID assessmentActor,String loanNumber,String institution,String branch) {}
     @Data public static class AssessmentForm {
         private UUID requestKey=UUID.randomUUID(); private LocalDate date; private String evidence="",reason="";

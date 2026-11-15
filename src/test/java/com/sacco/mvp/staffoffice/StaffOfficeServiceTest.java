@@ -115,4 +115,20 @@ class StaffOfficeServiceTest {
         assertThatThrownBy(()->service.read(a,"customer-care","queue","","","",10001)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(reviews,loans,vouchers,accounts,clients,credit,administration);
     }
+    @Test void loanReviewCardIsIncludedBeforeOtherFinanceWorkAndOpensTheReviewerQueue() {
+        var a=actor(StaffOffice.FINANCE_MANAGER,UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,
+            UserClaim.VOUCHER_WORKSPACE_VIEW,UserClaim.ACCOUNTING_BUSINESS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_VIEW,
+            UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_VIEW,UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_APPROVE);
+        var pending=new OfficeWork.Page(List.of(new OfficeWork.Task("LN-1","Borrower","office.readyReview",null,"/finance/loan-records/1")),0,false);
+        when(reviews.officeReviews(any(),eq(Position.FINANCE_MANAGER),anyString(),anyString(),anyInt())).thenReturn(pending);
+        when(vouchers.officeWork(any(),any(),anyBoolean(),anyString(),anyString(),anyInt())).thenReturn(OfficeWork.Page.empty(0));
+        when(accounts.read(any(),anyBoolean(),anyString(),anyString(),anyInt())).thenReturn(OfficeWork.Page.empty(0));
+        var dashboard=service.read(a,"finance-manager","dashboard","","","",0);
+        assertThat(dashboard.sources().getFirst().key()).isEqualTo("loan-reviews");
+        assertThat(dashboard.summaries()).hasSize(3);assertThat(dashboard.summaries().getFirst().labelKey()).isEqualTo("office.source.loan-reviews");
+        assertThat(dashboard.summaries().getFirst().shown()).isEqualTo(1);
+        var queue=service.read(a,"finance-manager","queue","","","",0);
+        assertThat(queue.source().key()).isEqualTo("loan-reviews");
+        assertThat(queue.work().rows().getFirst().href()).contains("office=finance-manager","officeSource=loan-reviews");
+    }
 }

@@ -20,7 +20,7 @@ public final class LoanRecordingDtos {
     public record GroupLoan(UUID id,UUID product,UUID client,UUID recorder,String status,String termsHash,String number,String clientName,BigDecimal amount,boolean relatedActor) {}
     public record GroupRequest(UUID id,UUID loan,UUID rule,UUID maker,int round,String termsHash,String previousStatus) {}
     public record GroupDecision(UUID id,int step,UUID actor,String name,String decision,String reason,String evidence,OffsetDateTime at) {}
-    public record GroupReview(GroupRequest request,List<GroupStep> steps,List<GroupDecision> decisions,int step,boolean canApprove,boolean canReject) {}
+    public record GroupReview(GroupRequest request,List<GroupStep> steps,List<GroupDecision> decisions,int step,boolean canApprove,boolean canReject,boolean canSubmit) {}
     public record ChargeField(String code,String percentage,String amount) {}
     public record ChargeQuote(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan plan,List<ChargeField> fields) {}
     @Data public static class RecordForm {

@@ -80,6 +80,8 @@
             // JSP indentation is outside the fact. Keep intentional line breaks within the value.
             if (content.firstChild?.nodeType === Node.TEXT_NODE) content.firstChild.data = content.firstChild.data.trimStart();
             if (content.lastChild?.nodeType === Node.TEXT_NODE) content.lastChild.data = content.lastChild.data.trimEnd();
+            content.querySelectorAll('a[href]:not(.app-btn)').forEach(link=>link.classList.add('console-resource-link'));
+            if(value.closest('[data-copy-policy="explicit"]') && !value.hasAttribute('data-copyable')){value.append(content);return;}
             const button=document.createElement('button');button.type='button';button.className='console-copy';button.append(icon('copy'));
             const term=value.previousElementSibling?.textContent.trim() || '';
             button.setAttribute('aria-label',(label().copy || 'Copy')+(term?': '+term:''));button.title=button.getAttribute('aria-label');
@@ -87,7 +89,6 @@
                 try {await navigator.clipboard.writeText(text);announce(label().copied || 'Copied');}
                 catch {announce(label().copyFailed || 'Unable to copy');}
             });
-            content.querySelectorAll('a[href]:not(.app-btn)').forEach(link=>link.classList.add('console-resource-link'));
             value.append(button,content);
         });
     }

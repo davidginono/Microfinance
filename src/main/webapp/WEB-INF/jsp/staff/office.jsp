@@ -20,7 +20,7 @@
                 <c:forEach items="${officeView.summaries}" var="summary" varStatus="i">
                     <section class="erp-panel" data-dashboard-widget="office-work-${officeView.sources[i.index].key}" data-widget-width="2" data-widget-height="200">
                         <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="${summary.labelKey}" /></h2></div>
-                        <div class="erp-panel-body"><dl class="dashboard-data-metrics"><div><dt><spring:message code="office.items" /></dt><dd><c:out value="${summary.shown}" /><c:if test="${summary.more}">+</c:if></dd></div></dl></div>
+                        <div class="erp-panel-body"><dl class="dashboard-data-metrics"><div><dt><spring:message code="office.items" /></dt><dd><c:choose><c:when test="${officeView.sources[i.index].key eq 'loan-reviews'}"><c:url value="${office.base}/queue" var="reviewQueueUrl"><c:param name="source" value="loan-reviews" /></c:url><a class="resource-table-id-link" href="${reviewQueueUrl}" aria-label="<spring:message code='${summary.labelKey}' />"><c:out value="${summary.shown}" /><c:if test="${summary.more}">+</c:if></a></c:when><c:otherwise><c:out value="${summary.shown}" /><c:if test="${summary.more}">+</c:if></c:otherwise></c:choose></dd></div></dl></div>
                     </section>
                 </c:forEach>
             </div>

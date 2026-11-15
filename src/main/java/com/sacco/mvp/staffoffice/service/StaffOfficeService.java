@@ -105,7 +105,7 @@ public class StaffOfficeService {
             case CHIEF_ACCOUNTANT,FINANCE_MANAGER,ACCOUNTS_CLERK,ACCOUNTS_CLERK_2->List.of("voucher-reviews","account-reviews","vouchers","accounts","funding");
             default->List.of("loan-reviews","loans","collections");
         };
-        result.sort(Comparator.comparingInt(s->{int n=priority.indexOf(s.key());return n<0?priority.size():n;}));
+        result.sort(Comparator.comparingInt(s->{if(s.key().equals("loan-reviews"))return -1;int n=priority.indexOf(s.key());return n<0?priority.size():n;}));
         return List.copyOf(result);
     }
     private static void add(List<Source> list,String key,boolean chronological) {list.add(new Source(key,"office.source."+key,chronological));}

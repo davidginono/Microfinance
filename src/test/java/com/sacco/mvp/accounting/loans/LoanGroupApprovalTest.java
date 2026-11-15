@@ -104,7 +104,7 @@ class LoanGroupApprovalTest {
     @Test void submissionNeedsIndependentStaffCapacityAndRecordsNoApproval(){
         status="RECORDED";when(records.groupRequest(any(),eq(loan))).thenReturn(Optional.empty());
         when(records.groupRule(any(),eq(product))).thenReturn(Optional.of(new GroupRule(rule,product,1,"[{\"group\":\"CREDIT_OFFICER\",\"approvals\":1},{\"group\":\"MANAGER\",\"approvals\":1}]")));
-        var p=person(maker,Position.LOAN_OFFICER);var overlapping=UUID.randomUUID();
+        var p=person(recorder,Position.LOAN_OFFICER);var overlapping=UUID.randomUUID();
         when(records.groupCandidates(any(),any(),anyString())).thenReturn(Map.of(Position.CREDIT_OFFICER,List.of(overlapping),Position.MANAGER,List.of(overlapping)));
         assertThatThrownBy(()->service.submit(p,loan,UUID.randomUUID())).hasMessage("loanGroups.error.staff");
         when(records.groupCandidates(any(),any(),anyString())).thenReturn(Map.of(Position.CREDIT_OFFICER,List.of(overlapping),Position.MANAGER,List.of(UUID.randomUUID())));
@@ -115,5 +115,28 @@ class LoanGroupApprovalTest {
         for(var group:List.of(Position.FINANCE_MANAGER,Position.ICT_MANAGER,Position.CREDIT_OFFICER,Position.ACCOUNTS_CLERK,Position.CUSTOMER_CARE,Position.ACCOUNTS_CLERK_2))
             assertThat(UserClaim.defaultClaims(List.of(group),false)).doesNotContain(UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT,UserClaim.LOAN_RECORDING_POST);
         assertThat(Position.staffAssignableRoles()).hasSize(10).doesNotContain(Position.MEMBER,Position.BOARD,Position.CHAIRPERSON);
+    }
+    @Test void onlyTheRecorderCanSendARecordedApplicationForReview(){
+        status="RECORDED";when(records.groupRequest(any(),eq(loan))).thenReturn(Optional.empty());
+        var owner=person(recorder,Position.LOAN_OFFICER);var other=person(UUID.randomUUID(),Position.CREDIT_OFFICER);
+        assertThat(service.review(owner,loan).canSubmit()).isTrue();
+        assertThat(service.review(owner,loan).canApprove()).isFalse();
+        assertThat(service.review(other,loan).canSubmit()).isFalse();
+        assertThatThrownBy(()->service.submit(other,loan,UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
+        verify(recording,never()).validateStaffReview(any(),any());verify(records,never()).groupRequest(any(),any(),any());
+    }
+    @Test void reviewerNeedsNoRecordingPermissionAndCannotSeeTheRecorderCommand(){
+        var staff=person(UUID.randomUUID(),Position.CREDIT_OFFICER);
+        var reviewer=new AppUserPrincipal(members.find(staff.getMemberId()).orElseThrow(),EnumSet.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT));
+        var view=service.review(reviewer,loan);
+        assertThat(view.canSubmit()).isFalse();assertThat(view.canApprove()).isTrue();assertThat(view.canReject()).isTrue();
+        service.decide(reviewer,loan,request.id(),UUID.randomUUID(),"APPROVE","Checked signed papers","Paper reference");
+        assertThat(decisions).hasSize(1);verifyNoInteractions(recording);
+    }
+    @Test void rejectionRequiresAReasonBeforeAnyDecisionIsStored(){
+        var reviewer=person(UUID.randomUUID(),Position.CREDIT_OFFICER);
+        assertThatThrownBy(()->service.decide(reviewer,loan,request.id(),UUID.randomUUID(),"REJECT"," ","Paper reference"))
+            .hasMessage("loanGroups.error.reason");
+        assertThat(decisions).isEmpty();verify(records,never()).groupDecision(any(),any());
     }
 }
