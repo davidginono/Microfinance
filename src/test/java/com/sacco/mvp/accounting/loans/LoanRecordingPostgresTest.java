@@ -176,33 +176,33 @@ class LoanRecordingPostgresTest {
         assertThatThrownBy(()->service.save(actor,f)).hasMessage("charges.error.insuranceLimit");
         f.setInsurancePremium(new BigDecimal("7.65"));
         var id=service.save(actor,f);assertThat(service.save(actor,f)).isEqualTo(id);
-        var saved=service.chargeSummary(actor,id,0);
+        var saved=service.chargeSummary(actor,id);
         assertThat(saved.plan().terms()).extracting(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term::amount)
             .containsExactly(new BigDecimal("3.21"),new BigDecimal("6.78"),new BigDecimal("7.65"));
-        assertThat(saved.balance().assessed()).isZero();assertThat(saved.balance().collected()).isZero();assertThat(saved.history()).isEmpty();
+        assertThat(saved.balance().assessed()).isZero();assertThat(saved.balance().collected()).isZero();
         assertThat(jdbc.queryForObject("select count(*) from accountant_loan_post where loan_id=?",Integer.class,id)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from loan_ledgers where loan_application_id=?",Integer.class,id)).isZero();
         jdbc.update("update loan_product_settings set application_fee=999,processing_fee_rate=0.5,insurance_rate=0.5 where id=?",product);
-        assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("17.64");
+        assertThat(service.chargeSummary(actor,id).plan().total()).isEqualByComparingTo("17.64");
         var funding=chargedFunding(id);var posting=service.disburse(actor,funding);assertThat(service.disburse(actor,funding).id()).isEqualTo(posting.id());
-        var funded=service.chargeSummary(actor,id,0);assertThat(funded.balance().collected()).isEqualByComparingTo("17.64");
+        var funded=service.chargeSummary(actor,id);assertThat(funded.balance().collected()).isEqualByComparingTo("17.64");
         assertThat(funded.balance().outstanding()).isZero();
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,cash)).isEqualByComparingTo("982.36");
     }
     @Test void chargesAreFrozenAssessedAndCollectedInterestThenFeesThenPrincipal(){
-        chargePolicy("SEPARATE");var id=chargedLoan();assertThat(service.chargeSummary(actor,id,0).balance().assessed()).isZero();
+        chargePolicy("SEPARATE");var id=chargedLoan();assertThat(service.chargeSummary(actor,id).balance().assessed()).isZero();
         jdbc.update("update loan_product_settings set application_fee=999 where id=?",product);
-        service.disburse(actor,chargedFunding(id));assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isEqualByComparingTo("30.00");
+        service.disburse(actor,chargedFunding(id));assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("30.00");
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,insuranceAccount)).isEqualByComparingTo("10.00");
         var f=post(id,"25.00","CHARGE-R1");f.setInterestAccountId(interest);var first=service.repay(actor,f);assertThat(first.interest()).isEqualByComparingTo("20.00");assertThat(first.charges()).isEqualByComparingTo("5.00");assertThat(first.principal()).isZero();
         assertThat(service.repay(actor,f).id()).isEqualTo(first.id());
         var next=post(id,"30.00","CHARGE-R2");next.setInterestAccountId(interest);var second=service.repay(actor,next);assertThat(second.charges()).isEqualByComparingTo("25.00");assertThat(second.principal()).isEqualByComparingTo("5.00");
-        var other=operator("B1");service.reverse(other,second.id(),UUID.randomUUID(),TODAY,"Synthetic incorrect cash receipt");assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isEqualByComparingTo("25.00");
+        var other=operator("B1");service.reverse(other,second.id(),UUID.randomUUID(),TODAY,"Synthetic incorrect cash receipt");assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("25.00");
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where account_id=?",BigDecimal.class,chargeAccount)).isEqualByComparingTo("25.00");
     }
     @Test void deductionsReduceCashWithoutIncreasingContractPrincipal(){
         chargePolicy("DEDUCT");var id=chargedLoan();var p=service.disburse(actor,chargedFunding(id));
-        assertThat(service.detail(actor,id).loan().principal()).isEqualByComparingTo("1000.00");assertThat(service.fundingCash(actor,id,TODAY)).isEqualByComparingTo("970.00");assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isZero();
+        assertThat(service.detail(actor,id).loan().principal()).isEqualByComparingTo("1000.00");assertThat(service.fundingCash(actor,id,TODAY)).isEqualByComparingTo("970.00");assertThat(service.chargeSummary(actor,id).balance().outstanding()).isZero();
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("970.00");
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where account_id=?",BigDecimal.class,chargeAccount)).isZero();
     }
@@ -211,12 +211,12 @@ class LoanRecordingPostgresTest {
         try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<UUID> work=()->{start.await();return receiptService().post(actor,f).header().id();};var one=pool.submit(work);var two=pool.submit(work);start.countDown();assertThat(one.get()).isEqualTo(two.get());}
         var saved=receiptService().post(actor,f);assertThat(saved.rows().getFirst().charges()).isEqualByComparingTo("7.00");assertThat(saved.rows().getFirst().chargeAccount()).contains("CHARGES");
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,id)).isZero();
-        assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isEqualByComparingTo("23.00");
-        var other=operator("B1");receiptService().reverse(other,saved.header().id(),UUID.randomUUID(),TODAY,"Synthetic returned collection");assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isEqualByComparingTo("30.00");
+        assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("23.00");
+        var other=operator("B1");receiptService().reverse(other,saved.header().id(),UUID.randomUUID(),TODAY,"Synthetic returned collection");assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("30.00");
     }
     @Test void chargedFundingCorrectionReversesDeductionsAndAssessmentsTogether(){
         chargePolicy("DEDUCT");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var request=adjustments().request(actor,adjustment(id,"DISBURSEMENT_REVERSAL"));var other=operator("B1");adjustments().decide(other,request,UUID.randomUUID(),true,"Synthetic verified cash return");
-        assertThat(status(id)).isEqualTo("DISBURSEMENT_REVERSED");var balance=service.chargeSummary(actor,id,0).balance();assertThat(balance.assessed()).isZero();assertThat(balance.collected()).isZero();assertThat(balance.outstanding()).isZero();
+        assertThat(status(id)).isEqualTo("DISBURSEMENT_REVERSED");var balance=service.chargeSummary(actor,id).balance();assertThat(balance.assessed()).isZero();assertThat(balance.collected()).isZero();assertThat(balance.outstanding()).isZero();
         for(var account:List.of(cash,principal,chargeAccount,managementAccount,processingAccount,insuranceAccount))assertThat(jdbc.queryForObject("select coalesce(sum(debit-credit),0) from gl_journal_line where account_id=?",BigDecimal.class,account)).isZero();
         assertThatThrownBy(()->jdbc.update("delete from loan_charge_event where loan_id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
@@ -229,17 +229,17 @@ class LoanRecordingPostgresTest {
         jdbc.update("update loan_product_settings set application_fee=0,processing_fee_rate=0,insurance_rate=0.005 where id=?",product);
         var latest=chargeService().policy(actor,product).orElseThrow();policy.setRequestKey(UUID.randomUUID());policy.setExpectedVersion(latest.id());policy.setEffectiveFrom(LocalDate.of(2026,10,1));policy.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT);chargeService().savePolicy(actor,policy);
         var f=form();f.setTopUpSourceLoanId(original);f.setPrincipal(new BigDecimal("1500.00"));f.setApplicationDate(TODAY);f.setFirstPaymentDate(null);f.setInsurancePremium(new BigDecimal("7.50"));f.setInsuranceEvidence("Synthetic actual new insurer premium");f.setEvidence("Synthetic signed replacement agreement");var id=service.save(actor,f);var funding=topUpPost(id);var quote=service.disbursementTopUp(actor,id,TODAY).orElseThrow();funding.setSettlementCharges(quote.charges());funding.setSettlementChargeSequence(quote.chargeSequence());service.disburse(actor,funding);
-        var topup=service.topUp(actor,id).orElseThrow();assertThat(topup.sourceCharges()).isEqualByComparingTo("30.00");assertThat(topup.newDeductions()).isEqualByComparingTo("7.50");assertThat(topup.cash()).isEqualByComparingTo("442.50");assertThat(service.chargeSummary(actor,original,0).balance().outstanding()).isZero();assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isZero();
-        service.reverseTopUp(operator("B1"),id,UUID.randomUUID(),TODAY,"Synthetic returned transfer","Synthetic correction evidence");assertThat(service.chargeSummary(actor,original,0).balance().outstanding()).isEqualByComparingTo("30.00");assertThat(service.chargeSummary(actor,id,0).balance().assessed()).isZero();
+        var topup=service.topUp(actor,id).orElseThrow();assertThat(topup.sourceCharges()).isEqualByComparingTo("30.00");assertThat(topup.newDeductions()).isEqualByComparingTo("7.50");assertThat(topup.cash()).isEqualByComparingTo("442.50");assertThat(service.chargeSummary(actor,original).balance().outstanding()).isZero();assertThat(service.chargeSummary(actor,id).balance().outstanding()).isZero();
+        service.reverseTopUp(operator("B1"),id,UUID.randomUUID(),TODAY,"Synthetic returned transfer","Synthetic correction evidence");assertThat(service.chargeSummary(actor,original).balance().outstanding()).isEqualByComparingTo("30.00");assertThat(service.chargeSummary(actor,id).balance().assessed()).isZero();
     }
     @Test void assessmentRequiresEvidenceAndCorrectionsAreIndependentWithScopeAndClosedPeriodProtection(){
         chargePolicy("SEPARATE");var id=chargedLoan();approve(id);jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,'2026-09-01','2026-09-30','OPEN',?,now()),(?,?,'2026-10-01','2026-10-31','CLOSED',?,now())",UUID.randomUUID(),institution,actor.getMemberId(),UUID.randomUUID(),institution,actor.getMemberId());var f=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.AssessmentForm();f.setDate(LocalDate.of(2026,9,1));
-        assertThatThrownBy(()->chargeService().assess(actor,id,f)).hasMessage("charges.error.evidence");f.setEvidence("Synthetic signed agreement");var command=chargeService().assess(actor,id,f);assertThat(chargeService().assess(actor,id,f)).isEqualTo(command);var summary=service.chargeSummary(actor,id,0);
+        assertThatThrownBy(()->chargeService().assess(actor,id,f)).hasMessage("charges.error.evidence");f.setEvidence("Synthetic signed agreement");var command=chargeService().assess(actor,id,f);assertThat(chargeService().assess(actor,id,f)).isEqualTo(command);var summary=service.chargeSummary(actor,id);
         assertThatThrownBy(()->chargeService().reverseAssessment(actor,id,summary.assessmentJournal(),UUID.randomUUID(),TODAY,"Synthetic evidence","Correct terms")).hasMessage("charges.error.independent");
-        assertThatThrownBy(()->service.chargeSummary(operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
-        var borrower=Member.builder().id(client).saccoId(institution).stationId("B1").memberAccount(true).build();var owner=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(borrower,Set.of(UserClaim.MEMBER_LOANS_VIEW));assertThatThrownBy(()->service.chargeSummary(owner,id,0)).isInstanceOf(AccessDeniedException.class);
-        var stranger=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId(institution).stationId("B1").memberAccount(true).build(),Set.of(UserClaim.MEMBER_LOANS_VIEW));assertThatThrownBy(()->chargeService().summary(stranger,id,0)).isInstanceOf(AccessDeniedException.class);
-        var other=operator("B1");chargeService().reverseAssessment(other,id,summary.assessmentJournal(),UUID.randomUUID(),LocalDate.of(2026,9,1),"Synthetic replacement evidence","Correct assessment");assertThat(service.chargeSummary(actor,id,0).balance().assessed()).isZero();
+        assertThatThrownBy(()->service.chargeSummary(operator("B2"),id)).isInstanceOf(AccessDeniedException.class);
+        var borrower=Member.builder().id(client).saccoId(institution).stationId("B1").memberAccount(true).build();var owner=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(borrower,Set.of(UserClaim.MEMBER_LOANS_VIEW));assertThatThrownBy(()->service.chargeSummary(owner,id)).isInstanceOf(AccessDeniedException.class);
+        var stranger=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId(institution).stationId("B1").memberAccount(true).build(),Set.of(UserClaim.MEMBER_LOANS_VIEW));assertThatThrownBy(()->chargeService().summary(stranger,id)).isInstanceOf(AccessDeniedException.class);
+        var other=operator("B1");chargeService().reverseAssessment(other,id,summary.assessmentJournal(),UUID.randomUUID(),LocalDate.of(2026,9,1),"Synthetic replacement evidence","Correct assessment");assertThat(service.chargeSummary(actor,id).balance().assessed()).isZero();
         f.setDate(TODAY);f.setRequestKey(UUID.randomUUID());assertThatThrownBy(()->chargeService().assess(actor,id,f)).hasMessage("voucher.error.period");
     }
     @Test void chargeOnlyCollectionInvalidatesTopUpEvenWhenDebtSequenceDoesNotChange(){
@@ -248,7 +248,7 @@ class LoanRecordingPostgresTest {
     }
     @Test void chargeAuditFailureAndInvalidMixedReceiptsLeaveNoPartialPostings(){
         chargePolicy("DEDUCT");var id=chargedLoan();doThrow(new IllegalStateException("Synthetic charge audit failure")).when(context.getBean(AuditService.class)).logEvent(eq("LOAN_RECORDING"),any(),eq("LOAN_DISBURSEMENT_POSTED"),any(),any(),any(),any(),any(),any(),any(),any());
-        assertThatThrownBy(()->service.disburse(actor,chargedFunding(id))).hasMessage("Synthetic charge audit failure");assertThat(status(id)).isEqualTo("READY_FOR_DISBURSEMENT");assertThat(service.chargeSummary(actor,id,0).balance().assessed()).isZero();assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isZero();reset(context.getBean(AuditService.class));
+        assertThatThrownBy(()->service.disburse(actor,chargedFunding(id))).hasMessage("Synthetic charge audit failure");assertThat(status(id)).isEqualTo("READY_FOR_DISBURSEMENT");assertThat(service.chargeSummary(actor,id).balance().assessed()).isZero();assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isZero();reset(context.getBean(AuditService.class));
         service.disburse(actor,chargedFunding(id));var second=chargedLoan();service.disburse(actor,chargedFunding(second));var f=receiptForm(id,second);f.getRows().getLast().setAmount(new BigDecimal("99999.00"));assertThatThrownBy(()->receiptService().post(actor,f)).hasMessage("repayment.error.advance");assertThat(jdbc.queryForObject("select count(*) from accountant_loan_post where sacco_id=? and kind='PAYMENT'",Integer.class,institution)).isZero();
     }
     @Test void chargeOverridesRequirePermissionApprovedLimitAndDistinctInsuranceEvidence(){
@@ -256,7 +256,7 @@ class LoanRecordingPostgresTest {
         chargePolicy("SEPARATE");var latest=chargeService().policy(actor,product).orElseThrow();var p=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();p.setProductId(product);p.setExpectedVersion(latest.id());p.setEffectiveFrom(LocalDate.of(2026,8,1));p.setEnabled(true);p.setPolicyReference("Synthetic approved custom charge limit");p.setAgreementReference("Synthetic approved agreement");p.setReceivableAccountId(chargeAccount);p.setApplicationAccountId(managementAccount);p.setProcessingAccountId(processingAccount);p.setInsuranceAccountId(insuranceAccount);p.setInsurer(latest.insurer());p.setInsurerVerification(latest.insurerVerification());p.setAllowCustom(true);p.setCustomManagementLimit(new BigDecimal("10.00"));chargeService().savePolicy(actor,p);assertThat(chargeService().savePolicy(actor,p)).isNotNull();
         var f=form();f.setLoanMode("CUSTOM");f.setProductId(null);f.setInterestPercent(new BigDecimal("12"));f.setEvidence("Synthetic approved custom terms");f.setInsurancePremium(new BigDecimal("10.00"));f.setInsuranceEvidence("Synthetic unique premium "+UUID.randomUUID());f.setCustomApplicationCharge(new BigDecimal("5.00"));f.setCustomProcessingCharge(new BigDecimal("6.00"));assertThatThrownBy(()->service.save(actor,f)).hasMessage("charges.error.custom");f.setCustomProcessingCharge(new BigDecimal("5.00"));
         var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.LOAN_CHARGES_CUSTOM);var member=context.getBean(MemberDirectoryService.class).find(actor.getMemberId()).orElseThrow();var restricted=new AppUserPrincipal(member,permissions);assertThatThrownBy(()->service.save(restricted,f)).isInstanceOf(AccessDeniedException.class);
-        var id=service.save(actor,f);assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("20.00");var duplicate=form();duplicate.setLoanMode("CUSTOM");duplicate.setProductId(null);duplicate.setInterestPercent(new BigDecimal("12"));duplicate.setCustomApplicationCharge(new BigDecimal("5.00"));duplicate.setCustomProcessingCharge(new BigDecimal("5.00"));duplicate.setInsurancePremium(f.getInsurancePremium());duplicate.setInsuranceEvidence(f.getInsuranceEvidence());assertThatThrownBy(()->service.save(actor,duplicate)).hasMessage("charges.error.insuranceDuplicate");
+        var id=service.save(actor,f);assertThat(service.chargeSummary(actor,id).plan().total()).isEqualByComparingTo("20.00");var duplicate=form();duplicate.setLoanMode("CUSTOM");duplicate.setProductId(null);duplicate.setInterestPercent(new BigDecimal("12"));duplicate.setCustomApplicationCharge(new BigDecimal("5.00"));duplicate.setCustomProcessingCharge(new BigDecimal("5.00"));duplicate.setInsurancePremium(f.getInsurancePremium());duplicate.setInsuranceEvidence(f.getInsuranceEvidence());assertThatThrownBy(()->service.save(actor,duplicate)).hasMessage("charges.error.insuranceDuplicate");
         p.setRequestKey(UUID.randomUUID());p.setExpectedVersion(chargeService().policy(actor,product).orElseThrow().id());p.setEffectiveFrom(LocalDate.of(2026,10,1));p.setManagementTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.FINANCED);assertThatThrownBy(()->chargeService().savePolicy(actor,p)).hasMessage("charges.error.financed");
     }
     @Test void percentageAndAmountChargeEntriesFreezeServerAmountsAndPostExactlyOnce(){
@@ -266,22 +266,22 @@ class LoanRecordingPostgresTest {
         f.setCustomApplicationCharge(new BigDecimal("3.21"));f.setCustomProcessingBasis("PERCENTAGE");f.setCustomProcessingPercent(new BigDecimal("0.75"));f.setCustomProcessingCharge(new BigDecimal("999"));
         f.setCustomInsuranceBasis("PERCENTAGE");f.setInsurancePremium(new BigDecimal("999"));f.setCustomInsurancePercent(new BigDecimal("0.50"));
         var id=service.save(actor,f);assertThat(service.save(actor,f)).isEqualTo(id);
-        var plan=service.chargeSummary(actor,id,0).plan();
+        var plan=service.chargeSummary(actor,id).plan();
         assertThat(plan.terms()).extracting(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term::amount).containsExactly(new BigDecimal("3.21"),new BigDecimal("7.50"),new BigDecimal("5.00"));
         assertThat(jdbc.queryForObject("select (form_data->>'insurancePremium')::numeric from loan_applications where id=?",BigDecimal.class,id)).isEqualByComparingTo("5.00");
         assertThat(f.getInsurancePremium()).isEqualByComparingTo("999");
         assertThat(plan.terms()).allSatisfy(t->assertThat(t.evidence()).startsWith("Loan charge entry / "));
         var funding=chargedFunding(id);var posted=service.disburse(actor,funding);assertThat(service.disburse(actor,funding).id()).isEqualTo(posted.id());
-        assertThat(service.chargeSummary(actor,id,0).balance().collected()).isEqualByComparingTo("15.71");
-        assertThat(service.chargeSummary(actor,id,0).balance().outstanding()).isZero();
+        assertThat(service.chargeSummary(actor,id).balance().collected()).isEqualByComparingTo("15.71");
+        assertThat(service.chargeSummary(actor,id).balance().outstanding()).isZero();
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id=?",BigDecimal.class,posted.journalId())).isZero();
     }
     @Test void configuredChargesSaveWithoutRemovedInputsAndKeepDistinctRecordedProvenance(){
         chargePolicy("SEPARATE");var first=service.save(actor,form());var second=service.save(actor,form());
-        var one=service.chargeSummary(actor,first,0).plan();var two=service.chargeSummary(actor,second,0).plan();
+        var one=service.chargeSummary(actor,first).plan();var two=service.chargeSummary(actor,second).plan();
         assertThat(one.total()).isEqualByComparingTo("30.00");assertThat(two.total()).isEqualByComparingTo("30.00");
         assertThat(one.terms().getLast().evidence()).startsWith("Loan charge entry / ").isNotEqualTo(two.terms().getLast().evidence());
-        assertThat(service.chargeSummary(actor,first,0).balance().assessed()).isZero();
+        assertThat(service.chargeSummary(actor,first).balance().assessed()).isZero();
     }
     @Test void chargeTermsAndOutstandingAmountsAppearInEnglishAndKiswahiliPdfDocuments()throws Exception{
         chargePolicy("SEPARATE");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var payment=post(id,"25.00","PDF-CHARGES");payment.setInterestAccountId(interest);service.repay(actor,payment);
@@ -732,13 +732,13 @@ class LoanRecordingPostgresTest {
         UUID loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
         var collected=receiptService().post(actor,receiptForm(loan));
         receiptService().reverse(operator("B1"),collected.header().id(),UUID.randomUUID(),TODAY,"Correct charged receipt");
-        assertThat(service.chargeSummary(actor,loan,0).balance().outstanding()).isEqualByComparingTo("30.00");
+        assertThat(service.chargeSummary(actor,loan).balance().outstanding()).isEqualByComparingTo("30.00");
         receiptService().post(actor,receiptForm(loan));
-        assertThat(service.chargeSummary(actor,loan,0).balance().outstanding()).isZero();
+        assertThat(service.chargeSummary(actor,loan).balance().outstanding()).isZero();
         UUID batch=batches().create(actor,"Configured account types");batchItem(batch,receiptForm(loan));processBatch(batch,false);processBatch(batch,true);
         assertThat(batches().get(actor,batch).posted()).isEqualTo(1);
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("810.00");
-        assertThat(service.chargeSummary(actor,loan,0).balance().outstanding()).isZero();
+        assertThat(service.chargeSummary(actor,loan).balance().outstanding()).isZero();
     }
     @Test void arbitraryTopUpAccountsRetainSourceInterestAndReverseExactly(){
         principal=account("SOURCE-PRINCIPAL","LIABILITY","CREDIT","POSTING","OTHER");interest=account("SOURCE-INTEREST","EXPENSE","DEBIT","POSTING","OTHER");
@@ -1055,14 +1055,14 @@ class LoanRecordingPostgresTest {
         assertThat(quote.total()).isEqualByComparingTo("10.00");
         var id=service.save(actor,request);
         assertThat(service.save(actor,request)).isEqualTo(id);
-        assertThat(service.chargeSummary(actor,id,0).plan().total()).isEqualByComparingTo("10.00");
+        assertThat(service.chargeSummary(actor,id).plan().total()).isEqualByComparingTo("10.00");
         var funding=chargedFunding(id);
         assertThatThrownBy(()->service.disburse(actor,funding)).hasMessage("charges.error.fundingSetup");
         assertThat(chargeService().balance(actor,id,TODAY).assessed()).isEqualByComparingTo("0.00");
         chargePolicy("SEPARATE");
         jdbc.update("update loan_product_settings set application_fee=30 where id=?",product);
         service.disburse(actor,funding);
-        var funded=service.chargeSummary(actor,id,0);
+        var funded=service.chargeSummary(actor,id);
         assertThat(funded.plan().supported()).isTrue();
         assertThat(funded.balance().assessed()).isEqualByComparingTo("10.00");
     }

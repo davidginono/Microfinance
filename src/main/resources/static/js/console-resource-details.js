@@ -106,6 +106,7 @@
         region.textContent='';queueMicrotask(()=>region.textContent=text);
     }
     function details() {
+        if(document.querySelector('[data-resource-details-page="hub"]'))return;
         if(document.body.dataset.resourceDetails!=='true' && !document.querySelector('[data-resource-details-page]'))return;
         const scope=document.querySelector('[data-profile-tabs]') || document.querySelector('.shell-content-frame') || document.querySelector('main');if(!scope || scope.dataset.detailsReady)return;
         scope.dataset.detailsReady='true';

@@ -117,8 +117,6 @@ class ResourceTableSortPostgresTest {
         var terms=new com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository(jdbc);
         var ledger=LoanLedger.builder().loanApplicationId(id).saccoId(actor.getSaccoId()).stationId("B1").build();
         columns("interest-waivers","reference,date,amount,kind,reason",()->terms.history(ledger,0));
-        var charges=new com.sacco.mvp.accounting.charges.repository.LoanChargeRepository(jdbc);
-        columns("loan-charge-history","date,charge,event,amount,evidence",()->charges.history(id,0));
         var payroll=new com.sacco.mvp.accounting.payroll.repository.PayrollRepository(jdbc);
         columns("payroll-lines","employee,client,loan,principal,interest,requested,issue",()->payroll.lines(actor,id,0,26));
         columns("payroll-history","event,actor,evidence,date",()->payroll.events(actor,id,0));

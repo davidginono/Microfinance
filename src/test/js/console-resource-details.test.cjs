@@ -10,6 +10,20 @@ async function setup(markup,query=''){
 }
 const sections='<section class="accounting-section"><h2>Summary</h2><dl class="erp-detail-facts"><div><dt>Loan</dt><dd>L001</dd></div></dl></section><section id="schedule" class="erp-table-wrap"><h2>Schedule</h2><input value="draft"><form method="post"><input name="_csrf" value="token"></form></section><section id="history" class="erp-table-wrap"><h2>History</h2><a href="/receipt">Receipt</a></section>';
 
+test('hub details keep every section visible and native forms intact despite an old tab URL',async()=>{
+ const {dom,w,d}=await setup('<div class="accounting-workspace" data-resource-details-page="hub">'+sections+'</div>','?detailTab=history&historyPage=3');
+ try {
+  assert.equal(d.querySelector('[role=tablist]'),null);assert.equal(d.querySelector('[role=tabpanel]'),null);
+  for(const section of d.querySelectorAll('.accounting-workspace > section'))assert.equal(section.hidden,false);
+  assert.deepEqual([...d.querySelectorAll('.accounting-workspace > section h2')].map(h=>h.textContent),['Summary','Schedule','History']);
+  const form=d.querySelector('form'),input=d.querySelector('#schedule > input');input.value='unsaved';
+  w.ConsoleResourceDetails.init();input.dispatchEvent(new w.Event('invalid',{bubbles:false}));
+  assert.equal(d.querySelector('form'),form);assert.equal(form.elements._csrf.value,'token');assert.equal(input.value,'unsaved');
+  assert.equal(w.location.search,'?detailTab=history&historyPage=3');assert.equal(w.sessionStorage.length,0);
+  assert.ok(d.querySelector('.console-copy'));assert.equal(d.querySelector('#history a').getAttribute('href'),'/receipt');
+ }finally{dom.window.close();}
+});
+
 test('grouped client sections stay together without multiplying tabs and reveal nested review errors',async()=>{
  const summary=sections.slice(0,sections.indexOf('<section id="schedule"'));
  const card=title=>'<section class="erp-resource-section"><h2>'+title+'</h2><p>Recorded evidence</p></section>';

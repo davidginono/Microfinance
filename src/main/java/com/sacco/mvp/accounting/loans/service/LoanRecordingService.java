@@ -195,8 +195,8 @@ public class LoanRecordingService {
             ?new ChargeQuote(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan(plan.policyId(),plan.policyReference(),plan.agreementReference(),plan.terms(),false,""),quote.fields())
             :quote;
     }
-    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary chargeSummary(AppUserPrincipal a,UUID loan,int page){authorize(a,"VIEW");records.record(a,loan,false);return charges.summary(a,loan,page);}
-    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary fundingCharges(AppUserPrincipal a,UUID loan){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");return charges.summary(a,loan,0);}
+    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary chargeSummary(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.record(a,loan,false);return charges.summary(a,loan);}
+    @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary fundingCharges(AppUserPrincipal a,UUID loan){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");return charges.summary(a,loan);}
     @Transactional(readOnly=true) public BigDecimal fundingCash(AppUserPrincipal a,UUID id,LocalDate date){
         accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");var loan=records.loan(a,id,clock.today());var source=disbursementTopUp(a,id,date);
         return loan.principal().subtract(source.map(TopUpQuote::total).orElse(ZERO)).subtract(charges.quotedTerms(a,id).deductions());
