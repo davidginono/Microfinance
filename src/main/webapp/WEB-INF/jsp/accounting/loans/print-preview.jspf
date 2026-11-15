@@ -1,0 +1,16 @@
+<%@ page pageEncoding="UTF-8" %>
+<dialog id="loanPrintPreview" class="app-modal-panel loan-print-preview" aria-labelledby="loanPrintPreviewTitle">
+    <div class="app-modal-header">
+        <h2 id="loanPrintPreviewTitle" class="erp-panel-title"><spring:message code="voucher.print" /></h2>
+        <button type="button" class="app-modal-close" data-preview-close aria-label="<spring:message code='common.close' />"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5l10 10M15 5L5 15" fill="none" stroke="currentColor" stroke-width="1.8" /></svg></button>
+    </div>
+    <div class="loan-print-preview-body" data-preview-body>
+        <div class="console-message" role="alert" data-message-type="error" data-preview-error hidden><spring:message code="recording.printError" /><button type="button" class="app-btn btn-neutral" data-preview-retry><spring:message code="common.refresh" /></button></div>
+        <iframe title="<spring:message code='voucher.print' />" data-preview-frame hidden></iframe>
+    </div>
+    <div class="app-modal-actions">
+        <button type="button" class="app-btn btn-neutral" data-preview-close><spring:message code="common.close" /></button>
+        <button type="button" class="app-btn btn-neutral" data-preview-print hidden><spring:message code="voucher.print" /></button>
+    </div>
+</dialog>
+<script src="<c:url value='/js/loan-print-preview.js' />" defer></script>

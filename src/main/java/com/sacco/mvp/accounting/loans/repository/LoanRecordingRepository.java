@@ -122,7 +122,7 @@ public class LoanRecordingRepository {
                 and (strpos(lower(coalesce(l.loan_id,l.application_number::text)),?)>0 or strpos(lower(b.full_name),?)>0)
             """+" order by "+order+" limit 26 offset ?",
             (r,n)->new com.sacco.mvp.staffoffice.dto.OfficeWork.Task(r.getString("number"),r.getString("full_name"),
-                "office.readyReview",r.getBigDecimal("amount"),"/finance/loan-records/"+r.getObject("id",UUID.class)+"/review"),
+                "office.readyReview",r.getBigDecimal("amount"),"/finance/loan-records/"+r.getObject("id",UUID.class)),
             a.getSaccoId(),a.getStationId(),group.name(),a.getMemberId(),a.getMemberId(),a.getMemberId(),a.getMemberId(),a.getMemberId(),
             search.toLowerCase(Locale.ROOT),search.toLowerCase(Locale.ROOT),page*25);
     }

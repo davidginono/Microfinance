@@ -54,7 +54,7 @@ class LoanGroupApprovalPostgresTest {
     }
     @Test void officeQueueUsesFrozenOrderedGroupsAndExcludesPeopleWhoAlreadyDecided() {
         var request=submit();rule(1,1);
-        String href="/finance/loan-records/"+loan+"/review";
+        String href="/finance/loan-records/"+loan;
         assertThat(queue(first,Position.ACCOUNTANT)).contains(href);
         assertThat(queue(manager,Position.MANAGER)).isEmpty();
         decide(first,request,"APPROVE");

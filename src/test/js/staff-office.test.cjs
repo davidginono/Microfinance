@@ -24,3 +24,12 @@ test('changing queue source resets sort without losing the search',()=>{
     assert.equal(form.elements.sort.value,'number');assert.equal(form.elements.search.value,'Asha');
     assert.equal(form.elements.sort.options[1].disabled,true);dom.window.close();
 });
+
+test('office return joins the breadcrumb before the title without losing command context',()=>{
+    const dom=setup(`<main id="main-content"><nav class="erp-page-path"><a href="/finance/loan-records">Loan Records</a><span>›</span><span aria-current="page">Loan details</span></nav><h1>Loan details</h1><div class="shell-content-frame"><nav data-office-return><a href="/staff/offices/credit-officer/queue?source=loan-reviews&page=2">Back to work queue</a><template data-office-return-fields><input name="office" value="credit-officer" type="hidden"></template></nav><form method="post"><input name="reason" value="Checked"></form></div></main>`);
+    const d=dom.window.document,main=d.querySelector('main'),path=d.querySelector('.erp-page-path');
+    assert.equal(path.firstElementChild.textContent,'Back to work queue');
+    assert.match(path.firstElementChild.href,/source=loan-reviews&page=2/);assert.equal(main.children[0],path);assert.equal(main.children[1].tagName,'H1');
+    assert.equal(d.querySelector('[data-office-return]'),null);assert.equal(d.querySelector('form').elements.office.value,'credit-officer');
+    dom.window.eval(source);assert.equal(path.querySelectorAll('a').length,2);dom.window.close();
+});

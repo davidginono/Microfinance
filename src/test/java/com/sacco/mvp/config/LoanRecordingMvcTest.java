@@ -161,8 +161,39 @@ class LoanRecordingMvcTest {
         var id=UUID.randomUUID();
         mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor))).andExpect(status().isForbidden());
         var key=UUID.randomUUID();
-        mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf()).param("requestKey",key.toString())).andExpect(redirectedUrl("/finance/loan-records/"+id+"/review"));
+        mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf()).param("requestKey",key.toString())).andExpect(redirectedUrl("/finance/loan-records/"+id));
         verify(context.getBean(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class)).submit(actor,id,key);
+    }
+    @Test void reviewDecisionsReturnToLoanDetailsAndRetainFailedEvidence() throws Exception {
+        var id=UUID.randomUUID();var request=UUID.randomUUID();var key=UUID.randomUUID();
+        var approvals=context.getBean(LoanGroupApprovalService.class);reset(approvals);
+        mvc.perform(get("/finance/loan-records/"+id+"/review").with(user(actor))).andExpect(status().isMethodNotAllowed());
+        mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor))).andExpect(status().isForbidden());
+        for(var decision:List.of("APPROVE","REJECT")) {
+            mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor)).with(csrf())
+                .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision",decision).param("reason","Checked papers").param("evidence","Signed paper"))
+                .andExpect(redirectedUrl("/finance/loan-records/"+id));
+            verify(approvals).decide(actor,id,request,key,decision,"Checked papers","Signed paper");
+        }
+        doThrow(new IllegalArgumentException("loanGroups.error.changed")).when(approvals).decide(actor,id,request,key,"APPROVE","Keep reason","Keep evidence");
+        mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor)).with(csrf())
+            .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision","APPROVE").param("reason","Keep reason").param("evidence","Keep evidence"))
+            .andExpect(redirectedUrl("/finance/loan-records/"+id)).andExpect(flash().attribute("reviewReason","Keep reason"))
+            .andExpect(flash().attribute("reviewEvidence","Keep evidence")).andExpect(flash().attribute("reviewRequestKey",key));
+        doThrow(new org.springframework.security.access.AccessDeniedException("Outside branch")).when(approvals).decide(actor,id,request,key,"APPROVE","Outside branch","Evidence");
+        mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor)).with(csrf())
+            .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision","APPROVE").param("reason","Outside branch").param("evidence","Evidence"))
+            .andExpect(status().isForbidden());
+    }
+    @Test void loanDetailsIncludeTheCurrentStaffReviewEligibility() throws Exception {
+        var id=UUID.randomUUID();var detail=mock(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Detail.class);
+        when(service.detail(actor,id)).thenReturn(detail);when(detail.schedule()).thenReturn(List.of());
+        var approvals=context.getBean(LoanGroupApprovalService.class);reset(approvals);
+        var review=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupReview(null,List.of(),List.of(),0,false,false);
+        when(approvals.review(actor,id)).thenReturn(review);
+        mvc.perform(get("/finance/loan-records/"+id).with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/loans/details"))
+            .andExpect(model().attribute("groupReview",review)).andExpect(model().attributeExists("reviewRequestKey"));
+        verify(approvals).review(actor,id);
     }
     @Test void topUpPreviewIsScopedUncacheableAndPreservesDecimalStrings() throws Exception {
         var source=UUID.randomUUID();var date=java.time.LocalDate.of(2026,10,8);

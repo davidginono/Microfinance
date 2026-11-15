@@ -182,14 +182,14 @@ public class NotificationInboxService {
             && !incidentId.isBlank()) {
             return "/admin/incidents/" + incidentId;
         }
-        if (!applicationId.isBlank() && principal.isStaffSession() && access.has(principal,"LOAN_RECORDING_VIEW"))return "/finance/loan-records/"+applicationId+"/review";
+        if (!applicationId.isBlank() && principal.isStaffSession() && access.has(principal,"LOAN_RECORDING_VIEW"))return "/finance/loan-records/"+applicationId;
         return defaultTarget;
     }
 
     private String memberLoanTarget(String applicationId, String defaultTarget) {
         return applicationId == null || applicationId.isBlank()
             ? defaultTarget
-            : "/finance/loan-records/" + applicationId + "/review";
+            : "/finance/loan-records/" + applicationId;
     }
 
     private String resolveApplicationId(Map<String, Object> details, UUID recipientMemberId) {

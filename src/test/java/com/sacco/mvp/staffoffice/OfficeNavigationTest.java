@@ -30,7 +30,7 @@ class OfficeNavigationTest {
         assertThat(context).isNotNull();
         var uri=URLDecoder.decode(context.getHref(),StandardCharsets.UTF_8);
         assertThat(uri).startsWith("/staff/offices/credit-officer/queue?").contains("source=loan-reviews","search=LN-5 & test","sort=oldest","page=2").doesNotContain("FOREIGN","outside");
-        var record=context.attach("/finance/loan-records/123/review");
+        var record=context.attach("/finance/loan-records/123");
         assertThat(UriComponentsBuilder.fromUriString(record).build().getQueryParams().getFirst("officeSearch")).isEqualTo("LN-5%20%26%20test");
     }
     @Test void unassignedOfficesAndInvalidFiltersHaveNoReturnContext() {
@@ -40,9 +40,9 @@ class OfficeNavigationTest {
     }
     @Test void commandRedirectPreservesQueueContextAndExistingDestinationParameters() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(actor,null,List.of()));
-        var view=new ModelAndView("redirect:/finance/loan-records/123/review?tab=history");
+        var view=new ModelAndView("redirect:/finance/loan-records/123?tab=history");
         new OfficeNavigation().postHandle(request(),new MockHttpServletResponse(),new Object(),view);
-        assertThat(view.getViewName()).startsWith("redirect:/finance/loan-records/123/review?tab=history&")
+        assertThat(view.getViewName()).startsWith("redirect:/finance/loan-records/123?tab=history&")
             .contains("office=credit-officer","officeSource=loan-reviews","officePage=2");
         var external=new ModelAndView("redirect:https://outside.invalid");
         new OfficeNavigation().postHandle(request(),new MockHttpServletResponse(),new Object(),external);
