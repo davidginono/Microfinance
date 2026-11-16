@@ -118,23 +118,23 @@ public class LoanGroupApprovalService {
         event(a,loan,"LOAN_GROUP_REVIEW_STARTED",Map.of("request",key,"rule",rule.id(),"previousStatus",l.status()));
     }
     @Transactional
-    public void decide(AppUserPrincipal a,UUID loan,UUID request,UUID key,String decision,String reason,String evidence) {
+    public void decide(AppUserPrincipal a,UUID loan,UUID request,UUID key,String decision,String reason) {
         require(Set.of("APPROVE","REJECT").contains(decision),"decision");access.requireActor(a,"LOAN_RECORDING_"+decision);
-        access.requireActor(a,"LOAN_RECORDING_VIEW");text(reason,"reason");text(evidence,"evidence");require(key!=null,"request");
+        access.requireActor(a,"LOAN_RECORDING_VIEW");text(reason,"reason");require(key!=null,"request");
         var l=records.groupLoan(a,loan,true);var r=records.groupRequest(a,loan).orElseThrow(()->invalid("state"));
         require(!records.retiredGroup(a,loan),"retired");
         require(r.id().equals(request),"changed");var decisions=records.groupDecisions(r);
         var retry=decisions.stream().filter(d->d.id().equals(key)).findFirst();
-        if(retry.isPresent()) {var d=retry.get();require(d.actor().equals(a.getMemberId())&&d.decision().equals(decision)&&d.reason().equals(reason.strip())&&d.evidence().equals(evidence.strip()),"retry");return;}
+        if(retry.isPresent()) {var d=retry.get();require(d.actor().equals(a.getMemberId())&&d.decision().equals(decision)&&d.reason().equals(reason.strip()),"retry");return;}
         require("SUBMITTED".equals(l.status())&&r.termsHash().equals(l.termsHash()),"changed");
         var plan=steps(records.groupSteps(a,r.rule()));int step=next(plan,decisions);
         require(step<plan.size()&&independent(a,l,r,decisions),"independent");
         if(!currentGroups(a).contains(plan.get(step).group()))throw new AccessDeniedException("Current approval group required");
-        var d=new GroupDecision(key,step,a.getMemberId(),a.getFullName(),decision,reason.strip(),evidence.strip(),clock.now());
+        var d=new GroupDecision(key,step,a.getMemberId(),a.getFullName(),decision,reason.strip(),"",clock.now());
         records.groupDecision(r,d);var all=new ArrayList<>(decisions);all.add(d);
         if(decision.equals("REJECT"))records.groupStatus(a,loan,"REJECTED",clock.now());
         else if(next(plan,all)==plan.size())records.groupStatus(a,loan,"READY_FOR_DISBURSEMENT",clock.now());
-        event(a,loan,"LOAN_GROUP_"+decision,Map.of("request",r.id(),"step",step,"group",plan.get(step).group().name(),"reason",reason.strip(),"evidence",evidence.strip()));
+        event(a,loan,"LOAN_GROUP_"+decision,Map.of("request",r.id(),"step",step,"group",plan.get(step).group().name(),"reason",reason.strip()));
     }
     private Set<Position> currentGroups(AppUserPrincipal a) {
         return members.find(a.getMemberId()).filter(Member::isStaffAccessActive).map(Member::getActiveStaffRolesResolved).orElse(Set.of());

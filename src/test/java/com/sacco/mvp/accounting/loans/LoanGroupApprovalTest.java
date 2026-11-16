@@ -45,7 +45,7 @@ class LoanGroupApprovalTest {
         when(members.find(id)).thenReturn(Optional.of(m));
         return new AppUserPrincipal(m,EnumSet.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT));
     }
-    void decide(AppUserPrincipal p,String decision){service.decide(p,loan,request.id(),UUID.randomUUID(),decision,"Reviewed signed terms","Signed evidence REF-1");}
+    void decide(AppUserPrincipal p,String decision){service.decide(p,loan,request.id(),UUID.randomUUID(),decision,"Reviewed signed terms");}
     @Test void customWorkflowUsesInstitutionReferenceAndExistingVersionChecks(){
         var p=person(UUID.randomUUID(),Position.ICT_MANAGER);
         when(products.ensureCustomApprovalReference("I1")).thenReturn(product);
@@ -66,7 +66,7 @@ class LoanGroupApprovalTest {
         assertThatThrownBy(()->decide(first,"APPROVE")).isInstanceOf(IllegalArgumentException.class).hasMessage("loanGroups.error.independent");
         decide(second,"APPROVE");assertThat(status).isEqualTo("SUBMITTED");
         decide(manager,"APPROVE");assertThat(status).isEqualTo("READY_FOR_DISBURSEMENT");
-        assertThat(decisions).hasSize(3);verifyNoInteractions(recording);
+        assertThat(decisions).hasSize(3);assertThat(decisions).allMatch(d->d.evidence().isEmpty());verifyNoInteractions(recording);
     }
     @Test void recorderSubmitterAndBorrowerCannotApprove(){
         for(var id:List.of(recorder,maker,client))assertThatThrownBy(()->decide(person(id,Position.CREDIT_OFFICER),"APPROVE"))
@@ -82,19 +82,28 @@ class LoanGroupApprovalTest {
     @Test void changedTermsAndStaleRoundsNeedFreshReview(){
         var p=person(UUID.randomUUID(),Position.CREDIT_OFFICER);hash="changed";
         assertThatThrownBy(()->decide(p,"APPROVE")).hasMessage("loanGroups.error.changed");hash="hash";
-        assertThatThrownBy(()->service.decide(p,loan,UUID.randomUUID(),UUID.randomUUID(),"APPROVE","Reason","Evidence")).hasMessage("loanGroups.error.changed");
+        assertThatThrownBy(()->service.decide(p,loan,UUID.randomUUID(),UUID.randomUUID(),"APPROVE","Reason")).hasMessage("loanGroups.error.changed");
         assertThat(decisions).isEmpty();
     }
-    @Test void rejectionStopsTheRoundAndRetainsItsEvidence(){
+    @Test void rejectionStopsTheRoundAndRetainsItsReasonWithoutAReference(){
         decide(person(UUID.randomUUID(),Position.CREDIT_OFFICER),"REJECT");assertThat(status).isEqualTo("REJECTED");
         assertThatThrownBy(()->decide(person(UUID.randomUUID(),Position.MANAGER),"APPROVE")).hasMessage("loanGroups.error.changed");
-        assertThat(decisions.getFirst().evidence()).isEqualTo("Signed evidence REF-1");
+        assertThat(decisions.getFirst().reason()).isEqualTo("Reviewed signed terms");
+        assertThat(decisions.getFirst().evidence()).isEmpty();
     }
     @Test void uncertainDecisionCanBeRetriedOnceWithoutAnotherApproval(){
         var p=person(UUID.randomUUID(),Position.CREDIT_OFFICER);var key=UUID.randomUUID();
-        service.decide(p,loan,request.id(),key,"APPROVE","Reason","Evidence");
-        service.decide(p,loan,request.id(),key,"APPROVE","Reason","Evidence");assertThat(decisions).hasSize(1);
-        assertThatThrownBy(()->service.decide(p,loan,request.id(),key,"APPROVE","Changed","Evidence")).hasMessage("loanGroups.error.retry");
+        service.decide(p,loan,request.id(),key,"APPROVE","Reason");
+        service.decide(p,loan,request.id(),key,"APPROVE","Reason");assertThat(decisions).hasSize(1);
+        assertThatThrownBy(()->service.decide(p,loan,request.id(),key,"APPROVE","Changed")).hasMessage("loanGroups.error.retry");
+    }
+    @Test void retryKeepsAHistoricalReferenceWithoutRequestingItAgain(){
+        var p=person(UUID.randomUUID(),Position.CREDIT_OFFICER);var key=UUID.randomUUID();
+        var previous=new GroupDecision(key,0,p.getMemberId(),p.getFullName(),"APPROVE","Reason","Historical signed reference",clock.now());
+        decisions.add(previous);
+        service.decide(p,loan,request.id(),key,"APPROVE","Reason");
+        assertThat(decisions).containsExactly(previous);assertThat(decisions.getFirst().evidence()).isEqualTo("Historical signed reference");
+        verify(records,never()).groupDecision(any(),any());
     }
     @Test void pendingReviewUsesTheRecordedRuleRatherThanTheLatestRule(){
         var p=person(UUID.randomUUID(),Position.CREDIT_OFFICER);var view=service.review(p,loan);
@@ -141,12 +150,12 @@ class LoanGroupApprovalTest {
         var reviewer=new AppUserPrincipal(members.find(staff.getMemberId()).orElseThrow(),EnumSet.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT));
         var view=service.review(reviewer,loan);
         assertThat(view.canSubmit()).isFalse();assertThat(view.canApprove()).isTrue();assertThat(view.canReject()).isTrue();
-        service.decide(reviewer,loan,request.id(),UUID.randomUUID(),"APPROVE","Checked signed papers","Paper reference");
+        service.decide(reviewer,loan,request.id(),UUID.randomUUID(),"APPROVE","Checked signed papers");
         assertThat(decisions).hasSize(1);verifyNoInteractions(recording);
     }
     @Test void rejectionRequiresAReasonBeforeAnyDecisionIsStored(){
         var reviewer=person(UUID.randomUUID(),Position.CREDIT_OFFICER);
-        assertThatThrownBy(()->service.decide(reviewer,loan,request.id(),UUID.randomUUID(),"REJECT"," ","Paper reference"))
+        assertThatThrownBy(()->service.decide(reviewer,loan,request.id(),UUID.randomUUID(),"REJECT"," "))
             .hasMessage("loanGroups.error.reason");
         assertThat(decisions).isEmpty();verify(records,never()).groupDecision(any(),any());
     }

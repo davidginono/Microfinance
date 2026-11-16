@@ -394,8 +394,8 @@ public class LoanRecordingController {
         try{groupApprovals.submit(a,id,requestKey);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));}
         return "redirect:/finance/loan-records/"+id;
     }
-    @PostMapping("/loan-records/{id}/review") public String decideGroupReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID approvalRequest,@RequestParam UUID requestKey,@RequestParam String decision,@RequestParam String reason,@RequestParam String evidence,RedirectAttributes flash){
-        try{groupApprovals.decide(a,id,approvalRequest,requestKey,decision,reason,evidence);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));flash.addFlashAttribute("reviewReason",reason);flash.addFlashAttribute("reviewEvidence",evidence);flash.addFlashAttribute("reviewRequestKey",requestKey);}
+    @PostMapping("/loan-records/{id}/review") public String decideGroupReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID approvalRequest,@RequestParam UUID requestKey,@RequestParam String decision,@RequestParam String reason,RedirectAttributes flash){
+        try{groupApprovals.decide(a,id,approvalRequest,requestKey,decision,reason);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));flash.addFlashAttribute("reviewReason",reason);flash.addFlashAttribute("reviewRequestKey",requestKey);}
         return "redirect:/finance/loan-records/"+id;
     }
 

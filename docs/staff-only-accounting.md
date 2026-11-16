@@ -2,7 +2,7 @@
 
 The application is a staff accounting package. Clients are business records, not login accounts. Staff record client details, applications, signed documents and group loans. Existing loan contracts, decisions, repayments, journal entries, corrections and audit evidence remain historical records.
 
-## Access and user groups
+## Access and staff
 
 The assignable groups are Super Administrator, Loan Officer, General Manager, Finance Manager, Chief Accountant, ICT Manager, Credit Officer, Accounts Clerk, Customer Care and Accounts Clerk 2. Super Administrator uses the separate platform login. Institution staff use the staff login and invitation flow, including staff who also have a client record.
 
@@ -19,9 +19,9 @@ Historical manager, board, guarantor and reversal entities remain where reports,
 ## Loan recording and approval
 
 1. Staff record a draft or a complete application in Loan records. Drafts are unassessed records and cannot be funded.
-2. Configure ordered approval groups and the required number of different people for each product and branch inside Create Loan Product and Edit Loan Product → Approval Workflow. Custom loans also require this setup.
+2. The approval selector and review column are labelled Staff. Configure ordered staff groups and the required number of different people for each product and branch inside Create Loan Product and Edit Loan Product → Approval Workflow. Custom loans also require this setup.
 3. The recorder sends a complete recorded application for review. Required client checks and financial assessment must be present. A signed individual application is optional; guarantor evidence and signed group agreements retain their existing requirements. The application uses the latest approval workflow for its own loan product and branch; a missing workflow blocks submission. The system verifies that enough independent, authorized staff are available. Applications appear in the current configured group's loan review queue, then move to the next group after the required approvals. General Manager and Loan Officer receive applications only when selected by that product's workflow.
-4. Each reviewer records a real decision, reason and evidence. The recorder, submitter and borrower cannot approve the application. This includes named shared borrowers and company representatives. One person can decide only once in a review round, including when they belong to multiple groups.
+4. Each reviewer records a real decision and reason. No separate supporting document reference is requested. Older references remain immutable history. The recorder, submitter and borrower cannot approve the application. This includes named shared borrowers and company representatives. One person can decide only once in a review round, including when they belong to multiple groups.
 5. All required approvals make the unchanged application ready for disbursement. A rejection stops that round. A later round keeps the earlier decisions and freezes its own rule revision and terms.
 6. Authorized staff record disbursement separately, using the existing accounting, proof, closed-period, idempotency and reconciliation safeguards. Approval itself moves no money.
 
@@ -38,6 +38,8 @@ Recording a client profile does not verify it. Independent checks and the produc
 ## Database cutover
 
 `V154__staff_only_accounting.sql` snapshots the former borrower access flag and status, disables borrower access, retires borrower-only credentials, adds current group aliases and creates immutable loan review rules, requests and decisions. Unfinished borrower signups become unverified client records without credentials. Combined staff/client identities retain their staff credentials. The retired portal flag remains constrained false for database compatibility and historical evidence.
+
+`V163__loan_review_without_document_reference.sql` removes only the nonblank check on the legacy review-reference column. New decisions store no reference; existing references and all approval guards remain intact. Apply it with a verified backup before deploying the changed review service.
 
 `V155__staff_recorded_group_papers.sql` adds immutable physical paper evidence and links it to the existing group liability and payout records. Historical digital evidence continues to use its existing validation rules.
 

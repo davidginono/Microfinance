@@ -176,25 +176,25 @@ class LoanRecordingMvcTest {
         mvc.perform(post("/finance/loan-records/"+id+"/submit-for-review").with(user(actor)).with(csrf()).param("requestKey",key.toString())).andExpect(redirectedUrl("/finance/loan-records/"+id));
         verify(context.getBean(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class)).submit(actor,id,key);
     }
-    @Test void reviewDecisionsReturnToLoanDetailsAndRetainFailedEvidence() throws Exception {
+    @Test void reviewDecisionsNeedNoReferenceAndRetainTheReasonOnFailure() throws Exception {
         var id=UUID.randomUUID();var request=UUID.randomUUID();var key=UUID.randomUUID();
         var approvals=context.getBean(LoanGroupApprovalService.class);reset(approvals);
         mvc.perform(get("/finance/loan-records/"+id+"/review").with(user(actor))).andExpect(status().isMethodNotAllowed());
         mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor))).andExpect(status().isForbidden());
         for(var decision:List.of("APPROVE","REJECT")) {
             mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor)).with(csrf())
-                .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision",decision).param("reason","Checked papers").param("evidence","Signed paper"))
+                .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision",decision).param("reason","Checked papers"))
                 .andExpect(redirectedUrl("/finance/loan-records/"+id));
-            verify(approvals).decide(actor,id,request,key,decision,"Checked papers","Signed paper");
+            verify(approvals).decide(actor,id,request,key,decision,"Checked papers");
         }
-        doThrow(new IllegalArgumentException("loanGroups.error.changed")).when(approvals).decide(actor,id,request,key,"APPROVE","Keep reason","Keep evidence");
+        doThrow(new IllegalArgumentException("loanGroups.error.changed")).when(approvals).decide(actor,id,request,key,"APPROVE","Keep reason");
         mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor)).with(csrf())
-            .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision","APPROVE").param("reason","Keep reason").param("evidence","Keep evidence"))
+            .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision","APPROVE").param("reason","Keep reason"))
             .andExpect(redirectedUrl("/finance/loan-records/"+id)).andExpect(flash().attribute("reviewReason","Keep reason"))
-            .andExpect(flash().attribute("reviewEvidence","Keep evidence")).andExpect(flash().attribute("reviewRequestKey",key));
-        doThrow(new org.springframework.security.access.AccessDeniedException("Outside branch")).when(approvals).decide(actor,id,request,key,"APPROVE","Outside branch","Evidence");
+            .andExpect(flash().attributeCount(3)).andExpect(flash().attribute("reviewRequestKey",key));
+        doThrow(new org.springframework.security.access.AccessDeniedException("Outside branch")).when(approvals).decide(actor,id,request,key,"APPROVE","Outside branch");
         mvc.perform(post("/finance/loan-records/"+id+"/review").with(user(actor)).with(csrf())
-            .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision","APPROVE").param("reason","Outside branch").param("evidence","Evidence"))
+            .param("approvalRequest",request.toString()).param("requestKey",key.toString()).param("decision","APPROVE").param("reason","Outside branch"))
             .andExpect(status().isForbidden());
     }
     @Test void loanDetailsIncludeTheCurrentStaffReviewEligibility() throws Exception {
