@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css?v=20261030-auth-alerts' />" />
     <link rel="stylesheet" href="<c:url value='/css/public-access.css' />" />
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
+    <script defer src="<c:url value='/js/console-resource-details.js' />"></script>
 </head>
 <body class="auth-shell aws-auth-shell auth-login-page public-access min-h-screen font-sans text-slate-900 antialiased">
 <nav class="auth-language" aria-label="<spring:message code='portal.language' />">

@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261029-form-spacing'/>"/>
     <link rel="stylesheet" href="<c:url value='/css/form-validation.css?v=20261029-auth-forms'/>"/>
     <script defer src="<c:url value='/js/form-validation.js'/>"></script>
+    <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css' />" />
+    <script defer src="<c:url value='/js/console-resource-details.js' />"></script>
 </head>
 <body class="aws-auth-shell text-slate-800">
 <span id="form-validation-labels" hidden

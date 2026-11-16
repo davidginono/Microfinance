@@ -6,6 +6,6 @@
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <div class="accounting-workspace">
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="accounting.actionFailed" /></h1></div>
-<c:if test="${not empty accountingSuccess}"><p role="status"><spring:message code="${accountingSuccess}" /></p></c:if>
+<c:if test="${not empty accountingSuccess}"><p data-message-type="success" role="status"><spring:message code="${accountingSuccess}" /></p></c:if>
 <p role="alert"><spring:message code="${accountingError}" /></p></div>
 <%@ include file="../fragments/footer.jspf" %>

@@ -7,7 +7,7 @@ function markup(file){
  return source.slice(source.indexOf('<body'),source.indexOf('<script>',source.indexOf('<body')))
   .replace(/<%@[^]*?%>/g,'').replace(/<\/?(?:c|spring):[^>]*>/g,'');
 }
-test('client, staff and system-admin notifications share an external rail above the login card',()=>{
+test('staff and system-admin notifications share an external rail above the login card',()=>{
  const dom=new JSDOM(markup('login.jsp'));
  try{
   const d=dom.window.document,rail=d.querySelector('#authToastContainer'),card=d.querySelector('.auth-frame');
@@ -17,7 +17,8 @@ test('client, staff and system-admin notifications share an external rail above 
   assert.equal(d.querySelectorAll('#authToastContainer').length,1);
   assert.equal(rail.getAttribute('aria-live'),'polite');
   for(const type of ['staff-password','system-admin-password'])assert.ok(card.querySelector(`input[name="loginType"][value="${type}"]`));
-  assert.ok(card.querySelector('#clientLoginIdentifier'));
+  assert.ok(card.querySelector('#staffLoginIdentifier'));
+  assert.equal(card.querySelector('#clientLoginIdentifier'),null);
  }finally{dom.window.close();}
 });
 test('MFA errors and success feedback sit above the verification card without moving its form',()=>{

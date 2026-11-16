@@ -43,15 +43,20 @@
         const parent=node.parentElement;
         if(parent?.tagName==='SPAN' && parent.childElementCount===1)parent.classList.add('console-status-host');
     }
+    const messageSelector='[data-message-type],.console-message,[data-app-toast],[role="alert"],[role="status"],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.live-account-status-message,.app-loading-error,.loan-error-summary,.accounting-error-summary,.loan-success,.coa-success,.portfolio-notice,.accounting-resource-workspace > .coa-error,:is(div,p,section):is(.bg-emerald-50,.bg-green-50,.bg-rose-50,.bg-red-50,.bg-amber-50,.bg-yellow-50)';
+    const automaticMessageTypes=new WeakMap();
     function messages(scope) {
-        const selector='[data-message-type],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.live-account-status-message,.app-loading-error,.workspace-navigation-feedback[role="alert"],.loan-error-summary,.accounting-error-summary,.accounting-resource-workspace > .coa-error,.accounting-resource-workspace > .coa-success,.library-modal .coa-success';
-        const candidates=[...(scope.matches?.(selector)?[scope]:[]),...scope.querySelectorAll(selector)];
+        const candidates=[...(scope.matches?.(messageSelector)?[scope]:[]),...scope.querySelectorAll(messageSelector)];
         candidates.forEach(message=>{
+            if(message.matches('.sr-only,.erp-field-error,.field-error,.app-loading-spinner,.kyc-contact-result,.library-lookup-status,.voucher-number-output,[data-resource-status],[data-choice-error],[data-save-status],[data-batch-progress],[data-code-status],[data-work-status]')
+                || message.closest('.sr-only,[role="progressbar"]') || message.querySelector('[data-resource-status]'))return;
+            if(message.matches('.dashboard-data-status') && message.getAttribute('role')!=='alert')return;
             if(!message.textContent.trim())return;
             const classes=message.className;
-            const declared=message.dataset.messageAuto==='true'?null:message.dataset.messageType;
-            if(!declared)message.dataset.messageAuto='true';
-            const kind=/danger|error|delete-callout/.test(classes) || message.getAttribute('role')==='alert'?'error':/warning|is-unavailable|admin-status-callout/.test(classes)?'warning':/success/.test(classes)?'success':declared || 'info';
+            const declared=message.dataset.messageType;
+            const explicit=['success','error','warning','info'].includes(declared) && declared!==automaticMessageTypes.get(message);
+            const kind=explicit?declared:/danger|error|delete-callout|bg-rose-|bg-red-/.test(classes)?'error':/warning|is-unavailable|admin-status-callout|bg-amber-|bg-yellow-/.test(classes)?'warning':/success|bg-emerald-|bg-green-/.test(classes)?'success':message.getAttribute('role')==='alert'?'error':'info';
+            if(explicit)automaticMessageTypes.delete(message);else automaticMessageTypes.set(message,kind);
             message.classList.add('console-message');message.dataset.messageType=kind;
             if(!message.hasAttribute('role'))message.setAttribute('role',kind==='error'?'alert':'status');
             const current=message.querySelector(':scope > .console-message-icon');
@@ -171,6 +176,11 @@
     }
     window.ConsoleResourceDetails={init,icon,status};
     onReady(()=>{window.ResourceTable?.init();details();init();
-        let queued=false;new MutationObserver(records=>{if(queued || !records.some(record=>record.addedNodes.length))return;queued=true;queueMicrotask(()=>{queued=false;init();});}).observe(document.querySelector('main') || document.body,{childList:true,subtree:true});
+        let queued=false;new MutationObserver(records=>{
+            if(queued || !records.some(record=>record.type==='attributes'
+                ? record.oldValue!==record.target.getAttribute(record.attributeName) && record.target.matches(messageSelector+', [data-resource-status]')
+                : record.type==='characterData'?record.target.parentElement?.closest(messageSelector):record.addedNodes.length || record.target.matches?.(messageSelector)))return;
+            queued=true;queueMicrotask(()=>{queued=false;init();});
+        }).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeOldValue:true,attributeFilter:['class','role','data-message-type','data-resource-status']});
     });
 })();

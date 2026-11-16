@@ -13,12 +13,14 @@
     <link rel="stylesheet" href="<c:url value='/css/console-components.css?v=20260809-loan-detail-action-v33' />" />
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261029-form-spacing' />" />
+    <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css' />" />
+    <script defer src="<c:url value='/js/console-resource-details.js' />"></script>
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="auth-form-page">
     <div class="auth-form-layout">
-        <div id="staffMfaError" class="auth-login-notice hidden border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700" role="alert"></div>
-        <div id="staffMfaSuccess" class="auth-login-notice hidden border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status"></div>
+        <div id="staffMfaError" data-message-type="error" class="auth-login-notice hidden border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700" role="alert"></div>
+        <div id="staffMfaSuccess" data-message-type="success" class="auth-login-notice hidden border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700" role="status"></div>
     <div class="mfa-card auth-form-card">
         <div class="mb-6">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Sign-In Verification</p>

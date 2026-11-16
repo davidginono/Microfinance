@@ -2,7 +2,7 @@
 <c:if test="${waiversLoaded}">
 <div class="accounting-workspace accounting-servicing-workspace" id="interest-waivers">
 <c:if test="${not empty prepaymentError}"><div class="coa-error" role="alert" tabindex="-1"><spring:message code="${prepaymentError}" /></div></c:if>
-<c:if test="${prepaymentSaved}"><p role="status"><spring:message code="prepayment.saved" /></p></c:if>
+<c:if test="${prepaymentSaved}"><p data-message-type="success" role="status"><spring:message code="prepayment.saved" /></p></c:if>
 <sec:authorize access="@access.has(principal,'LOAN_INTEREST_WAIVE')">
 <c:url value="${waiverBase}/interest-waivers" var="waiverAction" />
 <c:if test="${waiverQuote.legacy and waiverQuote.sequence==1}"><section class="accounting-section accounting-form"><h2><spring:message code="prepayment.adopt" /></h2><p><spring:message code="prepayment.adoptHelp" /></p>

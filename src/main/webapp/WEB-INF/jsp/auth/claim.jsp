@@ -17,6 +17,8 @@
     <%@ include file="../fragments/otp-ui-styles.jspf" %>
     <link rel="stylesheet" href="<c:url value='/css/aws-auth.css?v=20261029-form-spacing' />" />
     <script defer src="<c:url value='/js/password-visibility.js?v=20261022' />"></script>
+    <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css' />" />
+    <script defer src="<c:url value='/js/console-resource-details.js' />"></script>
 </head>
 <body class="aws-auth-shell text-slate-800">
 <main class="auth-form-page">
@@ -27,10 +29,10 @@
         </div>
 
         <c:if test="${not empty claimMessage}">
-            <div class="mb-4 border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">${claimMessage}</div>
+            <div data-message-type="success" role="status"><c:out value="${claimMessage}" /></div>
         </c:if>
         <c:if test="${not empty claimError}">
-            <div class="mb-4 border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">${claimError}</div>
+            <div data-message-type="error" role="alert"><c:out value="${claimError}" /></div>
         </c:if>
 
         <c:choose>

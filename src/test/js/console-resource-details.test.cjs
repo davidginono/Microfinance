@@ -82,6 +82,29 @@ test('shared alerts preserve native recovery actions and hidden and empty states
  } finally {dom.window.close();}
 });
 
+test('page notices and legacy feedback get severity icons without decorating fields or progress',async()=>{
+ const {dom,w,d}=await setup('<p class="loan-success">Loan saved.</p><div class="coa-success">Account saved.</div><p class="repayment-error" role="alert">Payment failed.</p><p id="information" role="status">Read this update.</p><p data-message-type="warning" role="alert">Check the account.</p><div class="bg-emerald-50">Settings saved.</div><div class="bg-rose-50">Try again.</div><div class="bg-amber-50">Missing history.</div><p class="erp-field-error" role="alert">Amount is required.</p><span class="kyc-contact-result" role="status">Phone checked.</span><span data-batch-progress role="status">Saving 2 of 3</span><span class="app-loading-spinner" role="status">Loading</span><p class="sr-only" role="status">Row selected</p>');
+ try{
+  for(const [selector,kind] of [['.loan-success','success'],['.coa-success','success'],['.repayment-error','error'],['#information','info'],['[data-message-type="warning"]','warning'],['.bg-emerald-50','success'],['.bg-rose-50','error'],['.bg-amber-50','warning']]){
+   const notice=d.querySelector(selector);assert.equal(notice.querySelector('.console-message-icon').dataset.kind,kind);assert.equal(notice.querySelector('svg').getAttribute('aria-hidden'),'true');
+  }
+  for(const selector of ['.erp-field-error','.kyc-contact-result','[data-batch-progress]','.app-loading-spinner','.sr-only'])assert.equal(d.querySelector(selector).querySelector('.console-message-icon'),null);
+  w.ConsoleResourceDetails.init();assert.equal(d.querySelector('.loan-success').querySelectorAll('.console-message-icon').length,1);
+ }finally{dom.window.close();}
+});
+
+test('body-mounted modal messages and in-place severity changes stay synchronized',async()=>{
+ const {dom,w,d}=await setup('<p id="changing" class="loan-success">Saved.</p><div id="empty" role="status"></div>');
+ try{
+  const modal=d.createElement('div');modal.innerHTML='<section role="dialog"><p data-message-type="error" role="alert">Retry <button>Try again</button></p></section>';d.body.append(modal);
+  await settle();await settle();
+  const notice=modal.querySelector('p'),button=notice.querySelector('button');assert.equal(notice.querySelector('.console-message-icon').dataset.kind,'error');assert.equal(notice.querySelector('button'),button);
+  notice.dataset.messageType='warning';await settle();await settle();assert.equal(notice.querySelector('.console-message-icon').dataset.kind,'warning');assert.equal(notice.querySelectorAll('.console-message-icon').length,1);
+  const changing=d.querySelector('#changing');changing.classList.remove('loan-success');changing.classList.add('repayment-error');changing.setAttribute('role','alert');await settle();await settle();assert.equal(changing.querySelector('.console-message-icon').dataset.kind,'error');
+  const empty=d.querySelector('#empty');assert.equal(empty.querySelector('svg'),null);const text=d.createTextNode('');empty.append(text);await settle();text.data='New information';await settle();await settle();assert.equal(empty.querySelector('.console-message-icon').dataset.kind,'info');assert.equal(empty.textContent,'New information');
+ }finally{dom.window.close();}
+});
+
 test('resource IDs retain native same-tab navigation and only real new-tab links get an external hint',async()=>{
  const {dom,w,d}=await setup('<dl class="erp-detail-facts"><div><dt>Loan</dt><dd><a class="resource-table-id-link" href="/loan/1">L001</a></dd></div></dl><a id="policy" href="https://example.org/policy" target="_blank" rel="help">Policy</a><a id="download" href="/receipt/pdf" target="_blank" download>PDF</a>');
  const loan=d.querySelector('.resource-table-id-link'),policy=d.querySelector('#policy');

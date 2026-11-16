@@ -10,7 +10,7 @@
 <nav class="erp-page-path"><a href="<c:url value='/admin/settings-controls/loan-products/${product.id}/edit' />"><c:out value="${product.displayName}" /></a><span>›</span><span aria-current="page"><spring:message code="prepayment.title" /></span></nav>
 <div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="prepayment.title" /></h1></div>
 <c:if test="${not empty prepaymentError}"><div class="coa-error" role="alert" tabindex="-1"><spring:message code="${prepaymentError}" /></div></c:if>
-<c:if test="${prepaymentSaved}"><p role="status"><spring:message code="prepayment.saved" /></p></c:if>
+<c:if test="${prepaymentSaved}"><p data-message-type="success" role="status"><spring:message code="prepayment.saved" /></p></c:if>
 <form:form method="post" modelAttribute="policyForm" cssClass="accounting-create-form">
 <section class="accounting-section accounting-form"><h2><c:out value="${product.displayName}" /></h2>
 <p><spring:message code="prepayment.productHelp" /></p>
