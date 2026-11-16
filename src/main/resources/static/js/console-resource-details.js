@@ -24,7 +24,7 @@
     };
     const label = () => document.getElementById('console-resource-labels')?.dataset || {};
     const type = value => {
-        const state=(value || '').trim().toUpperCase().replace(/[ -]+/g,'_');
+        const state=(value || '').trim().split('.').pop().toUpperCase().replace(/[ -]+/g,'_');
         if (/^(ACTIVE|APPROVE[D]?|ALL_GUARANTORS_APPROVED|SUCCESS|SUCCESSFUL|ASSOCIATED|POSTED|PAID|DISBURSED|COMPLETED|COMPLETE|VALIDATED|ENABLED|LINKED|HEALTHY|OK|READY|ACCEPTED|DELIVERED|SENT|RESOLVED|ON_TRACK)$/.test(state))return 'success';
         if (/REJECT|FAIL|ERROR|DEFAULT|DEPLETED|CRITICAL|INVALID|DECLINED/.test(state))return 'error';
         if (/OVERDUE|ARREARS|^PAR$|WARNING|LOW|INCOMPLETE|NOT_VALIDATED|NOT_LINKED|RETRY/.test(state))return 'warning';

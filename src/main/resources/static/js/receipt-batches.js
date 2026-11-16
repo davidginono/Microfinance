@@ -181,7 +181,7 @@ function initializeReceiptBatches() {
         }catch(error){showIssue(item,error.message,false,error.code);}
         finally{pending.delete(item.id);trigger.disabled=false;saveStatus();controls();}
     }
-    function paintStatus(item){if(!item.status)return;item.status.replaceChildren(el('span',t('state.' + item.state)));if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}}
+    function paintStatus(item){if(!item.status)return;const state=el('span',t('state.' + item.state));state.dataset.resourceStatus=item.state;item.status.replaceChildren(state);if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}}
     function paintPreview(item){
         const plan = item.preview;item.amountTotal && (item.amountTotal.textContent = total(item));
         if(!plan)return;
@@ -242,7 +242,7 @@ function initializeReceiptBatches() {
         window.ResourceTable.setPage(tableRegion,{page,hasNext,loading});
     }
     async function refreshSummary(){summary = await api(url + '/summary');canEdit = editor.dataset.canEdit === 'true';
-        const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed]]){const fact = el('div');fact.append(el('dt',t(label)),el('dd',String(value)));area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
+        const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed]]){const fact = el('div'),valueNode=el('dd');if(label==='status'){const state=el('span',String(value));state.dataset.resourceStatus=summary.batch.state;valueNode.append(state);}else valueNode.textContent=String(value);fact.append(el('dt',t(label)),valueNode);area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
     async function load(){if(loading)return;loading = true;try{controls();await flush();await refreshSummary();const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){body.querySelector('[data-batch-loading]')?.replaceWith(document.createTextNode(t('error.failed')));globalError(error.message);}finally{loading = false;controls();}}
     editor.querySelector('[data-default-account]').addEventListener('change',event=>{
         const account = event.target;if(!editable() || editor.dataset.payrollSealed === 'true' || !account.value)return;

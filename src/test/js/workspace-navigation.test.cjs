@@ -52,7 +52,7 @@ test('user access saves refresh the main content without replacing the shell or 
   const main=d.querySelector('main'),form=d.querySelector('form'),button=form.querySelector('button'),header=d.getElementById('shellTopNav'),sidebar=d.getElementById('appSidebar'),link=sidebar.querySelector('a');
   header.insertAdjacentHTML('beforeend','<button id="header-child">Menu</button>');const headerChild=d.getElementById('header-child');
   headerChild.addEventListener('click',()=>w.commands.push('old-header'));
-  const scrolls=[];w.scrollTo=options=>scrolls.push(options);w.HTMLElement.prototype.scrollIntoView=function(options){scrolls.push(options);};
+  const scrolls=[];w.scrollTo=options=>scrolls.push(options);w.HTMLElement.prototype.scrollTo=function(options){scrolls.push(options);};w.HTMLElement.prototype.scrollIntoView=function(options){scrolls.push(options);};
   Object.defineProperty(w,'scrollY',{value:700,configurable:true});
   form.method='post';form.action='/admin/users/USER1';form.dataset.accessEditForm='';
   form.insertAdjacentHTML('beforeend','<input type="hidden" name="_csrf" value="csrf-token"><input type="checkbox" name="claims" value="ONE" checked><input type="checkbox" name="claims" value="TWO" checked>');

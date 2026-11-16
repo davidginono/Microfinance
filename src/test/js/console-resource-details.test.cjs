@@ -131,6 +131,15 @@ test('status icons follow actual state, preserve labels and refresh after replac
  assert.equal(d.querySelector('[data-resource-status=DISBURSED]').dataset.statusType,'success');assert.equal(d.querySelector('[data-resource-status=DISBURSED]').textContent,'Imetolewa');assert.equal(d.querySelector('[data-resource-status=PENDING]').dataset.statusType,'pending');assert.equal(d.querySelector('[data-resource-status=REJECTED]').dataset.statusType,'error');
  const replacement=d.createElement('span');replacement.dataset.resourceStatus='REVERSED';replacement.textContent='Reversed';d.querySelector('section').append(replacement);await settle();assert.equal(replacement.dataset.statusType,'stopped');w.ConsoleResourceDetails.init();assert.equal(replacement.querySelectorAll('svg').length,1);dom.window.close();
 });
+
+test('office status keys use the same icons in either language and update without duplicate icons',async()=>{
+ const {dom,w,d}=await setup('<span data-resource-status="recording.status.READY_FOR_DISBURSEMENT">Ready for disbursement</span><span data-resource-status="kyc.state.RECORDED">Imerekodiwa</span><span data-resource-status="coav.state.APPROVED">Approved</span>');
+ try{
+  const states=d.querySelectorAll('[data-resource-status]');assert.equal(states[0].dataset.statusType,'pending');assert.equal(states[1].dataset.statusType,'pending');assert.equal(states[2].dataset.statusType,'success');
+  states[0].dataset.resourceStatus='recording.status.REJECTED';states[0].lastChild.textContent='Imekataliwa';await settle();await settle();
+  assert.equal(states[0].dataset.statusType,'error');assert.equal(states[0].textContent,'Imekataliwa');assert.equal(states[0].querySelectorAll('.console-icon').length,1);
+ }finally{dom.window.close();}
+});
 test('copy has a localized accessible name, copies the value once and preserves resource links',async()=>{
  const {dom,w,d}=await setup('<section class="accounting-section"><h2>Details</h2><dl class="erp-detail-facts"><div><dt>Client</dt><dd><a href="/clients/1" target="_blank">CL001</a></dd></div><div><dt>Status</dt><dd><span data-resource-status="ACTIVE">Active</span></dd></div></dl></section>');let copied=[];Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async text=>copied.push(text)}});
  const button=d.querySelector('button.console-copy');assert.equal(button.getAttribute('aria-label'),'Copy: Client');button.click();await settle();assert.deepEqual(copied,['CL001']);assert.equal(d.querySelector('#console-copy-feedback').textContent,'Copied');assert.equal(d.querySelector('a').getAttribute('href'),'/clients/1');assert.equal(d.querySelector('a').querySelectorAll('svg').length,1);assert.equal(d.querySelectorAll('.console-copy').length,1);w.ConsoleResourceDetails.init();assert.equal(d.querySelectorAll('.console-copy').length,1);dom.window.close();

@@ -28,7 +28,7 @@
                 <c:forEach items="${officeView.work.rows}" var="task" varStatus="i"><tr <c:if test="${not empty task.href}">data-group-row="task-${i.index}" data-target="<c:url value='${task.href}' />"</c:if>>
                     <td><input type="checkbox" ${empty task.href ? 'disabled' : ''} aria-label="<spring:message code='voucher.select' /> <c:out value='${task.number}' />" /></td>
                     <td data-group-identity><c:choose><c:when test="${not empty task.href}"><a class="resource-table-id-link" href="<c:url value='${task.href}' />"><c:out value="${task.number}" /></a></c:when><c:otherwise><c:out value="${task.number}" /></c:otherwise></c:choose></td>
-                    <td><c:out value="${task.name}" /></td><td><spring:message code="${task.stateKey}" /></td><td class="office-amount"><c:choose><c:when test="${not empty task.amount}"><fmt:formatNumber value="${task.amount}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></td>
+                    <td><c:out value="${task.name}" /></td><td><span data-resource-status="${task.stateKey}"><spring:message code="${task.stateKey}" /></span></td><td class="office-amount"><c:choose><c:when test="${not empty task.amount}"><fmt:formatNumber value="${task.amount}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></td>
                 </tr></c:forEach>
                 <c:if test="${empty officeView.work.rows}"><tr><td colspan="5"><spring:message code="${empty officeView.sources ? 'office.noWorkAssigned' : not empty search ? 'credit.noMatches' : officeView.source.key eq 'loan-reviews' ? 'office.noLoanReviews' : 'office.noWork'}" /></td></tr></c:if>
             </tbody></table></div>

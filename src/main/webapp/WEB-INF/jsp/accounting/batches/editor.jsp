@@ -10,7 +10,7 @@
 <c:if test="${payrollLinked}"><p role="status"><spring:message code="payroll.feedback.sealed" /></p></c:if>
 <c:if test="${not empty importedReceiptCount}"><p class="console-message" data-message-type="success" role="status"><spring:message code="batch.sheet.imported" arguments="${importedReceiptCount}" /></p></c:if>
 <section class="erp-resource-section"><h2><spring:message code="batch.batchDetails" /></h2><dl class="erp-detail-facts" data-batch-summary aria-live="polite">
-<div><dt><spring:message code="batch.status" /></dt><dd><spring:message code="batch.state.${summary.batch.state}" /></dd></div>
+<div><dt><spring:message code="batch.status" /></dt><dd><span data-resource-status="${summary.batch.state}"><spring:message code="batch.state.${summary.batch.state}" /></span></dd></div>
 <div><dt><spring:message code="batch.receiptRows" /></dt><dd><c:out value="${summary.receipts}" /></dd></div>
 <div><dt><spring:message code="batch.total" /></dt><dd><fmt:formatNumber value="${summary.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
 <div><dt><spring:message code="batch.posted" /></dt><dd><c:out value="${summary.posted}" /></dd></div>

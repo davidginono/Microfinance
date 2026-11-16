@@ -13,7 +13,7 @@
     </dl>
 </c:if>
 <c:forEach items="${generatedChargeAccounts}" var="generatedChargeAccount">
-    <div class="min-w-0 break-words"><span><spring:message code="charges.account.${generatedChargeAccount.component}" /></span>: <c:out value="${generatedChargeAccount.label}" /> - <spring:message code="coav.state.${generatedChargeAccount.state}" /></div>
+    <div class="min-w-0 break-words"><span><spring:message code="charges.account.${generatedChargeAccount.component}" /></span>: <c:out value="${generatedChargeAccount.label}" /> - <span data-resource-status="${generatedChargeAccount.state}"><spring:message code="coav.state.${generatedChargeAccount.state}" /></span></div>
 </c:forEach>
 <input form="${chargeFormId}" type="hidden" name="requestKey" value="<c:out value='${chargePolicy.requestKey}' />" />
 <input form="${chargeFormId}" type="hidden" name="expectedVersion" value="<c:out value='${chargePolicy.expectedVersion}' />" />

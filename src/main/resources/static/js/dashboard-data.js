@@ -6,7 +6,7 @@
     const format=(value,decimals=0)=>number(value)===null?'—':new Intl.NumberFormat(document.documentElement.lang || 'en',{maximumFractionDigits:decimals}).format(Number(value));
     function init(root){
         if(regions.has(root))return;
-        const l=labels(),status=root.querySelector('[data-dashboard-data-status]'),range=root.querySelector('[data-dashboard-range]');
+        const l=labels(),status=root.querySelector('[data-dashboard-data-status]'),range=root.querySelector('[data-dashboard-range]'),retry=root.querySelector('[data-dashboard-retry]');
         const targets=[...root.querySelectorAll('[data-dashboard-metric]:not([data-dashboard-metric="updated"]),[data-live-chart]')];
         targets.forEach(target=>target.setAttribute('data-ui-loading-region',''));
         const end=()=>targets.forEach(target=>window.AppLoading?.end(target));
@@ -35,6 +35,7 @@
         async function load(force=false){
             if(!visible()||blocked)return;
             if(request && !force)return;
+            if(retry)retry.hidden=true;
             request?.abort();const current=++version,controller=new AbortController();request=controller;
             const timeout=setTimeout(()=>controller.abort(),20000);
             root.setAttribute('aria-busy','true');
@@ -45,10 +46,11 @@
                 if((response.status===401||response.status===403||response.redirected)&&current===version){blocked=true;end();targets.forEach(target=>{target.textContent=target.matches('[data-live-chart]')?'':'—';});}
                 if(!response.ok || response.redirected)throw new Error('request');const payload=await response.json();
                 if(current!==version || !visible())return;end();render(payload);loaded=true;if(status){status.hidden=true;status.replaceChildren();status.classList.remove('dashboard-data-error');status.setAttribute('role','status');}
-            }catch(error){if(current===version && visible()){if(status){status.hidden=false;status.classList.add('dashboard-data-error');status.setAttribute('role','alert');status.textContent=l.loadError;}}}
+            }catch(error){if(current===version && visible()){if(status){status.hidden=false;status.classList.add('dashboard-data-error');status.setAttribute('role','alert');status.textContent=l.loadError;}if(retry)retry.hidden=blocked;}}
             finally{clearTimeout(timeout);if(current===version){end();request=null;root.removeAttribute('aria-busy');schedule();}}
         }
         range?.addEventListener('change',()=>void load(true));
+        retry?.addEventListener('click',()=>void load(true));
         root.querySelector('[data-dashboard-view]')?.addEventListener('change',event=>{root.querySelectorAll('[data-dashboard-chart-panel]').forEach(panel=>panel.hidden=panel.dataset.dashboardChartPanel!==event.target.value);});
         root.addEventListener('dashboard:visibility',()=>{if(visible())void load(true);else stop();});
         const state={load,stop,start(){stop();if(visible())void load();}};regions.set(root,state);void load();

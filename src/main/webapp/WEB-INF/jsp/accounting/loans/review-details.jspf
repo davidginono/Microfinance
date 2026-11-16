@@ -8,7 +8,7 @@
 </c:if>
 <c:set var="hasReviewEvidence" value="false" /><c:forEach items="${groupReview.decisions}" var="d"><c:if test="${not empty d.evidence}"><c:set var="hasReviewEvidence" value="true" /></c:if></c:forEach>
 <section class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar"><h2><spring:message code="recording.history" /></h2></div><div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="evidence-history"><thead><tr><th><spring:message code="voucher.date" /></th><th><spring:message code="recording.recordedBy" /></th><th><spring:message code="loanGroups.decision" /></th><th><spring:message code="loanGroups.reason" /></th><c:if test="${hasReviewEvidence}"><th><spring:message code="voucher.evidence" /></th></c:if></tr></thead><tbody>
-<c:forEach items="${groupReview.decisions}" var="d"><tr><td>${appTime:display(d.at)}</td><td><c:out value="${d.name}" /></td><td><spring:message code="loanGroups.${d.decision}" /></td><td><c:out value="${d.reason}" /></td><c:if test="${hasReviewEvidence}"><td><c:out value="${d.evidence}" /></td></c:if></tr></c:forEach>
+<c:forEach items="${groupReview.decisions}" var="d"><tr><td>${appTime:display(d.at)}</td><td><c:out value="${d.name}" /></td><td><span data-resource-status="${d.decision}"><spring:message code="loanGroups.${d.decision}" /></span></td><td><c:out value="${d.reason}" /></td><c:if test="${hasReviewEvidence}"><td><c:out value="${d.evidence}" /></td></c:if></tr></c:forEach>
 <c:if test="${empty groupReview.decisions}"><tr><td colspan="${hasReviewEvidence ? 5 : 4}"><spring:message code="recording.statement.empty" /></td></tr></c:if>
 </tbody></table></div></section>
 </c:if>
