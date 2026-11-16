@@ -109,7 +109,8 @@
             // Resolve collisions in stable order before filling the gaps.
             const pending=[...next].sort((a,b)=>a[1].y-b[1].y || a[1].x-b[1].x),placed=[target];next.clear();next.set(e.id,target);
             for(const [id,rect] of pending){let p={...rect},hits;while((hits=placed.filter(q=>overlap(p,q))).length)p.y=Math.max(...hits.map(q=>q.y+q.h+gap));next.set(id,p);placed.push(p);}
-            return compact(next,e.id);
+            // Keep the resize handle anchored until release; commit fills the gaps afterward.
+            return swap?compact(next,e.id):next;
         };
         const commit=next=>{
             for(const [id,p] of next)entries.get(id).positions[columns]={x:p.x,y:p.y};

@@ -90,6 +90,19 @@ test('resize pushes neighbors, snaps to the grid, persists on release and rolls 
  pointer(w,handle,'pointerdown',100,100);pointer(w,w,'pointermove',1000,500);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(w.localStorage.getItem(key(d,w)),stored);assert.equal(root.dataset.boardWidth,'3');assert.equal(root.style.getPropertyValue('--widget-height'),'480px');
 });
 
+test('corner resizing stays anchored while shrinking into an earlier gap, then fills gaps on release',async t=>{
+ const html=markup().replace('data-dashboard-widget="Clients" data-widget-width="2"','data-dashboard-widget="Clients" data-widget-width="3"');
+ const {dom,w,d}=await setup(html);t.after(()=>dom.window.close());const activity=d.querySelector('[data-dashboard-widget=Activity]'),handle=activity.querySelector('.dashboard-resize'),before=positions(d),step=1286/4;
+ assert.equal(before.Activity.y,420);
+ pointer(w,handle,'pointerdown',step*2-20,800);pointer(w,w,'pointermove',step-20,720);
+ assert.equal(positions(d).Activity.width,1);assert.equal(positions(d).Activity.height,320);
+ assert.equal(positions(d).Activity.x,before.Activity.x);assert.equal(positions(d).Activity.y,before.Activity.y);noOverlap(d);
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.deepEqual(positions(d),before);assert.equal(key(d,w),undefined);
+ pointer(w,handle,'pointerdown',step*2-20,800);pointer(w,w,'pointermove',step-20,720);pointer(w,w,'pointerup',step-20,720);
+ assert.equal(positions(d).Activity.width,1);assert.equal(positions(d).Activity.height,320);assert.equal(positions(d).Activity.y,0);noOverlap(d);
+ const savedKey=key(d,w),saved=w.localStorage.getItem(savedKey),restored=await setup(html,store=>store.setItem(savedKey,saved));t.after(()=>restored.dom.window.close());assert.deepEqual(positions(restored.d),positions(d));
+});
+
 test('two dimensional dragging swaps equal widgets and preserves native fields; invalid drops and Escape restore positions',async t=>{
  const {dom,w,d}=await setup();t.after(()=>dom.window.close());const input=d.querySelector('#draft');input.value='unsaved';const a=d.querySelector('[data-dashboard-widget=Clients]'),handle=a.querySelector('.dashboard-drag'),before=positions(d),step=(1266+20)/4;
  pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step*2+20,20);assert.ok(d.querySelector('.dashboard-drop-preview'));assert.match(a.style.transform,/translate3d/);pointer(w,w,'pointerup',step*2+20,20);
