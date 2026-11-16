@@ -15,7 +15,6 @@ import java.util.*;
 
 @Service @RequiredArgsConstructor
 public class LoanGroupApprovalService {
-    private static final Set<String> CLOSED=Set.of("DISBURSED","PAR","DEFAULTED","WRITTEN_OFF","PAID","DISBURSEMENT_REVERSED","WITHDRAWN");
     private final LoanRecordingRepository records;
     private final GeneralLedgerService access;
     private final MemberDirectoryService members;
@@ -106,8 +105,7 @@ public class LoanGroupApprovalService {
         if(previous.isPresent()&&previous.get().id().equals(key)) {
             require(previous.get().maker().equals(a.getMemberId())&&previous.get().termsHash().equals(l.termsHash()),"retry");return;
         }
-        require(!CLOSED.contains(l.status())&&!"READY_FOR_DISBURSEMENT".equals(l.status()),"state");
-        require(previous.isEmpty()||!"SUBMITTED".equals(l.status()),"state");
+        require(Set.of("RECORDED","REJECTED").contains(l.status()),"state");
         recording.validateStaffReview(a,loan);
         var rule=records.groupRule(a,l.product()).orElseThrow(()->invalid("rule"));
         var plan=steps(rule.steps());

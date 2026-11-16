@@ -122,6 +122,41 @@ class LoanGroupApprovalPostgresTest {
         decide(manager,request,"APPROVE");
         assertThat(queue(manager,Position.MANAGER)).isEmpty();
     }
+    @Test void eachProductRoutesOnlyToItsConfiguredReviewers() {
+        UUID otherProduct=UUID.randomUUID();
+        f.jdbc.update("""
+            insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,
+                guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at)
+            select ?,sacco_id,loan_type,active,product_status,'MANAGER-REVIEW','Synthetic manager-reviewed loan',form_schema,
+                guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,now(),now()
+            from loan_product_settings where id=?
+            """,otherProduct,f.product);
+        var form=individual();form.setProductId(otherProduct);form.setApplicationDetails(new ApplicationDetails());
+        form.getApplicationDetails().setDocumentTypes(List.of("SIGNED_APPLICATION"));
+        form.getApplicationDetails().setDocumentNames(List.of("Synthetic signed application"));
+        UUID otherLoan=f.service.save(f.actor,form,List.of(s.paper()));
+        assertThatThrownBy(()->service.submit(f.actor,otherLoan,UUID.randomUUID())).hasMessage("loanGroups.error.rule");
+        assertThat(service.review(f.actor,otherLoan).request()).isNull();
+
+        var configuration=new GroupRuleForm();configuration.setProductId(otherProduct);
+        configuration.setGroups(List.of(Position.MANAGER));configuration.setApprovals(List.of(1));
+        service.saveRule(f.actor,configuration);
+        UUID request=submit(),otherRequest=UUID.randomUUID();service.submit(f.actor,otherLoan,otherRequest);
+        assertThat(queue(first,Position.ACCOUNTANT)).containsExactly("/finance/loan-records/"+loan);
+        assertThat(queue(manager,Position.MANAGER)).containsExactly("/finance/loan-records/"+otherLoan);
+        assertThat(service.review(first,otherLoan).canApprove()).isFalse();
+        assertThat(service.review(manager,otherLoan).canApprove()).isTrue();
+        assertThatThrownBy(()->service.decide(first,otherLoan,otherRequest,UUID.randomUUID(),"APPROVE","Checked","Signed paper"))
+            .isInstanceOf(AccessDeniedException.class);
+        var frozen=service.review(manager,otherLoan);
+        assertThat(frozen.steps()).extracting(GroupStep::group).containsExactly(Position.MANAGER);
+        assertThat(f.jdbc.queryForObject("select product_id from loan_group_rule where id=?",UUID.class,frozen.request().rule())).isEqualTo(otherProduct);
+        decide(first,request,"APPROVE");decide(second,request,"APPROVE");
+        assertThat(queue(manager,Position.MANAGER)).containsExactlyInAnyOrder("/finance/loan-records/"+loan,"/finance/loan-records/"+otherLoan);
+        service.decide(manager,otherLoan,otherRequest,UUID.randomUUID(),"REJECT","Missing income proof","Signed paper");
+        assertThat(queue(manager,Position.MANAGER)).containsExactly("/finance/loan-records/"+loan);
+        assertThat(status()).isEqualTo("SUBMITTED");assertThat(count("loan_ledgers")).isZero();
+    }
     @Test void officeQueueFollowsTheLatestRoundAndNeverReturnsAnotherBranch() {
         var request=submit();decide(first,request,"REJECT");
         assertThat(queue(second,Position.ACCOUNTANT)).isEmpty();

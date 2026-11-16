@@ -116,6 +116,15 @@ class LoanGroupApprovalTest {
             assertThat(UserClaim.defaultClaims(List.of(group),false)).doesNotContain(UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT,UserClaim.LOAN_RECORDING_POST);
         assertThat(Position.staffAssignableRoles()).hasSize(10).doesNotContain(Position.MEMBER,Position.BOARD,Position.CHAIRPERSON);
     }
+    @Test void onlyRecordedOrRejectedApplicationsCanStartANewReviewRound(){
+        var recorder=person(this.recorder,Position.LOAN_OFFICER);
+        for(var state:List.of("DRAFT","SUBMITTED","READY_FOR_DISBURSEMENT","DISBURSED","PAID","WITHDRAWN","PENDING_MANAGER_REVIEW")) {
+            status=state;
+            assertThatThrownBy(()->service.submit(recorder,loan,UUID.randomUUID())).hasMessage("loanGroups.error.state");
+        }
+        verifyNoInteractions(recording);verify(records,never()).groupRule(any(),any());
+        verify(records,never()).groupRequest(any(),any(),any());
+    }
     @Test void onlyTheRecorderCanSendARecordedApplicationForReview(){
         status="RECORDED";when(records.groupRequest(any(),eq(loan))).thenReturn(Optional.empty());
         var owner=person(recorder,Position.LOAN_OFFICER);var other=person(UUID.randomUUID(),Position.CREDIT_OFFICER);
