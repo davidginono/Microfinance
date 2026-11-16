@@ -64,21 +64,38 @@
         const gap=20,snap=20;
         const overlap=(a,b)=>a.x<b.x+b.w && a.x+a.w>b.x && a.y<b.y+b.h+gap && a.y+a.h+gap>b.y;
         const geometry=e=>({x:e.positions[columns]?.x || 0,y:e.positions[columns]?.y || 0,w:Math.min(e.width,columns),h:e.auto?Math.ceil(e.widget.getBoundingClientRect().height)||e.height:e.height});
-        const firstSpace=(rect,placed)=>{
+        const firstSpace=(rect,placed,preferColumn=false)=>{
             const rows=[0,...placed.map(p=>p.y+p.h+gap)].sort((a,b)=>a-b);
-            for(const y of rows)for(let x=0;x<=columns-rect.w;x++){const p={...rect,x,y};if(!placed.some(other=>overlap(p,other)))return p;}
+            const cells=Array.from({length:columns-rect.w+1},(_,x)=>x);
+            if(preferColumn && cells.includes(rect.x)){cells.splice(cells.indexOf(rect.x),1);cells.unshift(rect.x);}
+            for(const y of rows)for(const x of cells){const p={...rect,x,y};if(!placed.some(other=>overlap(p,other)))return p;}
+        };
+        const compact=(positions,activeId)=>{
+            const next=new Map(),placed=[];
+            // Fill the earliest free space, retaining the chosen column when it fits there.
+            for(const [id,rect] of [...positions].sort((a,b)=>a[1].y-b[1].y || a[1].x-b[1].x)){
+                const p=firstSpace(rect,placed,!activeId || id===activeId);next.set(id,p);placed.push(p);
+            }
+            return next;
         };
         function layout(proposal,activeId){
-            const placed=[];
-            for(const widget of visible()){
-                const e=entries.get(widget.dataset.dashboardWidget),rect=e.id===activeId?geometry(e):proposal?.get(e.id) || geometry(e);
-                let p=rect;
-                if(!proposal && (!e.positions[columns] || rect.x+rect.w>columns || placed.some(other=>overlap(rect,other))))p=firstSpace(rect,placed);
-                if(!proposal)e.positions[columns]={x:p.x,y:p.y};
-                widget.style.gridColumn=(p.x+1)+' / span '+p.w;widget.style.gridRow=(p.y+1)+' / span '+p.h;
-                widget.style.setProperty('--widget-height',p.h+'px');placed.push(p);
+            let next=proposal;
+            if(!next){
+                const placed=[],positions=new Map();
+                for(const widget of visible()){
+                    const e=entries.get(widget.dataset.dashboardWidget),rect=geometry(e);
+                    const p=!e.positions[columns] || rect.x+rect.w>columns || placed.some(other=>overlap(rect,other))?firstSpace(rect,placed):rect;
+                    positions.set(e.id,p);placed.push(p);
+                }
+                next=compact(positions);
+                for(const [id,p] of next)entries.get(id).positions[columns]={x:p.x,y:p.y};
             }
-            grid.style.minHeight=Math.max(240,...(proposal?[...proposal.values()]:placed).map(p=>p.y+p.h))+'px';
+            for(const widget of visible()){
+                const e=entries.get(widget.dataset.dashboardWidget),p=e.id===activeId?geometry(e):next.get(e.id);
+                widget.style.gridColumn=(p.x+1)+' / span '+p.w;widget.style.gridRow=(p.y+1)+' / span '+p.h;
+                widget.style.setProperty('--widget-height',p.h+'px');
+            }
+            grid.style.minHeight=Math.max(240,...[...next.values()].map(p=>p.y+p.h))+'px';
         }
         const snapshot=()=>new Map([...entries.values()].filter(e=>!e.widget.hidden).map(e=>[e.id,geometry(e)]));
         const propose=(e,target,base,swap=true)=>{
@@ -89,10 +106,10 @@
                 const replacements=collisions.map(([id,p])=>[id,{...p,x:p.x+origin.x-target.x,y:p.y+origin.y-target.y}]);
                 if(collisions.every(([,p])=>p.x>=target.x && p.x+p.w<=target.x+target.w && p.y>=target.y && p.y+p.h<=target.y+target.h) && replacements.every(([,p])=>!overlap(p,target) && ![...next].some(([id,q])=>!ids.has(id) && overlap(p,q))))for(const [id,p] of replacements)next.set(id,p);
             }
-            // The active item stays at the requested cell; collisions push down in stable order.
+            // Resolve collisions in stable order before filling the gaps.
             const pending=[...next].sort((a,b)=>a[1].y-b[1].y || a[1].x-b[1].x),placed=[target];next.clear();next.set(e.id,target);
             for(const [id,rect] of pending){let p={...rect},hits;while((hits=placed.filter(q=>overlap(p,q))).length)p.y=Math.max(...hits.map(q=>q.y+q.h+gap));next.set(id,p);placed.push(p);}
-            return next;
+            return compact(next,e.id);
         };
         const commit=next=>{
             for(const [id,p] of next)entries.get(id).positions[columns]={x:p.x,y:p.y};
@@ -121,6 +138,7 @@
             const next=target?propose(e,target,base):null;layout(next || base,activeId);
             for(const [w,r] of before)animateFrom(w,r);
             if(!target){clearDrop();return null;}
+            target=next.get(e.id);
             let marker=root.querySelector('.dashboard-drop-preview');
             if(!marker){marker=node('div','dashboard-drop-preview');marker.setAttribute('aria-hidden','true');root.append(marker);}
             const step=(grid.getBoundingClientRect().width+gap)/columns;

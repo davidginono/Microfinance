@@ -98,10 +98,40 @@ test('two dimensional dragging swaps equal widgets and preserves native fields; 
  pointer(w,handle,'pointerdown',step*2+20,20);pointer(w,w,'pointermove',-50,50);pointer(w,w,'pointerup',-50,50);assert.deepEqual(positions(d),saved);
 });
 
-test('dragging into empty cells keeps the requested row and column after reload',async t=>{
+test('dragging into empty cells fills the vacated space during preview and after reload',async t=>{
  const {dom,w,d}=await setup();t.after(()=>dom.window.close());const handle=d.querySelector('.dashboard-drag'),step=1286/4;
- pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step+20,880);pointer(w,w,'pointerup',step+20,880);assert.equal(positions(d).Clients.x,1);assert.equal(positions(d).Clients.y,840);noOverlap(d);
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step+20,880);
+ assert.equal(positions(d).Operations.y,0);assert.equal(d.querySelector('.dashboard-drop-preview').style.top,'420px');
+ pointer(w,w,'pointerup',step+20,880);assert.equal(positions(d).Clients.x,1);assert.equal(positions(d).Clients.y,420);noOverlap(d);
  const savedKey=key(d,w),saved=w.localStorage.getItem(savedKey),restored=await setup(markup(),store=>store.setItem(savedKey,saved));t.after(()=>restored.dom.window.close());assert.deepEqual(positions(restored.d),positions(d));
+});
+
+test('mixed-size widgets fill earlier gaps without changing their sizes or native content',async t=>{
+ const html=markup().replace(widget('Activity'),widget('Activity').replace('height="400"','height="560"')).replace(widget('Operations'),widget('Operations').replace('width="2"','width="1"')+widget('Support').replace('width="2"','width="1"'));
+ const {dom,w,d}=await setup(html);t.after(()=>dom.window.close());const input=d.querySelector('#draft'),before=positions(d),handle=d.querySelector('.dashboard-drag');input.value='edited';
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',20,880);
+ assert.equal(positions(d).Operations.y,0);assert.equal(positions(d).Support.y,0);
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.deepEqual(positions(d),before);assert.equal(key(d,w),undefined);
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',20,880);pointer(w,w,'pointerup',20,880);
+ assert.equal(positions(d).Clients.y,420);assert.equal(d.querySelector('#draft'),input);assert.equal(input.value,'edited');noOverlap(d);
+ for(const [id,p] of Object.entries(positions(d))){assert.equal(p.width,before[id].width);assert.equal(p.height,before[id].height);}
+});
+
+test('dragging a narrow widget lets its neighbors fill the empty column before wider widgets',async t=>{
+ const html='<main class="shell-content-frame"><header class="erp-page-header"><h1>Dashboard</h1></header><div data-dashboard-board="test">'+['Clients','Activity','Operations','Funding'].map(id=>widget(id).replace('width="2"','width="1"')).join('')+widget('Support')+'</div></main>';
+ const {dom,w,d}=await setup(html);t.after(()=>dom.window.close());const handle=d.querySelector('.dashboard-drag'),step=1286/4;
+ pointer(w,handle,'pointerdown',20,20);pointer(w,w,'pointermove',step*2+20,460);
+ assert.equal(positions(d).Activity.x,0);assert.equal(positions(d).Operations.x,1);assert.equal(positions(d).Funding.x,2);
+ pointer(w,w,'pointerup',step*2+20,460);assert.equal(positions(d).Clients.x,3);assert.equal(positions(d).Clients.y,0);noOverlap(d);
+ const savedKey=key(d,w),saved=w.localStorage.getItem(savedKey),restored=await setup(html,store=>store.setItem(savedKey,saved));t.after(()=>restored.dom.window.close());assert.deepEqual(positions(restored.d),positions(d));
+});
+
+test('removing or shrinking widgets closes gaps and restores stored layouts without blank rows',async t=>{
+ const initial=await setup();t.after(()=>initial.dom.window.close());initial.d.querySelector('.dashboard-toolbar .btn-neutral').click();const savedKey=key(initial.d,initial.w);
+ const saved=JSON.parse(initial.w.localStorage.getItem(savedKey));for(const item of saved.items)item.positions[4].y+=1000;
+ const {dom,w,d}=await setup(markup(),store=>store.setItem(savedKey,JSON.stringify(saved)));t.after(()=>dom.window.close());assert.equal(positions(d).Clients.y,0);assert.equal(positions(d).Operations.y,420);
+ const clients=d.querySelector('[data-dashboard-widget=Clients]');clients.querySelector('.dashboard-resize').dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));assert.equal(positions(d).Operations.y,380);
+ clients.querySelector('.dashboard-widget-controls button').click();clients.querySelector('.dashboard-widget-menu button:last-child').click();assert.equal(positions(d).Operations.y,0);noOverlap(d);
 });
 
 test('responsive layouts use six/four/two/one columns and restore desktop positions and widths',async t=>{
