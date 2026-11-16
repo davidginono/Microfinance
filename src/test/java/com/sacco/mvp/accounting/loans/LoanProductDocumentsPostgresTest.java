@@ -27,6 +27,28 @@ class LoanProductDocumentsPostgresTest {
     void names(String name,String id){var form=new LoanProductDocumentsForm();form.setRequiredAttachmentName(List.of(name));form.setRequiredAttachmentMaxSizeMb(List.of(new BigDecimal("1.00")));form.setRequiredAttachmentId(List.of(id));tx.executeWithoutResult(s->definitions.replaceForProduct(f.product,form));}
     UUID definition(){return definitions.activeForProduct(f.product).getFirst().getId();}
     void freeze(UUID loan,String policy){tx.executeWithoutResult(s->{var r=new LoanRecordingRepository(f.jdbc);var l=r.groupLoan(f.actor,loan,true);var at=f.context.getBean(com.sacco.mvp.service.ApplicationClock.class).now();var rule=r.groupRule(f.actor,f.product).orElseGet(()->{var created=new GroupRule(UUID.randomUUID(),f.product,1,"[{\"group\":\"ACCOUNTANT\",\"approvals\":1}]");r.groupRule(f.actor,created,at);return created;});r.groupRequest(f.actor,new GroupRequest(UUID.randomUUID(),loan,rule.id(),f.actor.getMemberId(),1,l.termsHash(),l.status()),at,policy);});}
+    @Test void requiredFundingProofKeepsTheApplicationsProductPolicyAfterTheProductChanges(){
+        f.jdbc.update("update loan_product_settings set disbursement_proof_required=true where id=?",f.product);
+        var loan=f.service.save(f.actor,f.form());var post=f.post(loan,"1000.00","D-PROOF-REQUIRED");
+        var application=f.context.getBean(com.sacco.mvp.repository.LoanApplicationRepository.class).findById(loan).orElseThrow();
+        assertThat(f.service.disbursementProofRequired(application)).isTrue();
+        f.jdbc.update("update loan_product_settings set disbursement_proof_required=false where id=?",f.product);
+        assertThatThrownBy(()->f.service.disburse(f.actor,post)).hasMessage("recording.error.attachments");
+        var empty=new org.springframework.mock.web.MockMultipartFile("attachments","",null,new byte[0]);
+        assertThatThrownBy(()->f.service.disburse(f.actor,post,List.of(empty))).hasMessage("recording.error.attachments");
+        assertThat(f.jdbc.queryForObject("select count(*) from accountant_loan_post where loan_id=?",Integer.class,loan)).isZero();
+        var proof=new org.springframework.mock.web.MockMultipartFile("attachments","proof.pdf","application/pdf","%PDF-1.4 synthetic funding proof".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        f.service.disburse(f.actor,post,List.of(proof));
+        assertThat(f.service.attachments(f.actor,loan)).hasSize(1);
+    }
+    @Test void optionalFundingProofStaysOptionalAfterTheProductChanges(){
+        var loan=f.service.save(f.actor,f.form());var post=f.post(loan,"1000.00","D-PROOF-OPTIONAL");
+        var application=f.context.getBean(com.sacco.mvp.repository.LoanApplicationRepository.class).findById(loan).orElseThrow();
+        assertThat(f.service.disbursementProofRequired(application)).isFalse();
+        f.jdbc.update("update loan_product_settings set disbursement_proof_required=true where id=?",f.product);
+        f.service.disburse(f.actor,post);
+        assertThat(f.service.attachments(f.actor,loan)).isEmpty();
+    }
     @Test void optionalAttachmentsPermitReviewWithGuarantorsAndIgnoreRetainedDocumentNames(){
         policy(false,1);names("Signed guarantor papers","");var loan=f.service.save(f.actor,f.form());
         assertThat(review(loan)).contains("\"required\":false","\"guarantorConsent\":false","\"documents\":[]");

@@ -31,8 +31,8 @@
     <%@ include file="../accounting/loans/choice-search.jspf" %>
 </div>
 
-<div class="md:col-span-2"><label><spring:message code="recording.attachments" />
-    <span class="attachment-dropzone" data-attachment-dropzone><input type="file" name="attachments" multiple accept=".pdf,.png,.jpg,.jpeg" class="attachment-dropzone-input" data-attachment-input /><span class="attachment-dropzone-main"><span class="attachment-dropzone-copy"><span class="attachment-dropzone-title"><spring:message code="recording.attachments.drop" /></span><span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" /></span></span><span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.chooseOne" text="Choose files" /></span></span></span>
+<div class="md:col-span-2"><label><spring:message code="recording.attachments" /> (<spring:message code="${disbursementProofRequired?'common.required':'common.optional'}" />)
+    <span class="attachment-dropzone" data-attachment-dropzone><input type="file" name="attachments" multiple accept=".pdf,.png,.jpg,.jpeg" class="attachment-dropzone-input" data-attachment-input ${disbursementProofRequired?'required':''} /><span class="attachment-dropzone-main"><span class="attachment-dropzone-copy"><span class="attachment-dropzone-title"><spring:message code="recording.attachments.drop" /></span><span class="attachment-dropzone-files" data-attachment-files><spring:message code="attachments.dropzone.none" /></span></span><span class="attachment-dropzone-action"><spring:message code="attachments.dropzone.chooseOne" text="Choose files" /></span></span></span>
 </label></div>
 
 <script src="<c:url value='/js/loan-topup.js' />" defer></script>
