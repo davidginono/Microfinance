@@ -257,6 +257,8 @@
                 const seen=new Set();for(const item of saved.items){const e=entries.get(item?.id);if(!e || seen.has(item.id))continue;seen.add(item.id);e.width=bounded(item.width,e.min,6,e.defaultWidth);e.height=bounded(item.height,240,720,e.defaultHeight);e.widget.hidden=item.hidden===true;
                     for(const count of [1,2,4,6]){const p=item.positions?.[count];if(p && Number.isInteger(p.x) && Number.isInteger(p.y) && p.x>=0 && p.x<count && p.y>=0 && p.y<=entries.size*1000)e.positions[count]={x:p.x,y:p.y};}
                     setSize(e);grid.append(e.widget);}
+                // Newly authorized widgets follow the user's existing order.
+                for(const [id,e] of entries)if(!seen.has(id))grid.append(e.widget);
             }
         }catch{/* Ignore obsolete or corrupt preferences. */}
         reset.addEventListener('click',()=>{cancelInteraction?.();closeMenus();[...entries.values()].sort((a,b)=>a.defaultIndex-b.defaultIndex).forEach(e=>{e.motion?.cancel();e.width=e.defaultWidth;e.height=e.defaultHeight;e.positions={};grid.append(e.widget);e.widget.hidden=false;setSize(e);e.widget.dispatchEvent(new CustomEvent('dashboard:visibility',{bubbles:true}));});layout();updatePalette();persist();announce(l.restored);});

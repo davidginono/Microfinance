@@ -124,6 +124,15 @@ class AdminControllerUserAccessSecurityTest {
             .build();
     }
 
+    @Test void institutionAdminDashboardRedirectsToThePersonalDashboardWithoutReadingOverviewData() throws Exception {
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        mockMvc.perform(get("/admin/dashboard").with(authentication(authenticationFor(principal(Set.of(UserClaim.ADMIN_DASHBOARD_VIEW))))))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/staff/dashboard"));
+        Mockito.verifyNoInteractions(adminService);
+        mockMvc.perform(get("/admin/dashboard").with(authentication(authenticationFor(principal(Set.of(UserClaim.USER_ACCESS_VIEW))))))
+            .andExpect(status().isForbidden());
+    }
+
     @Test void productAccountLookupRequiresProductConfigurationClaimsAndUsesSelectedInstitution() throws Exception {
         var actor=principal(Set.of(UserClaim.LOAN_PRODUCTS_UPDATE));
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));

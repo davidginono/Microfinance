@@ -67,6 +67,27 @@ class LoanGroupApprovalPostgresTest {
     List<String> queue(AppUserPrincipal actor,Position group) {
         return service.officeReviews(actor,group,"","number",0).rows().stream().map(com.sacco.mvp.staffoffice.dto.OfficeWork.Task::href).toList();
     }
+    @Test void personalDashboardCountsKeepAllAssignedReviewGroupsAndFrozenEligibility() {
+        var directory=f.context.getBean(MemberDirectoryService.class);
+        var member=directory.find(manager.getMemberId()).orElseThrow();
+        member.setStaffRoles(Set.of(Position.ACCOUNTANT,Position.MANAGER));
+        var combined=new AppUserPrincipal(member,EnumSet.allOf(UserClaim.class));
+        var offices=new com.sacco.mvp.staffoffice.service.StaffOfficeService(directory,
+            f.context.getBean(UserClaimService.class),f.context.getBean(SaccoRegistryService.class),new AccessControlService(),service,f.service,
+            mock(com.sacco.mvp.accounting.approval.service.VoucherWorkflowService.class),mock(com.sacco.mvp.accounting.service.AccountOfficeWorkService.class),
+            f.context.getBean(com.sacco.mvp.clients.onboarding.service.OnboardingService.class),mock(com.sacco.mvp.lending.controls.service.CreditControlService.class),
+            mock(AdminOfficeWorkService.class),mock(AdminService.class));
+        var request=submit();
+        var pending=offices.activity(combined,"loan-reviews");
+        assertThat(pending.entries()).hasSize(2);
+        assertThat(pending.entries()).filteredOn(c->c.office().equals("chief-accountant")).extracting(c->c.shown()).containsExactly(1);
+        assertThat(pending.entries()).filteredOn(c->c.office().equals("general-manager")).extracting(c->c.shown()).containsExactly(0);
+        decide(first,request,"APPROVE");decide(second,request,"APPROVE");
+        var next=offices.activity(combined,"loan-reviews");
+        assertThat(next.entries()).filteredOn(c->c.office().equals("chief-accountant")).extracting(c->c.shown()).containsExactly(0);
+        assertThat(next.entries()).filteredOn(c->c.office().equals("general-manager")).extracting(c->c.shown()).containsExactly(1);
+        assertThat(offices.activity(f.operator("B2"),"loan-reviews").entries()).allMatch(c->c.shown()==0);
+    }
     @Test void officeQueueUsesFrozenOrderedGroupsAndExcludesPeopleWhoAlreadyDecided() {
         var request=submit();rule(1,1);
         String href="/finance/loan-records/"+loan;

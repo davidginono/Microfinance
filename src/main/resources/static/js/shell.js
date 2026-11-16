@@ -63,7 +63,7 @@
         }
     };
     const breadcrumbRootHref = function (root) {
-        if (root === 'admin tools') return '/admin/dashboard';
+        if (root === 'admin tools') return document.querySelector('.shell-sidebar-scroll a[href$="/staff/dashboard"]') ? '/staff/dashboard' : '/admin/dashboard';
         if (root === 'disbursement panel') return '/disbursement/dashboard';
         if (root === 'staff workspace' || root === 'workspace') return '/staff/dashboard';
         if (root === 'documents') return '/finance/loan-records';

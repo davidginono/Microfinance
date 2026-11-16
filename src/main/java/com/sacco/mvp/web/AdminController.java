@@ -167,12 +167,7 @@ public class AdminController {
             model.addAttribute("platformDashboard", platformAdminService.dashboard());
             return "admin/platform-dashboard";
         }
-        model.addAttribute("dashboard", adminService.dashboard(
-            adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
-            principal.getMemberId()
-        ));
-        return "admin/dashboard";
+        return "redirect:/staff/dashboard";
     }
 
     @GetMapping("/sms-usage")

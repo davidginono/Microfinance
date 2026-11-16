@@ -18,6 +18,23 @@ async function setup(html=markup(),storage,configure){const dom=new JSDOM(labels
  if(storage)storage(dom.window.localStorage);configure?.(w);dom.window.eval(source);await settle();return {dom,w:dom.window,d:dom.window.document};}
 const key=(d,w)=>Object.keys(w.localStorage).find(key=>key.startsWith('dashboard-layout:'));
 
+test('newly authorized widgets append after saved widgets and preserve hidden choices',async t=>{
+ const initial=await setup();t.after(()=>initial.dom.window.close());
+ const clients=initial.d.querySelector('[data-dashboard-widget=Clients]');clients.querySelector('.dashboard-widget-controls button').click();clients.querySelector('.dashboard-widget-menu button:last-child').click();
+ const saved=initial.w.localStorage.getItem(key(initial.d,initial.w));
+ const updated=await setup(markup().replace(widget('Activity'),widget('Reviews')+widget('Activity')),storage=>storage.setItem(key(initial.d,initial.w),saved));t.after(()=>updated.dom.window.close());
+ assert.equal(updated.d.querySelector('[data-dashboard-widget=Clients]').hidden,true);
+ assert.deepEqual([...updated.d.querySelector('.dashboard-grid').children].map(e=>e.dataset.dashboardWidget),['Clients','Activity','Operations','Reviews']);
+ assert.equal(updated.d.querySelector('[data-dashboard-widget=Reviews]').hidden,false);
+});
+
+test('revoked widgets cannot be restored through saved layout data',async t=>{
+ const initial=await setup();t.after(()=>initial.dom.window.close());initial.d.querySelector('.dashboard-toolbar .btn-neutral').click();
+ const saved=initial.w.localStorage.getItem(key(initial.d,initial.w));
+ const updated=await setup(markup().replace(widget('Activity'),''),storage=>storage.setItem(key(initial.d,initial.w),saved));t.after(()=>updated.dom.window.close());
+ assert.equal(updated.d.querySelector('[data-dashboard-widget=Activity]'),null);assert.equal(updated.d.querySelectorAll('.dashboard-palette-item').length,2);
+});
+
 for(const chartsFirst of [false,true])test('initial dashboard hides source cards and tables until board and charts are ready: '+(chartsFirst?'charts first':'board first'),async()=>{
  const css=readFileSync('src/main/resources/static/css/ui-loading.css','utf8'),charts=readFileSync('src/main/resources/static/js/dashboard-charts.js','utf8');
  const chart='<div data-dashboard-chart><table data-chart-source><thead><tr><th>Status</th><th>Applications</th></tr></thead><tbody><tr><th>Waiting</th><td>3</td></tr></tbody></table></div>';

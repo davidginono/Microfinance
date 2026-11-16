@@ -110,7 +110,7 @@ class AuthControllerSaccoAccessTest {
             when(memberDirectoryService.findByEmail(staff.getEmail())).thenReturn(Optional.of(staff));
             when(userClaimService.effectiveClaims(staff.getId(),staff.getActiveStaffRolesResolved(),false)).thenReturn(java.util.Set.of());
             var response=controller().verifyStaffLoginOtp(staff.getEmail(),"123456",new MockHttpServletRequest());
-            assertThat(response.getBody()).containsEntry("valid",true).containsEntry("redirectUrl",office.getDashboard());
+            assertThat(response.getBody()).containsEntry("valid",true).containsEntry("redirectUrl","/staff/dashboard");
         }
         org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }

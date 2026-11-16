@@ -13,7 +13,13 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/staff/offices")
 public class StaffOfficeController {
     private final StaffOfficeService offices;
-    @GetMapping("/{office}/{section:dashboard|queue|reports}")
+    @GetMapping("/{office}/dashboard")
+    public String formerDashboard(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable String office,HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store");
+        offices.requireOffice(actor,office);
+        return "redirect:/staff/dashboard";
+    }
+    @GetMapping("/{office}/{section:queue|reports}")
     public String view(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable String office,@PathVariable String section,
             @RequestParam(defaultValue="") String source,@RequestParam(defaultValue="") String search,
             @RequestParam(defaultValue="") String sort,@RequestParam(defaultValue="0") int page,Model model,HttpServletResponse response) {

@@ -1,8 +1,11 @@
 <sec:authorize access="@access.notPlatformIdentity(principal)">
+<sec:authorize access="@access.staffDashboardAccess(principal)">
+<a href="<c:url value='/staff/dashboard' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq '/staff/dashboard' ? 'shell-nav-active' : ''}" <c:if test="${requestUri eq '/staff/dashboard'}">aria-current="page"</c:if>><spring:message code="menu.dashboard" /></a>
+</sec:authorize>
 <c:forEach items="${staffOffices}" var="staffOffice">
     <div class="shell-sidebar-nav-heading"><span><spring:message code="${staffOffice.labelKey}" /></span></div>
     <div class="shell-sidebar-group space-y-1">
-        <c:forEach items="${['dashboard','queue','reports']}" var="officeSection">
+        <c:forEach items="${['queue','reports']}" var="officeSection">
             <c:set var="officePath" value="${staffOffice.base}/${officeSection}" />
             <a href="<c:url value='${officePath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq officePath ? 'shell-nav-active' : ''}" ${requestUri eq officePath ? 'aria-current="page"' : ''}>
                 <spring:message code="office.section.${officeSection}" />
@@ -10,8 +13,7 @@
         </c:forEach>
     </div>
 </c:forEach>
-<sec:authorize access="@access.hasAny(principal,'ADMIN_DASHBOARD_VIEW','USER_ACCESS_VIEW','SUPPORT_VIEW','OUTBOX_VIEW','SMS_USAGE_VIEW')"><div class="shell-sidebar-nav-heading"><span><spring:message code="admin.tools" /></span></div></sec:authorize>
-<sec:authorize access="@access.has(principal,'ADMIN_DASHBOARD_VIEW')"><a href="<c:url value='/admin/dashboard' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq '/admin/dashboard' ? 'shell-nav-active' : ''}"><spring:message code="admin.dashboard.title" /></a></sec:authorize>
+<sec:authorize access="@access.hasAny(principal,'USER_ACCESS_VIEW','SUPPORT_VIEW','OUTBOX_VIEW','SMS_USAGE_VIEW')"><div class="shell-sidebar-nav-heading"><span><spring:message code="admin.tools" /></span></div></sec:authorize>
 <sec:authorize access="@access.has(principal,'USER_ACCESS_VIEW')"><a href="<c:url value='/admin/users' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/users') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.usersRoles" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'SUPPORT_VIEW')"><a href="<c:url value='/admin/incidents' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/incidents') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.incidents" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'OUTBOX_VIEW')"><a href="<c:url value='/admin/outbox' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/outbox') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.outboxMonitor" /></a></sec:authorize>

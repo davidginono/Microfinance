@@ -8,24 +8,8 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <c:set var="office" value="${officeView.office}" />
 <spring:message code="${office.labelKey}" var="officeName" />
-<nav class="erp-page-path" aria-label="<spring:message code='office.path' />"><c:choose><c:when test="${officeView.section eq 'dashboard'}"><span><c:out value="${officeName}" /></span></c:when><c:otherwise><a href="<c:url value='${office.dashboard}' />"><c:out value="${officeName}" /></a></c:otherwise></c:choose><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="office.section.${officeView.section}" /></span></nav>
+<nav class="erp-page-path" aria-label="<spring:message code='office.path' />"><a href="<c:url value='/staff/dashboard' />"><spring:message code="menu.dashboard" /></a><span aria-hidden="true">›</span><span><c:out value="${officeName}" /></span><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="office.section.${officeView.section}" /></span></nav>
 <c:choose>
-    <c:when test="${officeView.section eq 'dashboard'}">
-        <%@ include file="../fragments/dashboard-support.jspf" %>
-        <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${office.labelKey}" /></h1></div>
-        <c:choose><c:when test="${empty officeView.summaries}"><section class="erp-panel"><div class="erp-panel-body"><p><spring:message code="office.noWorkAssigned" /></p></div></section></c:when>
-        <c:otherwise>
-            <p class="erp-hint"><spring:message code="office.summaryLimit" /></p>
-            <div data-dashboard-board="office-${office.slug}" aria-busy="true">
-                <c:forEach items="${officeView.summaries}" var="summary" varStatus="i">
-                    <section class="erp-panel" data-dashboard-widget="office-work-${officeView.sources[i.index].key}" data-widget-width="2" data-widget-height="200">
-                        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="${summary.labelKey}" /></h2></div>
-                        <div class="erp-panel-body"><dl class="dashboard-data-metrics"><div><dt><spring:message code="office.items" /></dt><dd><c:choose><c:when test="${officeView.sources[i.index].key eq 'loan-reviews'}"><c:url value="${office.base}/queue" var="reviewQueueUrl"><c:param name="source" value="loan-reviews" /></c:url><a class="resource-table-id-link" href="${reviewQueueUrl}" aria-label="<spring:message code='${summary.labelKey}' />"><c:out value="${summary.shown}" /><c:if test="${summary.more}">+</c:if></a></c:when><c:otherwise><c:out value="${summary.shown}" /><c:if test="${summary.more}">+</c:if></c:otherwise></c:choose></dd></div></dl></div>
-                    </section>
-                </c:forEach>
-            </div>
-        </c:otherwise></c:choose>
-    </c:when>
     <c:when test="${officeView.section eq 'queue'}">
         <c:url value="${office.base}/queue" var="queueUrl" />
         <section class="erp-table-wrap" data-resource-table="staff-office-queue" data-group-register data-table-selection="single" data-aws-table-region>

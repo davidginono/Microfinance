@@ -10,10 +10,6 @@
         <c:set var="profileWorkspaceHome" value="/admin/dashboard" />
         <c:set var="profileWorkspaceLabel" value="Admin Tools" />
     </c:when>
-    <c:when test="${not empty staffOffices}">
-        <c:set var="profileWorkspaceHome" value="${staffOffices[0].dashboard}" />
-        <c:set var="profileWorkspaceLabel" value="Staff Workspace" />
-    </c:when>
     <c:otherwise>
         <c:set var="profileWorkspaceHome" value="/staff/dashboard" />
         <c:set var="profileWorkspaceLabel" value="Staff Workspace" />

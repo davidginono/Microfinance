@@ -22,7 +22,6 @@ public enum StaffOffice {
     public String getSlug() { return slug; }
     public String getLabelKey() { return "userGroup."+group.name(); }
     public String getBase() { return "/staff/offices/"+slug; }
-    public String getDashboard() { return getBase()+"/dashboard"; }
     public List<Position> getAliases() { return Arrays.stream(Position.values()).filter(p->p.userGroup()==group).toList(); }
     public static Optional<StaffOffice> fromSlug(String slug) { return Arrays.stream(values()).filter(o->o.slug.equals(slug)).findFirst(); }
     public static List<StaffOffice> assigned(Collection<Position> roles) {

@@ -12,6 +12,7 @@ import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import com.sacco.mvp.staffoffice.dto.OfficeWork.*;
 import com.sacco.mvp.staffoffice.model.StaffOffice;
+import com.sacco.mvp.staffoffice.dto.PersonalDashboard;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -31,13 +32,13 @@ public class StaffOfficeService {
     private final OnboardingService clients;
     private final CreditControlService credit;
     private final AdminOfficeWorkService administration;
+    private final AdminService admin;
 
-    public record View(StaffOffice office,String section,List<Source> sources,Source source,Page work,
-                       List<Summary> summaries,List<Report> reports) {}
+    public record View(StaffOffice office,String section,List<Source> sources,Source source,Page work,List<Report> reports) {}
 
     /** Validate the live assignment even for staff with an explicitly empty permission set. */
-    private AppUserPrincipal authorize(AppUserPrincipal actor,StaffOffice office) {
-        if(!access.staffDashboardAccess(actor) || !StaffOffice.assigned(actor.getStaffRoles()).contains(office))
+    private AppUserPrincipal authorize(AppUserPrincipal actor) {
+        if(!access.staffDashboardAccess(actor))
             throw new AccessDeniedException("Office unavailable");
         var current=members.find(actor.getMemberId()).filter(Member::isStaffAccessActive)
             .filter(m->m.getStatus()==MemberStatus.ACTIVE && Objects.equals(m.getSaccoId(),actor.getSaccoId())
@@ -55,10 +56,56 @@ public class StaffOfficeService {
     }
 
     @Transactional(readOnly=true)
+    public void requireOffice(AppUserPrincipal principal,String slug) {
+        var actor=authorize(principal);
+        if(StaffOffice.fromSlug(slug).filter(o->StaffOffice.assigned(actor.getStaffRoles()).contains(o)).isEmpty())
+            throw new AccessDeniedException("Office unavailable");
+    }
+
+    @Transactional(readOnly=true)
+    public PersonalDashboard.View dashboard(AppUserPrincipal principal) {
+        var actor=authorize(principal);
+        var overview=access.canAccessAdminArea(actor)&&has(actor,"ADMIN_DASHBOARD_VIEW")
+            ?admin.dashboard(actor.getSaccoId(),actor.getStationId(),actor.getMemberId()):null;
+        return new PersonalDashboard.View(activities(actor),overview,
+            actor.getMemberId()+"|"+actor.getSaccoId()+"|"+actor.getStationId()+"|personal");
+    }
+
+    /** Role-specific review counts remain separate; shared work is read only once. */
+    @Transactional(readOnly=true)
+    public PersonalDashboard.Summary activity(AppUserPrincipal principal,String source) {
+        var actor=authorize(principal);
+        var definition=activities(actor).stream().filter(s->s.key().equals(source)).findFirst()
+            .orElseThrow(()->new AccessDeniedException("Activity unavailable"));
+        var counts=new ArrayList<PersonalDashboard.Count>();
+        for(var destination:definition.destinations()) {
+            var office=StaffOffice.fromSlug(destination.office()).orElseThrow();
+            var first=work(actor,office,source,"","number",0);
+            counts.add(new PersonalDashboard.Count(destination.office(),first.rows().size(),first.hasNext()));
+        }
+        return new PersonalDashboard.Summary(source,List.copyOf(counts));
+    }
+
+    private List<PersonalDashboard.Activity> activities(AppUserPrincipal actor) {
+        var definitions=new LinkedHashMap<String,List<PersonalDashboard.Destination>>();
+        for(var office:StaffOffice.assigned(actor.getStaffRoles()))for(var source:sources(actor,office)) {
+            var destinations=definitions.computeIfAbsent(source.key(),key->new ArrayList<>());
+            if(destinations.isEmpty()||Set.of("loan-reviews","voucher-reviews").contains(source.key()))
+                destinations.add(new PersonalDashboard.Destination(office.getSlug(),office.getLabelKey(),
+                    office.getBase()+"/queue?source="+source.key()));
+        }
+        var priority=List.of("loan-reviews","voucher-reviews","account-reviews");
+        return definitions.entrySet().stream()
+            .sorted(Comparator.comparingInt(e->{int n=priority.indexOf(e.getKey());return n<0?priority.size():n;}))
+            .map(e->new PersonalDashboard.Activity(e.getKey(),"office.source."+e.getKey(),List.copyOf(e.getValue()))).toList();
+    }
+
+    @Transactional(readOnly=true)
     public View read(AppUserPrincipal principal,String slug,String section,String source,String search,String sort,int page) {
         var office=StaffOffice.fromSlug(slug).orElseThrow(()->new AccessDeniedException("Office unavailable"));
-        var actor=authorize(principal,office);
-        if(!Set.of("dashboard","queue","reports").contains(section) || search==null || search.length()>100
+        var actor=authorize(principal);
+        if(!StaffOffice.assigned(actor.getStaffRoles()).contains(office))throw new AccessDeniedException("Office unavailable");
+        if(!Set.of("queue","reports").contains(section) || search==null || search.length()>100
             || page<0 || page>10000 || !Set.of("","number","number_desc","newest","oldest").contains(sort))
             throw new IllegalArgumentException("office.invalidFilter");
         var sources=sources(actor,office);
@@ -71,20 +118,15 @@ public class StaffOfficeService {
             var navigation=new Navigation(office,selected.key(),search,sort.isBlank()?"number":sort,page);
             work=new Page(work.rows().stream().map(t->new Task(t.number(),t.name(),t.stateKey(),t.amount(),t.href()==null?null:navigation.attach(t.href()))).toList(),page,work.hasNext());
         }
-        var summaries=new ArrayList<Summary>();
-        if(section.equals("dashboard"))for(var s:sources.stream().limit(3).toList()) {
-            var first=work(actor,office,s.key(),"","number",0);
-            summaries.add(new Summary(s.labelKey(),first.rows().size(),first.hasNext()));
-        }
         var reportNavigation=new Navigation(office,"reports","","number",0);
         var catalogue=reports(actor,office).stream().map(r->new Report(r.labelKey(),reportNavigation.attach(r.href()))).toList();
-        return new View(office,section,sources,selected,work,List.copyOf(summaries),catalogue);
+        return new View(office,section,sources,selected,work,catalogue);
     }
 
     private List<Source> sources(AppUserPrincipal a,StaffOffice office) {
         var result=new ArrayList<Source>();
         if(has(a,"LOAN_RECORDING_VIEW") && hasAny(a,"LOAN_RECORDING_APPROVE","LOAN_RECORDING_REJECT")
-            && a.getStaffRoles().contains(office.getGroup()))add(result,"loan-reviews",true);
+            && office.getAliases().stream().anyMatch(a.getStaffRoles()::contains))add(result,"loan-reviews",true);
         if(has(a,"VOUCHER_WORKSPACE_VIEW") && hasAny(a,"ACCOUNTING_BUSINESS_VIEW","ACCOUNTING_JOURNALS_VIEW")) {
             add(result,"voucher-reviews",true);add(result,"vouchers",true);
         }

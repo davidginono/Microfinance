@@ -11,7 +11,7 @@ public final class WorkspaceLanding {
     }
     private static String staffDashboard(Collection<Position> roles) {
         if(roles.contains(Position.ADMIN)) return "/admin/dashboard";
-        return StaffOffice.assigned(roles).stream().findFirst().map(StaffOffice::getDashboard).orElse("/staff/dashboard");
+        return "/staff/dashboard";
     }
     public static String authenticatedDefault(AppUserPrincipal principal) { return staffDashboard(principal); }
     public static String afterLogin(AppUserPrincipal principal,String savedTarget) {
@@ -27,7 +27,9 @@ public final class WorkspaceLanding {
                 var office=parts.length==2?StaffOffice.fromSlug(parts[0]).orElse(null):null;
                 if(office==null||!StaffOffice.assigned(principal.getStaffRoles()).contains(office)
                     ||!java.util.Set.of("dashboard","queue","reports").contains(parts[1]))return fallback;
+                if(parts[1].equals("dashboard"))return fallback;
             }
+            if(path.equals("/admin/dashboard")&&!principal.isPlatformIdentity())return fallback;
             // Saved requests are returned on this application. Destination services still check claims and record scope.
             return uri.getRawPath()+(uri.getRawQuery()==null?"":"?"+uri.getRawQuery());
         }catch(IllegalArgumentException invalid){return fallback;}

@@ -89,7 +89,7 @@ class PasswordLoginIsolationTest {
                 var request=new MockHttpServletRequest("POST","/login");request.setParameter("loginType","staff-password");
                 var response=new org.springframework.mock.web.MockHttpServletResponse();
                 success.onAuthenticationSuccess(request,response,new UsernamePasswordAuthenticationToken(principal,null,List.of()));
-                assertThat(response.getRedirectedUrl()).isEqualTo(office.getDashboard());
+                assertThat(response.getRedirectedUrl()).isEqualTo("/staff/dashboard");
             }
 
             assertThatThrownBy(() -> login(manager, "", "dual.user")).isInstanceOf(AuthenticationException.class);

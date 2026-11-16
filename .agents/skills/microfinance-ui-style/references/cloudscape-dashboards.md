@@ -15,7 +15,7 @@ Reuse `fragments/dashboard-support.jspf`, `dashboard-board.js`, `dashboard-chart
 
 Mark a dashboard with `data-dashboard-board` and authorized native sections with stable `data-dashboard-widget` keys. Set default width, minimum width and height on each section. Reordering, hiding, adding and resizing retain original nodes, forms and edited values. The palette contains metadata rather than copies of widget data. Keep Preferences first and Remove last in each menu. Provide pointer and keyboard operations, recoverable removal, restoration of defaults and responsive stacking. The narrow-screen palette uses the shared modal rules: body mounting, focus containment, Escape, background isolation and scroll restoration.
 
-Save layout only, keyed by user, institution, branch, role and dashboard. Validate stored sizes/IDs against the current authorized widgets. Never persist chart payloads, record selections, financial values or permission decisions in layout storage. The layout cannot grant access.
+Save layout only, keyed by user, institution, branch and dashboard. The unified personal staff dashboard deliberately excludes role from its key so new assignments preserve the user's layout; separate platform dashboards keep their own namespace. Automatically append newly authorized personal widgets while retaining deliberate hidden choices. Validate stored sizes/IDs against the current authorized widgets. Never persist chart payloads, record selections, financial values or permission decisions in layout storage. The layout cannot grant access.
 
 ## Widget content
 

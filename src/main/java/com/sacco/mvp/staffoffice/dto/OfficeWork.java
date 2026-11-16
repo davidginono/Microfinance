@@ -15,7 +15,6 @@ public final class OfficeWork {
     }
     public record Source(String key, String labelKey, boolean chronological) {}
     public record Report(String labelKey, String href) {}
-    public record Summary(String labelKey, int shown, boolean more) {}
     public record Navigation(StaffOffice office,String source,String search,String sort,int page) {
         public Map<String,String> parameters() {
             return Map.of("office",office.getSlug(),"officeSource",source,"officeSearch",search,"officeSort",sort,"officePage",Integer.toString(page));

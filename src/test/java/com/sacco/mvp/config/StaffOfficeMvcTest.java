@@ -43,8 +43,8 @@ class StaffOfficeMvcTest {
         when(institutions.findStation("I1","B1")).thenReturn(Optional.of(SaccoStation.builder().stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         return new AppUserPrincipal(member,Set.of());
     }
-    @Test void allAssignedOfficesRenderAllThreePagesWithoutProfileCompletionOrBusinessClaims()throws Exception {
-        for(var office:StaffOffice.values())for(var section:List.of("dashboard","queue","reports"))
+    @Test void allAssignedOfficesKeepQueuesAndReportsWithoutProfileCompletionOrBusinessClaims()throws Exception {
+        for(var office:StaffOffice.values())for(var section:List.of("queue","reports"))
             mvc.perform(get(office.getBase()+"/"+section).with(user(actor(office.getGroup(),"B1")))
                     .param("stationId","FOREIGN").param("saccoId","FOREIGN"))
                 .andExpect(status().isOk()).andExpect(view().name("staff/office"))
@@ -62,6 +62,11 @@ class StaffOfficeMvcTest {
         mvc.perform(get("/staff/offices/customer-care/queue").with(user(current)).param("page","-1")).andExpect(status().isBadRequest());
         mvc.perform(get("/staff/offices/customer-care/queue").with(user(current)).param("search","x".repeat(101))).andExpect(status().isBadRequest());
     }
+    @Test void oldAssignedDashboardsRedirectWithoutRenderingOrQueryingWork()throws Exception {
+        for(var office:StaffOffice.values())
+            mvc.perform(get(office.getBase()+"/dashboard").with(user(actor(office.getGroup(),"B1"))))
+                .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/staff/dashboard"));
+    }
     @Configuration @EnableWebMvc @Import({StaffOfficeService.class,StaffOfficeController.class}) static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}
         @Bean SaccoRegistryService institutions(){return mock(SaccoRegistryService.class);}
@@ -72,5 +77,6 @@ class StaffOfficeMvcTest {
         @Bean OnboardingService clients(){return mock(OnboardingService.class);}
         @Bean CreditControlService credit(){return mock(CreditControlService.class);}
         @Bean AdminOfficeWorkService administration(){return mock(AdminOfficeWorkService.class);}
+        @Bean AdminService admin(){return mock(AdminService.class);}
     }
 }

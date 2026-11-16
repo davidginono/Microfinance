@@ -4,8 +4,10 @@
 <sec:authentication property="name" var="dashboardLayoutUser" />
 <sec:authentication property="principal.saccoId" var="dashboardLayoutInstitution" />
 <link rel="stylesheet" href="<c:url value='/css/dashboard-board.css' />" />
+<c:set var="dashboardResolvedScope" value="${dashboardLayoutUser}|${dashboardLayoutInstitution}|${headerStation.stationId}|${currentMember.position}" />
+<c:if test="${not empty dashboardPersonalScope}"><c:set var="dashboardResolvedScope" value="${dashboardPersonalScope}" /></c:if>
 <template id="dashboard-labels"
- data-scope="<c:out value='${dashboardLayoutUser}|${dashboardLayoutInstitution}|${headerStation.stationId}|${currentMember.position}' />"
+ data-scope="<c:out value='${dashboardResolvedScope}' />"
  data-icons="<c:url value='/icons/dashboard/' />"
  data-reset="<spring:message code='dashboard.layout.reset' />" data-add="<spring:message code='dashboard.layout.add' />"
  data-add-item="<spring:message code='common.add' />" data-added="<spring:message code='dashboard.layout.added' />"

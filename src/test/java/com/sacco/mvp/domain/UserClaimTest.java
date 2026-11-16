@@ -14,7 +14,7 @@ class UserClaimTest {
         var member=Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B").position(Position.ACCOUNTANT)
             .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
         var actor=new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.GROUP_LENDING_VIEW));
-        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(actor)).isEqualTo("/staff/offices/chief-accountant/dashboard");
+        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(actor)).isEqualTo("/staff/dashboard");
     }
     @Test
     void obsoleteReportClaimsKeepIdentifiersButCannotBeAssignedOrLoaded() {
@@ -77,7 +77,7 @@ class UserClaimTest {
         var member = Member.builder().id(java.util.UUID.randomUUID()).saccoId("I").stationId("B")
             .position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
         var principal = new com.sacco.mvp.security.AppUserPrincipal(member,java.util.Set.of(UserClaim.VOUCHER_WORKSPACE_VIEW, UserClaim.ACCOUNTING_JOURNALS_VIEW));
-        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(principal)).isEqualTo("/staff/offices/chief-accountant/dashboard");
+        assertThat(com.sacco.mvp.security.WorkspaceLanding.authenticatedDefault(principal)).isEqualTo("/staff/dashboard");
     }
 
     @Test
