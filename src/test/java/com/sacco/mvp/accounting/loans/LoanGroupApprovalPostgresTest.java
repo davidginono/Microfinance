@@ -67,6 +67,26 @@ class LoanGroupApprovalPostgresTest {
     List<String> queue(AppUserPrincipal actor,Position group) {
         return service.officeReviews(actor,group,"","number",0).rows().stream().map(com.sacco.mvp.staffoffice.dto.OfficeWork.Task::href).toList();
     }
+    @Test void assignedReviewersCanReadTheirQueueButCannotDecideWithoutExplicitClaims() {
+        UUID request=submit();
+        var viewer=new AppUserPrincipal(f.context.getBean(MemberDirectoryService.class).find(first.getMemberId()).orElseThrow(),Set.of(UserClaim.LOAN_RECORDING_VIEW));
+        when(f.context.getBean(UserClaimService.class).effectiveClaims(eq(viewer.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.LOAN_RECORDING_VIEW));
+        assertThat(service.assignedReviewGroups(viewer)).containsExactly(Position.ACCOUNTANT);
+        assertThat(queue(viewer,Position.ACCOUNTANT)).hasSize(1);
+        assertThat(service.review(viewer,loan).canApprove()).isFalse();assertThat(service.review(viewer,loan).canReject()).isFalse();
+        for(var decision:List.of("APPROVE","REJECT"))
+            assertThatThrownBy(()->service.decide(viewer,loan,request,UUID.randomUUID(),decision,"Checked","Signed paper")).isInstanceOf(AccessDeniedException.class);
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_decision where request_id=?",Integer.class,request)).isZero();
+        assertThat(service.assignedReviewGroups(f.operator("B2"))).isEmpty();
+    }
+    @Test void reviewerCardsKeepPendingFrozenAssignmentsAfterConfigurationChanges() {
+        UUID request=submit();
+        var form=new GroupRuleForm();form.setProductId(f.product);form.setExpectedRevision(1);form.setGroups(List.of(Position.LOAN_OFFICER));form.setApprovals(List.of(1));
+        service.saveRule(f.actor,form);
+        assertThat(service.assignedReviewGroups(first)).contains(Position.ACCOUNTANT);
+        decide(second,request,"REJECT");
+        assertThat(service.assignedReviewGroups(first)).isEmpty();
+    }
     @Test void personalDashboardCountsKeepAllAssignedReviewGroupsAndFrozenEligibility() {
         var directory=f.context.getBean(MemberDirectoryService.class);
         var member=directory.find(manager.getMemberId()).orElseThrow();

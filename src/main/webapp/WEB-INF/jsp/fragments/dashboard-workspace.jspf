@@ -20,7 +20,7 @@
 <section class="erp-panel dashboard-auto-widget" data-dashboard-widget="pending-work" data-widget-width="4" data-widget-height="480" data-dashboard-work data-work-url="<c:url value='/api/dashboard/work' />" data-context-path="${pageContext.request.contextPath}">
     <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="dashboard.work.title" /></h2></div>
     <div class="erp-panel-body">
-        <div class="dashboard-work-tools"><span data-work-updated></span><button type="button" class="app-btn btn-neutral" data-work-refresh><spring:message code="common.refresh" /></button></div>
+        <div class="dashboard-work-tools"><span data-work-updated></span></div>
         <div data-work-status role="status"></div>
         <div class="dashboard-infolet-grid" data-work-cards></div>
         <div class="dashboard-work-chart" data-work-chart></div>

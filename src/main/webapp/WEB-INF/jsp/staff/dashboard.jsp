@@ -17,12 +17,11 @@
             <div class="erp-panel-body">
                 <dl class="dashboard-data-metrics">
                     <c:forEach items="${activity.destinations}" var="destination">
-                        <div><dt><c:choose><c:when test="${activity.destinations.size() gt 1}"><spring:message code="${destination.labelKey}" /></c:when><c:otherwise><spring:message code="office.items" /></c:otherwise></c:choose></dt>
-                            <dd><a class="resource-table-id-link" href="<c:url value='${destination.href}' />" title="<spring:message code='office.summaryLimit' />"><span class="sr-only"><spring:message code="${activity.labelKey}" />: <spring:message code="${destination.labelKey}" /> </span><span data-activity-count="${destination.office}">—</span></a></dd></div>
+                        <div><dt class="${activity.destinations.size() eq 1 ? 'sr-only' : ''}"><c:choose><c:when test="${activity.destinations.size() gt 1}"><spring:message code="${destination.labelKey}" /></c:when><c:otherwise><spring:message code="office.items" /></c:otherwise></c:choose></dt>
+                            <dd><a class="resource-table-id-link" href="<c:url value='${destination.href}' />" title="<spring:message code='office.summaryLimit' />"><span class="sr-only"><spring:message code="${activity.labelKey}" />: <spring:message code="${destination.labelKey}" /> </span><span data-activity-count="${destination.office}" aria-live="polite" aria-atomic="true">—</span></a></dd></div>
                     </c:forEach>
                 </dl>
                 <p class="dashboard-data-status" data-activity-status role="status"></p>
-                <button type="button" class="app-btn btn-neutral" data-activity-refresh><spring:message code="common.refresh" /></button>
             </div>
         </section>
     </c:forEach>

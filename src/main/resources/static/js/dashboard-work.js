@@ -77,10 +77,9 @@
                 const captured=new Date(data.capturedAt);if(!Number.isNaN(captured.getTime()))root.querySelector('[data-work-updated]').textContent=l('updated')+' '+new Intl.DateTimeFormat(document.documentElement.lang||'en',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Africa/Nairobi'}).format(captured);
                 for(const e of entries.values())if(e.minimumDays||Number(e.minimumAmount))void loadCard(e);
             }catch(error){if(current===version){status.textContent=general.loadError;status.setAttribute('role','alert');}}
-            finally{clearTimeout(timeout);if(current===version){request=null;root.removeAttribute('aria-busy');window.AppLoading?.end(canvas);clearTimeout(timer);timer=setTimeout(load,30000);}}
+            finally{clearTimeout(timeout);if(current===version){request=null;root.removeAttribute('aria-busy');window.AppLoading?.end(canvas);clearTimeout(timer);if(visible())timer=setTimeout(load,5000);}}
         }
         const stop=()=>{version++;request?.abort();request=null;clearTimeout(timer);window.AppLoading?.end(canvas);for(const e of entries.values()){e.version++;e.request?.abort();window.AppLoading?.end(e.front);}};
-        root.querySelector('[data-work-refresh]').addEventListener('click',()=>{stop();void load();},{signal:lifetime.signal});
         root.addEventListener('dashboard:visibility',()=>{stop();if(visible())void load();},{signal:lifetime.signal});
         document.addEventListener('visibilitychange',()=>{stop();if(visible())void load();},{signal:lifetime.signal});
         regions.set(root,{destroy(){stop();lifetime.abort();}});void load();

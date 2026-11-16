@@ -50,6 +50,28 @@ public class LoanRecordingRepository {
             """+(lock?" for update of l":""),(r,n)->new GroupLoan(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class),r.getString(5),r.getString(6),r.getString(7),r.getString(8),r.getBigDecimal(9),r.getBoolean(10)),
             a.getMemberId(),id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Loan unavailable"));
     }
+    public Set<com.sacco.mvp.domain.Position> reviewGroups(AppUserPrincipal a,List<com.sacco.mvp.domain.Position> groups) {
+        if(groups.isEmpty())return Set.of();
+        var args=new ArrayList<Object>();groups.forEach(g->args.add(g.name()));args.add(a.getSaccoId());args.add(a.getStationId());
+        String sql="""
+            select candidate.name from (values
+            """+String.join(",",Collections.nCopies(groups.size(),"(?::text)"))+"""
+            ) candidate(name) where exists (
+                select 1 from loan_group_rule r where r.sacco_id=? and r.station_id=?
+                  and exists(select 1 from jsonb_array_elements(r.steps) step where step->>'group'=candidate.name)
+                  and (not exists(select 1 from loan_group_rule newer where newer.sacco_id=r.sacco_id
+                        and newer.station_id=r.station_id and newer.product_id=r.product_id and newer.revision>r.revision)
+                    or exists(select 1 from loan_group_request request join loan_applications l on l.id=request.loan_id
+                        and l.sacco_id=request.sacco_id and l.station_id=request.station_id
+                        where request.rule_id=r.id and request.sacco_id=r.sacco_id and request.station_id=r.station_id
+                          and l.status='SUBMITTED' and not exists(select 1 from loan_group_request next_round
+                            where next_round.loan_id=request.loan_id and next_round.sacco_id=request.sacco_id
+                              and next_round.station_id=request.station_id and next_round.round>request.round)))
+            ) limit 9
+            """;
+        org.springframework.jdbc.core.RowMapper<com.sacco.mvp.domain.Position> mapper=(r,n)->com.sacco.mvp.domain.Position.valueOf(r.getString(1));
+        return new LinkedHashSet<>(jdbc.query(sql,mapper,args.toArray()));
+    }
     public Optional<GroupRule> groupRule(AppUserPrincipal a,UUID product) {
         return jdbc.query("select id,product_id,revision,steps::text from loan_group_rule where sacco_id=? and station_id=? and product_id=? order by revision desc limit 1",
             (r,n)->new GroupRule(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getInt(3),r.getString(4)),a.getSaccoId(),a.getStationId(),product).stream().findFirst();

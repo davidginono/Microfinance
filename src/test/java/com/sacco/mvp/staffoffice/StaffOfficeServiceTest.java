@@ -153,6 +153,18 @@ class StaffOfficeServiceTest {
         assertThatThrownBy(()->service.activity(a,"unknown")).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(administration);
     }
+    @Test void configuredReviewersSeeTheCardAndQueueWithoutReceivingDecisionClaims() {
+        var a=actor(StaffOffice.LOAN_OFFICER,UserClaim.LOAN_RECORDING_VIEW);
+        when(reviews.assignedReviewGroups(any())).thenReturn(Set.of(Position.LOAN_OFFICER));
+        when(reviews.officeReviews(any(),eq(Position.LOAN_OFFICER),anyString(),anyString(),anyInt())).thenReturn(OfficeWork.Page.empty(0));
+        assertThat(service.dashboard(a).activities()).extracting(s->s.key()).contains("loan-reviews");
+        assertThat(service.activity(a,"loan-reviews").entries()).hasSize(1);
+        assertThat(service.read(a,"loan-officer","queue","loan-reviews","","",0).source().key()).isEqualTo("loan-reviews");
+        assertThat(a.getClaims()).containsExactly("LOAN_RECORDING_VIEW");
+        when(reviews.assignedReviewGroups(any())).thenReturn(Set.of());
+        assertThat(service.dashboard(a).activities()).extracting(s->s.key()).doesNotContain("loan-reviews");
+        assertThatThrownBy(()->service.activity(a,"loan-reviews")).isInstanceOf(AccessDeniedException.class);
+    }
     @Test void loanReviewCardIsIncludedBeforeOtherFinanceWorkAndOpensTheReviewerQueue() {
         var a=actor(StaffOffice.FINANCE_MANAGER,UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,
             UserClaim.VOUCHER_WORKSPACE_VIEW,UserClaim.ACCOUNTING_BUSINESS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_VIEW,

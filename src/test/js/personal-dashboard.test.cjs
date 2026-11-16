@@ -4,11 +4,14 @@ const {readFileSync}=require('node:fs');
 const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/personal-dashboard.js','utf8');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
-const widget=(id,hidden=false)=>`<section data-personal-activity="${id}" data-activity-url="/api/dashboard/activities/${id}" ${hidden?'hidden':''}><a href="/staff/offices/loan-officer/queue?source=${id}" data-activity-count="loan-officer">—</a><p data-activity-status></p><button data-activity-refresh>Refresh</button></section>`;
+const widget=(id,hidden=false)=>`<section data-personal-activity="${id}" data-activity-url="/api/dashboard/activities/${id}" ${hidden?'hidden':''}><a href="/staff/offices/loan-officer/queue?source=${id}" data-activity-count="loan-officer">—</a><p data-activity-status></p></section>`;
 async function setup(html,fetch){
  const dom=new JSDOM('<template id="dashboard-labels" data-loading="Loading" data-load-error="Unable to refresh"></template>'+html,{url:'http://localhost/staff/dashboard',runScripts:'outside-only',pretendToBeVisual:true});
+ const timers=new Map(),nativeTimeout=dom.window.setTimeout.bind(dom.window),nativeClear=dom.window.clearTimeout.bind(dom.window);let next=-1;
+ dom.window.setTimeout=(fn,delay)=>{if(delay!==5000)return nativeTimeout(fn,delay);const id=next--;timers.set(id,fn);return id;};
+ dom.window.clearTimeout=id=>{if(id<0)timers.delete(id);else nativeClear(id);};
  dom.window.fetch=fetch;dom.window.eval(readFileSync('src/main/resources/static/js/ui-loading.js','utf8'));dom.window.eval(source);await settle();
- return {dom,w:dom.window,d:dom.window.document};
+ return {dom,w:dom.window,d:dom.window.document,tick(){const entry=timers.entries().next().value;if(entry){timers.delete(entry[0]);entry[1]();}},timers};
 }
 const response=(source,shown=2,more=false)=>({ok:true,redirected:false,json:async()=>({source,entries:[{office:'loan-officer',shown,more}]})});
 
@@ -26,13 +29,13 @@ test('hidden widgets do not fetch until restored and resizing never fetches',asy
  w.dispatchEvent(new w.Event('resize'));await settle();assert.equal(calls,1);
 });
 test('refresh failures retain verified counts and allow a local retry',async t=>{
- let fail=false;const {dom,d}=await setup(widget('loans'),async()=>{if(fail)throw new Error('offline');return response('loans',4);});t.after(()=>dom.window.close());
- fail=true;d.querySelector('button').click();await settle();assert.equal(d.querySelector('a').textContent,'4');assert.equal(d.querySelector('[role=alert]').textContent,'Unable to refresh');assert.equal(d.querySelector('button').disabled,false);
- fail=false;d.querySelector('button').click();await settle();assert.equal(d.querySelector('[data-activity-status]').textContent,'');
+ let fail=false;const {dom,d,tick}=await setup(widget('loans'),async()=>{if(fail)throw new Error('offline');return response('loans',4);});t.after(()=>dom.window.close());
+ fail=true;tick();await settle();assert.equal(d.querySelector('a').textContent,'4');assert.equal(d.querySelector('[role=alert]').textContent,'Unable to refresh');assert.equal(d.querySelector('button'),null);
+ fail=false;tick();await settle();assert.equal(d.querySelector('[data-activity-status]').textContent,'');
 });
 test('authorization failure clears previously rendered counts',async t=>{
- let revoked=false;const {dom,d}=await setup(widget('loans'),async()=>revoked?{ok:false,status:403}:response('loans',4));t.after(()=>dom.window.close());
- revoked=true;d.querySelector('button').click();await settle();assert.equal(d.querySelector('a').textContent,'—');assert.equal(d.querySelector('[role=alert]').textContent,'Unable to refresh');
+ let revoked=false;const {dom,d,tick,timers}=await setup(widget('loans'),async()=>revoked?{ok:false,status:403}:response('loans',4));t.after(()=>dom.window.close());
+ revoked=true;tick();await settle();assert.equal(d.querySelector('a').textContent,'—');assert.equal(d.querySelector('[role=alert]').textContent,'Unable to refresh');assert.equal(timers.size,0);
 });
 test('removed widgets abort their request and ignore stale responses',async t=>{
  let resolve,signal;const {dom,w,d}=await setup(widget('loans'),(url,options)=>{signal=options.signal;return new Promise(r=>resolve=r);});t.after(()=>dom.window.close());
@@ -44,4 +47,13 @@ test('workspace exit cancels requests and restored pages fetch again',async t=>{
 });
 test('unknown or malformed response counts are never rendered',async t=>{
  const {dom,d}=await setup(widget('loans'),async()=>response('clients',-1));t.after(()=>dom.window.close());assert.equal(d.querySelector('a').textContent,'—');assert.equal(d.querySelector('[role=alert]').textContent,'Unable to refresh');
+});
+test('five-second polling updates only numbers without hiding them or overlapping requests',async t=>{
+ let calls=0,resolve;const {dom,w,d,tick,timers}=await setup(widget('loans'),async()=>{
+  calls++;if(calls===1)return response('loans',2);return new Promise(r=>resolve=r);
+ });t.after(()=>dom.window.close());
+ assert.equal(timers.size,1);tick();assert.equal(calls,2);assert.equal(d.querySelector('a').textContent,'2');assert.equal(d.querySelector('.app-loading-spinner'),null);
+ assert.equal(timers.size,0);tick();assert.equal(calls,2);resolve(response('loans',3));await settle();
+ assert.equal(d.querySelector('a').textContent,'3');assert.equal(timers.size,1);
+ const root=d.querySelector('section');root.hidden=true;root.dispatchEvent(new w.Event('dashboard:visibility'));assert.equal(timers.size,0);
 });

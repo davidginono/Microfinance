@@ -88,7 +88,8 @@ public class StaffOfficeService {
 
     private List<PersonalDashboard.Activity> activities(AppUserPrincipal actor) {
         var definitions=new LinkedHashMap<String,List<PersonalDashboard.Destination>>();
-        for(var office:StaffOffice.assigned(actor.getStaffRoles()))for(var source:sources(actor,office)) {
+        var reviewGroups=reviewGroups(actor);
+        for(var office:StaffOffice.assigned(actor.getStaffRoles()))for(var source:sources(actor,office,reviewGroups)) {
             var destinations=definitions.computeIfAbsent(source.key(),key->new ArrayList<>());
             if(destinations.isEmpty()||Set.of("loan-reviews","voucher-reviews").contains(source.key()))
                 destinations.add(new PersonalDashboard.Destination(office.getSlug(),office.getLabelKey(),
@@ -108,7 +109,7 @@ public class StaffOfficeService {
         if(!Set.of("queue","reports").contains(section) || search==null || search.length()>100
             || page<0 || page>10000 || !Set.of("","number","number_desc","newest","oldest").contains(sort))
             throw new IllegalArgumentException("office.invalidFilter");
-        var sources=sources(actor,office);
+        var sources=sources(actor,office,reviewGroups(actor));
         Source selected=source==null||source.isBlank()?sources.stream().findFirst().orElse(null)
             :sources.stream().filter(s->s.key().equals(source)).findFirst().orElseThrow(()->new AccessDeniedException("Queue unavailable"));
         if(selected!=null && !selected.chronological() && !sort.isBlank() && !Set.of("number","number_desc").contains(sort))
@@ -123,10 +124,15 @@ public class StaffOfficeService {
         return new View(office,section,sources,selected,work,catalogue);
     }
 
-    private List<Source> sources(AppUserPrincipal a,StaffOffice office) {
+    private Set<Position> reviewGroups(AppUserPrincipal a) {
+        if(!has(a,"LOAN_RECORDING_VIEW"))return Set.of();
+        if(hasAny(a,"LOAN_RECORDING_APPROVE","LOAN_RECORDING_REJECT"))
+            return StaffOffice.assigned(a.getStaffRoles()).stream().map(StaffOffice::getGroup).collect(java.util.stream.Collectors.toSet());
+        return reviews.assignedReviewGroups(a);
+    }
+    private List<Source> sources(AppUserPrincipal a,StaffOffice office,Set<Position> reviewGroups) {
         var result=new ArrayList<Source>();
-        if(has(a,"LOAN_RECORDING_VIEW") && hasAny(a,"LOAN_RECORDING_APPROVE","LOAN_RECORDING_REJECT")
-            && office.getAliases().stream().anyMatch(a.getStaffRoles()::contains))add(result,"loan-reviews",true);
+        if(reviewGroups.contains(office.getGroup()))add(result,"loan-reviews",true);
         if(has(a,"VOUCHER_WORKSPACE_VIEW") && hasAny(a,"ACCOUNTING_BUSINESS_VIEW","ACCOUNTING_JOURNALS_VIEW")) {
             add(result,"voucher-reviews",true);add(result,"vouchers",true);
         }

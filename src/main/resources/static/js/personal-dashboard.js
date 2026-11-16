@@ -5,21 +5,21 @@
     const drain=()=>{while(active<2&&queue.length){const state=queue.shift();state.queued=false;if(!state.visible())continue;active++;state.load().finally(()=>{active--;drain();});}};
     function init(root){
         if(regions.has(root))return;
-        const labels=document.getElementById('dashboard-labels')?.dataset||{},status=root.querySelector('[data-activity-status]'),refresh=root.querySelector('[data-activity-refresh]');
+        const labels=document.getElementById('dashboard-labels')?.dataset||{},status=root.querySelector('[data-activity-status]');
         const targets=[...root.querySelectorAll('[data-activity-count]')];targets.forEach(t=>t.setAttribute('data-ui-loading-region',''));
-        let request=null,version=0,loaded=false;
+        let request=null,version=0,loaded=false,timer=null,blocked=false;
         const visible=()=>root.isConnected&&!root.hidden&&!document.hidden;
-        const end=()=>{targets.forEach(t=>window.AppLoading?.end(t));root.removeAttribute('aria-busy');refresh.disabled=false;};
-        const state={queued:false,visible,stop(){version++;request?.abort();request=null;const index=queue.indexOf(state);if(index>=0)queue.splice(index,1);state.queued=false;end();},
-            enqueue(force=false){if(!visible()||request||state.queued||loaded&&!force)return;state.queued=true;queue.push(state);drain();},
+        const end=()=>{targets.forEach(t=>window.AppLoading?.end(t));root.removeAttribute('aria-busy');};
+        const state={queued:false,visible,stop(){version++;clearTimeout(timer);request?.abort();request=null;const index=queue.indexOf(state);if(index>=0)queue.splice(index,1);state.queued=false;end();},
+            enqueue(force=false){if(blocked||!visible()||request||state.queued||loaded&&!force)return;clearTimeout(timer);state.queued=true;queue.push(state);drain();},
             async load(){
                 const current=++version,controller=new AbortController();request=controller;
-                const timeout=setTimeout(()=>controller.abort(),20000);root.setAttribute('aria-busy','true');refresh.disabled=true;status.textContent='';status.setAttribute('role','status');
-                targets.forEach(t=>window.AppLoading?.begin(t,{table:false,replace:true,label:labels.loading,size:'small'}));
+                const timeout=setTimeout(()=>controller.abort(),20000);root.setAttribute('aria-busy','true');
+                if(!loaded){status.textContent='';status.setAttribute('role','status');targets.forEach(t=>window.AppLoading?.begin(t,{table:false,replace:true,label:labels.loading,size:'small'}));}
                 try{
                     const url=new URL(root.dataset.activityUrl,location.href);if(url.origin!==location.origin)throw new Error('scope');
                     const response=await fetch(url,{credentials:'same-origin',cache:'no-store',headers:{Accept:'application/json'},signal:controller.signal});
-                    if((response.status===403||response.status===401||response.redirected)&&current===version){end();targets.forEach(t=>t.textContent='—');}
+                    if((response.status===403||response.status===401||response.redirected)&&current===version){blocked=true;end();targets.forEach(t=>t.textContent='—');}
                     if(!response.ok||response.redirected)throw new Error('request');
                     const payload=await response.json();
                     if(current!==version||!visible())return;
@@ -30,11 +30,10 @@
                         return new Intl.NumberFormat(document.documentElement.lang||'en').format(entry.shown)+(entry.more?'+':'');
                     });
                     // End loading first so its original-node recovery cannot replace the fresh counts.
-                    end();targets.forEach((target,index)=>target.textContent=values[index]);loaded=true;
+                    end();targets.forEach((target,index)=>{if(target.textContent!==values[index])target.textContent=values[index];});loaded=true;status.textContent='';status.setAttribute('role','status');
                 }catch(error){if(current===version&&visible()){status.setAttribute('role','alert');status.textContent=labels.loadError;}}
-                finally{clearTimeout(timeout);if(current===version){end();request=null;}}
+                finally{clearTimeout(timeout);if(current===version){end();request=null;if(visible()&&!blocked)timer=setTimeout(()=>state.enqueue(true),5000);}}
             }};
-        refresh.addEventListener('click',()=>state.enqueue(true));
         root.addEventListener('dashboard:visibility',()=>{if(visible())state.enqueue(true);else state.stop();});
         regions.set(root,state);state.enqueue();
     }
