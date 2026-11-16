@@ -206,6 +206,7 @@ public class LoanChargeService {
             ?Optional.of(json.treeToValue(snapshot,Plan.class)):Optional.empty();
     }
     private Term term(String kind,String basis,BigDecimal value,BigDecimal total,Policy p,boolean insurance,String evidence){return new Term(UUID.randomUUID(),kind,basis,value,total,p==null?Timing.SEPARATE:insurance?p.insuranceTiming():p.managementTiming(),p==null?null:p.receivableAccountId(),p==null?null:p.account(kind),evidence,insurance && p!=null?p.insurer():"",insurance && p!=null?p.insurerVerification():"");}
+    @Transactional(propagation=Propagation.MANDATORY) public void clearUnpostedForEdit(AppUserPrincipal a,UUID loan){accounting.requireActor(a,"LOAN_RECORDING_CREATE");readable(a,loan,true);repository.clearUnpostedForEdit(loan);}
     @Transactional(propagation=Propagation.MANDATORY) public void freeze(AppUserPrincipal a,UUID loan,Plan plan){repository.freeze(a,loan,plan,clock.now());}
     private LoanChargeRepository.Loan readable(AppUserPrincipal a,UUID loan,boolean lock){if(a==null||!a.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Loan unavailable");return repository.loan(a,loan,lock);}
     @Transactional(readOnly=true) public Plan quotedTerms(AppUserPrincipal actor,UUID loan){

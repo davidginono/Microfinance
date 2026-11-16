@@ -4,3 +4,6 @@
 <a class="resource-table-id-link" href="<c:url value='/finance/loan-records/applications/${recordForm.applicationId}/documents/${file.id}'/>" data-download-action="true"><c:out value="${empty file.documentTitle?file.originalName:file.documentTitle}"/></a>
 <button type="submit" form="recording-remove-${index.index}" formnovalidate class="erp-icon-btn recording-file-remove" aria-label="<spring:message code='applications.remove' htmlEscape='true'/> <c:out value='${file.originalName}'/>"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
 </li></c:if></c:forEach></ul></c:if>
+<c:if test="${recordingPhotoPurpose == 'OTHER' and not empty recordedAttachments}"><ul class="recording-saved-files">
+<c:forEach items="${recordedAttachments}" var="file"><li><a class="resource-table-id-link" href="<c:url value='/finance/loan-records/${editingLoanId}/attachments/${file.id}' />"><c:out value="${file.originalName}" /></a><c:if test="${file.superseded}"> &#183; <spring:message code="recording.history" /></c:if></li></c:forEach>
+</ul></c:if>

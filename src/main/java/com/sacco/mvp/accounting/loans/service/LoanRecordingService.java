@@ -33,7 +33,7 @@ public class LoanRecordingService {
         if(loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0) {
             var files=attachments.parse(loan.getAttachmentsJson());
             if(loan.getApplicantMemberId()==null)check(simpleGroups.simple(actor,id)?simpleGroups.guaranteesReady(actor,id):records.personalGuaranteesReady(actor,id),"personalGuarantees");
-            else check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
+            else check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose"))&&!Boolean.TRUE.equals(f.get("superseded")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
         }
     }
     @Transactional public void withdrawGroup(AppUserPrincipal a,UUID id,UUID key,String state,String terms,String reason){
@@ -231,6 +231,26 @@ public class LoanRecordingService {
         check("INDIVIDUAL".equals(f.getLoanFor()),"request");
         return saveInternal(a,f,files,null,null);
     }
+    @Transactional(readOnly=true)
+    public boolean editable(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return a.getClaims().contains("LOAN_RECORDING_CREATE")&&records.editable(a,id);}
+    @Transactional(readOnly=true)
+    public RecordForm editForm(AppUserPrincipal a,UUID id){
+        authorize(a,"CREATE");authorize(a,"VIEW");requireEditable(a,id);
+        var loan=loans.findById(id).orElseThrow();var form=read(records.record(a,id,false).get("metadata").toString(),RecordForm.class);
+        form.setApplicationId(null);form.setExpectedVersion(loan.getVersion());form.setRequestKey(UUID.randomUUID());
+        if(form.getApplicationDetails()!=null){form.getApplicationDetails().setDocumentNames(new ArrayList<>());form.getApplicationDetails().setDocumentTypes(new ArrayList<>());form.getApplicationDetails().setRequiredAttachmentIds(new ArrayList<>());}
+        return form;
+    }
+    private void requireEditable(AppUserPrincipal a,UUID id){if(!records.editable(a,id))throw new AccessDeniedException("Only the recorder may edit an individual loan before its first review");}
+    @Transactional
+    public UUID edit(AppUserPrincipal a,UUID id,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files){
+        authorize(a,"CREATE");authorize(a,"VIEW");validateFiles(files);check(f.getApplicationId()==null&&"INDIVIDUAL".equals(f.getLoanFor()),"state");
+        String payload=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var retry=records.editRetry(a,id,f.getRequestKey(),payload);if(retry.isPresent())return retry.get();
+        records.groupLoan(a,id,true);requireEditable(a,id);var previous=loans.findById(id).orElseThrow();if(!Objects.equals(previous.getVersion(),f.getExpectedVersion()))throw new IllegalArgumentException("loanGroups.error.changed");
+        check(Objects.equals(previous.getTopUpSourceLoanId(),f.getTopUpSourceLoanId()),"state");
+        records.beginEdit(a,id,f,payload);charges.clearUnpostedForEdit(a,id);
+        return saveInternal(a,f,files,null,null,previous);
+    }
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public UUID saveGroup(AppUserPrincipal a,RecordForm input,List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement){
         authorize(a,"CREATE");check(input!=null&&"GROUP".equals(input.getLoanFor()),"request");
@@ -248,6 +268,9 @@ public class LoanRecordingService {
             if(draft!=null){f.setApplicationId(draft);f.setExpectedVersion(version);simpleGroups.consumeDraft(a,f);}return id;});
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
+        return saveInternal(a,f,files,borrowerParty,payoutSnapshot,null);
+    }
+    private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot,LoanApplication editing){
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);if(borrowerParty==null)evidence.applyClientProfile(a,f);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
         com.sacco.mvp.domain.LoanApplication existingDraft=null;
@@ -303,22 +326,30 @@ public class LoanRecordingService {
         var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
         if(shared.active()>0)policy.put("sharedCredit",Map.of("active",shared.active(),"maximumLiability",shared.liability(),"monthlyPayment",shared.monthlyPayment(),"assessedAt",now));
         snapshot.put("recordedCharges",chargePlan);snapshot.put("recordedChargeTotal",chargePlan.total());snapshot.put("recordedChargeDeductions",chargePlan.deductions());snapshot.put("recordedNetCashEstimate",f.getPrincipal().subtract(settlement==null?ZERO:settlement.total()).subtract(chargePlan.deductions()));snapshot.put("recordedTotalPayable",f.getPrincipal().add(calculation.totalInterest()).add(chargePlan.total()));policy.put("recordedChargePolicy",Objects.toString(chargePlan.policyId(),""));
-        long number=numbers.nextFor(a.getSaccoId());
-        var loan=LoanApplication.builder().id(existingDraft==null?UUID.randomUUID():existingDraft.getId()).applicationNumber(existingDraft==null?number:existingDraft.getApplicationNumber()).saccoId(a.getSaccoId()).stationId(a.getStationId())
+        var existing=editing==null?existingDraft:editing;
+        long number=existing==null?numbers.nextFor(a.getSaccoId()):existing.getApplicationNumber();
+        var loan=LoanApplication.builder().id(existing==null?UUID.randomUUID():existing.getId()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).borrowerPartyId(borrowerParty).paymentDetailsSnapshot(payoutSnapshot).topUpSourceLoanId(f.getTopUpSourceLoanId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
             .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(storedForm))
             .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
-            .installmentAmount(calculation.installment()).createdAt(existingDraft==null?now:existingDraft.getCreatedAt()).updatedAt(now).build();
-        loan.setVersion(existingDraft==null?null:existingDraft.getVersion());
-        loan.setAttachmentsJson(namedUploads==null?attachments.store(loan.getId(),files,existingDraft==null?null:existingDraft.getAttachmentsJson()):attachments.storeNamed(loan.getId(),namedUploads,existingDraft==null?null:existingDraft.getAttachmentsJson()));
-        loan=loans.saveAndFlush(loan);UUID id=loan.getId();records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
+            .installmentAmount(calculation.installment()).createdAt(existing==null?now:existing.getCreatedAt()).updatedAt(now).build();
+        loan.setVersion(existing==null?null:existing.getVersion());
+        String retained=existing==null?null:existing.getAttachmentsJson();
+        if(editing!=null){
+            if(!Objects.equals(editing.getApplicantMemberId(),f.getClientId()))retained=null;
+            else {var priorFiles=attachments.parse(retained);priorFiles.stream().filter(file->"GUARANTOR_CONSENT".equals(file.get("documentPurpose"))).forEach(file->file.put("superseded",true));retained=write(priorFiles);}
+        }
+        loan.setAttachmentsJson(namedUploads==null?attachments.store(loan.getId(),files,retained):attachments.storeNamed(loan.getId(),namedUploads,retained));
+        loan=loans.saveAndFlush(loan);UUID id=loan.getId();
+        if(editing==null)records.insertRecord(a,id,f,hash,product.getDisplayName(),write(f),now);
+        else records.updateRecord(a,id,storedForm,product.getDisplayName(),write(storedForm));
         String clientKycError=loans.kycError(id,a.getSaccoId(),a.getStationId(),clock.today());
         if(clientKycError!=null)throw new IllegalArgumentException(clientKycError);
         if(chargePlan.supported())charges.freeze(a,id,chargePlan);
         if(borrowerParty!=null && !"GROUP".equals(f.getLoanFor()) && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
         loans.saveAndFlush(loan);
-        event(a,id,"LOAN_APPLICATION_RECORDED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
+        event(a,id,editing==null?"LOAN_APPLICATION_RECORDED":"LOAN_RECORD_EDITED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
     }
     @Transactional(readOnly=true)
     public Detail detail(AppUserPrincipal a,UUID id){

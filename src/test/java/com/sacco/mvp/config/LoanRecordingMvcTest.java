@@ -85,6 +85,18 @@ class LoanRecordingMvcTest {
             .andExpect(jsonPath("$.schedule[0].amount").value("9007199254740992.01"))
             .andExpect(jsonPath("$.schedule[0].beginningBalance").value("9007199254740992.01")).andExpect(jsonPath("$.schedule[0].endingBalance").value("0.00"));
     }
+    @Test void editUsesTheExistingRecordingFormAndKeepsValidationLocal() throws Exception {
+        var id=UUID.randomUUID();var form=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.RecordForm();when(service.editForm(actor,id)).thenReturn(form);
+        mvc.perform(get("/finance/loan-records/"+id+"/edit").with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/loans/record-form")).andExpect(model().attribute("editingLoanId",id));
+        mvc.perform(multipart("/finance/loan-records/"+id+"/edit").with(user(actor)).with(csrf()).param("principal","invalid").param("purpose","Keep this value"))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/loans/record-form")).andExpect(model().attribute("editingLoanId",id)).andExpect(model().attributeHasFieldErrors("recordForm","principal"));
+        verify(service,never()).edit(any(),any(),any(),any());
+        mvc.perform(multipart("/finance/loan-records/"+id+"/edit").with(user(actor))).andExpect(status().isForbidden());
+        var file=new MockMultipartFile("attachments","consent.pdf","application/pdf","%PDF synthetic".getBytes());
+        mvc.perform(multipart("/finance/loan-records/"+id+"/edit").file(file).with(user(actor)).with(csrf()).param("principal","1200.00").param("expectedVersion","2"))
+            .andExpect(redirectedUrl("/finance/loan-records/"+id)).andExpect(flash().attribute("loanEditSaved",true));
+        verify(service).edit(eq(actor),eq(id),argThat(f->f.getExpectedVersion()==2&&new BigDecimal("1200.00").equals(f.getPrincipal())),argThat(files->files.size()==1));
+    }
     @Test void multipartRecordingPassesDocumentsAndRetainsValuesOnInvalidInput() throws Exception {
         var id=UUID.randomUUID();when(service.save(any(),any(),any())).thenReturn(id);var file=new MockMultipartFile("attachments","proof.pdf","application/pdf","%PDF synthetic".getBytes());
         mvc.perform(multipart("/finance/loan-records").file(file).with(user(actor)).with(csrf()).param("principal","1000.00").param("loanMode","CUSTOM").param("tenureValue","10").param("tenureUnit","DAYS"))

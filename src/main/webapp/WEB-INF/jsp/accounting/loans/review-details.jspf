@@ -12,8 +12,11 @@
 </tbody></table></div></section>
 </c:if>
 <c:if test="${not empty groupError}"><div class="loan-error-summary" role="alert" tabindex="-1" data-workspace-response-error><spring:message code="${groupError}" /></div></c:if>
-<c:if test="${groupReview.canSubmit}"><form method="post" action="<c:url value='/finance/loan-records/${detail.loan.id}/submit-for-review' />" class="accounting-actions loan-form-actions" data-workspace-submit="recover">
+<c:if test="${canEdit or groupReview.canSubmit}"><div class="accounting-actions loan-form-actions">
+<c:if test="${canEdit}"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records/${detail.loan.id}/edit' />"><spring:message code="common.edit" /></a></c:if>
+<c:if test="${groupReview.canSubmit}"><form method="post" action="<c:url value='/finance/loan-records/${detail.loan.id}/submit-for-review' />" data-workspace-submit="recover">
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="requestKey" value="${reviewRequestKey}" /><button class="app-btn btn-launch"><spring:message code="recording.submitReview" /></button></form></c:if>
+</div></c:if>
 <c:if test="${groupReview.canApprove or groupReview.canReject}">
 <c:if test="${not retiredGroupApplication}"><form method="post" action="<c:url value='/finance/loan-records/${detail.loan.id}/review' />" data-workspace-submit="recover">
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="requestKey" value="${reviewRequestKey}" /><input type="hidden" name="approvalRequest" value="${groupReview.request.id}" />

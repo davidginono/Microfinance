@@ -13,6 +13,19 @@ import java.util.*;
 
 @Repository @RequiredArgsConstructor
 public class LoanRecordingRepository {
+    public boolean editable(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_record r where r.loan_id=? and r.sacco_id=? and r.station_id=? and r.actor_id=? and loan_record_editable(r.loan_id))",Boolean.class,id,a.getSaccoId(),a.getStationId(),a.getMemberId()));}
+    public Optional<UUID> editRetry(AppUserPrincipal a,UUID id,UUID key,String hash){
+        var rows=jdbc.queryForList("select loan_id,actor_id,payload_hash from loan_record_edit where sacco_id=? and station_id=? and request_key=?",a.getSaccoId(),a.getStationId(),key);
+        if(rows.isEmpty())return Optional.empty();var row=rows.getFirst();
+        if(!id.equals(row.get("loan_id"))||!a.getMemberId().equals(row.get("actor_id"))||!hash.equals(row.get("payload_hash")))throw new IllegalArgumentException("recording.error.retry");
+        return Optional.of(id);
+    }
+    public void beginEdit(AppUserPrincipal a,UUID id,RecordForm f,String hash){
+        jdbc.update("insert into loan_record_edit(loan_id,sacco_id,station_id,actor_id,request_key,payload_hash,expected_version) values(?,?,?,?,?,?,?)",id,a.getSaccoId(),a.getStationId(),a.getMemberId(),f.getRequestKey(),hash,f.getExpectedVersion());
+    }
+    public void updateRecord(AppUserPrincipal a,UUID id,RecordForm f,String product,String metadata){
+        jdbc.update("update accountant_loan_record set application_date=?,requested_principal=?,first_payment_date=?,product_name=?,metadata=?::jsonb where loan_id=? and sacco_id=? and station_id=?",f.getApplicationDate(),f.getRequestedPrincipal(),f.getFirstPaymentDate(),product,metadata,id,a.getSaccoId(),a.getStationId());
+    }
     public Map<com.sacco.mvp.domain.Position,List<UUID>> groupCandidates(AppUserPrincipal a,GroupLoan loan,String groups) {
         var candidates=new LinkedHashMap<com.sacco.mvp.domain.Position,List<UUID>>();
         jdbc.query("""

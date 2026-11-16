@@ -1,0 +1,13 @@
+# Edit a loan before review
+
+Loan details shows **Edit** beside **Send for review** for the recorder of an individual loan with the existing `LOAN_RECORDING_VIEW` and `LOAN_RECORDING_CREATE` claims. The loan must still be `RECORDED`, with no review request, historical guarantor decision, group contract, ledger, posting or charge command/event. Opening or saving an edit checks current institution, branch, staff access and recorder ownership on the server. Review submission and editing serialize on the same loan lock.
+
+Edit reuses the recording form. Staff can change the client, product or customised terms, amount, date, purpose, guarantors, collateral and supporting uploads. Client financial information continues to come from the scoped client profile. Top-up source identity remains fixed. Group contracts and applications already sent for review keep their existing evidence protections.
+
+Saving retains the Loan ID and `RECORDED` status. It reruns recording validation, KYC checks, `LoanAmortizationCalculator` and charge calculation; it neither submits a review nor posts money. A stale version cannot overwrite another edit. Request keys make successful retries idempotent, and changed payloads cannot reuse a key. Validation failures retain the entered form.
+
+`V161__recorded_loan_edits_before_review.sql` captures the previous application, recording envelope, attachment metadata, charge contract and charge terms in immutable `loan_record_edit` evidence. Only that captured, locked transaction may replace current unposted terms. A deferred check requires the complete new recording and version to commit together. Posted financial records and existing review snapshots remain immutable. Existing files stay stored; prior guarantor consent becomes historical after an edit and cannot satisfy the current consent gate. Changing the client requires new current attachments. The previous attachment list stays in the audit snapshot.
+
+Apply the migration to an existing environment only with a verified backup. Migration and concurrency tests use an isolated temporary PostgreSQL database, never the application's configured database. Deploy the new controller/service code with the migration before using the Edit link. Functional tests do not establish a throughput claim.
+
+Verification on 16 November 2026: Java 25 / PostgreSQL 17.9, 122 targeted tests passed (86 loan accounting, 26 MVC/security, 5 edit/history/concurrency/consent, 4 schedule/document, and 1 Jasper test covering both affected pages). The migration ran on a disposable loopback database. Rendered JSP fixtures verified Edit navigation, English/Kiswahili labels, closed-edit visibility and 360/768/1366/1920px layouts; these previews are separate from authenticated backend checks.

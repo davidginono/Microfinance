@@ -12,6 +12,7 @@ import java.util.*;
 
 @Repository @RequiredArgsConstructor
 public class LoanChargeRepository {
+    public void clearUnpostedForEdit(UUID loan){jdbc.update("delete from loan_charge_term where loan_id=?",loan);jdbc.update("delete from loan_charge_contract where loan_id=?",loan);}
     private final JdbcTemplate jdbc;
     public record Loan(UUID id,UUID client,String status,LocalDate applicationDate,UUID source,String number,String institution,String branch) {}
     public Loan loan(AppUserPrincipal a,UUID id,boolean lock){return jdbc.query("select l.id,l.applicant_member_id,l.status,r.application_date,l.top_up_source_loan_id,coalesce(l.loan_id,l.application_number::text),i.sacco_name,coalesce(nullif(s.address_location,''),r.station_id) from accountant_loan_record r join loan_applications l on l.id=r.loan_id join registered_saccos i on i.sacco_id=r.sacco_id join sacco_stations s on s.sacco_id=r.sacco_id and s.station_id=r.station_id where r.loan_id=? and r.sacco_id=? and r.station_id=?"+(lock?" for update of r":""),(r,n)->new Loan(id,r.getObject(2,UUID.class),r.getString(3),r.getObject(4,LocalDate.class),r.getObject(5,UUID.class),r.getString(6),r.getString(7),r.getString(8)),id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Loan unavailable"));}
