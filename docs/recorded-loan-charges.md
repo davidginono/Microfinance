@@ -112,3 +112,13 @@ Version 1 policies retain the shared deferred management-fee account. Frozen loa
 Charge configuration is embedded in Create/Edit Loan Product. Existing products show generated Income accounts as proposed defaults and retain their old policy until staff save a new effective revision. Account generation supplies no missing policy/agreement/insurer evidence and does not enable charges. See [account generation, migration and deployment](loan-product-account-links.md).
 
 The deferred-fee-only statements in the earlier implementation notes describe accounting version 1. They do not apply to the explicitly selected version 2 assessment treatment.
+
+## Funding charge selection (16 November 2026)
+
+The disbursement form's Deduct picker can collect selected existing separate charges from the funding cash. The server quotes the exact frozen amounts, keeps agreed deductions mandatory, and rejects unknown or duplicate selections and a non-positive cash payout. A signed agreement evidence reference and the existing disbursement permission remain required. Changing selections refreshes the quote and clears confirmation; a failed refresh disables posting until retry succeeds.
+
+V164 permits this election through the existing append-only DEDUCT events, tied to the same scoped funding posting and balanced journal. It changes no tables, claims, principal, frozen charge terms or historical estimate. Top-up source settlement remains separate from new-loan deductions. Independent funding corrections retain linked DEDUCT_UNDO evidence. Apply deployment migrations only with the verified backup required by the staff-only accounting deployment procedure; verification uses a disposable database.
+
+Monetary entry controls share the amount formatter, including product fees, client income and loan evidence rows. Commas are presentation only; native validation and submitted decimal values remain unchanged. The loan summary keeps its credit cards and unavailable values without the redundant live-status notice.
+
+Verification: 113 focused Java/PostgreSQL/JSP checks and 95 JavaScript checks passed. PostgreSQL 18.3 applied all migrations through V164 in a fresh disposable database. Browser checks covered charge selection, retained references, invalid-date recovery, local credit-card hydration, typed income/expense separators and contained layouts at 390, 768, 1366 and 1920 pixels. Browser checks posted no funding. These correctness checks do not measure throughput.

@@ -217,8 +217,14 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary chargeSummary(AppUserPrincipal a,UUID loan){authorize(a,"VIEW");records.record(a,loan,false);return charges.summary(a,loan);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Summary fundingCharges(AppUserPrincipal a,UUID loan){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");return charges.summary(a,loan);}
     @Transactional(readOnly=true) public BigDecimal fundingCash(AppUserPrincipal a,UUID id,LocalDate date){
+        return fundingQuote(a,id,date,List.of()).cash();
+    }
+    @Transactional(readOnly=true) public FundingQuote fundingQuote(AppUserPrincipal a,UUID id,LocalDate date,List<UUID> selected){
         accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");var loan=records.loan(a,id,clock.today());var source=disbursementTopUp(a,id,date);
-        return loan.principal().subtract(source.map(TopUpQuote::total).orElse(ZERO)).subtract(charges.quotedTerms(a,id).deductions());
+        var plan=charges.quotedTerms(a,id);var deductions=charges.fundingDeductions(plan,selected);
+        var cash=loan.principal().subtract(source.map(TopUpQuote::total).orElse(ZERO)).subtract(deductions);
+        check(cash.signum()>0,"disbursementAmount");
+        return new FundingQuote(cash,deductions,plan.total().subtract(deductions),source.orElse(null));
     }
     @Transactional(readOnly=true)
     public AllocationPreview postingPreview(AppUserPrincipal a,PostForm f,String kind){
@@ -436,7 +442,8 @@ public class LoanRecordingService {
             charges.freeze(a,loan.getId(),chargePlan);
         }
         charges.assessAtFunding(a,loan.getId(),f.getEffectiveDate(),f.getEvidence());
-        BigDecimal deductions=chargePlan.deductions();
+        BigDecimal deductions=charges.fundingDeductions(chargePlan,f.getDeductChargeIds());
+        if(!f.getDeductChargeIds().isEmpty())text(f.getEvidence(),500,true);
         var linked=productAccounts.bind(a,loan.getId(),loan.getLoanProductSettingId(),null,"DISBURSEMENT");
         check(f.getPrincipalAccountId()==null || f.getPrincipalAccountId().equals(linked.principalId()),"account");
         var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,linked.principalId(),"PRINCIPAL");
@@ -462,7 +469,7 @@ public class LoanRecordingService {
         loan.setAttachmentsJson(attachments.store(loan.getId(),files,loan.getAttachmentsJson(),LoanAttachmentService.CATEGORY_DISBURSEMENT_PROOF));
         disbursementNumbers.assign(loan,a.getMemberId(),f.getEffectiveDate());
         loan.setRepaymentScheduleJson(schedule.scheduleJson());loan.setFinalDueDate(schedule.finalDueDate());loan.setUpdatedAt(now);loans.saveAndFlush(loan);
-        if(settlement==null){repayments.openAtDisbursement(loan);var lines=new ArrayList<Object[]>();lines.add(new Object[]{principal.id(),f.getAmount(),ZERO});check(f.getAmount().compareTo(deductions)>0,"disbursementAmount");lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(deductions)});lines.addAll(charges.collect(a,loan.getId(),"DEDUCT",deductions,f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes()));records.lines(a,journal,lines);}
+        if(settlement==null){repayments.openAtDisbursement(loan);var lines=new ArrayList<Object[]>();lines.add(new Object[]{principal.id(),f.getAmount(),ZERO});check(f.getAmount().compareTo(deductions)>0,"disbursementAmount");lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(deductions)});lines.addAll(charges.collect(a,loan.getId(),"DEDUCT",deductions,f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes(),f.getDeductChargeIds()));records.lines(a,journal,lines);}
         else {
             repayments.openAtTopUp(loan);
             UUID transaction=repayments.settleRecordedTopUp(source.get(),a,f.getEffectiveDate(),f.getRequestKey(),id,settlement.sequence(),settlement.principal(),settlement.interest());
@@ -471,7 +478,7 @@ public class LoanRecordingService {
             var lines=new ArrayList<Object[]>();lines.add(new Object[]{principal.id(),f.getAmount(),ZERO});lines.add(new Object[]{records.principalAccount(source.get()),ZERO,settlement.principal()});
             lines.add(new Object[]{money.id(),ZERO,f.getAmount().subtract(settlement.total()).subtract(deductions)});if(settlementInterest!=null)lines.add(new Object[]{settlementInterest.id(),ZERO,settlement.interest()});
             lines.addAll(charges.collect(a,source.get(),"SETTLE",settlement.charges(),f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes()));
-            lines.addAll(charges.collect(a,loan.getId(),"DEDUCT",deductions,f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes()));
+            lines.addAll(charges.collect(a,loan.getId(),"DEDUCT",deductions,f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes(),f.getDeductChargeIds()));
             records.lines(a,journal,lines);
         }
         records.finish(id,null,f.getAmount(),ZERO,f.getAmount());records.postJournal(a,journal,now);

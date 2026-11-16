@@ -4174,12 +4174,6 @@ html.session-timeout-active,
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-kpi-card .loan-stat-value {
         grid-column: 2;
     }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-live-status {
-        padding: 8px 10px;
-    }
-    .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-live-status:has(.live-account-status-message.hidden) {
-        display: none;
-    }
     .loan-staff-review-template[data-staff-review-page="true"] .loan-staff-review-progress {
         border-top: 1px solid #d5dbdb;
         padding: 10px;
@@ -4476,61 +4470,7 @@ html.session-timeout-active,
         border-radius: 2px;
     }
 
-    .live-account-status-message {
-        min-height: 32px;
-        justify-content: flex-start;
-        flex-flow: row nowrap;
-        align-items: center;
-        gap: 8px;
-        background: #f1faff;
-        color: #033160;
-        padding: 6px 10px;
-        font-size: 13px;
-        line-height: 18px;
-        text-align: left;
-    }
 
-    .live-account-status-message [data-live-account-status-message] {
-        min-width: 0;
-        flex: 1 1 auto;
-    }
-
-    .live-account-status-message.hidden,
-    .live-account-status-message[hidden] {
-        display: none !important;
-    }
-
-    .live-account-status-message.is-unavailable {
-        border-color: #ff9900;
-        background: #fff7e8;
-        color: #5f3b00;
-    }
-
-    .live-account-status-spinner {
-        display: none;
-        box-sizing: border-box;
-        width: 14px;
-        height: 14px;
-        flex: 0 0 14px;
-        border: 2px solid transparent;
-        border-top-color: #687078;
-        border-right-color: #687078;
-        border-radius: 50%;
-        transform-origin: 50% 50%;
-        animation: aws-console-spin 0.65s linear infinite;
-        will-change: transform;
-    }
-
-    .live-account-status-message.is-loading .live-account-status-spinner {
-        display: block;
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-        .live-account-status-spinner {
-            animation: none;
-            will-change: auto;
-        }
-    }
 
     .loan-status-badge {
         display: inline-flex;

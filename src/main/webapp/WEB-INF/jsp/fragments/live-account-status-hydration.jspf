@@ -1,25 +1,10 @@
 <script>
     (() => {
         const LIVE_ACCOUNT_STATUS_TIMEOUT_MS = 10000;
+        const unknownLabel = "<spring:message code='common.notAvailable' javaScriptEscape='true' />";
         const activeRequests = new WeakMap();
         const creditProfileUnavailable = "<spring:message code='creditProfile.unavailable' javaScriptEscape='true' />";
         const creditProfileTimeout = "<spring:message code='creditProfile.timeout' javaScriptEscape='true' />";
-
-        function setStatusBoxState(box, state, statusMessage) {
-            if (!box) {
-                return;
-            }
-            const hidden = state === "available";
-            box.hidden = hidden;
-            box.classList.toggle("hidden", hidden);
-            box.classList.toggle("is-loading", state === "loading");
-            box.classList.toggle("is-unavailable", state === "unavailable");
-            box.setAttribute("aria-hidden", hidden ? "true" : "false");
-            const message = box.querySelector("[data-live-account-status-message]");
-            if (message) {
-                message.textContent = statusMessage || "";
-            }
-        }
 
         function applyLiveAccountStatus(container, payload) {
             if (!container || !payload) {
@@ -27,27 +12,16 @@
             }
             const activeExposure = container.querySelector("[data-live-account-status-active-exposure]");
             const riskHistory = container.querySelector("[data-live-account-status-risk-history]");
-            const message = container.querySelector("[data-live-account-status-message]");
-            const box = container.querySelector("[data-live-account-status-box]");
 
             if (activeExposure) {
-                activeExposure.textContent = payload.activeExposureLabel || "-";
+                activeExposure.textContent = payload.available || payload.pending ? payload.activeExposureLabel || unknownLabel : unknownLabel;
+                activeExposure.title = payload.statusMessage || "";
             }
             if (riskHistory) {
-                riskHistory.textContent = payload.riskHistoryLabel || "-";
+                riskHistory.textContent = payload.available || payload.pending ? payload.riskHistoryLabel || unknownLabel : unknownLabel;
+                riskHistory.title = payload.statusMessage || "";
             }
-            if (message) {
-                message.textContent = payload.statusMessage || "";
-            }
-            if (payload.available) {
-                setStatusBoxState(box, "available", "");
-                return;
-            }
-            setStatusBoxState(
-                box,
-                payload.pending ? "loading" : "unavailable",
-                payload.statusMessage || creditProfileUnavailable
-            );
+
         }
 
         function cancelLiveAccountStatusRequest(container) {
@@ -146,7 +120,9 @@
             cancel: cancelLiveAccountStatusRequest
         };
 
-        if (document.readyState === "loading") {
+        if (window.WorkspaceNavigation) {
+            window.WorkspaceNavigation.onReady(hydrateAllLiveAccountStatuses);
+        } else if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", hydrateAllLiveAccountStatuses, { once: true });
         } else {
             hydrateAllLiveAccountStatuses();

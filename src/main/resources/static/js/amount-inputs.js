@@ -1,7 +1,7 @@
 /* Group the visible amount; keep the existing numeric control authoritative for scripts and transport. */
 (() => {
     'use strict';
-    const selector = 'input[type="number"][data-amount-input="true"]';
+    const selector = 'input[data-amount-input="true"],input[data-money-input="true"]';
     const states = new Map(), valueProperty = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
     let serial = 0;
     const plain = value => value.replace(/,/g, '').trim();
@@ -11,6 +11,10 @@
 
     function enhance(native) {
         if (states.has(native)) return;
+        if(native.type !== 'number') {
+            const raw=plain(native.value);
+            native.type='number';native.step=native.getAttribute('step') || '0.01';native.value=valid(raw)?raw:'';
+        }
         // Row templates can contain a cloned presentation, but never its listeners or state.
         let wrapper = native.closest('.erp-amount-control');
         if (wrapper) wrapper.querySelectorAll('[data-amount-display]').forEach(input => input.remove());

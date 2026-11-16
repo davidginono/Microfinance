@@ -64,6 +64,21 @@ import java.util.stream.Collectors;
 @RequestMapping("/disbursement")
 @PreAuthorize("@access.canAccessDisbursementArea(principal)")
 public class DisbursementController {
+    @GetMapping("/loan-applications/{id}/funding-quote")
+    @PreAuthorize("@access.has(principal, 'DISBURSEMENT_QUEUE_DISBURSE')")
+    @ResponseBody
+    public ResponseEntity<?> fundingQuote(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
+        @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,
+        @RequestParam(required=false) List<UUID> deductChargeIds) {
+        try {
+            var q=loanRecordingService.fundingQuote(actor,id,date,deductChargeIds==null?List.of():deductChargeIds);
+            var result=new LinkedHashMap<String,Object>();
+            result.put("cash",q.cash().toPlainString());result.put("deductions",q.deductions().toPlainString());result.put("separate",q.separate().toPlainString());
+            var s=q.settlement();
+            if(s!=null){result.put("principal",s.principal().toPlainString());result.put("interest",s.interest().toPlainString());result.put("excludedInterest",s.excludedInterest().toPlainString());result.put("total",s.total().toPlainString());result.put("charges",s.charges().toPlainString());result.put("sequence",s.sequence());result.put("chargeSequence",s.chargeSequence());}
+            return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(result);
+        }catch(IllegalArgumentException ex){return ResponseEntity.badRequest().cacheControl(org.springframework.http.CacheControl.noStore()).body(Map.of("error",message(ex.getMessage())));}
+    }
     @org.springframework.web.bind.annotation.GetMapping("/loan-applications/{id}/top-up-quote")
     @org.springframework.web.bind.annotation.ResponseBody
     public org.springframework.http.ResponseEntity<?> topUpQuote(@AuthenticationPrincipal AppUserPrincipal actor,@org.springframework.web.bind.annotation.PathVariable UUID id,
@@ -411,7 +426,9 @@ public class DisbursementController {
         }
         if(recordedApplication && canDisburseLoan)try {
             var date=model.getAttribute("postingDisbursementDate") instanceof LocalDate retainedDate?retainedDate:null;
-            var topUp=loanRecordingService.disbursementTopUp(principal,app.getId(),date).orElse(null);model.addAttribute("topUpQuote",topUp);model.addAttribute("disbursementBaseAmount",loanRecordingService.fundingCash(principal,app.getId(),date));model.addAttribute("fundingCharges",loanRecordingService.fundingCharges(principal,app.getId()));
+            @SuppressWarnings("unchecked") var selected=model.getAttribute("postingDeductChargeIds") instanceof List<?> values?(List<UUID>)values:List.<UUID>of();
+            var q=loanRecordingService.fundingQuote(principal,app.getId(),date,selected);
+            model.addAttribute("topUpQuote",q.settlement());model.addAttribute("disbursementBaseAmount",q.cash());model.addAttribute("fundingQuote",q);model.addAttribute("fundingCharges",loanRecordingService.fundingCharges(principal,app.getId()));
         }catch(IllegalArgumentException ex){model.addAttribute("topUpUnavailable",ex.getMessage());}
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("disbursementOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(
@@ -484,6 +501,7 @@ public class DisbursementController {
                            @RequestParam(required = false) String settlementEvidence,
                            @RequestParam(defaultValue = "false") boolean settlementConfirmed,
                            @RequestParam(required = false) List<MultipartFile> attachments,
+                           @RequestParam(required = false) List<UUID> deductChargeIds,
                            RedirectAttributes ra) {
         try {
             LoanApplication application=requireVisibleApplication(id,principal.getSaccoId(),principal.getStationId());
@@ -495,9 +513,10 @@ public class DisbursementController {
                 form.setRequestKey(requestKey);form.setLoanId(id);form.setEffectiveDate(disbursementDate);form.setFirstPaymentDate(firstRepaymentDate);
                 form.setAmount(application.getAmount());form.setMoneyAccountId(moneyAccountId);form.setPrincipalAccountId(principalAccountId);
                 form.setInterestAccountId(interestAccountId);form.setSettlementSequence(settlementSequence);form.setSettlementPrincipal(settlementPrincipal);form.setSettlementInterest(settlementInterest);form.setSettlementCharges(settlementCharges);form.setSettlementChargeSequence(settlementChargeSequence);form.setEvidence(settlementEvidence==null?"":settlementEvidence);
+                form.setDeductChargeIds(deductChargeIds==null?List.of():deductChargeIds);
                 if(application.getTopUpSourceLoanId()!=null && !settlementConfirmed)throw new IllegalArgumentException("recording.error.topUpChanged");
                 form.setReference(disbursementReference==null?"":disbursementReference);form.setNotes(disbursementNotes==null?"":disbursementNotes);
-                if(depositAmount!=null && depositAmount.compareTo(loanRecordingService.fundingCash(principal,id,disbursementDate))!=0)throw new IllegalArgumentException("recording.error.disbursementAmount");
+                if(depositAmount!=null && depositAmount.compareTo(loanRecordingService.fundingQuote(principal,id,disbursementDate,form.getDeductChargeIds()).cash())!=0)throw new IllegalArgumentException("recording.error.disbursementAmount");
                 var documents=new java.util.ArrayList<MultipartFile>();if(disbursementProofFile!=null && !disbursementProofFile.isEmpty())documents.add(disbursementProofFile);
                 if(attachments!=null)documents.addAll(attachments);
                 loanRecordingService.disburse(principal,form,documents);
@@ -522,6 +541,7 @@ public class DisbursementController {
             ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);ra.addFlashAttribute("postingInterestAccountId",interestAccountId);ra.addFlashAttribute("postingSettlementEvidence",settlementEvidence);
             ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
             ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);
+            ra.addFlashAttribute("postingDeductChargeIds",deductChargeIds==null?List.of():deductChargeIds);
         } catch(org.springframework.dao.DataIntegrityViolationException ex){ra.addFlashAttribute("error",message("recording.error.duplicate"));}
         return "redirect:/disbursement/loan-applications/" + id;
     }

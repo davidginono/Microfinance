@@ -1,6 +1,12 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
 const source=fs.readFileSync('src/main/resources/static/js/amount-inputs.js','utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+test('existing text money fields share grouping and keep one exact numeric transport value',async()=>{
+ const dom=new JSDOM('<form><label for="fee">Fee</label><input id="fee" name="fee" data-money-input="true" type="text" value="1,250,000.50"></form>',{runScripts:'outside-only'});
+ const w=dom.window;w.eval(source);await tick();const native=w.document.querySelector('[name=fee]'),display=w.document.querySelector('[data-amount-display]');
+ assert.equal(display.value,'1,250,000.50');assert.equal(native.type,'number');assert.equal(new w.FormData(native.form).get('fee'),'1250000.50');
+ native.value='2000000.01';assert.equal(display.value,'2,000,000.01');assert.equal(w.document.querySelector('label').htmlFor,display.id);dom.window.close();
+});
 async function setup(markup=''){
  const dom=new JSDOM(`<body><span id="amount-input-labels" data-invalid="Enter a valid amount."></span><form><label for="amount">Amount</label><input id="amount" name="amount" type="number" data-amount-input="true" min="0" max="9999999999999999.99" step="0.01" value="100000.50" required><input name="rate" type="number" value="12.5"><input name="count" type="number" value="3">${markup}<button>Save</button></form></body>`,{url:'http://localhost',runScripts:'outside-only'});
  dom.window.eval(source);await tick();return dom;

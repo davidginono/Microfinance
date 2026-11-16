@@ -96,6 +96,8 @@ public final class LoanRecordingDtos {
         private boolean declarationAccepted;
     }
     @Data public static class PostForm {
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+        private List<UUID> deductChargeIds=new ArrayList<>();
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String sharedPayer;
         private UUID requestKey = UUID.randomUUID();
         private UUID loanId;
@@ -114,6 +116,7 @@ public final class LoanRecordingDtos {
         private String evidence = "";
         private String notes = "";
     }
+    public record FundingQuote(BigDecimal cash,BigDecimal deductions,BigDecimal separate,TopUpQuote settlement) {}
     public record Choice(UUID id, String label, String purpose, String tenureUnit,
         String minimumAmount, String maximumAmount, Integer minimumTenure, Integer maximumTenure) {
         public Choice(UUID id,String label,String purpose,String tenureUnit){this(id,label,purpose,tenureUnit,null,null,null,null);}

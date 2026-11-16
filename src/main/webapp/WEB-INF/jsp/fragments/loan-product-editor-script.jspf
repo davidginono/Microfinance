@@ -8,31 +8,6 @@
             document.body.appendChild(modal);
         });
 
-        function normalizeMoneyValue(value) {
-            return String(value || '')
-                .replace(/,/g, '')
-                .replace(/[^\d.]/g, '')
-                .replace(/(\..*)\./g, '$1');
-        }
-
-        function trimMoneyDecimalZeros(value) {
-            if (!value || !value.includes('.')) {
-                return value || '';
-            }
-            return value.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
-        }
-
-        function formatMoneyValue(value, trimDecimals) {
-            const raw = normalizeMoneyValue(value);
-            if (raw === '') {
-                return '';
-            }
-            const normalized = trimDecimals ? trimMoneyDecimalZeros(raw) : raw;
-            const parts = normalized.split('.');
-            const grouped = parts[0].replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-            return parts.length > 1 ? grouped + '.' + parts.slice(1).join('') : grouped;
-        }
-
         function loanProductDraftValues(form) {
             const draft = form.querySelector('[data-loan-product-form-draft]');
             const valuesByName = new Map();
@@ -105,10 +80,6 @@
             }
         });
 
-        function syncMoneyInput(input, trimDecimals) {
-            input.value = formatMoneyValue(input.value, trimDecimals);
-        }
-
         function trimDecimalZeros(value) {
             const raw = String(value || '').trim();
             if (raw === '') {
@@ -118,27 +89,10 @@
             return Number.isFinite(numericValue) ? String(numericValue) : raw;
         }
 
-        document.querySelectorAll('[data-money-input="true"]').forEach((input) => {
-            syncMoneyInput(input, true);
-            input.addEventListener('input', () => syncMoneyInput(input, false));
-            input.addEventListener('blur', () => syncMoneyInput(input, true));
-        });
-
         document.querySelectorAll('[data-trim-decimal-input="true"]').forEach((input) => {
             input.value = trimDecimalZeros(input.value);
             input.addEventListener('blur', () => {
                 input.value = trimDecimalZeros(input.value);
-            });
-        });
-
-        document.querySelectorAll('form').forEach((form) => {
-            if (!form.querySelector('[data-money-input="true"]')) {
-                return;
-            }
-            form.addEventListener('submit', () => {
-                form.querySelectorAll('[data-money-input="true"]').forEach((input) => {
-                    input.value = normalizeMoneyValue(input.value);
-                });
             });
         });
 
@@ -171,6 +125,7 @@
         }
 
         document.querySelectorAll('input[type="number"], input[inputmode="decimal"], input[data-money-input="true"]').forEach((input) => {
+            if (input.hasAttribute('data-amount-display')) return;
             input.setAttribute('maxlength', input.getAttribute('maxlength') || '15');
             input.setAttribute('data-numeric-maxlength', input.getAttribute('data-numeric-maxlength') || '15');
             enforceNumericTextLength(input);

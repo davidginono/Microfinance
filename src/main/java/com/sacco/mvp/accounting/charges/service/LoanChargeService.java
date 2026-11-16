@@ -231,9 +231,24 @@ public class LoanChargeService {
     }
     @Transactional(propagation=Propagation.MANDATORY) public void assessAtFunding(AppUserPrincipal a,UUID loan,LocalDate date,String evidence){accounting.requireActor(a,"DISBURSEMENT_QUEUE_DISBURSE");var p=repository.frozen(loan);if(p.terms().isEmpty() || repository.assessed(loan))return;var f=new AssessmentForm();f.setRequestKey(UUID.nameUUIDFromBytes(("CHARGE_ASSESS/"+loan+"/"+repository.sequence(loan)).getBytes(java.nio.charset.StandardCharsets.UTF_8)));f.setDate(date);f.setEvidence(evidence);f.setReason("");assessment(a,loan,f);}
     private void dated(UUID loan,LocalDate date){var b=repository.balance(loan,LocalDate.MAX);require(b.lastDate()==null || !date.isBefore(b.lastDate()),"date");}
+    /** A funding election collects an existing fee; it never rewrites its frozen amount or timing. */
+    public BigDecimal fundingDeductions(Plan plan,List<UUID> selected){
+        require(selected!=null && selected.size()<=3 && new HashSet<>(selected).size()==selected.size(),"selection");
+        require(plan.terms().stream().filter(t->t.timing()==Timing.SEPARATE).map(Term::id).toList().containsAll(selected),"selection");
+        return plan.terms().stream().filter(t->t.timing()==Timing.DEDUCT || selected.contains(t.id())).map(Term::amount).reduce(ZERO,BigDecimal::add);
+    }
     @Transactional(propagation=Propagation.MANDATORY) public List<Object[]> collect(AppUserPrincipal a,UUID loan,String kind,BigDecimal total,LocalDate date,UUID journal,UUID posting,String evidence,String reason){
-        if(total.signum()==0)return List.of();var l=readable(a,loan,true);dated(loan,date);require(Set.of("COLLECT","DEDUCT","SETTLE").contains(kind),"input");if(kind.equals("COLLECT"))require(Set.of("DISBURSED","PAR","DEFAULTED").contains(l.status()),"state");var remaining=total;var lines=new ArrayList<Object[]>();
-        for(var t:repository.frozen(loan).terms()){if(kind.equals("DEDUCT") && t.timing()!=Timing.DEDUCT)continue;var due=repository.outstanding(t.id());var paid=remaining.min(due);if(paid.signum()<=0)continue;repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");repository.event(a,loan,t,kind,paid,date,journal,posting,null,null,evidence,reason,clock.now());lines.add(new Object[]{t.receivableAccountId(),ZERO,paid});remaining=remaining.subtract(paid);}
+        return collect(a,loan,kind,total,date,journal,posting,evidence,reason,List.of());
+    }
+    @Transactional(propagation=Propagation.MANDATORY) public List<Object[]> collect(AppUserPrincipal a,UUID loan,String kind,BigDecimal total,LocalDate date,UUID journal,UUID posting,String evidence,String reason,List<UUID> selected){
+        require(selected!=null,"selection");
+        if(total.signum()==0 && selected.isEmpty())return List.of();
+        var l=readable(a,loan,true);
+        var plan=repository.frozen(loan);
+        if(kind.equals("DEDUCT"))require(total.compareTo(fundingDeductions(plan,selected))==0,"amount");
+        else require(selected.isEmpty(),"selection");
+        dated(loan,date);require(Set.of("COLLECT","DEDUCT","SETTLE").contains(kind),"input");if(kind.equals("COLLECT"))require(Set.of("DISBURSED","PAR","DEFAULTED").contains(l.status()),"state");var remaining=total;var lines=new ArrayList<Object[]>();
+        for(var t:plan.terms()){if(kind.equals("DEDUCT") && t.timing()!=Timing.DEDUCT && !selected.contains(t.id()))continue;var due=repository.outstanding(t.id());var paid=remaining.min(due);if(paid.signum()<=0)continue;repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");repository.event(a,loan,t,kind,paid,date,journal,posting,null,null,evidence,reason,clock.now());lines.add(new Object[]{t.receivableAccountId(),ZERO,paid});remaining=remaining.subtract(paid);}
         require(remaining.signum()==0,"amount");return lines;
     }
     @Transactional(propagation=Propagation.MANDATORY) public void undoCollections(AppUserPrincipal a,UUID originalJournal,UUID reversalJournal,UUID posting,LocalDate date,String evidence,String reason){
