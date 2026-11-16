@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class ClientLoanStatementDocumentTest {
-    @Test void htmlAndPdfShareStoredTermsAndPostedPrincipalMovements() throws Exception {
+    @Test void screenPrintAndPdfUseCompactFieldsAndPostedPrincipalMovements() throws Exception {
         var service=mock(LoanRecordingService.class);var clock=mock(ApplicationClock.class);
         var actor=mock(AppUserPrincipal.class);var client=UUID.randomUUID();var loan=UUID.randomUUID();
         var date=LocalDate.of(2026,9,17);when(clock.today()).thenReturn(date.plusDays(2));
@@ -34,9 +34,24 @@ class ClientLoanStatementDocumentTest {
         var movements=List.of(post(loan,"DISBURSEMENT",date,"D001","1000","0","1000"),
             post(loan,"PAYMENT",date.plusDays(1),"P001","100","10","900"),
             post(loan,"REVERSAL",date.plusDays(2),"R001","100","10","1000"));
-        when(service.exportStatement(actor,client)).thenReturn(new LoanRecordingService.StatementExport("0001 - James Mafumba",List.of(row),movements,List.of(terms)));
+        var source=new LoanRecordingService.StatementExport("0001 - James Mafumba",List.of(row),movements,List.of(terms));
+        when(service.exportStatement(actor,client)).thenReturn(source);
+        when(service.loanStatement(actor,client,loan,0,false)).thenReturn(new LoanRecordingService.LoanStatementView(source,movements.getFirst(),0,false));
+        when(service.loanStatement(actor,client,loan,0,true)).thenReturn(new LoanRecordingService.LoanStatementView(source,movements.getFirst(),0,false));
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
         var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));var controller=new LoanRecordingController(mock(com.sacco.mvp.grouplending.service.SimpleGroupLoanService.class),service,mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class),renderer,clock,messages,mock(com.sacco.mvp.service.SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));
+        var screen=new ExtendedModelMap();
+        assertThat(controller.loanStatement(actor,client,loan,0,Locale.ENGLISH,screen)).isEqualTo("accounting/loans/loan-statement");
+        var document=(StatementDocument)screen.get("document");
+        var section=document.sections().getFirst();
+        assertThat(section.columns()).containsExactly("Date","Details","Debit (principal)","Credit (principal)","Interest","Principal balance");
+        assertThat(document.client()).hasSize(3);
+        assertThat(section.fields()).hasSize(14);
+        assertThat(section.fields()).extracting(StatementField::label)
+            .contains("Loan ID","Loan product","Interest rate","First / last payment","Outstanding principal (TZS)","Due interest (TZS)","Outstanding charges","Overdue amount (TZS)")
+            .doesNotContain("Fund","Opening principal balance (TZS)","Future scheduled interest (TZS)","Supporting evidence","Application component");
+        assertThat(section.rows().get(1)).containsExactly("18/09/2026","Repayment / Marejesho ya mkopo","","100.00","10.00","900.00");
+        assertThat(section.rows().get(2)).containsExactly("19/09/2026","Repayment reversal / Marejesho ya mkopo","100.00","","-10.00","1,000.00");
         var model=new ExtendedModelMap();var request=new MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/print");
         var print=(ResponseEntity<?>)controller.statementExport(actor,client,request,Locale.ENGLISH,model);
         assertThat(print.getHeaders().getFirst("Content-Disposition")).startsWith("inline");
@@ -48,18 +63,33 @@ class ClientLoanStatementDocumentTest {
         java.nio.file.Files.write(java.nio.file.Path.of("target/loan-statement-reference.pdf"),(byte[])response.getBody());
         try(var pdf=Loader.loadPDF((byte[])response.getBody())){
             assertThat(pdf.getPage(0).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(0).getMediaBox().getHeight());
-            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains(messages.getMessage("recording.statement",null,Locale.ENGLISH).toUpperCase(Locale.ROOT),"James Mafumba","D001","P001","R001","Principal balance","24.00");
+            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains(messages.getMessage("recording.statement",null,Locale.ENGLISH).toUpperCase(Locale.ROOT),"James Mafumba","Repayment","Principal balance","24.00").doesNotContain("Document date","Document reference","Document number","Account code","D001","P001","R001");
+        }
+        request.setRequestURI("/finance/client-ledgers/"+client+"/loans/"+loan+"/statement/pdf");
+        try(var pdf=Loader.loadPDF(controller.loanStatementPdf(actor,client,loan,request,Locale.ENGLISH).getBody())){
+            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("James Mafumba","900.00","-10.00").doesNotContain("Document reference","Document number");
+        }
+        var noPostings=new LoanRecordingService.StatementExport(source.client(),source.loans(),List.of(),source.terms());
+        when(service.loanStatement(actor,client,loan,0,false)).thenReturn(new LoanRecordingService.LoanStatementView(noPostings,null,0,false));
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
+            var emptyScreen=new ExtendedModelMap();controller.loanStatement(actor,client,loan,0,locale,emptyScreen);
+            var emptySection=((StatementDocument)emptyScreen.get("document")).sections().getFirst();
+            assertThat(emptySection.rows()).isEmpty();
+            for(var key:List.of("recording.statement.disbursed","recording.statement.outstanding","recording.statement.dueInterest","charges.outstanding","recording.statement.arrears")){
+                assertThat(emptySection.fields()).filteredOn(f->f.label().equals(messages.getMessage(key,null,locale)))
+                    .extracting(StatementField::value).containsExactly(messages.getMessage("recording.unavailable",null,locale));
+            }
         }
     }
     @Test void landscapeStatementRepeatsHeadersAndKeepsEveryTransactionAcrossPages() throws Exception {
-        var rows=IntStream.rangeClosed(1,180).mapToObj(n->List.of("18-SEP-2026","REF-"+n,"Unavailable","Repayment","120",
-            "Marejesho ya mkopo — é "+"Long description ".repeat(20),"","100.00","10.00","900.00")).toList();
+        var rows=IntStream.rangeClosed(1,180).mapToObj(n->List.of("18/09/2026",
+            "Repayment "+n+" / Marejesho ya mkopo — é "+"Long description ".repeat(20),"","100.00","10.00","900.00")).toList();
         var source=new StatementDocument("CLIENT LOAN STATEMENT",List.of(new StatementField("Client Number","0001")),
-            List.of(new StatementSection(List.of(new StatementField("Loan ID","7526")),List.of("Date","Reference","Document","Activity","Account","Description","Debit","Credit","Interest","Principal balance"),rows)),"No transactions","Amounts in TZS.");
+            List.of(new StatementSection(List.of(new StatementField("Loan ID","7526")),List.of("Date","Details","Debit","Credit","Interest","Principal balance"),rows)),"No transactions","Amounts in TZS.");
         var renderer=new LoanRecordingPdfService(new ReportExportLimiter(1));
         try(var pdf=Loader.loadPDF(renderer.renderStatement(source))){
             assertThat(pdf.getNumberOfPages()).isGreaterThan(2);
-            String text=new PDFTextStripper().getText(pdf);assertThat(text).contains("REF-1","REF-180","Marejesho ya mkopo — é");
+            String text=new PDFTextStripper().getText(pdf);assertThat(text).contains("Repayment 1 /","Repayment 180 /","Marejesho ya mkopo — é");
             var stripper=new PDFTextStripper();for(int n=1;n<=pdf.getNumberOfPages();n++){stripper.setStartPage(n);stripper.setEndPage(n);assertThat(stripper.getText(pdf).replaceAll("\\s+"," ")).contains("CLIENT LOAN STATEMENT","Principal balance");}
             var bounds=new PDFTextStripper(){
                 @Override protected void processTextPosition(TextPosition text){
@@ -81,10 +111,9 @@ class ClientLoanStatementDocumentTest {
     @Test void localizedFieldsAndRightmostAmountsStayWithinPrintableMargins() throws Exception {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
         for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
-            var columns=List.of("date","reference","documentNumber","activity","accountCode","description","debit","credit","interest","balance").stream()
+            var columns=List.of("date","description","debit","credit","interest","balance").stream()
                 .map(key->messages.getMessage("recording.statement."+key,null,locale)).toList();
-            var rows=IntStream.rangeClosed(1,45).mapToObj(n->List.of("19-OCT-2026","REFERENCE-"+n,"Unavailable","Repayment","111001",
-                "Posted repayment with a description that wraps across several lines.","9,999,999.99","9,999,999.99","999,999.99","9,999,999.99")).toList();
+            var rows=IntStream.rangeClosed(1,45).mapToObj(n->List.of("19/10/2026", "Repayment "+n+" / Posted repayment with a description that wraps across several lines.","9,999,999.99","9,999,999.99","999,999.99","9,999,999.99")).toList();
             var source=new StatementDocument(messages.getMessage("recording.statement",null,locale).toUpperCase(locale),
                 List.of(new StatementField("Client Number","CL10001"),new StatementField("Name","Long client name for statement layout checks"),new StatementField("As of","19-OCT-2026")),
                 List.of(new StatementSection(List.of(new StatementField("Institution / Branch","Long institution name / Branch office with a long name")),columns,rows)),"No transactions","Amounts in TZS.");
@@ -98,7 +127,7 @@ class ClientLoanStatementDocumentTest {
                         super.processTextPosition(text);
                     }
                 }.getText(pdf);
-                assertThat(new PDFTextStripper().getText(pdf)).contains("REFERENCE-45","9,999,999.99");
+                assertThat(new PDFTextStripper().getText(pdf)).contains("Repayment 45 /","9,999,999.99");
             }
         }
     }

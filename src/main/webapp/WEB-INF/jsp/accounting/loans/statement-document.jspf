@@ -10,11 +10,11 @@
             <dl class="statement-facts"><c:forEach items="${section.fields}" var="field"><div><dt><c:out value="${field.label}" /></dt><dd><c:out value="${field.value}" /></dd></div></c:forEach></dl>
             <div class="statement-transactions">
                 <table data-table-sort-mode="none" data-table-sort-reason="document">
-                    <colgroup><col /><col /><col /><col /><col /><col /><col /><col /><col /><col /></colgroup>
+                    <colgroup><c:forEach items="${section.columns}" var="column"><col /></c:forEach></colgroup>
                     <thead><tr><c:forEach items="${section.columns}" var="column"><th scope="col"><c:out value="${column}" /></th></c:forEach></tr></thead>
                     <tbody>
-                    <c:forEach items="${section.rows}" var="row"><tr><c:forEach items="${row}" var="cell" varStatus="position"><td class="${position.index >= 6 ? 'statement-money' : ''}"><c:out value="${cell}" /></td></c:forEach></tr></c:forEach>
-                    <c:if test="${empty section.rows}"><tr><td colspan="10"><c:out value="${document['empty']}" /></td></tr></c:if>
+                    <c:forEach items="${section.rows}" var="row"><tr><c:forEach items="${row}" var="cell" varStatus="position"><td class="${position.index >= section.monetaryColumnStart ? 'statement-money' : ''}"><c:out value="${cell}" /></td></c:forEach></tr></c:forEach>
+                    <c:if test="${empty section.rows}"><tr><td colspan="${section.columns.size()}"><c:out value="${document['empty']}" /></td></tr></c:if>
                     </tbody>
                 </table>
             </div>

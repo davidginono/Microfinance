@@ -24,8 +24,8 @@ public class LoanRecordingPdfService {
     public record Document(String title,String institution,String branch,String filename,List<String> lines) {}
     public record StatementField(String label,String value) {}
     public record StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths,int monetaryColumnStart) {
-        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows){this(fields,columns,rows,List.of(),6);}
-        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths){this(fields,columns,rows,columnWidths,6);}
+        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows){this(fields,columns,rows,List.of(),2);}
+        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths){this(fields,columns,rows,columnWidths,2);}
     }
     public record StatementDocument(String title,List<StatementField> client,List<StatementSection> sections,String empty,String note) {}
     public byte[] renderAmortization(LoanAmortizationPdfDocument.Source source){return limiter.run(()->{
@@ -49,7 +49,7 @@ public class LoanRecordingPdfService {
 
             var sections=source.sections().isEmpty()?List.of(new StatementSection(List.of(),List.of(),List.of())):source.sections();
             for(var section:sections){
-                float[] widths={70,80,55,76,58,173,70,70,70,70};
+                float[] widths={80,290,100,100,90,110};
                 if(section.columnWidths()!=null&&!section.columnWidths().isEmpty()){
                     if(section.columnWidths().size()!=section.columns().size()||section.columnWidths().stream().anyMatch(w->w==null||!Float.isFinite(w)||w<=0))throw new IllegalArgumentException("Invalid statement columns");
                     widths=new float[section.columnWidths().size()];for(int c=0;c<widths.length;c++)widths[c]=section.columnWidths().get(c);

@@ -222,11 +222,10 @@ public class LoanRecordingController {
         String unavailable=label("recording.unavailable",locale);String[] client=source.client().split(" - ",2);
         var identity=List.of(new StatementField(label("recording.statement.clientNumber",locale),client[0]),
             new StatementField(label("recording.statement.name",locale),client.length>1?client[1]:source.client()),
-            new StatementField(label("recording.asOf",locale),statementDate(clock.today(),locale)),
-            new StatementField(label("recording.statement.currency",locale),"TZS"));
+            new StatementField(label("recording.asOf",locale),statementDate(clock.today(),locale)));
         var terms=source.terms().stream().collect(java.util.stream.Collectors.toMap(StatementTerms::loanId,t->t));
         var posts=source.movements().stream().collect(java.util.stream.Collectors.groupingBy(Posting::loanId,LinkedHashMap::new,java.util.stream.Collectors.toList()));
-        var columns=List.of("date","reference","documentNumber","activity","accountCode","description","debit","credit","interest","balance")
+        var columns=List.of("date","description","debit","credit","interest","balance")
             .stream().map(key->label("recording.statement."+key,locale)).toList();
         var sections=new ArrayList<StatementSection>();
         for(var loan:source.loans()){
@@ -235,35 +234,36 @@ public class LoanRecordingController {
             var fields=new ArrayList<StatementField>();
             statementField(fields,"loan",loan.number(),locale);statementField(fields,"product",loan.product(),locale);
             statementField(fields,"disbursementDate",disbursement==null?unavailable:statementDate(disbursement.date(),locale),locale);
-            statementField(fields,"fund",unavailable,locale);statementField(fields,"principal",statementMoney(loan.principal(),locale),locale);
+            statementField(fields,"principal",statementMoney(loan.principal(),locale),locale);
             statementField(fields,"months",term==null?unavailable:term.tenureValue()+" "+label("recording.tenure."+term.tenureUnit(),locale),locale);
-            statementField(fields,"installments",term==null || term.installments()<1?unavailable:Integer.toString(term.installments()),locale);
             statementField(fields,"rateAnnual",term==null || term.rate()==null || "AMOUNT".equals(term.rateBasis())?unavailable:statementMoney(term.rate().multiply(new BigDecimal("100")),locale)+"% "+label("recording.basis."+term.rateBasis(),locale),locale);
-            statementField(fields,"firstDate",term==null?unavailable:statementDate(term.firstPaymentDate(),locale),locale);
-            statementField(fields,"lastDate",term==null?unavailable:statementDate(term.lastPaymentDate(),locale),locale);
+            statementField(fields,"paymentDates",term==null?unavailable:statementDate(term.firstPaymentDate(),locale)+" / "+statementDate(term.lastPaymentDate(),locale),locale);
             statementField(fields,"installment",term==null || term.frequency()==null?unavailable:statementMoney(term.installment(),locale)+" / "+label("recording.frequency."+term.frequency(),locale),locale);
-            statementField(fields,"opening",disbursement==null?unavailable:statementMoney(disbursement.principalBalance(),locale),locale);
             statementField(fields,"disbursed",disbursement==null?unavailable:statementMoney(disbursement.amount(),locale),locale);
             statementField(fields,"outstanding",disbursement==null?unavailable:statementMoney(loan.outstandingPrincipal(),locale),locale);
             statementField(fields,"dueInterest",disbursement==null?unavailable:statementMoney(loan.dueInterest(),locale),locale);
-            statementField(fields,"futureInterest",disbursement==null?unavailable:statementMoney(loan.futureInterest(),locale),locale);
-            fields.add(new StatementField(label("charges.outstanding",locale),statementMoney(loan.charges(),locale)));
-            if(term!=null && !term.chargeSnapshot().isBlank())try{var plan=new tools.jackson.databind.json.JsonMapper().readValue(term.chargeSnapshot(),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan.class);for(var field:chargeFields(plan,locale))fields.add(new StatementField(field.label(),field.value()));}catch(tools.jackson.core.JacksonException ex){throw new IllegalStateException("Invalid frozen charge terms",ex);}
+            fields.add(new StatementField(label("charges.outstanding",locale),disbursement==null?unavailable:statementMoney(loan.charges(),locale)));
             statementField(fields,"arrears",disbursement==null?unavailable:statementMoney(loan.arrears(),locale),locale);
             statementField(fields,"branch",term==null?unavailable:term.institution()+" / "+term.branch(),locale);
             var rows=new ArrayList<List<String>>();
             for(var post:movements){
-                boolean credit=Set.of("PAYMENT","SETTLEMENT","FUNDING_UNDO").contains(post.kind());String account=Objects.toString(post.moneyAccount(),"");
-                String code=account.contains(" - ")?account.split(" - ",2)[0]:unavailable;
-                String description=post.notes()==null || post.notes().isBlank()?account:post.notes();if(post.charges().signum()>0)description+=" / "+label("charges.title",locale)+": "+statementMoney(post.charges(),locale);if(Set.of("CHARGE_ASSESS","CHARGE_UNDO").contains(post.kind()))description+=" / TZS "+statementMoney(post.amount(),locale);
-                rows.add(List.of(statementDate(post.date(),locale),post.reference(),unavailable,label("recording.document."+post.kind(),locale),code,description,
+                boolean credit=Set.of("PAYMENT","SETTLEMENT","FUNDING_UNDO").contains(post.kind());
+                String description=label(switch(post.kind()){
+                    case "DISBURSEMENT" -> "recording.statement.disbursement";
+                    case "PAYMENT" -> "recording.statement.repayment";
+                    default -> "recording.document."+post.kind();
+                },locale);
+                if(post.notes()!=null && !post.notes().isBlank())description+=" / "+post.notes();
+                if(post.charges().signum()>0)description+=" / "+label("charges.title",locale)+": "+statementMoney(post.charges(),locale);
+                if(Set.of("CHARGE_ASSESS","CHARGE_UNDO").contains(post.kind()))description+=" / TZS "+statementMoney(post.amount(),locale);
+                rows.add(List.of(statementDate(post.date(),locale),description,
                     credit?"":statementMoney(post.principal(),locale),credit?statementMoney(post.principal(),locale):"",
                     statementMoney(Set.of("REVERSAL","SETTLEMENT_UNDO").contains(post.kind())?post.interest().negate():post.interest(),locale),statementMoney(post.principalBalance(),locale)));
             }
             sections.add(new StatementSection(fields,columns,rows));
         }
         return new StatementDocument(label("recording.statement",locale).toUpperCase(locale),identity,sections,
-            label("recording.statement.empty",locale),label("recording.statement.note",locale)+" "+label("charges.notPaid",locale));
+            label("recording.statement.empty",locale),label("recording.statement.note",locale));
     }
     private void statementField(List<StatementField> fields,String key,String value,Locale locale){fields.add(new StatementField(label("recording.statement."+key,locale),value));}
     private String statementDate(LocalDate value,Locale locale){return value==null?label("recording.unavailable",locale):value.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu",locale)).toUpperCase(locale);}

@@ -7,7 +7,7 @@
 .statement-facts dt { font-size: 8pt; font-weight: bold; text-transform: uppercase; }
 .statement-facts dd { margin: 3px 0 0; font-size: 9pt; overflow-wrap: anywhere; }
 .statement-transactions { max-width: 100%; overflow-x: auto; }
-.statement-transactions table { width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; font-size: 8pt; }
+.statement-transactions table { width: 100%; min-width: 860px; table-layout: fixed; border-collapse: collapse; font-size: 9pt; }
 .statement-transactions th, .statement-transactions td { padding: 5px 4px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 .statement-transactions th { background: #dedede; }
 .statement-transactions td.statement-money { text-align: right; font-variant-numeric: tabular-nums; }
@@ -29,16 +29,12 @@
     .statement-facts dd { font-size: 8pt; }
 }
 
-.statement-transactions col:nth-child(1) { width: 8.6%; }
-.statement-transactions col:nth-child(2) { width: 9.8%; }
-.statement-transactions col:nth-child(3) { width: 8.8%; }
-.statement-transactions col:nth-child(4) { width: 9.1%; }
-.statement-transactions col:nth-child(5) { width: 8.6%; }
-.statement-transactions col:nth-child(6) { width: 24.7%; }
-.statement-transactions col:nth-child(7) { width: 7.6%; }
-.statement-transactions col:nth-child(8) { width: 7.6%; }
-.statement-transactions col:nth-child(9) { width: 7.3%; }
-.statement-transactions col:nth-child(10) { width: 7.9%; }
+.statement-transactions col:nth-child(1) { width: 10.4%; }
+.statement-transactions col:nth-child(2) { width: 37.6%; }
+.statement-transactions col:nth-child(3) { width: 13%; }
+.statement-transactions col:nth-child(4) { width: 13%; }
+.statement-transactions col:nth-child(5) { width: 11.7%; }
+.statement-transactions col:nth-child(6) { width: 14.3%; }
 
 /* Workspace cards stretch equally; only the table canvas may scroll. */
 .client-statement-workspace { grid-template-columns: minmax(0, 1fr); }
@@ -60,9 +56,8 @@
 .loan-statement-workspace { grid-template-columns: minmax(0,1fr); }
 .statement-preview-scroll { width: 100%; min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .statement-preview-scroll:focus-visible { outline: 2px solid #0073bb; outline-offset: 2px; }
-.statement-preview-scroll .reference-report.client-loan-statement { box-sizing: border-box; width: 100%; min-width: 1120px; margin: 0; }
-.statement-preview-scroll .statement-transactions { overflow: visible; }
-.statement-preview-scroll .reference-report.client-loan-statement .statement-facts { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.statement-preview-scroll .reference-report.client-loan-statement { box-sizing: border-box; width: 100%; margin: 0; }
+.statement-preview-scroll .statement-money { text-align: left; }
 .reference-report.client-loan-statement { max-width: none; font-family: "Times New Roman", Times, serif; }
 .reference-report.client-loan-statement h1 { font-weight: bold; }
 .reference-report.client-loan-statement .statement-facts { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px 24px; }
@@ -75,4 +70,5 @@
     .statement-preview-scroll { overflow: visible; }
     .statement-preview-scroll .reference-report.client-loan-statement { min-width: 0; padding: 0; }
     .statement-preview-scroll .statement-transactions table { min-width: 0; }
+    .statement-preview-scroll .statement-money { text-align: right; }
 }
