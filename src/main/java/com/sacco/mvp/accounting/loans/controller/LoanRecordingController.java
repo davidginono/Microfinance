@@ -132,7 +132,7 @@ public class LoanRecordingController {
         var product=evidence.product(actor,id);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.ProductFormView(
             product.product(),product.fields().stream().map(f->new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Field(
-                f.getName(),f.getType(),f.isRequired(),f.getMin(),f.getMax(),f.getEnumOptions(),messages.getMessage(f.getLabelKey(),null,f.getName(),locale))).toList(),product.requirements()));
+                f.getName(),f.getType(),f.isRequired(),f.getMin(),f.getMax(),f.getEnumOptions(),messages.getMessage(f.getLabelKey(),null,f.getName(),locale))).toList(),product.requirements(),product.attachmentsRequired()));
     }
     @GetMapping("/loan-recording/top-up-quote") @ResponseBody
     public ResponseEntity<?> topUpQuote(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam UUID source,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,@RequestParam(required=false) BigDecimal principal,Locale locale){

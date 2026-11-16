@@ -39,3 +39,34 @@ test('charge return links reopen the account mappings and keep product values',(
     assert.equal(dom.window.document.querySelector('[name="pricing"]').value,'retained');
   }finally{dom.window.close();}
 });
+function documentForm(draft='') {
+  const dom=new JSDOM(`<form><input type="number" name="guarantorsRequired" value="1"><input type="checkbox" name="applicantAttachmentRequired" value="true" data-required-attachments-toggle><p data-product-guarantor-note>Signed guarantor papers</p><div data-required-attachments-panel><button type="button" data-add-required-attachment>Add</button><div data-required-attachments-list><div data-required-attachment-row><input type="hidden" name="requiredAttachmentId" value="retained-id"><label>Name<input name="requiredAttachmentName" value="Signed papers"></label><label>MB<input name="requiredAttachmentMaxSizeMb" type="number" value="5"></label><button type="button" data-remove-required-attachment>Remove</button></div></div><p data-required-attachments-empty>Empty</p></div>${draft}</form>`,{runScripts:'outside-only',url:'http://localhost/admin'});
+  dom.window.eval(source);return dom;
+}
+test('optional attachments do not submit hidden required names; toggling retains values and IDs',()=>{
+  const dom=documentForm(),w=dom.window,d=w.document;try{
+    const toggle=d.querySelector('[data-required-attachments-toggle]'),panel=d.querySelector('[data-required-attachments-panel]');
+    assert.equal(panel.hidden,true);assert.equal(d.querySelector('[data-product-guarantor-note]').hidden,true);
+    assert.equal(new w.FormData(d.querySelector('form')).has('requiredAttachmentName'),false);
+    toggle.click();assert.equal(panel.hidden,false);assert.equal(d.querySelector('[data-product-guarantor-note]').hidden,false);
+    assert.equal(new w.FormData(d.querySelector('form')).get('requiredAttachmentId'),'retained-id');
+    toggle.click();toggle.click();assert.equal(d.querySelector('[name="requiredAttachmentName"]').value,'Signed papers');
+    d.querySelector('[name="guarantorsRequired"]').value='0';d.querySelector('[name="guarantorsRequired"]').dispatchEvent(new w.Event('input'));assert.equal(d.querySelector('[data-product-guarantor-note]').hidden,true);
+  }finally{w.close();}
+});
+test('document rows add and remove accessibly, stay bounded and require complete names only when enabled',()=>{
+  const dom=documentForm(),w=dom.window,d=w.document;try{
+    d.querySelector('[data-required-attachments-toggle]').click();const add=d.querySelector('[data-add-required-attachment]');
+    add.click();assert.equal(d.activeElement.name,'requiredAttachmentName');assert.equal(d.activeElement.required,true);
+    assert.equal(d.querySelectorAll('[data-required-attachment-row]').length,2);
+    for(let i=0;i<12;i++)add.click();assert.equal(d.querySelectorAll('[data-required-attachment-row]').length,10);assert.equal(add.disabled,true);
+    d.querySelector('[data-remove-required-attachment]').click();assert.equal(add.disabled,false);
+    while(d.querySelector('[data-remove-required-attachment]'))d.querySelector('[data-remove-required-attachment]').click();
+    assert.equal(d.querySelector('[data-required-attachments-empty]').hidden,false);assert.equal(d.activeElement,add);
+    assert.equal(new w.FormData(d.querySelector('form')).has('requiredAttachmentName'),false);
+  }finally{w.close();}
+});
+test('failed save restores an intentionally empty requirement list without reviving removed rows',()=>{
+  const dom=documentForm('<div data-loan-product-form-draft><span data-loan-product-form-value="documentRowsSubmitted">true</span><span data-loan-product-form-value="applicantAttachmentRequired">true</span></div>');
+  try{const d=dom.window.document;assert.equal(d.querySelector('[data-required-attachments-panel]').hidden,false);assert.equal(d.querySelectorAll('[data-required-attachment-row]').length,0);}finally{dom.window.close();}
+});

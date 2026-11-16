@@ -60,7 +60,7 @@ class RecordedLoanEditPostgresTest {
         assertThat(fixture.jdbc.queryForObject("select count(*) from loan_record_edit where loan_id=?",Integer.class,id)).isZero();
     }
     @Test void priorSignedConsentRemainsEvidenceButCannotApproveARevisedApplication(){
-        fixture.jdbc.update("update loan_product_settings set guarantors_required=1 where id=?",fixture.product);
+        fixture.jdbc.update("update loan_product_settings set guarantors_required=1,applicant_attachment_required=true where id=?",fixture.product);
         var service=fixture.service;var id=service.save(fixture.actor,fixture.form());
         fixture.jdbc.update("update loan_applications set attachments_json=?::jsonb where id=?","[{\"id\":\""+UUID.randomUUID()+"\",\"originalName\":\"consent.pdf\",\"documentPurpose\":\"GUARANTOR_CONSENT\"}]",id);
         var reviewTransaction=new org.springframework.transaction.support.TransactionTemplate(fixture.context.getBean(org.springframework.transaction.PlatformTransactionManager.class));

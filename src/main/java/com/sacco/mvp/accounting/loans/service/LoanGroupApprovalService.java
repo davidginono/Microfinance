@@ -106,7 +106,7 @@ public class LoanGroupApprovalService {
             require(previous.get().maker().equals(a.getMemberId())&&previous.get().termsHash().equals(l.termsHash()),"retry");return;
         }
         require(Set.of("RECORDED","REJECTED").contains(l.status()),"state");
-        recording.validateStaffReview(a,loan);
+        String documents=recording.validateStaffReview(a,loan);
         var rule=records.groupRule(a,l.product()).orElseThrow(()->invalid("rule"));
         var plan=steps(rule.steps());
         var candidates=records.groupCandidates(a,l,json.writeValueAsString(plan.stream().map(GroupStep::group).distinct().toList()));
@@ -114,7 +114,7 @@ public class LoanGroupApprovalService {
         var assigned=new HashMap<UUID,Integer>();
         for(int i=0;i<slots.size();i++)require(assign(i,slots,candidates,assigned,new HashSet<>()),"staff");
         var r=new GroupRequest(key,loan,rule.id(),a.getMemberId(),previous.map(GroupRequest::round).orElse(0)+1,l.termsHash(),l.status());
-        records.groupRequest(a,r,clock.now());records.groupStatus(a,loan,"SUBMITTED",clock.now());
+        records.groupRequest(a,r,clock.now(),documents);records.groupStatus(a,loan,"SUBMITTED",clock.now());
         event(a,loan,"LOAN_GROUP_REVIEW_STARTED",Map.of("request",key,"rule",rule.id(),"previousStatus",l.status()));
     }
     @Transactional

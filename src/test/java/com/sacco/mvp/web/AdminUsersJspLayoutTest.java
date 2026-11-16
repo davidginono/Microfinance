@@ -103,6 +103,6 @@ class AdminUsersJspLayoutTest {
         assertThat(productEditJsp).doesNotContain("function validateBeforeSubmit()");
         assertThat(sharedScript).contains("applyServerFieldErrors", "restoreLoanProductFormDraft");
         assertThat(sharedScript).contains("data-required-attachments-list");
-        assertThat(sharedScript).contains("data-required-attachment-add");
+        assertThat(sharedScript).contains("data-add-required-attachment");
     }
 }

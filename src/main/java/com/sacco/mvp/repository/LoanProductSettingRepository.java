@@ -14,6 +14,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface LoanProductSettingRepository extends JpaRepository<LoanProductSetting, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+    @Query("select p from LoanProductSetting p where p.id=:id and p.saccoId=:institution")
+    Optional<LoanProductSetting> documentReviewProduct(@Param("id") UUID id,@Param("institution") String institution);
     @Query(value="select 1 from (select pg_advisory_xact_lock(hashtextextended('CUSTOM_RECORDING/'||:institution,0))) locked",nativeQuery=true)
     int lockCustomRecording(@Param("institution") String institution);
     Optional<LoanProductSetting> findBySaccoIdAndCustomRecordingConfigurationTrue(String saccoId);

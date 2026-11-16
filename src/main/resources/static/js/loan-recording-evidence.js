@@ -289,6 +289,7 @@
                 form.dispatchEvent(new CustomEvent('recording:product',{detail:null}));
                 var draft = form.querySelector('[data-recording-draft]'); if (draft) draft.disabled = form.elements.loanFor?.value!=='GROUP'&&(form.elements.loanMode.value !== 'CONFIGURED' || clientSelect?.selectedOptions[0]?.dataset.clientKind !== 'PROVISIONAL');
                 error.hidden = true;
+                const rule=root.querySelector('[data-evidence-attachment-rule]');if(rule)rule.hidden=true;
                 if (form.elements.loanMode.value !== 'CONFIGURED' || !id) {
                     requirements = []; documentRequirements(); root.querySelector('[data-evidence-fields]').replaceChildren();
                     root.querySelector('[data-evidence-requirements]').textContent = ''; return;
@@ -299,6 +300,9 @@
                     var data = await response.json(); if (sequence !== productVersion) return;
                     form.dispatchEvent(new CustomEvent('recording:product',{detail:data.product}));
                     requirements = data.requirements; documentRequirements();
+                    if(rule && typeof data.attachmentsRequired==='boolean' && form.elements.loanFor?.value!=='GROUP'){
+                        rule.textContent=data.attachmentsRequired?(data.product.guarantors>0?rule.dataset.guarantor:rule.dataset.required):rule.dataset.optional;rule.hidden=false;
+                    }
                     root.querySelector('[data-evidence-requirements]').textContent = requirements.map(function (item) { return item.name + ' (' + item.maxSizeMb + ' MB)'; }).join(', ');
                     if (!changed) return;
                     var fields = root.querySelector('[data-evidence-fields]'); fields.replaceChildren();

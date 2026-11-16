@@ -5103,41 +5103,11 @@ html.session-timeout-active,
     background: #f7f8f8;
 }
 
-.product-config-subsection {
-    scroll-margin-top: calc(var(--shell-nav-height, 52px) + var(--shell-context-height, 36px) + 12px);
-    overflow: visible;
-    border: 1px solid #d5dbdb;
-    border-radius: 2px;
-    background: #ffffff;
-}
 
-.product-config-subsection + .product-config-subsection {
-    margin-top: 0.75rem;
-}
 
-.product-config-subsection > summary {
-    min-height: 2.75rem;
-    padding: 0.7rem 0.9rem;
-    background: #f2f3f3;
-    color: #16191f;
-    cursor: pointer;
-    font-size: 0.9375rem;
-    font-weight: 700;
-}
 
-.product-config-subsection > summary:hover {
-    background: #eaf3fb;
-}
 
-.product-config-subsection > summary:focus-visible {
-    outline: 2px solid #0972d3;
-    outline-offset: -2px;
-}
 
-.product-config-subsection-body {
-    padding: 1rem;
-    border-top: 1px solid #d5dbdb;
-}
 
 .product-config-actionbar {
     position: sticky;

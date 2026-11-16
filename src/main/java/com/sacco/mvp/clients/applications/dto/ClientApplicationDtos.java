@@ -42,9 +42,13 @@ public final class ClientApplicationDtos {
     public record Choice(UUID id,String label) {}
     public record Product(UUID id,String name,String tenureUnit,int minimumTenure,int maximumTenure,int guarantors,boolean collateralRequired,String rateBasis,String frequency) {}
     public record Requirement(UUID id,String name,BigDecimal maxSizeMb) {}
-    public record ProductForm(Product product,List<com.sacco.mvp.service.dto.FormField> fields,List<Requirement> requirements) {}
+    public record ProductForm(Product product,List<com.sacco.mvp.service.dto.FormField> fields,List<Requirement> requirements,boolean attachmentsRequired) {
+        public ProductForm(Product product,List<com.sacco.mvp.service.dto.FormField> fields,List<Requirement> requirements){this(product,fields,requirements,false);}
+    }
     public record Field(String name,String type,boolean required,BigDecimal min,BigDecimal max,List<String> enumOptions,String label) {}
-    public record ProductFormView(Product product,List<Field> fields,List<Requirement> requirements) {}
+    public record ProductFormView(Product product,List<Field> fields,List<Requirement> requirements,boolean attachmentsRequired) {
+        public ProductFormView(Product product,List<Field> fields,List<Requirement> requirements){this(product,fields,requirements,false);}
+    }
     public record Row(UUID id,UUID clientId,String number,String client,String product,String status,BigDecimal amount,OffsetDateTime createdAt) {}
     public record Page(List<Row> rows,int page,boolean hasNext) {}
     public record Command(UUID id,UUID applicationId,int version,String payloadHash) {}

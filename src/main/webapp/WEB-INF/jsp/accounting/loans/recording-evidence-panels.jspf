@@ -22,6 +22,7 @@
 <c:set var="recordingPhotoPurpose" value="OTHER"/><%@ include file="recording-saved-files.jspf" %>
 
 <p data-evidence-requirements></p>
+<p data-evidence-attachment-rule hidden data-optional="<spring:message code='productDocuments.optional' />" data-required="<spring:message code='productDocuments.required' />" data-guarantor="<spring:message code='productDocuments.consentRequired' />"></p>
 <div data-evidence-documents></div>
 <template data-evidence-document-template><div class="recording-evidence-row"><div class="loan-form-grid">
 <label><spring:message code="applications.file"/><span data-evidence-filename></span></label>

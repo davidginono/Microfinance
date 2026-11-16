@@ -1912,7 +1912,6 @@ body.aws-console table.erp-table :is(th, td).text-center {
 
 .workflow-subsection,
 .product-builder-section,
-.product-config-subsection,
 .product-builder-section-body {
     overflow: visible;
 }
@@ -2076,13 +2075,7 @@ body.aws-console table.erp-table :is(th, td).text-center {
     padding: 1.25rem !important;
 }
 
-.aws-console .product-config-workspace .product-config-subsection {
-    padding: 0 !important;
-}
 
-.aws-console .product-config-workspace .product-config-subsection-body {
-    padding: 1rem !important;
-}
 
 @media (max-width: 767px) {
     .aws-console .aws-filter-toolbar {

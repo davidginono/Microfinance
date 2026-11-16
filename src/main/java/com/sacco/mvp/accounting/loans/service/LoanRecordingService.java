@@ -21,8 +21,8 @@ import java.security.MessageDigest;
 
 @Service @RequiredArgsConstructor
 public class LoanRecordingService {
-    @Transactional(readOnly=true)
-    public void validateStaffReview(AppUserPrincipal actor,UUID id) {
+    @Transactional
+    public String validateStaffReview(AppUserPrincipal actor,UUID id) {
         authorize(actor,"CREATE");records.groupLoan(actor,id,false);
         var loan=loans.findById(id).orElseThrow();
         if(loan.getApplicantMemberId()!=null)check(records.client(actor,loan.getApplicantMemberId()).isPresent(),"client");
@@ -30,11 +30,31 @@ public class LoanRecordingService {
         LoanAmortizationCalculator.estimate(loan.getAmount(),loan.getTenorMonths(),schedules.parseSummary(loan.getFinancialSnapshot()));
         String kyc=loans.kycError(id,actor.getSaccoId(),actor.getStationId(),clock.today());
         if(kyc!=null)throw new IllegalArgumentException(kyc);
+        var documents=reviewDocuments(actor,loan);
+        var files=attachments.parse(loan.getAttachmentsJson()).stream().filter(file->!Boolean.TRUE.equals(file.get("superseded"))).toList();
         if(loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0) {
-            var files=attachments.parse(loan.getAttachmentsJson());
             if(loan.getApplicantMemberId()==null)check(simpleGroups.simple(actor,id)?simpleGroups.guaranteesReady(actor,id):records.personalGuaranteesReady(actor,id),"personalGuarantees");
-            else check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose"))&&!Boolean.TRUE.equals(f.get("superseded")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
+            else if(documents.guarantorConsent())check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
         }
+        if(documents.required()){
+            check(!files.isEmpty(),"requiredAttachments");
+            for(var requirement:documents.documents())check(files.stream().anyMatch(file->requirement.id().toString().equals(file.get("requiredAttachmentId"))
+                && file.get("size") instanceof Number size && size.longValue()>0 && BigDecimal.valueOf(size.longValue()).compareTo(requirement.maxSizeMb().multiply(BigDecimal.valueOf(1024L*1024L)))<=0),"requiredAttachments");
+        }
+        return write(documents);
+    }
+    private ReviewDocuments reviewDocuments(AppUserPrincipal actor,LoanApplication loan){
+        var frozen=records.reviewDocumentPolicy(actor,loan.getId());
+        if(frozen.isPresent()){
+            if(!schedules.parseSummary(frozen.get()).containsKey("required"))return new ReviewDocuments(false,loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0,List.of());
+            var policy=read(frozen.get(),ReviewDocuments.class);check(policy.documents()!=null&&policy.documents().size()<=10,"attachments");return policy;
+        }
+        if(loan.getLoanType()==LoanType.CUSTOMIZED_LOAN)return new ReviewDocuments(false,false,List.of());
+        var product=products.documentReviewProduct(loan.getLoanProductSettingId(),actor.getSaccoId()).orElseThrow(()->new AccessDeniedException("Product unavailable"));
+        boolean required=product.isApplicantAttachmentRequired();
+        var definitions=required?records.reviewDocumentDefinitions(actor,product.getId()):List.<com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Requirement>of();
+        check(definitions.size()<=10,"attachments");
+        return new ReviewDocuments(required,required&&loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0,definitions);
     }
     @Transactional public void withdrawGroup(AppUserPrincipal a,UUID id,UUID key,String state,String terms,String reason){
         authorize(a,"CREATE");accounting.requireActor(a,"GROUP_LENDING_UPDATE");check(key!=null,"request");text(reason,500,true);

@@ -64,3 +64,20 @@
     .aws-console:has([data-admin-workspace]) .aws-qualification-grid { grid-template-columns: minmax(0,1fr) !important; grid-template-areas: "applicants" "guarantors" "risk"; grid-template-rows: auto; }
     .customised-workflow-form .product-builder-section-body { padding: 16px !important; }
 }
+.aws-console:has([data-admin-workspace]) .product-document-fields {display:grid;gap:20px;min-width:0;}
+.aws-console:has([data-admin-workspace]) .product-document-fields label {font-size:14px;line-height:20px;}
+.aws-console:has([data-admin-workspace]) .product-document-count {display:flex;flex-direction:column;gap:8px;max-width:220px;}
+.aws-console:has([data-admin-workspace]) .product-document-options {display:grid;gap:12px;}
+.aws-console:has([data-admin-workspace]) .product-document-check {display:flex;flex-direction:row;align-items:flex-start;gap:8px;font-size:14px;font-weight:400;}
+.aws-console:has([data-admin-workspace]) .product-document-check input {flex:none;width:16px;height:16px;margin:2px 0 0;}
+.product-document-options .voucher-help {margin:0;}
+.product-document-list-heading {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+.product-document-list-heading h3 {margin:0;font-size:16px;}
+.product-document-rows {display:grid;gap:20px;}
+.product-required-attachment-row {display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;min-width:0;}
+.product-required-attachment-row>label {display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 220px;}
+.product-required-attachment-row>label:nth-of-type(2) {flex:0 1 140px;}
+.product-required-attachment-row>.erp-icon-btn {flex:none;margin-bottom:2px;}
+.product-required-attachment-row .aws-control {width:100%;min-width:0;}
+.product-document-fields [hidden] {display:none!important;}
+@media(max-width:480px){.product-required-attachment-row>label:first-of-type{flex-basis:100%;}.product-required-attachment-row>label:nth-of-type(2){flex:1 1 120px;}}

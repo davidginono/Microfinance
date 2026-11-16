@@ -54,13 +54,13 @@
         function restoreLoanProductAttachmentRows(form, valuesByName) {
             const list = form.querySelector('[data-required-attachments-list]');
             const attachmentNames = valuesByName.get('requiredAttachmentName') || [];
-            if (!list || !attachmentNames.length) {
+            if (!list || (!attachmentNames.length && (!valuesByName.has('documentRowsSubmitted') || !(valuesByName.get('applicantAttachmentRequired') || []).includes('true')))) {
                 return;
             }
             const attachmentSizes = valuesByName.get('requiredAttachmentMaxSizeMb') || [];
             list.innerHTML = '';
             attachmentNames.forEach((name, index) => {
-                list.appendChild(requiredAttachmentRow(name, attachmentSizes[index] || '5.00'));
+                list.appendChild(requiredAttachmentRow(name, attachmentSizes[index] || '5.00', (valuesByName.get('requiredAttachmentId') || [])[index] || ''));
             });
         }
 
@@ -291,16 +291,18 @@
             }
             applyServerFieldErrors(form);
         });
-        function requiredAttachmentRow(name, maxSizeMb) {
+        function requiredAttachmentRow(name, maxSizeMb, id) {
             const row = document.createElement('div');
             row.className = 'product-required-attachment-row';
             row.setAttribute('data-required-attachment-row', 'true');
             row.innerHTML =
+                '<input type="hidden" name="requiredAttachmentId" />' +
                 '<label><spring:message code="applications.documentName" javaScriptEscape="true" />' +
-                '<input name="requiredAttachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>' +
+                '<input name="requiredAttachmentName" type="text" maxlength="120" class="aws-control" /></label>' +
                 '<label><spring:message code="chairperson.maximumFileSize" javaScriptEscape="true" />' +
-                '<input name="requiredAttachmentMaxSizeMb" type="number" min="0.01" max="100" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" /></label>' +
-                '<button type="button" class="app-btn btn-neutral erp-icon-btn erp-form-row-action" data-remove-required-attachment><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12" /></svg></button>';
+                '<input name="requiredAttachmentMaxSizeMb" type="number" min="0.01" max="25" step="0.01" class="aws-control" /></label>' +
+                '<button type="button" class="erp-icon-btn" data-remove-required-attachment><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>';
+            row.querySelector('[name="requiredAttachmentId"]').value = id || '';
             const remove = row.querySelector('[data-remove-required-attachment]');
             remove.setAttribute('aria-label', '<spring:message code="applications.remove" javaScriptEscape="true" />');
             remove.title = remove.getAttribute('aria-label');
@@ -310,61 +312,30 @@
         }
 
         function syncRequiredAttachmentPanel(form) {
-            const toggle = form.querySelector('[data-required-attachments-toggle]');
-            const panel = form.querySelector('[data-required-attachments-panel]');
-            const list = form.querySelector('[data-required-attachments-list]');
-            if (!toggle || !panel) {
-                return;
-            }
-            if (list) {
-                const render = () => {
-                    const enabled = toggle.checked;
-                    panel.classList.toggle('hidden', !enabled);
-                    if (enabled && !list.querySelector('[data-required-attachment-row]')) {
-                        list.appendChild(requiredAttachmentRow('', '5.00'));
-                    }
-                };
-                toggle.addEventListener('change', render);
-                form.querySelectorAll('[data-add-required-attachment]').forEach((button) => {
-                    button.addEventListener('click', () => {
-                        list.appendChild(requiredAttachmentRow('', '5.00'));
-                    });
-                });
-                list.addEventListener('click', (event) => {
-                    const button = event.target.closest('[data-remove-required-attachment]');
-                    if (!button) {
-                        return;
-                    }
-                    const row = button.closest('[data-required-attachment-row]');
-                    if (row) {
-                        row.remove();
-                    }
-                });
-                render();
-                return;
-            }
-
-            const addButton = form.querySelector('[data-required-attachment-add]');
-            const attachmentForm = form.querySelector('[data-required-attachment-form]');
-            const cancelButton = form.querySelector('[data-required-attachment-cancel]');
-            const hideEntryForm = () => {
-                attachmentForm?.classList.add('hidden');
-                addButton?.classList.remove('hidden');
+            const toggle=form.querySelector('[data-required-attachments-toggle]');
+            const panel=form.querySelector('[data-required-attachments-panel]');
+            const list=form.querySelector('[data-required-attachments-list]');
+            if(!toggle || !panel || !list)return;
+            const render=()=>{
+                panel.hidden=!toggle.checked;
+                list.querySelectorAll('input').forEach(input=>{input.disabled=!toggle.checked;if(input.type!=='hidden')input.required=toggle.checked;});
+                const add=panel.querySelector('[data-add-required-attachment]');if(add)add.disabled=list.children.length>=10;
+                const empty=panel.querySelector('[data-required-attachments-empty]');
+                if(empty)empty.hidden=!!list.children.length;
+                const note=form.querySelector('[data-product-guarantor-note]');
+                if(note)note.hidden=!toggle.checked || Number(form.elements.guarantorsRequired?.value || 0)===0;
             };
-            const render = () => {
-                panel.classList.toggle('hidden', !toggle.checked);
-                if (!toggle.checked) {
-                    hideEntryForm();
-                }
-            };
-            addButton?.addEventListener('click', () => {
-                attachmentForm?.classList.remove('hidden');
-                addButton.classList.add('hidden');
-                attachmentForm?.querySelector('input[name="attachmentName"]')?.focus();
+            toggle.addEventListener('change',render);
+            form.elements.guarantorsRequired?.addEventListener('input',render);
+            form.querySelector('[data-add-required-attachment]')?.addEventListener('click',()=>{
+                if(list.children.length>=10)return;
+                const row=requiredAttachmentRow('', '5.00');list.append(row);render();row.querySelector('[name="requiredAttachmentName"]').focus();
             });
-            cancelButton?.addEventListener('click', hideEntryForm);
-            document.getElementById('requiredAttachmentCreateForm')?.addEventListener('submit', hideEntryForm);
-            toggle.addEventListener('change', render);
+            list.addEventListener('click',event=>{
+                const remove=event.target.closest('[data-remove-required-attachment]');if(!remove)return;
+                const row=remove.closest('[data-required-attachment-row]'),next=row.nextElementSibling || row.previousElementSibling;
+                row.remove();render();(next?.querySelector('input:not([type="hidden"])') || panel.querySelector('[data-add-required-attachment]')).focus();
+            });
             render();
         }
 
@@ -506,11 +477,6 @@
                 const nav = navButtons.find((button) => button.getAttribute('data-product-config-nav') === key);
                 return nav?.querySelector('strong')?.textContent.trim() || 'section';
             };
-            const workflowScrollTarget = (step) => {
-                return step.getAttribute('data-product-config-step') === 'evidence'
-                    ? step.querySelector('.product-config-subsection')
-                    : null;
-            };
             const workflowScrollOffset = () => {
                 const workspaceNav = workspace.querySelector('.product-config-workspace-nav');
                 if (workspaceNav && window.getComputedStyle) {
@@ -528,7 +494,7 @@
                 return pageHeader ? Math.ceil(Math.max(0, pageHeader.getBoundingClientRect().bottom) + 12) : 12;
             };
             const scrollStepIntoView = (step, behavior = 'instant') => {
-                const target = workflowScrollTarget(step) || step;
+                const target = step;
                 if (typeof window.scrollTo === 'function') {
                     const scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
                     const targetTop = target.getBoundingClientRect().top + scrollY - workflowScrollOffset();
@@ -626,10 +592,6 @@
             nextButton?.addEventListener('click', () => moveStep(1));
 
             form.addEventListener('invalid', (event) => {
-                const disclosure = event.target.closest('details.product-config-subsection');
-                if (disclosure) {
-                    disclosure.open = true;
-                }
                 const step = event.target.closest('[data-product-config-step]');
                 if (step) {
                     activateStep(step.getAttribute('data-product-config-step'));
@@ -659,6 +621,7 @@
             let initialKey = workspace.querySelector('[data-product-approval-form] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'workflow'
                 ? 'workflow' : firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
             if (workspace.querySelector('[data-product-config-step="accounts"] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'accounts') initialKey = 'accounts';
+            if(workspace.querySelector('[data-product-config-step="evidence"] [role="alert"]'))initialKey='evidence';
             if (!initialKey && storageKey) {
                 try {
                     initialKey = window.sessionStorage.getItem(storageKey);

@@ -58,8 +58,6 @@
 .aws-console:has([data-admin-workspace]) .product-config-step-nav {background:transparent;}
 .aws-console:has([data-admin-workspace]) .erp-panel>.border-b {padding:16px 20px;background:#fafafa;}
 .aws-console:has([data-admin-workspace]) .erp-panel>.border-b>h2 {font-size:16px;line-height:24px;}
-.aws-console:has([data-admin-workspace]) .product-config-subsection {border:1px solid #d5dbdb;border-radius:0;background:#fff;}
-.aws-console:has([data-admin-workspace]) .product-config-subsection>summary {padding:12px 16px;background:#fafafa;font-size:14px;}
 .aws-console:has([data-admin-workspace]) .aws-settings-group {margin-bottom:20px;}
 .aws-console:has([data-admin-workspace]) .aws-settings-footer {display:flex;justify-content:flex-end;gap:8px;padding-top:16px;}
 .aws-console:has([data-admin-workspace]) :is(.aws-settings-save-action,.aws-settings-footer .app-btn) {width:auto;flex:none;}

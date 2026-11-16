@@ -110,8 +110,17 @@ public class LoanRecordingRepository {
             """,(r,n)->new GroupDecision(r.getObject(1,UUID.class),r.getInt(2),r.getObject(3,UUID.class),r.getString(4),r.getString(5),r.getString(6),r.getString(7),r.getObject(8,OffsetDateTime.class)),request.id());
     }
     public void groupRequest(AppUserPrincipal a,GroupRequest r,OffsetDateTime at) {
-        jdbc.update("insert into loan_group_request(id,loan_id,sacco_id,station_id,round,rule_id,terms_hash,previous_status,maker_id,recorded_at) values(?,?,?,?,?,?,?,?,?,?)",
-            r.id(),r.loan(),a.getSaccoId(),a.getStationId(),r.round(),r.rule(),r.termsHash(),r.previousStatus(),r.maker(),at);
+        groupRequest(a,r,at,"{}");
+    }
+    public void groupRequest(AppUserPrincipal a,GroupRequest r,OffsetDateTime at,String documents) {
+        jdbc.update("insert into loan_group_request(id,loan_id,sacco_id,station_id,round,rule_id,terms_hash,previous_status,maker_id,recorded_at,document_policy) values(?,?,?,?,?,?,?,?,?,?,coalesce(?::jsonb,'{}'::jsonb))",
+            r.id(),r.loan(),a.getSaccoId(),a.getStationId(),r.round(),r.rule(),r.termsHash(),r.previousStatus(),r.maker(),at,documents);
+    }
+    public Optional<String> reviewDocumentPolicy(AppUserPrincipal a,UUID loan){
+        return jdbc.query("select document_policy::text from loan_group_request where loan_id=? and sacco_id=? and station_id=? order by round desc limit 1",(r,n)->r.getString(1),loan,a.getSaccoId(),a.getStationId()).stream().findFirst();
+    }
+    public List<com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Requirement> reviewDocumentDefinitions(AppUserPrincipal a,UUID product){
+        return jdbc.query("select d.id,d.attachment_name,coalesce(d.max_size_mb,5.00) from loan_product_required_attachments d join loan_product_settings p on p.id=d.loan_product_setting_id where p.id=? and p.sacco_id=? and d.active=true order by d.display_order,d.created_at limit 11",(r,n)->new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Requirement(r.getObject(1,UUID.class),r.getString(2),r.getBigDecimal(3)),product,a.getSaccoId());
     }
     public void groupDecision(GroupRequest r,GroupDecision d) {
         jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,?,?,?,?,?,?)",

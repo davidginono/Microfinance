@@ -46,8 +46,8 @@ public class LoanRecordingEvidenceService {
                 product.isCollateralRequired(),"PRODUCT",product.getResolvedRepaymentFrequency().name()),
             schemas.toFormModel(product.getLoanType(),product.getFormSchema()).getFields().stream()
                 .filter(field->!STANDARD.contains(field.getName())).toList(),
-            requirements.activeForProduct(id).stream()
-                .map(r->new ClientApplicationDtos.Requirement(r.getId(),r.getAttachmentName(),r.getMaxSizeMb())).toList());
+            (product.isApplicantAttachmentRequired()?requirements.activeForProduct(id):List.<com.sacco.mvp.domain.LoanProductRequiredAttachment>of()).stream()
+                .map(r->new ClientApplicationDtos.Requirement(r.getId(),r.getAttachmentName(),r.getMaxSizeMb())).toList(),product.isApplicantAttachmentRequired());
     }
 
     private Map<UUID,String> labels(AppUserPrincipal actor,ApplicationDetails details) {

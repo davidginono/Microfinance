@@ -254,6 +254,7 @@ class AdminServiceTest {
             userSettingsRepository,
             loanApplicationRepository,
             loanProductSettingRepository,
+            org.mockito.Mockito.mock(LoanProductRequiredAttachmentService.class),
             loanProductBoardReviewerRepository,
             saccoSettingsRepository,
             saccoStationRepository,
@@ -438,7 +439,7 @@ class AdminServiceTest {
         var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"WORKFLOW","Workflow Loan","Staff approval",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,null);
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,null,new com.sacco.mvp.service.dto.LoanProductDocumentsForm());
         assertThat(approval.getProductId()).isEqualTo(product.getId()).isNotEqualTo(suppliedProduct);
         assertThat(approval.getExpectedRevision()).isZero();
         verify(groupApprovals).saveRule(actor,approval);
@@ -455,7 +456,7 @@ class AdminServiceTest {
         var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"CHARGES","Fee loan","Staff charge setup",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.TEN,BigDecimal.ZERO,new BigDecimal("0.01"),
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,policy);
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,policy,new com.sacco.mvp.service.dto.LoanProductDocumentsForm());
         assertThat(policy.getProductId()).isEqualTo(product.getId()).isNotEqualTo(supplied);
         verify(loanCharges).savePolicy(actor,policy);
     }

@@ -195,80 +195,13 @@
                     </div>
                 </section>
 
-                <section class="product-builder-section product-config-step" data-product-config-step="evidence"><div class="product-builder-section-header"><h2><spring:message code="recording.attachments" /></h2></div><div class="product-builder-section-body" data-product-config-panel hidden>
-<label><input type="checkbox" name="disbursementProofRequired" value="true" ${product.disbursementProofRequired ? 'checked' : ''} /><spring:message code="admin.settings.disbursementProofRequired" text="Disbursement proof" /></label>
-<label><input type="checkbox" name="applicantAttachmentRequired" value="true" ${product.applicantAttachmentRequired ? 'checked' : ''} /><spring:message code="applications.signedApplication" text="Signed application" /></label>
-</div><label><spring:message code="recording.guarantors"/><input name="guarantorsRequired" type="number" min="0" max="15" value="${product.guarantorsRequired}" class="aws-control"/></label>
-<details class="workflow-subsection product-config-subsection">
-                            <summary class="workflow-subsection-title">Applicant documents</summary>
-                            <div class="product-config-subsection-body">
-                            <div class="workflow-support-grid">
-                                <label class="settings-checkbox-card flex items-center gap-2 rounded border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <input name="applicantAttachmentRequired" type="checkbox" value="true" ${product.applicantAttachmentRequired ? 'checked' : ''} data-required-attachments-toggle />
-                                    <span><spring:message code="admin.settings.requireApplicantAttachment" text="Require applicant attachment while applying" /></span>
-                                </label>
-                                <input type="hidden" name="applicantAttachmentRequired" value="false" />
-                            </div>
-                            <div class="mt-3 ${product.applicantAttachmentRequired ? '' : 'hidden '} border border-slate-200 bg-white p-3" data-required-attachments-panel>
-                                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                    <div>
-                                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Required Attachments</p>
-                                        <p class="mt-1 text-xs text-slate-500">Create one record for each document the applicant must upload.</p>
-                                    </div>
-                                    <button type="button" class="app-btn btn-neutral" data-required-attachment-add>Add Name of Required Attachment</button>
-                                </div>
-                                <div class="hidden border border-slate-200 bg-slate-50 p-3" data-required-attachment-form>
-                                    <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_10rem_auto_auto] md:items-end" data-table-toolbar-for="admin-loan-product-edit-4" >
-                                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            Attachment Name
-                                            <input form="requiredAttachmentCreateForm" name="attachmentName" type="text" maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder="e.g. Salary slip" />
-                                        </label>
-                                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                            Max MB
-                                            <input form="requiredAttachmentCreateForm" name="maxSizeMb" type="number" min="0.01" max="100" step="0.01" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="5.00" />
-                                        </label>
-                                        <button form="requiredAttachmentCreateForm" type="submit" class="app-btn btn-launch">Create</button>
-                                        <button type="button" class="app-btn btn-neutral" data-required-attachment-cancel>Cancel</button>
-                                    </div>
-                                </div>
-                                <div class="erp-table-wrap mt-4" data-aws-table-region data-loading-label="Loading clients..." data-resource-table="admin-loan-product-edit-4" data-resource-split data-table-title-id="admin-loan-product-edit-title">
-                                    <div class="erp-table-scroll erp-table-scroll-sm">
-                                    <table data-table-sort-mode="none" data-table-sort-reason="editor" class="erp-table min-w-[620px]">
-                                        <thead>
-                                        <tr>
-                                            <th class="px-3 py-2 text-left">Name</th>
-                                            <th class="px-3 py-2 text-left">Max MB</th>
-                                            <th class="px-3 py-2 text-left" data-table-actions-header>Action</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        <c:choose>
-                                            <c:when test="${empty requiredAttachments}">
-                                                <tr>
-                                                    <td colspan="3" class="px-4 py-5 text-sm text-slate-500">No required attachments have been created yet.</td>
-                                                </tr>
-                                            </c:when>
-                                            <c:otherwise>
-                                                <c:forEach items="${requiredAttachments}" var="attachmentRequirement">
-                                                    <tr>
-                                                        <td class="px-3 py-2 font-semibold text-slate-800"><c:out value="${attachmentRequirement.attachmentName}" /></td>
-                                                        <td class="px-3 py-2"><fmt:formatNumber value="${attachmentRequirement.maxSizeMb}" minFractionDigits="2" maxFractionDigits="2" /></td>
-                                                        <td class="px-3 py-2">
-                                                            <button form="deleteRequiredAttachment-${attachmentRequirement.id}" type="submit" class="app-btn btn-reject">Delete</button>
-                                                        </td>
-                                                    </tr>
-                                                </c:forEach>
-                                            </c:otherwise>
-                                        </c:choose>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            </div>
-                            </div>
-                        </details></section>
-
-
+                <section class="product-builder-section product-config-step" data-product-config-step="evidence">
+                    <div class="product-builder-section-header"><h2><spring:message code="recording.attachments" /></h2></div>
+                    <div class="product-builder-section-body" data-product-config-panel hidden>
+                        <c:set var="documentProduct" value="${product}" /><c:set var="documentRequirements" value="${requiredAttachments}" />
+                        <%@ include file="../fragments/loan-product-document-fields.jspf" %>
+                    </div>
+                </section>
 
                 <div class="product-config-actionbar">
                     <div class="product-config-section-actions" hidden aria-label="Configuration section navigation">
@@ -299,15 +232,6 @@
         </sec:authorize>
 </div>
 </div>
-
-<form id="requiredAttachmentCreateForm" action="/admin/settings-controls/loan-products/${product.id}/required-attachments" method="post" class="hidden">
-    <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-</form>
-<c:forEach items="${requiredAttachments}" var="attachmentRequirement">
-    <form id="deleteRequiredAttachment-${attachmentRequirement.id}" action="/admin/settings-controls/loan-products/${product.id}/required-attachments/${attachmentRequirement.id}/delete" method="post" class="hidden">
-        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-    </form>
-</c:forEach>
 
 <spring:message code="role.manager" text="Manager" var="runtimeManager" />
 <spring:message code="role.loanOfficer" text="Loan Officer" var="runtimeLoanOfficer" />

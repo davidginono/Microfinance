@@ -1218,8 +1218,9 @@ public class AdminController {
                                     @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
 
                                     @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
-                                    @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
+                                    @RequestParam(defaultValue = "false") boolean disbursementProofRequired,
                                     @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
+                                    @ModelAttribute com.sacco.mvp.service.dto.LoanProductDocumentsForm productDocuments, org.springframework.validation.BindingResult documentErrors,
 
                                     @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
                                     @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
@@ -1231,6 +1232,7 @@ public class AdminController {
                                     RedirectAttributes ra) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "product-" + id : normalizeLoanSettingsModalKey(modalKey);
         try {
+            if(documentErrors.hasErrors())throw new IllegalArgumentException("productDocuments.invalid");
             BigDecimal maxLoanSavingsRatio = percentToRatio(maxLoanSavingsPercent);
             BigDecimal processingFeeRate = percentToRatio(processingFeePercent);
             BigDecimal insuranceRate = percentToRatio(insurancePercent);
@@ -1239,7 +1241,7 @@ public class AdminController {
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
                 maxLoanSavingsRatio, savingsLimitCheckRequired, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, disbursementOfficerRequired,
-                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId);
+                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId,productDocuments);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -1265,41 +1267,6 @@ public class AdminController {
         productApproval(principal, id, model);
         productCharges(principal,id,model);
         return "admin/loan-product-edit";
-    }
-
-    @PostMapping("/settings-controls/loan-products/{id}/required-attachments")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_CONFIGURE')")
-    public String createRequiredAttachment(@PathVariable UUID id,
-                                           @AuthenticationPrincipal AppUserPrincipal principal,
-                                           @RequestParam(required = false) String attachmentName,
-                                           @RequestParam(required = false) BigDecimal maxSizeMb,
-                                           RedirectAttributes ra) {
-        try {
-            String saccoId = adminScopeService.currentSaccoId(principal);
-            adminService.loanProduct(saccoId, id);
-            adminService.updateApplicantAttachmentRequired(saccoId, principal.getMemberId(), id, true);
-            requiredAttachmentService.createForProduct(id, attachmentName, maxSizeMb);
-            ra.addFlashAttribute("message", "Required attachment created.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/admin/settings-controls/loan-products/" + id + "/edit";
-    }
-
-    @PostMapping("/settings-controls/loan-products/{id}/required-attachments/{requirementId}/delete")
-    @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'LOAN_PRODUCTS_CONFIGURE')")
-    public String deleteRequiredAttachment(@PathVariable UUID id,
-                                           @PathVariable UUID requirementId,
-                                           @AuthenticationPrincipal AppUserPrincipal principal,
-                                           RedirectAttributes ra) {
-        try {
-            adminService.loanProduct(adminScopeService.currentSaccoId(principal), id);
-            requiredAttachmentService.deleteForProduct(id, requirementId);
-            ra.addFlashAttribute("message", "Required attachment deleted.");
-        } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
-        }
-        return "redirect:/admin/settings-controls/loan-products/" + id + "/edit";
     }
 
     @PostMapping("/settings-controls/loan-products/{id}/delete")
@@ -1345,10 +1312,9 @@ public class AdminController {
                                               @RequestParam(defaultValue = "false") boolean freshFinancialDataRequired,
 
                                               @RequestParam(defaultValue = "true") boolean disbursementOfficerRequired,
-                                              @RequestParam(defaultValue = "true") boolean disbursementProofRequired,
+                                              @RequestParam(defaultValue = "false") boolean disbursementProofRequired,
                                               @RequestParam(defaultValue = "false") boolean applicantAttachmentRequired,
-                                              @RequestParam(name = "requiredAttachmentName", required = false) List<String> requiredAttachmentNames,
-                                              @RequestParam(name = "requiredAttachmentMaxSizeMb", required = false) List<BigDecimal> requiredAttachmentMaxSizeMb,
+                                              @ModelAttribute com.sacco.mvp.service.dto.LoanProductDocumentsForm productDocuments, org.springframework.validation.BindingResult documentErrors,
 
                                               @RequestParam(defaultValue = "false") boolean guarantorMinSavingsCheckRequired,
                                               @RequestParam(required = false) BigDecimal guarantorMinimumSavings,
@@ -1360,6 +1326,7 @@ public class AdminController {
                                               RedirectAttributes ra) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
+                if (documentErrors.hasErrors()) throw new IllegalArgumentException("productDocuments.invalid");
                 if (groupErrors.hasErrors()) throw new IllegalArgumentException("loanGroups.error.steps");
                 if (chargePolicy.isSaveChargePolicy() && chargeErrors.hasErrors()) throw new IllegalArgumentException("charges.error.input");
                 LoanProductSetting product = adminService.createLoanProductTenure(
@@ -1390,9 +1357,8 @@ public class AdminController {
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus,
-                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm,chargePolicy.isSaveChargePolicy()?chargePolicy:null
+                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm,chargePolicy.isSaveChargePolicy()?chargePolicy:null,productDocuments
             );
-            requiredAttachmentService.replaceForProduct(product.getId(), applicantAttachmentRequired ? requiredAttachmentNames : List.of(), requiredAttachmentMaxSizeMb);
             ra.addFlashAttribute("message", "Loan product created successfully.");
             ra.addFlashAttribute("createdLoanProductId", product.getId());
             return "redirect:/admin/settings-controls?section=loan";
@@ -1553,6 +1519,7 @@ public class AdminController {
     }
 
     private void attachLoanSettingsValidationFeedback(RedirectAttributes ra, String message) {
+        if(message!=null && message.startsWith("productDocuments.")){message=messages.getMessage(message,null,org.springframework.context.i18n.LocaleContextHolder.getLocale());ra.addFlashAttribute("documentSettingsError",message);}
         Map<String, String> fieldErrors = resolveLoanSettingsFieldErrors(message);
         if (fieldErrors.isEmpty()) {
             ra.addFlashAttribute("error",message!=null && message.startsWith("recording.error.") ? messages.getMessage(message,null,message,org.springframework.context.i18n.LocaleContextHolder.getLocale()) : message);

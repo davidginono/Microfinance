@@ -1,0 +1,27 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:if test="${not empty documentSettingsError}"><div class="console-message" data-message-type="error" role="alert" data-workspace-response-error><c:out value="${documentSettingsError}" /></div></c:if>
+<div class="product-document-fields" data-product-document-fields>
+    <input type="hidden" name="documentRowsSubmitted" value="true" />
+    <label class="product-document-count"><spring:message code="productDocuments.guarantors" />
+        <input name="guarantorsRequired" type="number" min="0" max="15" required class="aws-control" value="${empty documentProduct ? 2 : documentProduct.guarantorsRequired}" />
+    </label>
+    <div class="product-document-options">
+        <label class="product-document-check"><input type="checkbox" name="applicantAttachmentRequired" value="true" ${not empty documentProduct and documentProduct.applicantAttachmentRequired ? 'checked' : ''} data-required-attachments-toggle /><span><spring:message code="productDocuments.require" /></span></label>
+        <p class="voucher-help" data-product-guarantor-note><spring:message code="productDocuments.guarantorPapers" /></p>
+        <label class="product-document-check"><input type="checkbox" name="disbursementProofRequired" value="true" ${empty documentProduct or documentProduct.disbursementProofRequired ? 'checked' : ''} /><span><spring:message code="chairperson.disbursementProofRequired" /></span></label>
+    </div>
+    <div data-required-attachments-panel ${empty documentProduct or not documentProduct.applicantAttachmentRequired ? 'hidden' : ''}>
+        <div class="product-document-list-heading"><h3><spring:message code="productDocuments.names" /></h3><button type="button" class="app-btn btn-neutral" data-add-required-attachment><spring:message code="applications.add" /></button></div>
+        <div class="product-document-rows" data-required-attachments-list>
+            <c:forEach items="${documentRequirements}" var="requirement">
+                <div class="product-required-attachment-row" data-required-attachment-row>
+                    <input type="hidden" name="requiredAttachmentId" value="${requirement.id}" />
+                    <label><spring:message code="applications.documentName" /><input name="requiredAttachmentName" maxlength="120" class="aws-control" value="<c:out value='${requirement.attachmentName}' />" /></label>
+                    <label><spring:message code="chairperson.maximumFileSize" /><input name="requiredAttachmentMaxSizeMb" type="number" min="0.01" max="25" step="0.01" class="aws-control" value="${requirement.maxSizeMb}" /></label>
+                    <button type="button" class="erp-icon-btn" data-remove-required-attachment aria-label="<spring:message code='applications.remove' />" title="<spring:message code='applications.remove' />"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+                </div>
+            </c:forEach>
+        </div>
+        <p class="voucher-help" data-required-attachments-empty><spring:message code="productDocuments.noNames" /></p>
+    </div>
+</div>

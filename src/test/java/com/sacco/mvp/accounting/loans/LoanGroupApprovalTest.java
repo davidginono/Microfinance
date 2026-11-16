@@ -105,11 +105,13 @@ class LoanGroupApprovalTest {
         status="RECORDED";when(records.groupRequest(any(),eq(loan))).thenReturn(Optional.empty());
         when(records.groupRule(any(),eq(product))).thenReturn(Optional.of(new GroupRule(rule,product,1,"[{\"group\":\"CREDIT_OFFICER\",\"approvals\":1},{\"group\":\"MANAGER\",\"approvals\":1}]")));
         var p=person(recorder,Position.LOAN_OFFICER);var overlapping=UUID.randomUUID();
+        String documents="{\"required\":false,\"guarantorConsent\":false,\"documents\":[]}";when(recording.validateStaffReview(p,loan)).thenReturn(documents);
         when(records.groupCandidates(any(),any(),anyString())).thenReturn(Map.of(Position.CREDIT_OFFICER,List.of(overlapping),Position.MANAGER,List.of(overlapping)));
         assertThatThrownBy(()->service.submit(p,loan,UUID.randomUUID())).hasMessage("loanGroups.error.staff");
         when(records.groupCandidates(any(),any(),anyString())).thenReturn(Map.of(Position.CREDIT_OFFICER,List.of(overlapping),Position.MANAGER,List.of(UUID.randomUUID())));
         service.submit(p,loan,UUID.randomUUID());assertThat(status).isEqualTo("SUBMITTED");assertThat(decisions).isEmpty();
         verify(recording,times(2)).validateStaffReview(p,loan);
+        verify(records).groupRequest(eq(p),any(GroupRequest.class),any(),eq(documents));
     }
     @Test void newGroupsGrantNoFinancialPermissionAutomatically(){
         for(var group:List.of(Position.FINANCE_MANAGER,Position.ICT_MANAGER,Position.CREDIT_OFFICER,Position.ACCOUNTS_CLERK,Position.CUSTOMER_CARE,Position.ACCOUNTS_CLERK_2))
@@ -123,7 +125,7 @@ class LoanGroupApprovalTest {
             assertThatThrownBy(()->service.submit(recorder,loan,UUID.randomUUID())).hasMessage("loanGroups.error.state");
         }
         verifyNoInteractions(recording);verify(records,never()).groupRule(any(),any());
-        verify(records,never()).groupRequest(any(),any(),any());
+        verify(records,never()).groupRequest(any(),any(),any(),any());
     }
     @Test void onlyTheRecorderCanSendARecordedApplicationForReview(){
         status="RECORDED";when(records.groupRequest(any(),eq(loan))).thenReturn(Optional.empty());
@@ -132,7 +134,7 @@ class LoanGroupApprovalTest {
         assertThat(service.review(owner,loan).canApprove()).isFalse();
         assertThat(service.review(other,loan).canSubmit()).isFalse();
         assertThatThrownBy(()->service.submit(other,loan,UUID.randomUUID())).isInstanceOf(AccessDeniedException.class);
-        verify(recording,never()).validateStaffReview(any(),any());verify(records,never()).groupRequest(any(),any(),any());
+        verify(recording,never()).validateStaffReview(any(),any());verify(records,never()).groupRequest(any(),any(),any(),any());
     }
     @Test void reviewerNeedsNoRecordingPermissionAndCannotSeeTheRecorderCommand(){
         var staff=person(UUID.randomUUID(),Position.CREDIT_OFFICER);

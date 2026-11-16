@@ -56,6 +56,7 @@ public class AdminService {
     private final UserSettingsRepository userSettingsRepository;
     private final LoanApplicationRepository loanApplicationRepository;
     private final LoanProductSettingRepository loanProductSettingRepository;
+    private final LoanProductRequiredAttachmentService productDocuments;
     private final LoanProductBoardReviewerRepository loanProductBoardReviewerRepository;
     private final SaccoSettingsRepository saccoSettingsRepository;
     private final SaccoStationRepository saccoStationRepository;
@@ -667,19 +668,6 @@ public class AdminService {
             throw new IllegalArgumentException("Loan product not found in this SACCO");
         }
         return product;
-    }
-
-    @Transactional
-    public void updateApplicantAttachmentRequired(String saccoId, UUID adminId, UUID productId, boolean required) {
-        LoanProductSetting product = loanProduct(saccoId, productId);
-        if (product.isApplicantAttachmentRequired() == required) {
-            return;
-        }
-        Map<String, Object> before = snapshotProduct(product);
-        product.setApplicantAttachmentRequired(required);
-        product.setUpdatedAt(OffsetDateTime.now());
-        loanProductSettingRepository.save(product);
-        auditService.log("LOAN_PRODUCT", productId, "ADMIN_UPDATE_ATTACHMENT_REQUIREMENT", adminId, before, snapshotProduct(product));
     }
 
     public SaccoSettings settings(String saccoId) {
@@ -3010,7 +2998,7 @@ public class AdminService {
                                   boolean guarantorMinSavingsCheckRequired,
                                   BigDecimal guarantorMinimumSavings,
                                   LoanProductStatus productStatus,
-                                  Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId) {
+                                  Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
@@ -3019,6 +3007,7 @@ public class AdminService {
         productAccounts.configure(product,adminId,principalGlAccountId,interestGlAccountId);
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         loanProductSettingRepository.save(product);
+        if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
 
     }
 
@@ -3053,7 +3042,8 @@ public class AdminService {
                                                 Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,
                                                 com.sacco.mvp.security.AppUserPrincipal actor,
                                                 com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval,
-                                                com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm chargePolicy) {
+                                                com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm chargePolicy,
+                                                com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
         if (actor == null || !saccoId.equals(actor.getSaccoId()) || !adminId.equals(actor.getMemberId()))
             throw new org.springframework.security.access.AccessDeniedException("Product scope mismatch");
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
@@ -3070,6 +3060,7 @@ public class AdminService {
             groupApprovals.saveRule(actor, approval);
         }
         if(chargePolicy!=null){loanProductSettingRepository.flush();chargePolicy.setProductId(product.getId());loanCharges.savePolicy(actor,chargePolicy);}
+        if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
         return product;
     }
 

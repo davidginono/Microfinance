@@ -412,14 +412,13 @@
                         </div>
                     </section>
 
-                    <section class="product-builder-section"><div class="product-builder-section-body product-builder-grid two-up">
-<label><spring:message code="recording.guarantors"/><input name="guarantorsRequired" type="number" min="0" max="15" value="2" class="aws-control"/></label>
-<label><input type="checkbox" name="disbursementProofRequired" value="true" checked/><spring:message code="admin.settings.disbursementProofRequired" text="Disbursement proof"/></label>
-<label><input type="checkbox" name="applicantAttachmentRequired" value="true" data-required-attachments-toggle/><spring:message code="recording.attachments"/></label><input type="hidden" name="applicantAttachmentRequired" value="false"/>
-<div class="hidden" data-required-attachments-panel><button type="button" class="app-btn btn-neutral" data-add-required-attachment><spring:message code="applications.add"/></button><div data-required-attachments-list></div></div>
-</div></section>
-
-
+                    <section class="product-builder-section">
+                        <div class="product-builder-section-header"><h2><spring:message code="recording.attachments" /></h2></div>
+                        <div class="product-builder-section-body">
+                            <c:set var="documentProduct" value="${null}" /><c:set var="documentRequirements" value="${null}" />
+                            <%@ include file="../fragments/loan-product-document-fields.jspf" %>
+                        </div>
+                    </section>
 
                     <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
                     <section class="product-builder-section">

@@ -38,77 +38,29 @@ public class LoanProductRequiredAttachmentService {
     }
 
     @Transactional
-    public void replaceForProduct(UUID productId, List<String> names, List<BigDecimal> maxSizeMbValues) {
-        if (productId == null) {
-            return;
-        }
-        repository.deleteByLoanProductSettingId(productId);
-        if (names == null || names.isEmpty()) {
-            return;
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        List<LoanProductRequiredAttachment> items = new ArrayList<>();
-        for (int i = 0; i < names.size(); i++) {
-            String name = normalizeName(names.get(i));
-            if (name == null) {
-                continue;
+    public void replaceForProduct(UUID productId, com.sacco.mvp.service.dto.LoanProductDocumentsForm form) {
+        if(productId==null || form==null)throw new IllegalArgumentException("productDocuments.invalid");
+        var names=form.getRequiredAttachmentName();var sizes=form.getRequiredAttachmentMaxSizeMb();var ids=form.getRequiredAttachmentId();
+        if(names==null || sizes==null || ids==null || names.size()>10 || sizes.size()!=names.size() || (!ids.isEmpty() && ids.size()!=names.size()))throw new IllegalArgumentException("productDocuments.invalid");
+        var selected=ids.stream().filter(Objects::nonNull).filter(value->!value.isBlank()).map(this::documentId).toList();
+        if(new HashSet<>(selected).size()!=selected.size())throw new IllegalArgumentException("productDocuments.invalid");
+        var existing=selected.isEmpty()?List.<LoanProductRequiredAttachment>of():repository.findByLoanProductSettingIdAndIdIn(productId,selected);
+        var retained=new HashSet<UUID>();var replacements=new ArrayList<LoanProductRequiredAttachment>();var uniqueNames=new HashSet<String>();
+        var now=OffsetDateTime.now();
+        for(int index=0;index<names.size();index++){
+            String name=normalizeName(names.get(index));var size=sizes.get(index);
+            if(name==null || size==null || size.signum()<=0 || size.compareTo(new BigDecimal("25.00"))>0 || !uniqueNames.add(name.toLowerCase(Locale.ROOT)))throw new IllegalArgumentException("productDocuments.invalid");
+            LoanProductRequiredAttachment previous=null;
+            String value=ids.isEmpty()?"":Objects.toString(ids.get(index),"");
+            if(!value.isBlank()){
+                UUID id=documentId(value);
+                previous=existing.stream().filter(item->item.getId().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("productDocuments.invalid"));
             }
-            items.add(LoanProductRequiredAttachment.builder()
-                .id(UUID.randomUUID())
-                .loanProductSettingId(productId)
-                .attachmentName(name)
-                .maxSizeMb(normalizeMaxSize(maxSizeAt(maxSizeMbValues, i)))
-                .displayOrder(items.size() + 1)
-                .active(true)
-                .createdAt(now)
-                .updatedAt(now)
-                .build());
+            var item=previous!=null && previous.getAttachmentName().equals(name)?previous:LoanProductRequiredAttachment.builder().id(UUID.randomUUID()).loanProductSettingId(productId).createdAt(now).build();
+            item.setAttachmentName(name);item.setMaxSizeMb(normalizeMaxSize(size));item.setDisplayOrder(index+1);item.setActive(true);item.setUpdatedAt(now);retained.add(item.getId());replacements.add(item);
         }
-        if (!items.isEmpty()) {
-            repository.saveAll(items);
-        }
-    }
-
-    @Transactional
-    public void createForProduct(UUID productId, String name, BigDecimal maxSizeMb) {
-        if (productId == null) {
-            throw new IllegalArgumentException("Loan product is required.");
-        }
-        String normalizedName = normalizeName(name);
-        if (normalizedName == null) {
-            throw new IllegalArgumentException("Attachment name is required.");
-        }
-        OffsetDateTime now = OffsetDateTime.now();
-        int nextOrder = repository.findByLoanProductSettingIdOrderByDisplayOrderAscCreatedAtAsc(productId).stream()
-            .map(LoanProductRequiredAttachment::getDisplayOrder)
-            .filter(Objects::nonNull)
-            .max(Integer::compareTo)
-            .orElse(0) + 1;
-        repository.save(LoanProductRequiredAttachment.builder()
-            .id(UUID.randomUUID())
-            .loanProductSettingId(productId)
-            .attachmentName(normalizedName)
-            .maxSizeMb(normalizeMaxSize(maxSizeMb))
-            .displayOrder(nextOrder)
-            .active(true)
-            .createdAt(now)
-            .updatedAt(now)
-            .build());
-    }
-
-    @Transactional
-    public void deleteForProduct(UUID productId, UUID requirementId) {
-        if (productId == null || requirementId == null) {
-            throw new IllegalArgumentException("Attachment requirement was not found.");
-        }
-        LoanProductRequiredAttachment requirement = repository.findById(requirementId)
-            .orElseThrow(() -> new IllegalArgumentException("Attachment requirement was not found."));
-        if (!productId.equals(requirement.getLoanProductSettingId())) {
-            throw new IllegalArgumentException("Attachment requirement was not found for this product.");
-        }
-        requirement.setActive(false);
-        requirement.setUpdatedAt(OffsetDateTime.now());
-        repository.save(requirement);
+        if(retained.isEmpty())repository.deactivateAll(productId,now);else repository.deactivateOthers(productId,retained,now);
+        if(!replacements.isEmpty())repository.saveAll(replacements);
     }
 
     public BigDecimal normalizeMaxSize(BigDecimal value) {
@@ -130,6 +82,11 @@ public class LoanProductRequiredAttachmentService {
         return maxSizeMb.multiply(BigDecimal.valueOf(1024L * 1024L)).longValue();
     }
 
+    private UUID documentId(String value) {
+        try { return UUID.fromString(value); }
+        catch (IllegalArgumentException e) { throw new IllegalArgumentException("productDocuments.invalid", e); }
+    }
+
     private String normalizeName(String value) {
         if (value == null) {
             return null;
@@ -144,10 +101,4 @@ public class LoanProductRequiredAttachmentService {
         return normalized;
     }
 
-    private BigDecimal maxSizeAt(List<BigDecimal> values, int index) {
-        if (values == null || index < 0 || index >= values.size()) {
-            return DEFAULT_MAX_SIZE_MB;
-        }
-        return values.get(index);
-    }
 }
