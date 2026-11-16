@@ -117,6 +117,37 @@ test('recoverable platform POST keeps values on a server error, then commits onl
  }finally{dom.window.close();}
 });
 
+test('loan review submission shows its server validation error instead of a hidden print preview error',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  const main=d.querySelector('main'),form=d.querySelector('form'),button=form.querySelector('button');
+  form.method='post';form.action='/finance/loan-records/loan/submit-for-review';form.dataset.workspaceSubmit='recover';
+  form.insertAdjacentHTML('beforeend','<input type="hidden" name="requestKey" value="review-request"><input type="hidden" name="_csrf" value="csrf-token">');
+  form.requestSubmit(button);await until(()=>requests.some(r=>r.options.method==='POST'));
+  const post=requests.find(r=>r.options.method==='POST');
+  const destination=html('Loan details').replace('</main>','<dialog><div data-message-type="error" hidden>Could not open the print preview. Refresh</div></dialog><div class="loan-error-summary" data-workspace-response-error>Attach the signed application first.</div></main>');
+  post.resolve({ok:true,url:'http://localhost/finance/loan-records/loan',headers:{get:()=> 'text/html'},text:async()=>destination});
+  await until(()=>!form.hasAttribute('aria-busy'));
+  assert.equal(d.querySelector('main'),main);
+  assert.equal(form.querySelector('[data-workspace-form-error]').textContent,'Attach the signed application first.');
+  assert.equal(post.options.body.get('requestKey'),'review-request');assert.equal(post.options.body.get('_csrf'),'csrf-token');
+  assert.equal(requests.filter(r=>r.options.method==='POST').length,1);assert.equal(button.disabled,false);
+ }finally{dom.window.close();}
+});
+
+for(const container of ['<div hidden>','<dialog>'])test('successful submission ignores unused error messages inside '+container,async()=>{
+ const {dom,w,d,requests,failures}=await setup({holdNavigation:true});
+ try{
+  const form=d.querySelector('form');form.method='post';form.action='/finance/loan-records/loan/submit-for-review';form.dataset.workspaceSubmit='recover';
+  form.requestSubmit(form.querySelector('button'));await until(()=>requests.some(r=>r.options.method==='POST'));
+  const destination=html('Sent for review').replace('</main>',container+'<div data-message-type="error">Could not open the print preview. Refresh</div>'+(container==='<dialog>'?'</dialog>':'</div>')+'</main>');
+  requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/finance/loan-records/loan',headers:{get:()=> 'text/html'},text:async()=>destination});
+  await until(()=>w.location.pathname==='/finance/loan-records/loan');
+  assert.equal(d.querySelector('h1').textContent,'Sent for review');assert.equal(d.querySelector('[data-workspace-form-error]'),null);
+  assert.equal(requests.filter(r=>r.options.method==='POST').length,1);assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
 test('successful modal submission to the same register closes the dialog and reveals the saved notice',async()=>{
  const {dom,w,d,requests,pages,failures}=await setup({guard:true,holdNavigation:true});
  try{

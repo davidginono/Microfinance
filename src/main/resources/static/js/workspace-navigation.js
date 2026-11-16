@@ -349,7 +349,9 @@
             if(version!==generation)return true;
             if(!page.body.matches('.aws-console') || !page.querySelector('.shell-main') || !page.querySelector('#appSidebar'))throw new Error('Workspace shell');
             if(recover){
-                const error=page.querySelector('[data-workspace-response-error],[data-toast-type="error"],.shell-main [data-message-type="error"]');
+                const error=page.querySelector('[data-workspace-response-error],[data-toast-type="error"]') ||
+                    [...page.querySelectorAll('.shell-main [data-message-type="error"]')]
+                        .find(message=>!message.closest('[hidden],.hidden,[aria-hidden="true"],dialog:not([open]),template'));
                 if(error){
                     const form=options.submission.form;
                     form.inert=false;
