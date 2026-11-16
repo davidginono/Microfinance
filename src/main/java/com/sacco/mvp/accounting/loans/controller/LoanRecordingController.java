@@ -76,7 +76,7 @@ public class LoanRecordingController {
             case "recording.error.date","applications.error.date"->"applicationDate";
             case "recording.error.productLimits","recording.error.topUpCash"->"principal";
             case "applications.error.declaration"->"applicationDetails.declarationAccepted";
-            case "recording.error.attachments","applications.error.attachments","applications.error.signedApplication"->"attachments";
+            case "recording.error.attachments","applications.error.attachments"->"attachments";
             case "charges.error.insuranceLimit","charges.error.insuranceDuplicate"->"insurancePremium";
             default->"";
         };

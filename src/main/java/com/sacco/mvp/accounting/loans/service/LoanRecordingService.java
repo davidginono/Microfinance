@@ -30,9 +30,8 @@ public class LoanRecordingService {
         LoanAmortizationCalculator.estimate(loan.getAmount(),loan.getTenorMonths(),schedules.parseSummary(loan.getFinancialSnapshot()));
         String kyc=loans.kycError(id,actor.getSaccoId(),actor.getStationId(),clock.today());
         if(kyc!=null)throw new IllegalArgumentException(kyc);
-        var files=attachments.parse(loan.getAttachmentsJson());
-        check((loan.getApplicantSignatureVerifiedAt()!=null&&loan.getApplicantSignatureText()!=null&&!loan.getApplicantSignatureText().isBlank())||files.stream().anyMatch(f->"SIGNED_APPLICATION".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||simpleGroups.simple(actor,id),"signedApplication");
         if(loan.getRequiredGuarantors()!=null&&loan.getRequiredGuarantors()>0) {
+            var files=attachments.parse(loan.getAttachmentsJson());
             if(loan.getApplicantMemberId()==null)check(simpleGroups.simple(actor,id)?simpleGroups.guaranteesReady(actor,id):records.personalGuaranteesReady(actor,id),"personalGuarantees");
             else check(files.stream().anyMatch(f->"GUARANTOR_CONSENT".equals(f.get("documentPurpose")))||records.signedGroupApplication(actor,id)||records.recordedGuarantees(actor,id,loan.getRequiredGuarantors()),"guarantorConsent");
         }

@@ -125,11 +125,11 @@ test('loan review submission shows its server validation error instead of a hidd
   form.insertAdjacentHTML('beforeend','<input type="hidden" name="requestKey" value="review-request"><input type="hidden" name="_csrf" value="csrf-token">');
   form.requestSubmit(button);await until(()=>requests.some(r=>r.options.method==='POST'));
   const post=requests.find(r=>r.options.method==='POST');
-  const destination=html('Loan details').replace('</main>','<dialog><div data-message-type="error" hidden>Could not open the print preview. Refresh</div></dialog><div class="loan-error-summary" data-workspace-response-error>Attach the signed application first.</div></main>');
+  const destination=html('Loan details').replace('</main>','<dialog><div data-message-type="error" hidden>Could not open the print preview. Refresh</div></dialog><div class="loan-error-summary" data-workspace-response-error>Complete the client checks first.</div></main>');
   post.resolve({ok:true,url:'http://localhost/finance/loan-records/loan',headers:{get:()=> 'text/html'},text:async()=>destination});
   await until(()=>!form.hasAttribute('aria-busy'));
   assert.equal(d.querySelector('main'),main);
-  assert.equal(form.querySelector('[data-workspace-form-error]').textContent,'Attach the signed application first.');
+  assert.equal(form.querySelector('[data-workspace-form-error]').textContent,'Complete the client checks first.');
   assert.equal(post.options.body.get('requestKey'),'review-request');assert.equal(post.options.body.get('_csrf'),'csrf-token');
   assert.equal(requests.filter(r=>r.options.method==='POST').length,1);assert.equal(button.disabled,false);
  }finally{dom.window.close();}

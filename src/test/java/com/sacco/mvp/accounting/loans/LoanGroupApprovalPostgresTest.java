@@ -177,7 +177,22 @@ class LoanGroupApprovalPostgresTest {
         f.service.disburse(f.actor,f.post(loan,"1000.00","D-SYNTHETIC-INDIVIDUAL"));
         assertThat(count("loan_ledgers")).isEqualTo(1);
     }
-    @Test void anUnsignedIndividualApplicationCannotEnterReview(){UUID individual=f.service.save(f.actor,individual());assertThatThrownBy(()->service.submit(f.actor,individual,UUID.randomUUID())).hasMessage("recording.error.signedApplication");}
+    @Test void anIndividualApplicationCanBeReviewedWithoutASignedApplication(){
+        UUID individual=f.service.save(f.actor,individual()),request=UUID.randomUUID();
+        service.submit(f.actor,individual,request);
+        assertThat(f.jdbc.queryForObject("select status from loan_applications where id=?",String.class,individual)).isEqualTo("SUBMITTED");
+        assertThat(queue(first,Position.ACCOUNTANT)).containsExactly("/finance/loan-records/"+individual);
+        for(var reviewer:List.of(first,second,manager))
+            service.decide(reviewer,individual,request,UUID.randomUUID(),"APPROVE","Synthetic independent review","Synthetic income checks");
+        assertThat(f.jdbc.queryForObject("select status from loan_applications where id=?",String.class,individual)).isEqualTo("READY_FOR_DISBURSEMENT");
+        assertThat(count("loan_ledgers")).isZero();assertThat(count("gl_journal")).isZero();
+    }
+    @Test void optionalSignedApplicationDoesNotRemoveRequiredGuarantorConsent(){
+        UUID individual=f.service.save(f.actor,individual());
+        f.jdbc.update("update loan_applications set required_guarantors=1 where id=?",individual);
+        assertThatThrownBy(()->service.submit(f.actor,individual,UUID.randomUUID())).hasMessage("recording.error.guarantorConsent");
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_group_request where loan_id=?",Integer.class,individual)).isZero();
+    }
     @Test void orderedFrozenPlanRequiresDifferentPeopleAndPostsNoMoney(){
         UUID request=submit();rule(1,1);
         assertThatThrownBy(()->decide(manager,request,"APPROVE")).isInstanceOf(AccessDeniedException.class);
