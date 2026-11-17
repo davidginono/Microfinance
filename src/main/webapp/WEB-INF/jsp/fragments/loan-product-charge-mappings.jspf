@@ -1,0 +1,6 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:forEach items="${['APPLICATION','PROCESSING','RECEIVABLE','INSURANCE']}" var="mappedChargeKind">
+    <label class="block min-w-0"><spring:message code="charges.account.${mappedChargeKind}" />
+        <input type="text" readonly class="aws-control min-w-0 max-w-full" value="<c:out value='${currentChargeMappings[mappedChargeKind]}' default='—' />" />
+    </label>
+</c:forEach>

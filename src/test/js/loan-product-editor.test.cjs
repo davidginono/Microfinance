@@ -5,8 +5,8 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/webapp/WEB-INF/jsp/fragments/loan-product-editor-script.jspf','utf8').replace(/^<script>\s*/,'').replace(/\s*<\/script>\s*$/,'');
 function setup(query='',error=false,guarantorDraft=''){
   const keys=['identity','eligibility','pricing','workflow','accounts','evidence'];
-  const section=key=>`<section data-product-config-step="${key}"><input name="${key}" value="retained"></section>`;
-  const dom=new JSDOM(`<main data-product-config-workspace><nav data-product-config-tabs>${keys.map(key=>`<button data-product-config-nav="${key}"><strong>${key}</strong></button>`).join('')}</nav><form id="product" class="accounting-create-form" data-product-config-form>${keys.filter(key=>key!=='workflow').map(section).join('')}${guarantorDraft}<div class="product-config-actionbar"><span hidden data-product-config-save-state></span><button type="button" data-product-config-previous>Previous</button><button type="button" data-product-config-next>Next</button></div></form><section data-product-config-step="workflow"><label>Number of guarantors<input form="product" name="guarantorsRequired" type="number" min="0" max="15" required value="2"></label><button type="submit" form="product">Save product</button><form data-product-approval-form><input name="group" value="CREDIT_OFFICER">${error?'<p role="alert">Choose a group</p>':''}</form></section></main>`,{runScripts:'outside-only',url:'http://localhost/admin/loan-products/1'+query});
+  const section=key=>`<section data-product-config-step="${key}"><input name="${key}" value="retained">${key==='pricing'&&error==='charges'?'<p role="alert">Choose charge accounts</p>':''}</section>`;
+  const dom=new JSDOM(`<main data-product-config-workspace><nav data-product-config-tabs>${keys.map(key=>`<button data-product-config-nav="${key}"><strong>${key}</strong></button>`).join('')}</nav><form id="product" class="accounting-create-form" data-product-config-form>${keys.filter(key=>key!=='workflow').map(section).join('')}${guarantorDraft}<div class="product-config-actionbar"><span hidden data-product-config-save-state></span><button type="button" data-product-config-previous>Previous</button><button type="button" data-product-config-next>Next</button></div></form><section data-product-config-step="workflow"><label>Number of guarantors<input form="product" name="guarantorsRequired" type="number" min="0" max="15" required value="2"></label><button type="submit" form="product">Save product</button><form data-product-approval-form><input name="group" value="CREDIT_OFFICER">${error===true?'<p role="alert">Choose a group</p>':''}</form></section></main>`,{runScripts:'outside-only',url:'http://localhost/admin/loan-products/1'+query});
   dom.window.scrollTo=()=>{};dom.window.requestAnimationFrame=fn=>fn();dom.window.eval(source);return dom;
 }
 test('product tabs follow displayed order and keep approval in its own form',()=>{
@@ -96,4 +96,9 @@ test('document rows add and remove accessibly, stay bounded and require complete
 test('failed save restores an intentionally empty requirement list without reviving removed rows',()=>{
   const dom=documentForm('<div data-loan-product-form-draft><span data-loan-product-form-value="documentRowsSubmitted">true</span><span data-loan-product-form-value="applicantAttachmentRequired">true</span></div>');
   try{const d=dom.window.document;assert.equal(d.querySelector('[data-required-attachments-panel]').hidden,false);assert.equal(d.querySelectorAll('[data-required-attachment-row]').length,0);}finally{dom.window.close();}
+});
+
+test('charge setup errors reveal Repayment and Charges even when the return URL points to mappings',()=>{
+  const dom=setup('?tab=accounts','charges');
+  try{const d=dom.window.document;assert.equal(d.querySelector('[aria-selected="true"]').dataset.productConfigNav,'pricing');assert.equal(d.querySelector('[name="pricing"]').value,'retained');}finally{dom.window.close();}
 });

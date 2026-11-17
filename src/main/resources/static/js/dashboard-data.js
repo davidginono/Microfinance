@@ -12,7 +12,7 @@
         const end=()=>targets.forEach(target=>window.AppLoading?.end(target));
         let version=0,request=null,timer=null,loaded=false,blocked=false;
         const visible=()=>root.isConnected && !root.hidden && !document.hidden;
-        const text=(key,value)=>root.querySelectorAll('[data-dashboard-metric="'+key+'"]').forEach(n=>n.textContent=value);
+        const text=(key,value)=>root.querySelectorAll('[data-dashboard-metric="'+key+'"]').forEach(n=>{if(n.textContent!==value)n.textContent=value;});
         const stop=()=>{version++;request?.abort();request=null;clearTimeout(timer);timer=null;end();root.removeAttribute('aria-busy');};
         const chart=(key,data)=>{window.DashboardCharts?.render(root.querySelector('[data-live-chart="'+key+'"]'),data);};
         const render=payload=>{
@@ -52,7 +52,7 @@
         range?.addEventListener('change',()=>void load(true));
         retry?.addEventListener('click',()=>void load(true));
         root.querySelector('[data-dashboard-view]')?.addEventListener('change',event=>{root.querySelectorAll('[data-dashboard-chart-panel]').forEach(panel=>panel.hidden=panel.dataset.dashboardChartPanel!==event.target.value);});
-        root.addEventListener('dashboard:visibility',()=>{if(visible())void load(true);else stop();});
+        root.addEventListener('dashboard:visibility',()=>{if(visible())void load();else stop();});
         const state={load,stop,start(){stop();if(visible())void load();}};regions.set(root,state);void load();
     }
     function scan(){if(!window.document)return;for(const [root,state] of regions)if(!root.isConnected){state.stop();regions.delete(root);}document.querySelectorAll('[data-dashboard-source]').forEach(init);}

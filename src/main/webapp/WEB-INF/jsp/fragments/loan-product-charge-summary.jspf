@@ -1,5 +1,5 @@
 <%@ page pageEncoding="UTF-8" %>
-<div class="md:col-span-2"><h3><spring:message code="charges.postingSetup" /></h3></div>
+<div class="md:col-span-2"><h3><spring:message code="${chargeFormId eq 'productChargePolicyForm' ? 'charges.policy' : 'charges.postingSetup'}" /></h3></div>
 <c:if test="${empty currentChargePolicy and not creatingLoanProduct}"><p class="md:col-span-2"><spring:message code="charges.noCurrentSetup" /></p></c:if>
 <c:if test="${not empty currentChargePolicy}">
     <dl class="erp-detail-facts md:col-span-2">

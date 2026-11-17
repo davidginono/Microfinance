@@ -581,6 +581,7 @@
             let initialKey = workspace.querySelector('[data-product-approval-form] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'workflow'
                 ? 'workflow' : firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
             if (workspace.querySelector('[data-product-config-step="accounts"] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'accounts') initialKey = 'accounts';
+            if (workspace.querySelector('[data-product-config-step="pricing"] [role="alert"]')) initialKey = 'pricing';
             if(workspace.querySelector('[data-product-config-step="evidence"] [role="alert"]'))initialKey='evidence';
             if (!initialKey && storageKey) {
                 try {

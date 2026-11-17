@@ -149,6 +149,7 @@
                     </div>
                 </section>
 
+                <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')" var="canSetChargeAccounts" />
                 <section class="product-builder-section product-config-step" data-product-config-step="pricing" aria-label="Repayment and charges"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.repaymentCharges" /></h2></div>
                     <div id="product-config-pricing" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -178,21 +179,19 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
+                        <c:if test="${canSetChargeAccounts}"><c:set var="chargeFormId" value="productChargePolicyForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></c:if>
                     </div>
                 </section>
 
                 <section class="product-builder-section product-config-step" data-product-config-step="accounts" aria-label="<spring:message code='productAccounts.title' />">
-                    <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')" var="canSetChargeAccounts" />
                     <div class="product-builder-section-header">
                         <h2><spring:message code="productAccounts.title" /></h2>
                     </div>
                     <div id="product-config-accounts" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %><c:set var="productAccountSection" value="${false}" />
-                        <c:if test="${canSetChargeAccounts}"><c:set var="chargeFormId" value="productChargePolicyForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></c:if>
-                        <c:if test="${not canSetChargeAccounts}">
-                            <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_VIEW')"><%@ include file="../fragments/loan-product-charge-summary.jspf" %></sec:authorize>
-                            <p class="text-sm md:col-span-2"><spring:message code="charges.postingSetupPermission" /></p>
-                        </c:if>
+                        <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_VIEW') or (@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE'))">
+                            <%@ include file="../fragments/loan-product-charge-mappings.jspf" %>
+                        </sec:authorize>
                     </div>
                 </section>
 

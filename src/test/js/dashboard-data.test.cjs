@@ -46,3 +46,15 @@ test('only initial metrics use spinners; background updates keep verified number
   w.dispatchEvent(new w.Event('pagehide'));assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(d.querySelector('[data-dashboard-metric=activeUsers]').textContent,'4');
  }finally{dom.window.close();}
 });
+
+test('same-value refreshes and restoring a ready widget retain its chart and metric nodes without spinners',async()=>{
+ const {w,d,requests}=await setup();try{
+  w.eval(readFileSync('src/main/resources/static/js/dashboard-charts.js','utf8'));
+  requests[0].resolve({ok:true,json:async()=>payload(4)});await settle();
+  const metric=d.querySelector('[data-dashboard-metric=activeUsers]'),text=metric.firstChild,chart=d.querySelector('[data-live-chart] svg'),legend=d.querySelector('.dashboard-chart-legend button');
+  const root=d.querySelector('section');root.hidden=true;root.dispatchEvent(new w.Event('dashboard:visibility'));root.hidden=false;root.dispatchEvent(new w.Event('dashboard:visibility'));
+  assert.equal(d.querySelector('.app-loading-spinner'),null);assert.equal(metric.textContent,'4');
+  requests[1].resolve({ok:true,json:async()=>({...payload(4),capturedAtLabel:'20/10/2026 12:01'})});await settle();
+  assert.equal(metric.firstChild,text);assert.equal(d.querySelector('[data-live-chart] svg'),chart);assert.equal(d.querySelector('.dashboard-chart-legend button'),legend);assert.equal(d.querySelector('[data-dashboard-metric=updated]').textContent,'20/10/2026 12:01');
+ }finally{w.close();}
+});
