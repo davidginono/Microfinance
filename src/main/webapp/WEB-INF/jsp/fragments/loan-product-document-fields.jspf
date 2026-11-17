@@ -2,9 +2,6 @@
 <c:if test="${not empty documentSettingsError}"><div class="console-message" data-message-type="error" role="alert" data-workspace-response-error><c:out value="${documentSettingsError}" /></div></c:if>
 <div class="product-document-fields" data-product-document-fields>
     <input type="hidden" name="documentRowsSubmitted" value="true" />
-    <label class="product-document-count"><spring:message code="productDocuments.guarantors" />
-        <input name="guarantorsRequired" type="number" min="0" max="15" required class="aws-control" value="${empty documentProduct ? 2 : documentProduct.guarantorsRequired}" />
-    </label>
     <div class="product-document-options">
         <label class="product-document-check"><input type="checkbox" name="applicantAttachmentRequired" value="true" ${not empty documentProduct and documentProduct.applicantAttachmentRequired ? 'checked' : ''} data-required-attachments-toggle /><span><spring:message code="productDocuments.require" /></span></label>
         <p class="voucher-help" data-product-guarantor-note><spring:message code="productDocuments.guarantorPapers" /></p>

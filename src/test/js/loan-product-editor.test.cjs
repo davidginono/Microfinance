@@ -3,10 +3,10 @@ const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');
 const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/webapp/WEB-INF/jsp/fragments/loan-product-editor-script.jspf','utf8').replace(/^<script>\s*/,'').replace(/\s*<\/script>\s*$/,'');
-function setup(query='',error=false){
+function setup(query='',error=false,guarantorDraft=''){
   const keys=['identity','eligibility','pricing','workflow','accounts','evidence'];
   const section=key=>`<section data-product-config-step="${key}"><input name="${key}" value="retained"></section>`;
-  const dom=new JSDOM(`<main data-product-config-workspace><nav data-product-config-tabs>${keys.map(key=>`<button data-product-config-nav="${key}"><strong>${key}</strong></button>`).join('')}</nav><form data-product-config-form>${keys.filter(key=>key!=='workflow').map(section).join('')}<div class="product-config-actionbar"><button type="button" data-product-config-previous>Previous</button><button type="button" data-product-config-next>Next</button></div></form><section data-product-config-step="workflow"><form data-product-approval-form><input name="group" value="CREDIT_OFFICER">${error?'<p role="alert">Choose a group</p>':''}</form></section></main>`,{runScripts:'outside-only',url:'http://localhost/admin/loan-products/1'+query});
+  const dom=new JSDOM(`<main data-product-config-workspace><nav data-product-config-tabs>${keys.map(key=>`<button data-product-config-nav="${key}"><strong>${key}</strong></button>`).join('')}</nav><form id="product" class="accounting-create-form" data-product-config-form>${keys.filter(key=>key!=='workflow').map(section).join('')}${guarantorDraft}<div class="product-config-actionbar"><span hidden data-product-config-save-state></span><button type="button" data-product-config-previous>Previous</button><button type="button" data-product-config-next>Next</button></div></form><section data-product-config-step="workflow"><label>Number of guarantors<input form="product" name="guarantorsRequired" type="number" min="0" max="15" required value="2"></label><button type="submit" form="product">Save product</button><form data-product-approval-form><input name="group" value="CREDIT_OFFICER">${error?'<p role="alert">Choose a group</p>':''}</form></section></main>`,{runScripts:'outside-only',url:'http://localhost/admin/loan-products/1'+query});
   dom.window.scrollTo=()=>{};dom.window.requestAnimationFrame=fn=>fn();dom.window.eval(source);return dom;
 }
 test('product tabs follow displayed order and keep approval in its own form',()=>{
@@ -22,6 +22,33 @@ test('product tabs follow displayed order and keep approval in its own form',()=
     assert.equal(d.querySelector('[name="pricing"]').value,'retained');
     d.querySelector('[name="identity"]').dispatchEvent(new w.Event('invalid'));
     assert.equal(selected(),'identity');
+  }finally{w.close();}
+});
+
+test('workflow guarantor count belongs to the product save, retains its bounds and reveals errors from another tab',()=>{
+  const dom=setup(),w=dom.window,d=w.document;try{
+    const product=d.querySelector('[data-product-config-form]'),approval=d.querySelector('[data-product-approval-form]'),count=product.elements.guarantorsRequired;
+    assert.equal(count.closest('[data-product-config-step]').dataset.productConfigStep,'workflow');
+    assert.equal(new w.FormData(product).get('guarantorsRequired'),'2');assert.equal(new w.FormData(approval).has('guarantorsRequired'),false);
+    count.value='3';count.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(d.querySelector('[data-product-config-save-state]').hidden,false);
+    assert.equal(new w.FormData(product).get('guarantorsRequired'),'3');
+    for(const invalid of ['','-1','16']){d.querySelector('[data-product-config-nav="evidence"]').click();count.value=invalid;assert.equal(product.checkValidity(),false);assert.equal(d.querySelector('[aria-selected="true"]').dataset.productConfigNav,'workflow');}
+    count.value='0';assert.equal(product.checkValidity(),true);assert.equal(d.querySelector('[data-product-config-step="workflow"] button[type="submit"]').form,product);
+  }finally{w.close();}
+});
+
+test('failed product saves restore an externally associated guarantor count and reveal its workflow error',()=>{
+  const dom=setup('','', '<div data-loan-product-form-draft><span data-loan-product-form-value="guarantorsRequired">4</span></div>');
+  try{const d=dom.window.document,count=d.querySelector('[name="guarantorsRequired"]');assert.equal(count.value,'4');count.classList.add('field-error-input');d.querySelector('[data-product-config-form]').dispatchEvent(new dom.window.Event('submit',{cancelable:true}));count.dispatchEvent(new dom.window.Event('invalid'));assert.equal(d.querySelector('[aria-selected="true"]').dataset.productConfigNav,'workflow');}finally{dom.window.close();}
+});
+
+test('guarantor edits outside the product form keep unsaved-change protection during page initialization',async()=>{
+  const dom=setup(),w=dom.window,d=w.document;try{
+    d.body.insertAdjacentHTML('beforeend','<div id="accounting-discard-modal" hidden><div role="dialog"><div class="app-modal-actions"><button data-accounting-keep>Keep editing</button><button data-accounting-discard>Discard</button></div></div></div>');
+    w.eval(readFileSync('src/main/resources/static/js/accounting-form-ux.js','utf8'));
+    const count=d.querySelector('[name="guarantorsRequired"]');count.value='3';count.dispatchEvent(new w.Event('input',{bubbles:true}));
+    w.dispatchEvent(new w.Event('pageshow'));await new Promise(resolve=>setImmediate(resolve));
+    const leave=new w.CustomEvent('workspace:before-navigate',{cancelable:true,detail:{resume(){}}});d.dispatchEvent(leave);assert.equal(leave.defaultPrevented,true);assert.equal(d.querySelector('#accounting-discard-modal').hidden,false);assert.equal(count.value,'3');
   }finally{w.close();}
 });
 test('workflow return links and server errors reopen the approval form',()=>{

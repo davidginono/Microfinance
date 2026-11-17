@@ -1,0 +1,4 @@
+<%@ page pageEncoding="UTF-8" %>
+<label class="product-guarantor-count"><spring:message code="productDocuments.guarantors" />
+    <input form="${guarantorFormId}" name="guarantorsRequired" type="number" min="0" max="15" required class="aws-control" value="${empty guarantorProduct ? 2 : guarantorProduct.guarantorsRequired}" />
+</label>

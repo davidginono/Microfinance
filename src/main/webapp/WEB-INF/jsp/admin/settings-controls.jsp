@@ -420,12 +420,14 @@
                         </div>
                     </section>
 
-                    <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
                     <section class="product-builder-section">
                         <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
-                        <div class="product-builder-section-body"><%@ include file="../fragments/loan-product-approval-fields.jspf" %></div>
+                        <div class="product-builder-section-body">
+                            <c:set var="guarantorProduct" value="${null}" /><c:set var="guarantorFormId" value="loanProductCreateForm" />
+                            <%@ include file="../fragments/loan-product-guarantor-field.jspf" %>
+                            <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')"><%@ include file="../fragments/loan-product-approval-fields.jspf" %></sec:authorize>
+                        </div>
                     </section>
-                    </sec:authorize>
                     <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')">
                     <section class="product-builder-section"><div class="product-builder-section-header"><h2><spring:message code="productAccounts.title" /></h2></div>
                         <div class="product-builder-section-body product-builder-grid two-up"><c:set var="chargeFormId" value="loanProductCreateForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></div>

@@ -66,7 +66,7 @@
 }
 .aws-console:has([data-admin-workspace]) .product-document-fields {display:grid;gap:20px;min-width:0;}
 .aws-console:has([data-admin-workspace]) .product-document-fields label {font-size:14px;line-height:20px;}
-.aws-console:has([data-admin-workspace]) .product-document-count {display:flex;flex-direction:column;gap:8px;max-width:220px;}
+.aws-console:has([data-admin-workspace]) .product-guarantor-count {display:flex;flex-direction:column;gap:8px;max-width:220px;}
 .aws-console:has([data-admin-workspace]) .product-document-options {display:grid;gap:12px;}
 .aws-console:has([data-admin-workspace]) .product-document-check {display:flex;flex-direction:row;align-items:flex-start;gap:8px;font-size:14px;font-weight:400;}
 .aws-console:has([data-admin-workspace]) .product-document-check input {flex:none;width:16px;height:16px;margin:2px 0 0;}

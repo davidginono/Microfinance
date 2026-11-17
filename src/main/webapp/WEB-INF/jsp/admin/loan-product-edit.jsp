@@ -58,7 +58,7 @@
             <button type="button" data-product-config-nav="pricing">
                 <span><strong><spring:message code="admin.settings.loanProducts.repaymentCharges" /></strong></span>
             </button>
-            <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')"><button type="button" data-product-config-nav="workflow"><span><strong><spring:message code="admin.settings.workflow.title" /></strong></span></button></sec:authorize>
+            <button type="button" data-product-config-nav="workflow"><span><strong><spring:message code="admin.settings.workflow.title" /></strong></span></button>
             <button type="button" data-product-config-nav="accounts">
                 <span><strong><spring:message code="productAccounts.title" /></strong></span>
             </button>
@@ -70,7 +70,7 @@
     </section>
 
     <div class="product-config-workspace-main">
-        <form action="/admin/settings-controls/${product.id}"
+        <form id="loanProductConfigForm" action="/admin/settings-controls/${product.id}"
                    method="post"
                    class="product-builder-form accounting-create-form"
                   data-inline-validation-form="loan-settings"
@@ -218,18 +218,21 @@
         <c:if test="${canSetChargeAccounts}"><form id="productChargePolicyForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />" data-workspace-submit="recover" data-product-charge-form>
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
         </form></c:if>
-        <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
         <section class="product-builder-section product-config-step" data-product-config-step="workflow">
             <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
             <div class="product-builder-section-body" data-product-config-panel hidden>
+                <c:set var="guarantorProduct" value="${product}" /><c:set var="guarantorFormId" value="loanProductConfigForm" />
+                <%@ include file="../fragments/loan-product-guarantor-field.jspf" %>
+                <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_UPDATE')"><div class="accounting-actions"><button type="submit" form="loanProductConfigForm" class="app-btn btn-launch"><spring:message code="admin.workspace.saveProduct" /></button></div></sec:authorize>
+                <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
                 <form method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/approval' />" data-workspace-submit="recover" data-product-approval-form>
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <%@ include file="../fragments/loan-product-approval-fields.jspf" %>
                     <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_CONFIGURE')"><div class="accounting-actions"><button class="app-btn btn-launch"><spring:message code="common.save" /></button></div></sec:authorize>
                 </form>
+                </sec:authorize>
             </div>
         </section>
-        </sec:authorize>
 </div>
 </div>
 

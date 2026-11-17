@@ -546,12 +546,17 @@
             previousButton?.addEventListener('click', () => moveStep(-1));
             nextButton?.addEventListener('click', () => moveStep(1));
 
-            form.addEventListener('invalid', (event) => {
+            workspace.addEventListener('invalid', (event) => {
+                if (event.target.form !== form) return;
                 const step = event.target.closest('[data-product-config-step]');
                 if (step) {
                     activateStep(step.getAttribute('data-product-config-step'));
                 }
             }, true);
+
+            Array.from(form.elements).filter(field => !form.contains(field)).forEach(field => {
+                for (const type of ['input','change']) field.addEventListener(type, () => form.dispatchEvent(new Event(type, {bubbles:true})));
+            });
 
             form.addEventListener('input', () => {
                 if (saveState) {
@@ -565,14 +570,14 @@
                 if (!event.defaultPrevented) {
                     return;
                 }
-                const firstError = form.querySelector('.field-error-input, [aria-invalid="true"]');
+                const firstError = Array.from(form.elements).find(field => field.matches('.field-error-input, [aria-invalid="true"]'));
                 const errorStep = firstError?.closest('[data-product-config-step]');
                 if (errorStep) {
                     activateStep(errorStep.getAttribute('data-product-config-step'));
                 }
             });
 
-            const firstServerError = form.querySelector('.field-error-input, [aria-invalid="true"]');
+            const firstServerError = Array.from(form.elements).find(field => field.matches('.field-error-input, [aria-invalid="true"]'));
             let initialKey = workspace.querySelector('[data-product-approval-form] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'workflow'
                 ? 'workflow' : firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
             if (workspace.querySelector('[data-product-config-step="accounts"] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'accounts') initialKey = 'accounts';
