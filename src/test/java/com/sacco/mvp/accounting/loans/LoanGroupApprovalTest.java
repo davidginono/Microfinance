@@ -46,6 +46,21 @@ class LoanGroupApprovalTest {
         return new AppUserPrincipal(m,EnumSet.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.LOAN_RECORDING_REJECT));
     }
     void decide(AppUserPrincipal p,String decision){service.decide(p,loan,request.id(),UUID.randomUUID(),decision,"Reviewed signed terms");}
+    @Test void progressReadsFrozenEvidenceWithTheRequestedWorkspaceClaimAndNoDecisionActions(){
+        var p=person(UUID.randomUUID(),Position.ACCOUNTS_CLERK);
+        for(var claim:List.of(UserClaim.DISBURSEMENT_QUEUE_VIEW,UserClaim.DISBURSEMENT_QUEUE_DISBURSE,UserClaim.LOAN_RECORDING_VIEW)){
+            var progress=service.progress(p,claim,loan);
+            assertThat(progress.steps()).containsExactly(new GroupStep(Position.CREDIT_OFFICER,2),new GroupStep(Position.MANAGER,1));
+            assertThat(progress.request()).isEqualTo(request);assertThat(progress.canApprove()).isFalse();assertThat(progress.canReject()).isFalse();
+            verify(access).requireActor(p,claim.name());
+        }
+        verify(records,never()).groupRule(any(),any());verify(records,never()).groupDecision(any(),any());
+    }
+    @Test void progressRejectsUnrelatedClaimsBeforeReadingEvidence(){
+        var p=person(UUID.randomUUID(),Position.ACCOUNTS_CLERK);
+        assertThatThrownBy(()->service.progress(p,UserClaim.LOAN_RECORDING_POST,loan)).isInstanceOf(AccessDeniedException.class);
+        verify(records,never()).groupRequest(any(),any());
+    }
     @Test void customWorkflowUsesInstitutionReferenceAndExistingVersionChecks(){
         var p=person(UUID.randomUUID(),Position.ICT_MANAGER);
         when(products.ensureCustomApprovalReference("I1")).thenReturn(product);

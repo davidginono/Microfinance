@@ -84,6 +84,18 @@ public class LoanGroupApprovalService {
         records.groupRule(a,rule,clock.now());event(a,rule.id(),"LOAN_GROUP_RULE_SAVED",Map.of("product",f.getProductId(),"revision",rule.revision()));
     }
     @Transactional(readOnly=true)
+    public GroupReview progress(AppUserPrincipal actor,UserClaim permission,UUID loan) {
+        if(permission==null||!Set.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.DISBURSEMENT_QUEUE_VIEW,
+            UserClaim.DISBURSEMENT_QUEUE_DISBURSE).contains(permission))throw new AccessDeniedException("Loan workspace permission required");
+        access.requireActor(actor,permission.name());
+        records.groupLoan(actor,loan,false);
+        var request=records.groupRequest(actor,loan).orElse(null);
+        if(request==null)return new GroupReview(null,List.of(),List.of(),0,false,false,false);
+        var plan=steps(records.groupSteps(actor,request.rule()));
+        var decisions=records.groupDecisions(request);
+        return new GroupReview(request,plan,decisions,next(plan,decisions),false,false,false);
+    }
+    @Transactional(readOnly=true)
     public GroupReview review(AppUserPrincipal a,UUID loan) {
         access.requireActor(a,"LOAN_RECORDING_VIEW");var l=records.groupLoan(a,loan,false);
         var r=records.groupRequest(a,loan).orElse(null);

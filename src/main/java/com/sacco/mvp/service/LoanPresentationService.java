@@ -410,6 +410,41 @@ public class LoanPresentationService {
             org.springframework.context.i18n.LocaleContextHolder.getLocale());
     }
 
+    public List<Map<String, Object>> buildProgressItems(LoanApplication app,
+            com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupReview review) {
+        if(review==null||review.request()==null)return buildProgressItems(app);
+        var status=app.getStatus();
+        var items=new ArrayList<Map<String,Object>>();
+        boolean recorded=status==LoanStatus.RECORDED||status==LoanStatus.DRAFT;
+        items.add(progressItem(message("recording.status.RECORDED"),true,recorded,recorded?"current":"completed"));
+        int rejection=review.decisions().stream().filter(d->"REJECT".equals(d.decision()))
+            .mapToInt(d->d.step()).min().orElse(-1);
+        boolean stopped=rejection>=0||recorded||status==LoanStatus.WITHDRAWN||status==LoanStatus.REJECTED;
+        boolean currentFound=false;
+        for(int i=0;i<review.steps().size();i++) {
+            final int step=i;
+            var rule=review.steps().get(i);
+            long approved=review.decisions().stream().filter(d->d.step()==step&&"APPROVE".equals(d.decision()))
+                .map(d->d.actor()).distinct().count();
+            boolean rejected=i==rejection;
+            boolean completed=approved>=rule.approvals()&&!rejected;
+            boolean current=rejected?status==LoanStatus.REJECTED:
+                !completed&&!stopped&&!currentFound&&status==LoanStatus.SUBMITTED;
+            if(current)currentFound=true;
+            String state=rejected?"rejected":completed?"completed":stopped?"closed":current?"current":"pending";
+            var item=progressItem(message("userGroup."+rule.group().userGroup().name()),completed||current,current,state);
+            item.put("approved",approved);item.put("required",rule.approvals());items.add(item);
+        }
+        boolean funded=app.getDisbursementDate()!=null||Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,
+            LoanStatus.PAID,LoanStatus.WRITTEN_OFF,LoanStatus.DISBURSEMENT_REVERSED).contains(status);
+        boolean ready=status==LoanStatus.READY_FOR_DISBURSEMENT;
+        items.add(progressItem(message("recording.status.READY_FOR_DISBURSEMENT"),funded||ready,ready,
+            funded?"completed":ready?"current":stopped?"closed":"pending"));
+        if(!recorded&&!ready&&status!=LoanStatus.SUBMITTED&&(status!=LoanStatus.REJECTED||rejection<0))
+            items.add(progressItem(statusLabel(status),true,true,status==LoanStatus.WITHDRAWN?"closed":"current"));
+        return items;
+    }
+
     public List<Map<String, Object>> buildProgressItems(LoanApplication app) {
         if (app == null || app.getStatus() == null) {
             return List.of(progressItem("Draft", true, true, "current"));

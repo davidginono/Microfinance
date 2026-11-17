@@ -91,6 +91,7 @@ public class DisbursementController {
     private final com.sacco.mvp.service.ArchivedLoanDeletionService archivedLoanDeletionService;
     private final ManagerService managerService;
     private final com.sacco.mvp.accounting.loans.service.LoanRecordingService loanRecordingService;
+    private final com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService loanGroupApprovals;
     private final com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups;
     private final MemberDirectoryService memberDirectoryService;
     private final ObjectMapper objectMapper;
@@ -439,7 +440,7 @@ public class DisbursementController {
         model.addAttribute("disbursementProofRequired", recordedApplication ? loanRecordingService.disbursementProofRequired(app) : managerService.isDisbursementProofRequired(app));
         model.addAttribute("allowPaymentSync", true);
         model.addAttribute("allowDefaultedPaymentRecheck", canDisburseLoan);
-        addReviewDisplayAttributes(model, app);
+        addReviewDisplayAttributes(model, app, principal);
         return "disbursement/detail";
     }
 
@@ -747,13 +748,14 @@ public class DisbursementController {
         return status == LoanStatus.DISBURSED || status == LoanStatus.DEFAULTED || status == LoanStatus.PAID;
     }
 
-    private void addReviewDisplayAttributes(Model model, LoanApplication app) {
+    private void addReviewDisplayAttributes(Model model, LoanApplication app, AppUserPrincipal principal) {
         model.addAttribute("loanIdShort", app.getApplicationNumber() == null ? "" : app.getApplicationNumber().toString());
         model.addAttribute("disbursedLoanId", app.getLoanId());
         model.addAttribute("showReviewSidebar", app.getDisbursementDate() != null);
         model.addAttribute("managerReviewLayoutClass", app.getDisbursementDate() != null ? "xl:grid-cols-[1.45fr_0.55fr]" : "");
         model.addAttribute("applicantDetailsGridClass", app.getDisbursementDate() != null ? "sm:grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3");
-        model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app));
+        model.addAttribute("loanProgressItems", loanPresentationService.buildProgressItems(app,
+            loanGroupApprovals.progress(principal,disbursementReadClaim(principal),app.getId())));
         model.addAttribute("managerStatusBadgeClass", switch (app.getStatus()) {
             case READY_FOR_MANAGER -> "bg-amber-50 text-amber-700";
             case AWAITING_LOAN_OFFICER, AWAITING_BOARD, AWAITING_CREDIT_COMMITTEE, AWAITING_ACCOUNTANT -> "bg-blue-50 text-blue-700";

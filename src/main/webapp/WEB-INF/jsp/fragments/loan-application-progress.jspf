@@ -5,7 +5,7 @@
     <h3 id="loanApplicationProgressTitle"><spring:message code="loan.progress" text="Progress" /></h3>
     <div class="loan-simple-progress-list">
         <c:forEach items="${loanProgressItems}" var="item">
-            <div class="loan-simple-progress-item is-${item.state}">
+            <div class="loan-simple-progress-item is-${item.state}" ${item.current?'aria-current="step"':''}>
                 <span class="loan-simple-progress-dot" aria-hidden="true"></span>
                 <span class="loan-simple-progress-content">
                     <span class="loan-simple-progress-label"><c:out value="${item.label}" /></span>
@@ -18,6 +18,7 @@
                             <c:otherwise><spring:message code="loan.progress.pending" text="Pending" /></c:otherwise>
                         </c:choose>
                     </span>
+                    <c:if test="${not empty item.required}"><span class="loan-simple-progress-state"><spring:message code="loanGroups.count" />: <c:out value="${item.approved}" /> / <c:out value="${item.required}" /></span></c:if>
                     <c:if test="${item.current}">
                         <span class="loan-simple-progress-pill"><spring:message code="loan.progress.currentStatus" text="Current Status" /></span>
                     </c:if>

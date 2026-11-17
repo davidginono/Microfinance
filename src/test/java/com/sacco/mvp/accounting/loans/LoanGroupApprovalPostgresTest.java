@@ -215,6 +215,17 @@ class LoanGroupApprovalPostgresTest {
         assertThat(status()).isEqualTo("READY_FOR_DISBURSEMENT");assertThat(count("loan_ledgers")).isZero();assertThat(count("gl_journal")).isZero();
         assertThatThrownBy(()->f.jdbc.update("delete from loan_group_decision where request_id=?",request)).isInstanceOf(DataAccessException.class);
     }
+    @Test void progressUsesTheLatestRoundAndFrozenRuleWithinTheLiveBranch(){
+        UUID request=submit();rule(1,1);
+        var original=service.progress(f.actor,UserClaim.LOAN_RECORDING_VIEW,loan);
+        assertThat(original.steps().getFirst().approvals()).isEqualTo(2);
+        decide(first,request,"REJECT");UUID next=UUID.randomUUID();service.submit(f.actor,loan,next);
+        var current=service.progress(f.actor,UserClaim.DISBURSEMENT_QUEUE_VIEW,loan);
+        assertThat(current.request().id()).isEqualTo(next);assertThat(current.steps().getFirst().approvals()).isEqualTo(1);
+        assertThat(current.decisions()).isEmpty();assertThat(current.canApprove()).isFalse();
+        assertThatThrownBy(()->service.progress(f.operator("B2"),UserClaim.DISBURSEMENT_QUEUE_VIEW,loan)).isInstanceOf(AccessDeniedException.class);
+        assertThat(count("gl_journal")).isZero();
+    }
     @Test void termFingerprintIgnoresNumericScaleAndKeepsActualValuesDistinct(){
         assertThat(f.jdbc.queryForObject("select loan_group_canonical(?::jsonb)::text=loan_group_canonical(?::jsonb)::text",Boolean.class,
             "{\"amount\":1000.00,\"fees\":[10.00,0.0500]}","{\"fees\":[10.0,0.05],\"amount\":1000}")).isTrue();
