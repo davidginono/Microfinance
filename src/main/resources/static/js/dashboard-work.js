@@ -10,7 +10,7 @@
         const label=key=>labels[key]||labels['dashboard.work.open']||'';
         const l=key=>label('dashboard.work.'+key);
         const canvas=root.querySelector('[data-work-cards]'),chart=root.querySelector('[data-work-chart]'),status=root.querySelector('[data-work-status]');
-        const entries=new Map(),lifetime=new AbortController();let request=null,version=0,timer=null;
+        const entries=new Map(),lifetime=new AbortController();let request=null,version=0,timer=null,loaded=false;
         const format=value=>new Intl.NumberFormat(document.documentElement.lang||'en',{maximumFractionDigits:2}).format(value);
         const urlFor=path=>{const url=new URL((root.dataset.contextPath||'')+path,location.origin);if(url.origin!==location.origin)throw new Error('scope');return url.href;};
         const button=(text,cls='app-btn btn-neutral')=>{const el=node('button',cls,text);el.type='button';return el;};
@@ -66,13 +66,14 @@
             finally{clearTimeout(timeout);if(e.version===current){window.AppLoading?.end(e.front);e.request=null;}}
         }
         async function load(){
-            if(!visible()||request)return;const controller=new AbortController(),current=++version;request=controller;const timeout=setTimeout(()=>controller.abort(),20000);status.textContent='';status.setAttribute('role','status');root.setAttribute('aria-busy','true');
-            if(!entries.size)window.AppLoading?.begin(canvas,{replace:true,table:false,label:general.loading});
+            if(!visible()||request)return;const controller=new AbortController(),current=++version;request=controller;const timeout=setTimeout(()=>controller.abort(),20000);root.setAttribute('aria-busy','true');
+            // An empty result is loaded content too. Keep its message and height during polling.
+            if(!loaded){status.textContent='';status.setAttribute('role','status');window.AppLoading?.begin(canvas,{replace:true,table:false,label:general.loading});}
             try{
                 const data=await fetchWork(controller);if(current!==version||!visible())return;
                 const ids=new Set(data.infolets.map(item=>item.id));for(const [id,e] of entries)if(!ids.has(id)){e.widget.remove();entries.delete(id);}
                 for(const item of data.infolets){const e=entries.get(item.id);if(!e)create(item);else if(!e.minimumDays&&!Number(e.minimumAmount))update(e,item);}
-                status.textContent=data.infolets.length?'':l('empty');
+                const message=data.infolets.length?'':l('empty');if(status.textContent!==message)status.textContent=message;status.setAttribute('role','status');loaded=true;
                 if(data.infolets.length)window.DashboardCharts?.render(chart,{type:'bar',height:240,title:l('chart'),integer:true,xLabel:l('title'),labels:data.infolets.map(item=>label(item.labelKey)),series:[{label:l('title'),values:data.infolets.map(item=>item.count)}]});else chart.replaceChildren();
                 const captured=new Date(data.capturedAt);if(!Number.isNaN(captured.getTime()))root.querySelector('[data-work-updated]').textContent=l('updated')+' '+new Intl.DateTimeFormat(document.documentElement.lang||'en',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'Africa/Nairobi'}).format(captured);
                 for(const e of entries.values())if(e.minimumDays||Number(e.minimumAmount))void loadCard(e);

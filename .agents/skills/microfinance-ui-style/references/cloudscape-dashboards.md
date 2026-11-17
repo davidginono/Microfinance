@@ -31,4 +31,6 @@ Live widgets use existing scoped bounded endpoints with localized loading/error/
 
 Background refresh must not replace unchanged metric text, chart graphics, legends or data rows. Keep a ready widget visible when restored; reserve replacement spinners for initial loads and an explicitly changed data range. Build changed graphics off the live DOM and replace them atomically, retain legend focus and open data views, and redraw resize notifications only when the chart width actually changes.
 
+An empty result is loaded content. Retain its message and error state while polling; update them only when a response settles. Clearing the Pending work message while its request is in flight changes the auto-sized card height and shifts the board every five seconds.
+
 Verify layout restoration, permissions changing between visits, native control preservation, drag/keyboard reordering and resizing, palette add/remove/reset, missing/zero values, chart legends and data alternatives, stale responses and cancellation. Check 360/768/1366/1920px, English/Kiswahili and reduced motion. Component previews with sample data do not establish authenticated route or tenant-isolation correctness.
