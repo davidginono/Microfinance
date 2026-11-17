@@ -23,7 +23,8 @@ class FundingDeductionPostgresTest {
         var loan=f.chargedLoan();var ids=selected(loan,"APPLICATION","INSURANCE");
         var quote=f.service.fundingQuote(f.actor,loan,LoanRecordingPostgresTest.TODAY,ids);
         assertThat(quote.cash()).isEqualByComparingTo("980.00");assertThat(quote.deductions()).isEqualByComparingTo("20.00");assertThat(quote.separate()).isEqualByComparingTo("10.00");
-        var form=f.chargedFunding(loan);form.setDeductChargeIds(ids);var posted=f.service.disburse(f.actor,form);
+        var form=f.chargedFunding(loan);form.setEvidence("");form.setDeductChargeIds(ids);var posted=f.service.disburse(f.actor,form);
+        assertThat(f.jdbc.queryForList("select evidence from loan_charge_event where loan_id=? and kind in ('ASSESS','DEDUCT')",String.class,loan)).hasSize(5).allMatch(form.getReference()::equals);
         assertThat(posted.amount()).isEqualByComparingTo("980.00");
         assertThat(f.service.detail(f.actor,loan).loan().principal()).isEqualByComparingTo("1000.00");
         var summary=f.service.chargeSummary(f.actor,loan);
@@ -38,16 +39,23 @@ class FundingDeductionPostgresTest {
     @Test void agreedDeductionsRemainMandatory(){
         f.fixture();f.chargePolicy("DEDUCT");var loan=f.chargedLoan();
         assertThat(f.service.fundingQuote(f.actor,loan,LoanRecordingPostgresTest.TODAY,List.of()).deductions()).isEqualByComparingTo("30.00");
-        f.service.disburse(f.actor,f.chargedFunding(loan));
+        var form=f.chargedFunding(loan);form.setEvidence("");f.service.disburse(f.actor,form);
         assertThat(f.service.chargeSummary(f.actor,loan).balance().outstanding()).isZero();
     }
-    @Test void foreignAndDuplicateChoicesAndMissingEvidenceFailBeforeMoneyMoves(){
+    @Test void separateChargesUseThePaymentReferenceWithoutAnExtraEvidenceEntry(){
+        var loan=f.chargedLoan();var form=f.chargedFunding(loan);form.setEvidence("");
+        var posted=f.service.disburse(f.actor,form);
+        assertThat(posted.amount()).isEqualByComparingTo("1000.00");
+        assertThat(f.service.chargeSummary(f.actor,loan).balance().outstanding()).isEqualByComparingTo("30.00");
+        assertThat(f.jdbc.queryForList("select evidence from loan_charge_event where loan_id=? and kind='ASSESS'",String.class,loan)).hasSize(3).allMatch(form.getReference()::equals);
+    }
+    @Test void foreignAndDuplicateChoicesAndMissingPaymentReferenceFailBeforeMoneyMoves(){
         var loan=f.chargedLoan();var foreign=f.chargedLoan();var form=f.chargedFunding(loan);
         form.setDeductChargeIds(selected(foreign,"APPLICATION"));
         assertThatThrownBy(()->f.service.disburse(f.actor,form)).hasMessage("charges.error.selection");
         var id=selected(loan,"APPLICATION").getFirst();form.setDeductChargeIds(List.of(id,id));
         assertThatThrownBy(()->f.service.disburse(f.actor,form)).hasMessage("charges.error.selection");
-        form.setDeductChargeIds(List.of(id));form.setEvidence("");
+        form.setDeductChargeIds(List.of(id));form.setEvidence("");form.setReference("");
         assertThatThrownBy(()->f.service.disburse(f.actor,form)).isInstanceOf(IllegalArgumentException.class);
         assertThat(f.service.chargeSummary(f.actor,loan).balance().assessed()).isZero();
         assertThat(f.jdbc.queryForObject("select count(*) from accountant_loan_post where loan_id=?",Integer.class,loan)).isZero();
