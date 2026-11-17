@@ -34,7 +34,7 @@
         native.tabIndex = -1; native.setAttribute('aria-hidden', 'true');
         let emitting = false, lastValue, invalidText = false;
         function sync() {
-            if (!emitting && native.value !== lastValue) {input.value = grouped(native.value); invalidText = false; lastValue = native.value;}
+            if (!emitting && native.value !== lastValue) {input.value = grouped(native.readOnly ? native.value.replace(/\.0+$/, '') : native.value); invalidText = false; lastValue = native.value;}
             input.className = native.className.replace(/\berp-amount-native\b/g, '').trim();
             input.disabled = native.disabled; input.readOnly = native.readOnly; input.required = native.required;
             input.placeholder = native.placeholder;

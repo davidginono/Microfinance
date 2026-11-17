@@ -11,9 +11,7 @@
         const loading=form.querySelector('[data-funding-cash]');
         let controller,version=0;
         const money=value=>{const [whole,fraction='']=String(value).split('.');return whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+'.'+fraction.padEnd(2,'0');};
-        function close(){if(picker)picker.hidden=true;toggle?.setAttribute('aria-expanded','false');}
         toggle?.addEventListener('click',()=>{picker.hidden=!picker.hidden;toggle.setAttribute('aria-expanded',String(!picker.hidden));if(!picker.hidden)picker.querySelector('input:not(:disabled)')?.focus();});
-        picker?.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();close();toggle.focus();}});
         async function refresh(){
             const current=++version;controller?.abort();const active=controller=new AbortController();
             if(loading)window.AppLoading?.end(loading);
@@ -44,10 +42,10 @@
                 form.dispatchEvent(new Event('funding:error'));
             }finally{clearTimeout(timeout);if(current===version && loading)window.AppLoading?.end(loading);}
         }
-        picker?.addEventListener('change',()=>{close();toggle.focus();void refresh();});
+        picker?.addEventListener('change',refresh);
         date?.addEventListener('change',refresh);
         form.addEventListener('submit',event=>{if(submit?.disabled)event.preventDefault();});
-        window.addEventListener('pagehide',()=>{++version;controller?.abort();close();},{signal:lifetime.signal});
+        window.addEventListener('pagehide',()=>{++version;controller?.abort();},{signal:lifetime.signal});
         window.addEventListener('pageshow',event=>{if(event.persisted)void refresh();},{signal:lifetime.signal});
         document.addEventListener('workspace:navigated',()=>{if(!form.isConnected){++version;controller?.abort();lifetime.abort();}},{signal:lifetime.signal});
         void refresh();

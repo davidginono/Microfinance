@@ -12,6 +12,14 @@ async function setup(markup=''){
  dom.window.eval(source);await tick();return dom;
 }
 function enter(w,input,value){input.value=value;input.dispatchEvent(new w.Event('input',{bubbles:true}));}
+
+test('read-only whole amounts omit zero decimals while fractional values and exact transport are preserved',async()=>{
+ const dom=await setup('<input name="depositAmount" type="number" data-amount-input="true" value="1500000.00" readonly>'),w=dom.window,d=w.document,n=d.querySelector('[name=depositAmount]'),display=n.parentElement.querySelector('[data-amount-display]');
+ for(const [raw,formatted] of [['1500000.00','1,500,000'],['1485000.00','1,485,000'],['1485000.50','1,485,000.50'],['0.00','0']]){
+  n.value=raw;assert.equal(display.value,formatted);assert.equal(new w.FormData(n.form).get('depositAmount'),raw);
+ }
+ const editable=d.querySelector('#amount'),entry=editable.parentElement.querySelector('[data-amount-display]');enter(w,entry,'1500000.00');assert.equal(entry.value,'1,500,000.00');assert.equal(editable.value,'1500000.00');dom.window.close();
+});
 test('grouped display preserves exact decimal transport, field identity and plain values for calculations',async()=>{
  const dom=await setup(),w=dom.window,d=w.document,n=d.querySelector('#amount'),display=d.querySelector('[data-amount-display]'),form=n.form;
  assert.equal(display.value,'100,000.50');assert.equal(n.value,'100000.50');assert.equal(d.querySelector('label').htmlFor,display.id);
