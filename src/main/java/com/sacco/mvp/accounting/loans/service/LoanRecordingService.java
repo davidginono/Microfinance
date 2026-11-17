@@ -230,7 +230,7 @@ public class LoanRecordingService {
     public AllocationPreview postingPreview(AppUserPrincipal a,PostForm f,String kind){
         authorize(a,kind.equals("DISBURSEMENT")?"DISBURSE":"POST");validatePost(f);records.record(a,f.getLoanId(),false);
         var loan=loans.findById(f.getLoanId()).orElseThrow();
-        records.account(a,f.getMoneyAccountId(),"MONEY",false);
+        records.account(a,f.getMoneyAccountId(),kind.equals("DISBURSEMENT")?"FUNDING_MONEY":"MONEY",false);
         if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
         check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
@@ -446,7 +446,7 @@ public class LoanRecordingService {
         BigDecimal deductions=charges.fundingDeductions(chargePlan,f.getDeductChargeIds());
         var linked=productAccounts.bind(a,loan.getId(),loan.getLoanProductSettingId(),null,"DISBURSEMENT");
         check(f.getPrincipalAccountId()==null || f.getPrincipalAccountId().equals(linked.principalId()),"account");
-        var money=records.account(a,f.getMoneyAccountId(),"MONEY");var principal=records.account(a,linked.principalId(),"PRINCIPAL");
+        var money=records.account(a,f.getMoneyAccountId(),"FUNDING_MONEY");var principal=records.account(a,linked.principalId(),"PRINCIPAL");
         TopUpQuote settlement=source.isPresent()?topUpQuote(a,source.get(),f.getEffectiveDate(),loan.getId()):null;
         Choice settlementInterest=null;
         if(settlement!=null){
@@ -667,14 +667,14 @@ public class LoanRecordingService {
         accounting.requireActor(actor,"DISBURSEMENT_QUEUE_DISBURSE");records.record(actor,loan,false);
         check(allowedTeller(loans.findById(loan).orElseThrow(),actor.getMemberId()),"customTeller");
         check(Set.of("money","principal","interest").contains(category) && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
-        return records.accounts(actor,category.toUpperCase(Locale.ROOT),search,page);
+        return records.accounts(actor,category.equals("money")?"FUNDING_MONEY":category.toUpperCase(Locale.ROOT),search,page);
     }
     @Transactional(readOnly=true)
     public Choice postingAccount(AppUserPrincipal actor,UUID loan,UUID id,String category) {
         accounting.requireActor(actor,"DISBURSEMENT_QUEUE_DISBURSE");records.record(actor,loan,false);
         check(allowedTeller(loans.findById(loan).orElseThrow(),actor.getMemberId()),"customTeller");
         check(Set.of("MONEY","PRINCIPAL","INTEREST").contains(category),"filter");
-        return records.account(actor,id,category,false);
+        return records.account(actor,id,category.equals("MONEY")?"FUNDING_MONEY":category,false);
     }
 
     private Map<String,Object> recordedPolicy(AppUserPrincipal a,LoanProductSetting selectedProduct,String label,Integer guarantors) {

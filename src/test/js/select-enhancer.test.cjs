@@ -137,3 +137,24 @@ test('manual activity choice survives remote searching and remains selectable al
   [...d.querySelectorAll('.neo-select-option')].find(o=>o.textContent.includes('All activities')).click();assert.equal(select.value,'');
  }finally{dom.window.close();}
 });
+
+test('payment-account setup guidance differs from a search with no matches',async()=>{
+    const html=`<form><div data-loan-choice data-category="money" data-choice-url="/disbursement/loan/posting-accounts/money"><label for="money">Payment account</label><select id="money" data-choice-select data-empty-message="Ask your accountant to check the cash group"><option value="">Choose</option></select><span data-choice-error data-error="Lookup unavailable" data-search-label="Search accounts"></span></div></form>`;
+    const {dom,w,d,advance}=await setup(html,async()=>response([]));await tick();
+    d.querySelector('.neo-select-button').click();await tick();
+    assert.equal(d.querySelector('.neo-select-empty').textContent,'Ask your accountant to check the cash group');
+    const search=d.querySelector('.neo-select-search input');search.value='missing';search.dispatchEvent(new w.Event('input'));advance(350);await tick();
+    assert.equal(d.querySelector('.neo-select-empty').textContent,'No matching options.');dom.window.close();
+});
+
+test('a failed account lookup shows its error in the menu and reopening recovers the real options',async()=>{
+    let fail=true;
+    const html=`<form><input name="_csrf" value="fixture"><div data-loan-choice data-category="money" data-choice-url="/disbursement/loan/posting-accounts/money"><label for="money">Payment account</label><select id="money" name="moneyAccountId" data-choice-select><option value="">Choose</option></select><span data-choice-error data-error="Lookup unavailable" data-search-label="Search accounts"></span></div></form>`;
+    const {dom,d}=await setup(html,async()=>fail?{ok:false,redirected:false}:response([{id:'bank',label:'111001 - Bank'}]));await tick();
+    d.querySelector('.neo-select-button').click();await tick();
+    assert.equal(d.querySelector('.neo-select-empty[role="alert"]').textContent,'Lookup unavailable');
+    d.querySelector('.neo-select-button').click();fail=false;d.querySelector('.neo-select-button').click();await tick();await tick();
+    assert.deepEqual(labels(d),['111001 - Bank']);
+    d.querySelector('.neo-select-option').click();assert.equal(d.querySelector('select').value,'bank');
+    assert.equal(d.querySelector('[name="_csrf"]').value,'fixture');dom.window.close();
+});

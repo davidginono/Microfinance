@@ -30,7 +30,7 @@ test('OTP validation can cancel a submission without locking the later verified 
 test('staff posting lookups use the scoped review endpoint and preserve the chosen account',async()=>{
   const dom=new JSDOM(`<form data-loan-form><div data-loan-choice data-category="money" data-choice-url="/disbursement/loan-applications/scoped-loan/posting-accounts/money"><select data-choice-select><option value="">Choose</option><option value="account" selected>Cash account</option></select><span data-choice-error data-search-label="Search accounts" data-error="Lookup failed"></span></div></form>`,{runScripts:'outside-only',url:'http://localhost/disbursement/loan-applications/scoped-loan'});
   const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button');let requested;
-  w.NeoSelect={search:()=>({input,more,setLoading:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
+  w.NeoSelect={search:()=>({input,more,setLoading:()=>{},setError:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
   w.fetch=async url=>{requested=url;return {ok:true,redirected:false,json:async()=>[{id:'account',label:'101 - Teller cash'}]};};
   w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
   await new Promise(resolve=>setImmediate(resolve));
@@ -195,7 +195,7 @@ test('product lookup preserves exact decimal limits and updates a retained selec
   const dom=new JSDOM(`<div data-loan-choice data-category="products"><select data-choice-select><option value="product" data-tenure-unit="MONTHS" selected>Selected product</option></select><span data-choice-error data-search-label="Search products" data-error="Lookup failed"></span></div>`,{runScripts:'outside-only',url:'http://localhost/finance/loan-records/new'});
   const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button'),select=w.document.querySelector('select');let changes=0;
   select.addEventListener('change',()=>changes++);
-  w.NeoSelect={search:()=>({input,more,setLoading:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
+  w.NeoSelect={search:()=>({input,more,setLoading:()=>{},setError:()=>{}})};w.AppSearch={bind:()=>({cancel:()=>{}})};
   w.fetch=async()=>({ok:true,redirected:false,json:async()=>[{id:'product',label:'Business loan',tenureUnit:'MONTHS',minimumAmount:'1000.00',maximumAmount:'9007199254740991.01',minimumTenure:3,maximumTenure:24}]});
   w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
   await new Promise(resolve=>setImmediate(resolve));

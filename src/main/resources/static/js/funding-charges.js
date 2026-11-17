@@ -8,7 +8,7 @@
         const toggle=form.querySelector('[data-funding-picker-toggle]'),picker=form.querySelector('.funding-charge-picker');
         const initiallyDisabled=!!submit?.disabled;
         const lifetime=new AbortController();
-        const loading=form.querySelector('[data-funding-cash]'),retry=form.querySelector('[data-funding-retry]');
+        const loading=form.querySelector('[data-funding-cash]');
         let controller,version=0;
         const money=value=>{const [whole,fraction='']=String(value).split('.');return whole.replace(/\B(?=(\d{3})+(?!\d))/g,',')+'.'+fraction.padEnd(2,'0');};
         function close(){if(picker)picker.hidden=true;toggle?.setAttribute('aria-expanded','false');}
@@ -21,7 +21,6 @@
             if(amount)amount.value='';
             for(const key of ['deductions','separate','cash']){const node=form.querySelector('[data-funding-'+key+']');if(node)node.textContent='—';}
             if(error){error.hidden=true;error.textContent='';}
-            if(retry)retry.hidden=true;
             const confirmation=form.querySelector('[data-funding-confirm]');if(confirmation)confirmation.checked=false;
             form.dispatchEvent(new Event('funding:pending'));
             if(!date?.value)return;
@@ -42,13 +41,11 @@
             }catch(failure){
                 if(current!==version)return;
                 if(error){error.textContent=failure.name==='AbortError'?form.dataset.fundingError:failure.message || form.dataset.fundingError;error.hidden=false;}
-                if(retry)retry.hidden=false;
                 form.dispatchEvent(new Event('funding:error'));
             }finally{clearTimeout(timeout);if(current===version && loading)window.AppLoading?.end(loading);}
         }
         picker?.addEventListener('change',()=>{close();toggle.focus();void refresh();});
         date?.addEventListener('change',refresh);
-        retry?.addEventListener('click',refresh);
         form.addEventListener('submit',event=>{if(submit?.disabled)event.preventDefault();});
         window.addEventListener('pagehide',()=>{++version;controller?.abort();close();},{signal:lifetime.signal});
         window.addEventListener('pageshow',event=>{if(event.persisted)void refresh();},{signal:lifetime.signal});

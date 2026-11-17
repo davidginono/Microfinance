@@ -25,7 +25,7 @@
 </div></section>
 <label class="aws-settings-checkbox-row"><input type="checkbox" required class="aws-settings-checkbox" data-funding-confirm /><span><spring:message code="simpleGroup.disburseConfirm" /></span></label>
 <c:if test="${not empty error}"><p class="coa-error" role="alert"><c:out value="${error}" /></p></c:if>
-<p data-funding-error role="alert" class="coa-error" hidden></p><button type="button" class="app-btn btn-neutral" data-funding-retry hidden><spring:message code="charges.retry" /></button>
+<p data-funding-error role="alert" class="coa-error" hidden></p>
 <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/disbursement/queue' />"><spring:message code="common.cancel" /></a><button type="submit" class="app-btn btn-launch" data-funding-submit><spring:message code="simpleGroup.disburse" /></button></div>
 </form></c:if>
 <script src="<c:url value='/js/loan-recording.js' />" defer></script><script src="<c:url value='/js/staff-funding-code.js' />" defer></script><script src="<c:url value='/js/funding-charges.js' />" defer></script>

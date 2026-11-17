@@ -137,7 +137,7 @@
                 const emptyState = document.createElement('div');
                 emptyState.className = 'neo-select-empty';
                 emptyState.setAttribute('role','status');
-                emptyState.textContent = state.loading ? document.body.dataset.shellLoading : query ? document.body.dataset.selectNoMatches : document.body.dataset.shellNoOptions;
+                emptyState.textContent = state.loading ? document.body.dataset.shellLoading : query ? document.body.dataset.selectNoMatches : select.dataset.emptyMessage || document.body.dataset.shellNoOptions;
                 state.list.appendChild(emptyState);
                 if (state.wrapper.classList.contains('neo-select--open')) {
                     positionMenu(state);

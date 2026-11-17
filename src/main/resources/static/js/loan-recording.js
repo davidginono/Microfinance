@@ -12,8 +12,8 @@
     let page = 0, request = 0, controller, loading = false, loadedSearch, failed = false;
     function showError(active) {
       failed = active;
-      if (lazy) picker.setError(active ? error.dataset.error : '');
-      else error.textContent = active ? error.dataset.error : '';
+      picker.setError(active ? error.dataset.error : '');
+      if (!lazy) error.textContent = active ? error.dataset.error : '';
     }
     async function load(targetPage = 0) {
       if (!select.isConnected) return;

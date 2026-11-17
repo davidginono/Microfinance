@@ -391,18 +391,20 @@ public class LoanRecordingRepository {
         """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),"",r.getString("tenure_unit"),r.getString("minimum_amount"),r.getString("maximum_amount"),r.getInt("minimum_tenure"),r.getInt("maximum_tenure")),a.getSaccoId(),id).stream().findFirst();}
     public List<Choice> accounts(AppUserPrincipal a,String purpose,String search,int page){return jdbc.query("""
         select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and
-        ((?='MONEY' and kind='POSTING' and purpose in ('CASH','BANK','MOBILE_MONEY') and type='ASSET')
+        ((?='FUNDING_MONEY' and gl_loan_disbursement_account(id,sacco_id))
+        or (?='MONEY' and kind='POSTING' and purpose in ('CASH','BANK','MOBILE_MONEY') and type='ASSET')
         or (?='PRINCIPAL' and kind in ('POSTING','CONTROL'))
         or (?='INTEREST' and kind in ('POSTING','CONTROL')))
         and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?
-        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
     public Choice account(AppUserPrincipal a,UUID id,String category){
         return account(a,id,category,true);
     }
     public Choice account(AppUserPrincipal a,UUID id,String category,boolean lock){
-        var rows=jdbc.queryForList("select id,code,name,purpose,kind,type,normal_balance from gl_account where sacco_id=? and id=? and active"+(lock?" for share":""),a.getSaccoId(),id);
+        var rows=jdbc.queryForList("select id,code,name,purpose,kind,type,normal_balance,case when ?='FUNDING_MONEY' then gl_loan_disbursement_account(id,sacco_id) else false end funding_money from gl_account where sacco_id=? and id=? and active"+(lock?" for share":""),category,a.getSaccoId(),id);
         if(rows.isEmpty())throw new IllegalArgumentException("recording.error.account");var r=rows.getFirst();String purpose=(String)r.get("purpose");
-        boolean valid=switch(category){case "MONEY"->"POSTING".equals(r.get("kind")) && "ASSET".equals(r.get("type")) && Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);
+        boolean valid=switch(category){case "FUNDING_MONEY"->Boolean.TRUE.equals(r.get("funding_money"));
+            case "MONEY"->"POSTING".equals(r.get("kind")) && "ASSET".equals(r.get("type")) && Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);
             case "PRINCIPAL","INTEREST"->Set.of("POSTING","CONTROL").contains(r.get("kind"));
             default->false;};
         if(!valid)throw new IllegalArgumentException("recording.error.account");return new Choice(id,r.get("code")+" - "+r.get("name"),purpose);
