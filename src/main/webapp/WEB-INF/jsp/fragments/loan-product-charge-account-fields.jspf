@@ -1,0 +1,13 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:forEach items="${['APPLICATION','PROCESSING','RECEIVABLE','INSURANCE']}" var="chargeCategory">
+    <c:set var="chargeAccountPath" value="${chargeCategory=='APPLICATION'?'applicationAccountId':chargeCategory=='PROCESSING'?'processingAccountId':chargeCategory=='RECEIVABLE'?'receivableAccountId':'insuranceAccountId'}" />
+    <div class="min-w-0" data-loan-choice data-category="${chargeCategory}" data-choice-url="<c:url value='/admin/settings-controls/loan-charge-accounts/${chargeCategory}' />">
+        <label><spring:message code="charges.account.${chargeCategory}" /><select form="${chargeFormId}" name="${chargeAccountPath}" class="aws-control" data-choice-select data-searchable="true">
+            <option value=""><spring:message code="recording.choose" /></option>
+            <c:set var="chargeSelectionListed" value="${false}" />
+            <c:forEach items="${chargeAccounts[chargeCategory]}" var="chargeAccount"><c:if test="${chargePolicy[chargeAccountPath] == chargeAccount.id}"><c:set var="chargeSelectionListed" value="${true}" /></c:if><option value="${chargeAccount.id}" ${chargePolicy[chargeAccountPath] == chargeAccount.id ? 'selected' : ''}><c:out value="${chargeAccount.label}" /></option></c:forEach>
+            <c:forEach items="${generatedChargeAccounts}" var="pendingChargeAccount"><c:if test="${not chargeSelectionListed and pendingChargeAccount.component == chargeCategory and pendingChargeAccount.state == 'PENDING' and chargePolicy[chargeAccountPath] == pendingChargeAccount.accountId}"><option value="${pendingChargeAccount.accountId}" selected><c:out value="${pendingChargeAccount.label}" /> - <spring:message code="coav.state.PENDING" /></option></c:if></c:forEach>
+        </select></label>
+        <%@ include file="../accounting/loans/choice-search.jspf" %>
+    </div>
+</c:forEach>
