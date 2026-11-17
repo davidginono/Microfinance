@@ -409,6 +409,7 @@ public enum UserClaim {
                 case BOARD -> claims.addAll(legacyClaims("REVIEW_BOARD_QUEUE"));
                 case CREDIT_COMMITTEE -> claims.addAll(legacyClaims("REVIEW_CREDIT_COMMITTEE_QUEUE"));
                 case MINOR_ADMIN -> claims.addAll(workspaceAdminDefaults());
+                case ICT_MANAGER -> addAll(claims, LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
                 case ADMIN -> claims.addAll(platformAdminDefaults());
                 default -> { }
             }
@@ -421,6 +422,7 @@ public enum UserClaim {
         EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
         claims.addAll(legacyClaims("ACCESS_ADMIN_SETTINGS"));
         claims.addAll(legacyClaims("ACCESS_OUTBOX_MONITOR"));
+        addAll(claims, LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
         claims.removeIf(claim -> !claim.isAvailable());
         return claims;
     }

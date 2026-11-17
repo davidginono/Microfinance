@@ -183,6 +183,16 @@ class UserClaimServiceTest {
         );
     }
 
+    @Test void explicitAdministratorRevocationsStillOverrideTheNewDefaultsInSingleAndBatchReads() {
+        UUID member=UUID.randomUUID();var roles=List.of(Position.ICT_MANAGER);
+        when(memberAccessClaimRepository.findByIdMemberId(member)).thenReturn(List.of(accessClaim(member,"USER_ACCESS_VIEW")));
+        when(memberAccessClaimRepository.findByIdMemberIdIn(Set.of(member))).thenReturn(List.of(accessClaim(member,"USER_ACCESS_VIEW")));
+        assertThat(userClaimService.effectiveClaims(member,roles,false)).containsExactly(UserClaim.USER_ACCESS_VIEW);
+        assertThat(userClaimService.effectiveClaims(java.util.Map.of(member,new UserClaimService.ClaimSubject(roles,false))).get(member))
+            .containsExactly(UserClaim.USER_ACCESS_VIEW);
+        verifyNoInteractions(userSettingsRepository);
+    }
+
     @Test
     void updateClaimsPersistsMatrixRowsAndRemovesLegacyJsonClaims() {
         UUID memberId = UUID.randomUUID();

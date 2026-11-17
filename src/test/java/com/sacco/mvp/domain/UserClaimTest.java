@@ -5,6 +5,18 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UserClaimTest {
+    @Test void allAdministratorDefaultsIncludeChargeAccountSetup() {
+        for(var role:java.util.List.of(Position.ADMIN,Position.MINOR_ADMIN,Position.ICT_MANAGER)) {
+            assertThat(UserClaim.defaultClaims(java.util.List.of(role),false)).as(role.name())
+                .contains(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE)
+                .doesNotContain(UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_APPROVE,UserClaim.ACCOUNTING_ACCOUNT_APPROVAL_REJECT,
+                    UserClaim.LOAN_CHARGES_CUSTOM,UserClaim.LOAN_RECORDING_POST);
+        }
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.ICT_MANAGER),false))
+            .containsExactlyInAnyOrder(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
+        assertThat(UserClaim.defaultClaims(java.util.List.of(Position.LOAN_OFFICER),false))
+            .doesNotContain(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
+    }
     @Test void groupLendingClaimsRequireExplicitAssignmentAndPermitTheirOwnLanding() {
         var groupClaims=java.util.Arrays.stream(UserClaim.values()).filter(c->c.getFeature()==AccessFeature.GROUP_LENDING).toList();
         assertThat(groupClaims).hasSize(9);
