@@ -123,7 +123,8 @@ public class AdminController {
             }
             return;
         }
-        var editor=loanCharges.editor(actor,product,(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm)model.asMap().get("chargePolicy"));
+        var editor=product==null?loanCharges.editor(actor,null,(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm)model.asMap().get("chargePolicy"))
+            :loanCharges.accountEditor(actor,product,(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.AccountMappingForm)model.asMap().get("chargeAccountDraft"));
         model.addAttribute("chargePolicy",editor.form());model.addAttribute("currentChargePolicy",editor.current());
         model.addAttribute("chargeAccounts",editor.accounts());model.addAttribute("generatedChargeAccounts",editor.generated());model.addAttribute("currentChargeMappings",editor.currentMappings());
     }

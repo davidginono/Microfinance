@@ -8,7 +8,6 @@
 <%@ include file="../fragments/admin-workspace-support.jspf" %>
 
 
-<c:if test="${chargePolicySaved}"><spring:message code="charges.policySaved" var="chargeSavedMessage" /><div hidden data-toast-message="${fn:escapeXml(chargeSavedMessage)}" data-toast-type="success" data-toast-placement="workspace"></div></c:if>
 <div class="erp-page-header" data-aws-page-header>
     <div class="admin-page-heading">
     <p class="erp-breadcrumb"><spring:message code="admin.workspace.productBreadcrumb" /></p>
@@ -31,7 +30,7 @@
 </div>
 </div>
 
-<c:if test="${chargePolicySaved}"><spring:message code="charges.policySaved" var="chargeSavedMessage" /><div hidden data-toast-message="${fn:escapeXml(chargeSavedMessage)}" data-toast-type="success" data-toast-placement="workspace"></div></c:if>
+<c:if test="${chargeAccountsSaved}"><spring:message code="charges.accountsSaved" var="chargeSavedMessage" /><div hidden data-toast-message="${fn:escapeXml(chargeSavedMessage)}" data-toast-type="success" data-toast-placement="workspace"></div></c:if>
 <div class="product-config-workspace"
      data-product-config-workspace
      data-product-config-stage="Step 2 of 2 &middot; focused product"
@@ -179,7 +178,6 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
-                        <c:if test="${canSetChargeAccounts}"><c:set var="chargeFormId" value="productChargePolicyForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></c:if>
                     </div>
                 </section>
 
@@ -215,8 +213,10 @@
                 </div>
     </div>
         </form>
-        <c:if test="${canSetChargeAccounts}"><form id="productChargePolicyForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />" data-workspace-submit="recover" data-product-charge-form>
+        <c:if test="${canSetChargeAccounts}"><form id="productChargeAccountsForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />" data-workspace-submit="recover" data-product-charge-form>
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <input type="hidden" name="requestKey" value="<c:out value='${chargePolicy.requestKey}' />" />
+            <input type="hidden" name="expectedVersion" value="<c:out value='${chargePolicy.expectedVersion}' />" />
         </form></c:if>
         <section class="product-builder-section product-config-step" data-product-config-step="workflow">
             <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>

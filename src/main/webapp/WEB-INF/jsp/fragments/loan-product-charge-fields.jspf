@@ -1,5 +1,5 @@
 <%@ page pageEncoding="UTF-8" %>
-<%@ include file="loan-product-charge-summary.jspf" %>
+<div class="md:col-span-2"><h3><spring:message code="charges.postingSetup" /></h3></div>
 <c:if test="${creatingLoanProduct}">
     <p class="md:col-span-2"><spring:message code="charges.generatedOnCreate" /></p>
     <label class="md:col-span-2"><input form="${chargeFormId}" type="checkbox" name="saveChargePolicy" value="true" ${chargePolicy.saveChargePolicy ? 'checked' : ''} /> <spring:message code="charges.saveWithProduct" /></label>

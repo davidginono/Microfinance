@@ -1,9 +1,9 @@
 <%@ page pageEncoding="UTF-8" %>
 <c:choose><c:when test="${canSetChargeAccounts}">
-    <c:set var="chargeFormId" value="productChargePolicyForm" />
+    <c:set var="chargeFormId" value="productChargeAccountsForm" />
     <%@ include file="loan-product-charge-account-fields.jspf" %>
-    <c:if test="${chargeError eq 'charges.error.account'}"><div class="console-message md:col-span-2" data-message-type="error" role="alert" tabindex="-1"><spring:message code="${chargeError}" /></div></c:if>
-    <div class="product-config-save-actions md:col-span-2"><button type="submit" form="${chargeFormId}" class="app-btn btn-launch"><spring:message code="charges.savePolicy" /></button></div>
+    <c:if test="${not empty chargeError}"><div class="console-message md:col-span-2" data-message-type="error" role="alert" tabindex="-1"><spring:message code="${chargeError}" /></div></c:if>
+    <div class="product-config-save-actions md:col-span-2"><button type="submit" form="${chargeFormId}" class="app-btn btn-launch"><spring:message code="charges.saveAccounts" /></button></div>
 </c:when><c:otherwise>
 <c:forEach items="${['APPLICATION','PROCESSING','RECEIVABLE','INSURANCE']}" var="mappedChargeKind">
     <label class="block min-w-0"><spring:message code="charges.account.${mappedChargeKind}" />

@@ -8,6 +8,9 @@ import java.util.*;
 public final class LoanChargeDtos {
     private LoanChargeDtos() {}
     public enum Timing { SEPARATE, DEDUCT, FINANCED }
+    @Data public static class AccountMappingForm {
+        private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,insuranceAccountId,applicationAccountId,processingAccountId;
+    }
     @Data public static class PolicyForm {
         private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,managementAccountId,insuranceAccountId,applicationAccountId,processingAccountId;
         private boolean saveChargePolicy;

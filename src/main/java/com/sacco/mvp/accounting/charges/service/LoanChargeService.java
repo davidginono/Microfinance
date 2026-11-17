@@ -78,10 +78,30 @@ public class LoanChargeService {
         }
         return Map.copyOf(currentMappings);
     }
-    @Transactional public UUID savePolicy(AppUserPrincipal a,PolicyForm f){
+    @Transactional(readOnly=true) public Editor accountEditor(AppUserPrincipal a,UUID product,AccountMappingForm draft){
+        var base=editor(a,product,null);
+        if(draft==null)return base;
+        var form=base.form();applyMappings(form,draft);
+        return editor(a,product,form);
+    }
+    private void applyMappings(PolicyForm target,AccountMappingForm source){
+        target.setRequestKey(source.getRequestKey());target.setExpectedVersion(source.getExpectedVersion());
+        target.setApplicationAccountId(source.getApplicationAccountId());target.setProcessingAccountId(source.getProcessingAccountId());
+        target.setReceivableAccountId(source.getReceivableAccountId());target.setInsuranceAccountId(source.getInsuranceAccountId());
+    }
+    @Transactional public UUID saveAccountMappings(AppUserPrincipal a,AccountMappingForm f){
+        configure(a);require(f!=null && f.getProductId()!=null && f.getRequestKey()!=null,"input");
+        require(repository.product(a.getSaccoId(),f.getProductId()),"policy");repository.policyLock(a.getSaccoId(),f.getProductId());
+        String commandHash=hash(List.of("ACCOUNT_MAPPINGS_V1",f));
+        var retry=repository.policyRetry(a,f.getRequestKey(),commandHash);if(retry.isPresent())return retry.get();
+        var retained=editor(a,f.getProductId(),null).form();applyMappings(retained,f);
+        return recordPolicy(a,retained,commandHash);
+    }
+    @Transactional public UUID savePolicy(AppUserPrincipal a,PolicyForm f){return recordPolicy(a,f,null);}
+    private UUID recordPolicy(AppUserPrincipal a,PolicyForm f,String commandHash){
         configure(a);require(f!=null && f.getRequestKey()!=null && f.getProductId()!=null && f.getEffectiveFrom()!=null && f.getManagementTiming()!=null && f.getInsuranceTiming()!=null,"input");
         require(f.getManagementTiming()!=Timing.FINANCED && f.getInsuranceTiming()!=Timing.FINANCED,"financed");text(f.getPolicyReference(),f.isEnabled());text(f.getAgreementReference(),f.isEnabled());text(f.getInsurer(),false);text(f.getInsurerVerification(),false);
-        require(repository.product(a.getSaccoId(),f.getProductId()),"policy");repository.policyLock(a.getSaccoId(),f.getProductId());String hash=hash(f);var retry=repository.policyRetry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get();
+        require(repository.product(a.getSaccoId(),f.getProductId()),"policy");repository.policyLock(a.getSaccoId(),f.getProductId());String hash=commandHash==null?hash(f):commandHash;var retry=repository.policyRetry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get();
         var command=new PolicyForm();org.springframework.beans.BeanUtils.copyProperties(f,command);f=command;
         var product=repository.productChoice(a.getSaccoId(),f.getProductId());
         accounting.provisionLoanProductFeeAccounts(a.getSaccoId(),a.getMemberId(),f.getProductId(),product.label());
