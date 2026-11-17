@@ -101,6 +101,18 @@ public class UserClaimService {
 
     /** Enabling client access must not expand role-default staff permissions or rewrite explicit assignments. */
 
+    /** Add to an existing explicit matrix without rewriting legacy rows or preferences. */
+    @Transactional
+    public void addExplicitClaims(UUID memberId, List<UserClaim> additions) {
+        if(memberId==null || additions==null || additions.stream().anyMatch(c->c==null || !c.isAvailable()))
+            throw new IllegalArgumentException("Valid explicit claims required");
+        var stored=memberAccessClaimRepository.findByIdMemberId(memberId);
+        if(stored==null || stored.isEmpty())throw new IllegalStateException("An existing explicit access matrix is required");
+        var names=stored.stream().map(c->c.getId().getClaimName()).collect(java.util.stream.Collectors.toSet());
+        additions.stream().distinct().filter(c->!names.contains(c.name())).forEach(c->
+            memberAccessClaimRepository.save(MemberAccessClaim.builder().id(new MemberAccessClaimId(memberId,c.name())).build()));
+    }
+
     @Transactional
     public void updateClaims(UUID memberId, List<UserClaim> claims) {
         if (memberId == null) {

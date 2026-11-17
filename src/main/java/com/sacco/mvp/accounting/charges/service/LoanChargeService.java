@@ -47,7 +47,7 @@ public class LoanChargeService {
         var f=draft==null?new PolicyForm():draft;
         if(draft==null){
             f.setProductId(product);f.setExpectedVersion(prior.map(Policy::id).orElse(null));
-            f.setEffectiveFrom(prior.map(p->p.effectiveFrom().plusDays(1).isAfter(clock.today())?p.effectiveFrom().plusDays(1):clock.today()).orElse(clock.today()));
+            f.setEffectiveFrom(prior.map(p->p.effectiveFrom().isAfter(clock.today())?p.effectiveFrom():clock.today()).orElse(clock.today()));
             prior.ifPresent(p->{f.setEnabled(p.enabled());f.setManagementTiming(p.managementTiming());f.setInsuranceTiming(p.insuranceTiming());
                 f.setReceivableAccountId(p.receivableAccountId());f.setInsuranceAccountId(p.insuranceAccountId());
                 f.setApplicationAccountId(p.applicationAccountId());f.setProcessingAccountId(p.processingAccountId());
@@ -92,15 +92,19 @@ public class LoanChargeService {
     @Transactional public UUID saveAccountMappings(AppUserPrincipal a,AccountMappingForm f){
         configure(a);require(f!=null && f.getProductId()!=null && f.getRequestKey()!=null,"input");
         require(repository.product(a.getSaccoId(),f.getProductId()),"policy");repository.policyLock(a.getSaccoId(),f.getProductId());
-        String commandHash=hash(List.of("ACCOUNT_MAPPINGS_V1",f));
+        String commandHash=hash(List.of("ACCOUNT_MAPPINGS_V2",f));
         var retry=repository.policyRetry(a,f.getRequestKey(),commandHash);if(retry.isPresent())return retry.get();
         var retained=editor(a,f.getProductId(),null).form();applyMappings(retained,f);
+        retained.setPolicyReference("");retained.setAgreementReference("");retained.setInsurerVerification("");
+        retained.setInsurer(f.getInsuranceAccountId()==null?"":repository.accountName(a.getSaccoId(),f.getInsuranceAccountId(),"INSURANCE").orElse(""));
+        retained.setEnabled(f.getReceivableAccountId()!=null && f.getApplicationAccountId()!=null && f.getProcessingAccountId()!=null
+            && (!repository.requiresInsurance(a.getSaccoId(),f.getProductId()) || f.getInsuranceAccountId()!=null));
         return recordPolicy(a,retained,commandHash);
     }
     @Transactional public UUID savePolicy(AppUserPrincipal a,PolicyForm f){return recordPolicy(a,f,null);}
     private UUID recordPolicy(AppUserPrincipal a,PolicyForm f,String commandHash){
         configure(a);require(f!=null && f.getRequestKey()!=null && f.getProductId()!=null && f.getEffectiveFrom()!=null && f.getManagementTiming()!=null && f.getInsuranceTiming()!=null,"input");
-        require(f.getManagementTiming()!=Timing.FINANCED && f.getInsuranceTiming()!=Timing.FINANCED,"financed");text(f.getPolicyReference(),f.isEnabled());text(f.getAgreementReference(),f.isEnabled());text(f.getInsurer(),false);text(f.getInsurerVerification(),false);
+        require(f.getManagementTiming()!=Timing.FINANCED && f.getInsuranceTiming()!=Timing.FINANCED,"financed");text(f.getPolicyReference(),false);text(f.getAgreementReference(),false);text(f.getInsurer(),false);text(f.getInsurerVerification(),false);
         require(repository.product(a.getSaccoId(),f.getProductId()),"policy");repository.policyLock(a.getSaccoId(),f.getProductId());String hash=commandHash==null?hash(f):commandHash;var retry=repository.policyRetry(a,f.getRequestKey(),hash);if(retry.isPresent())return retry.get();
         var command=new PolicyForm();org.springframework.beans.BeanUtils.copyProperties(f,command);f=command;
         var product=repository.productChoice(a.getSaccoId(),f.getProductId());
@@ -115,11 +119,11 @@ public class LoanChargeService {
             if(generated.component().equals("PROCESSING") && f.getProcessingAccountId()==null)f.setProcessingAccountId(generated.accountId());
         }
         f.setManagementAccountId(null);
-        var prior=repository.policy(a.getSaccoId(),f.getProductId(),LocalDate.of(9999,12,31));require(Objects.equals(prior.map(Policy::id).orElse(null),f.getExpectedVersion()),"stale");require(prior.isEmpty() || f.getEffectiveFrom().isAfter(prior.get().effectiveFrom()),"date");
+        var prior=repository.policy(a.getSaccoId(),f.getProductId(),LocalDate.of(9999,12,31));require(Objects.equals(prior.map(Policy::id).orElse(null),f.getExpectedVersion()),"stale");require(prior.isEmpty() || !f.getEffectiveFrom().isBefore(prior.get().effectiveFrom()),"date");
         if(f.isEnabled() || f.getReceivableAccountId()!=null)repository.account(a.getSaccoId(),f.getReceivableAccountId(),"RECEIVABLE");
         if(f.isEnabled() || f.getApplicationAccountId()!=null)repository.account(a.getSaccoId(),f.getApplicationAccountId(),"APPLICATION");
         if(f.isEnabled() || f.getProcessingAccountId()!=null)repository.account(a.getSaccoId(),f.getProcessingAccountId(),"PROCESSING");
-        if(f.getInsuranceAccountId()!=null){repository.account(a.getSaccoId(),f.getInsuranceAccountId(),"INSURANCE");if(f.isEnabled()){text(f.getInsurer(),true);text(f.getInsurerVerification(),true);}}
+        if(f.getInsuranceAccountId()!=null){repository.account(a.getSaccoId(),f.getInsuranceAccountId(),"INSURANCE");if(f.isEnabled())text(f.getInsurer(),true);}
         if(f.isAllowCustom())require(f.getCustomManagementLimit()!=null && amount(f.getCustomManagementLimit()).signum()>0,"custom");
         var id=repository.insertPolicy(a,f,hash,clock.now());event(a,id,"LOAN_CHARGE_POLICY_RECORDED");return id;
     }
@@ -149,7 +153,7 @@ public class LoanChargeService {
         var terms=new ArrayList<Term>();
         if(policy!=null && policy.enabled()){
             if(application.signum()>0 && policy.account("APPLICATION")==null || processing.signum()>0 && policy.account("PROCESSING")==null)failure="charges.error.account";
-            if(insurance.signum()>0 && (policy.insuranceAccountId()==null || policy.insurer().isBlank() || policy.insurerVerification().isBlank()))failure="charges.error.insurance";
+            if(insurance.signum()>0 && (policy.insuranceAccountId()==null || policy.insurer().isBlank()))failure="charges.error.insurance";
         }
         String entryEvidence="Loan charge entry / "+f.getRequestKey();
         String managementEvidence=f.getEvidence()==null || f.getEvidence().isBlank()?entryEvidence:f.getEvidence();

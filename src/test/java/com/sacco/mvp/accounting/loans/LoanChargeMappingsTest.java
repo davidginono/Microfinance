@@ -31,19 +31,25 @@ class LoanChargeMappingsTest {
         when(repository.policy(eq("I1"),eq(product),any())).thenReturn(Optional.of(prior));
         when(repository.productChoice("I1",product)).thenReturn(new Choice(product,"Loan",""));
         when(repository.generatedAccounts("I1",product)).thenReturn(List.of());
+        when(repository.requiresInsurance("I1",product)).thenReturn(true);
+        when(repository.accountName(eq("I1"),any(),eq("INSURANCE"))).thenReturn(Optional.of("Panda Company"));
         when(repository.insertPolicy(eq(actor),any(),anyString(),any())).thenReturn(saved);
     }
     AccountMappingForm form(){var f=new AccountMappingForm();f.setProductId(product);f.setExpectedVersion(priorId);
         f.setApplicationAccountId(UUID.randomUUID());f.setProcessingAccountId(UUID.randomUUID());f.setReceivableAccountId(UUID.randomUUID());f.setInsuranceAccountId(UUID.randomUUID());return f;}
-    @Test void accountSaveRetainsAllExistingFinancialSettingsOnTheServer(){
+    @Test void completeMappingsEnableChargesWithoutReferencesAndRetainRecordedTimingAndCaps(){
         var f=form();assertThat(service.saveAccountMappings(actor,f)).isEqualTo(saved);
-        verify(repository).insertPolicy(eq(actor),argThat(p->!p.isEnabled() && p.getManagementTiming()==Timing.DEDUCT && p.getInsuranceTiming()==Timing.SEPARATE
-            && p.getPolicyReference().equals(prior.policyReference()) && p.getAgreementReference().equals(prior.agreementReference())
-            && p.getInsurer().equals(prior.insurer()) && p.getInsurerVerification().equals(prior.insurerVerification())
+        verify(repository).insertPolicy(eq(actor),argThat(p->p.isEnabled() && p.getManagementTiming()==Timing.DEDUCT && p.getInsuranceTiming()==Timing.SEPARATE
+            && p.getPolicyReference().isEmpty() && p.getAgreementReference().isEmpty()
+            && p.getInsurer().equals("Panda Company") && p.getInsurerVerification().isEmpty()
             && p.isAllowCustom() && p.getCustomManagementLimit().compareTo(prior.customManagementLimit())==0
             && p.getApplicationAccountId().equals(f.getApplicationAccountId()) && p.getProcessingAccountId().equals(f.getProcessingAccountId())
             && p.getReceivableAccountId().equals(f.getReceivableAccountId()) && p.getInsuranceAccountId().equals(f.getInsuranceAccountId())),anyString(),any());
         for(String kind:List.of("APPLICATION","PROCESSING","RECEIVABLE","INSURANCE"))verify(repository).account(eq("I1"),any(),eq(kind));
+    }
+    @Test void aMissingRequiredInsuranceMappingDoesNotEnableCharges(){
+        var f=form();f.setInsuranceAccountId(null);service.saveAccountMappings(actor,f);
+        verify(repository).insertPolicy(eq(actor),argThat(p->!p.isEnabled() && p.getInsuranceAccountId()==null),anyString(),any());
     }
     @Test void replayReturnsTheRecordedResultBeforeReadingChangedDefaults(){
         var f=form();var recorded=new HashMap<UUID,String>();
