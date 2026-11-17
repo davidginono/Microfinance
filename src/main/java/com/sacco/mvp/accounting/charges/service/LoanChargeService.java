@@ -35,6 +35,11 @@ public class LoanChargeService {
     @Transactional(readOnly=true) public List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice> accounts(AppUserPrincipal a,String kind,String search,int page){configure(a);require(search!=null && search.length()<=100 && page>=0 && page<=10000,"input");return repository.accounts(a.getSaccoId(),kind,search,page);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice productChoice(AppUserPrincipal a,UUID product){configure(a);return repository.productChoice(a.getSaccoId(),product);}
     @Transactional(readOnly=true) public com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice selectedAccount(AppUserPrincipal a,UUID id,String kind){configure(a);return repository.selectedAccount(a.getSaccoId(),id,kind);}
+    @Transactional(readOnly=true) public AccountSummary accountSummary(AppUserPrincipal actor,UUID product) {
+        accounting.requireActor(actor,"LOAN_PRODUCTS_VIEW");require(repository.product(actor.getSaccoId(),product),"policy");
+        var current=repository.policy(actor.getSaccoId(),product,clock.today()).orElse(null);
+        return new AccountSummary(current,repository.generatedAccounts(actor.getSaccoId(),product),currentMappings(actor.getSaccoId(),current));
+    }
     @Transactional(readOnly=true) public Editor editor(AppUserPrincipal actor,UUID product,PolicyForm draft) {
         configure(actor);var prior=product==null?Optional.<Policy>empty():policy(actor,product);
         var effective=product==null?Optional.<Policy>empty():repository.policy(actor.getSaccoId(),product,clock.today());
@@ -60,15 +65,18 @@ public class LoanChargeService {
             if(selected!=null && values.stream().noneMatch(c->c.id().equals(selected))){var choice=repository.selectedAccount(actor.getSaccoId(),selected,kind);if(choice!=null)values.add(choice);}
             choices.put(kind,List.copyOf(values));
         }
+        return new Editor(f,effective.orElse(null),choices,generated,currentMappings(actor.getSaccoId(),effective.orElse(null)));
+    }
+    private Map<String,String> currentMappings(String institution,Policy p) {
         var currentMappings=new LinkedHashMap<String,String>();
-        if(effective.isPresent()){
-            var p=effective.get();var selected=new LinkedHashMap<String,UUID>();
+        if(p!=null){
+            var selected=new LinkedHashMap<String,UUID>();
             selected.put("APPLICATION",p.account("APPLICATION"));selected.put("PROCESSING",p.account("PROCESSING"));
             selected.put("RECEIVABLE",p.receivableAccountId());selected.put("INSURANCE",p.insuranceAccountId());
-            var labels=repository.accountLabels(actor.getSaccoId(),selected.values().stream().filter(Objects::nonNull).distinct().toList());
+            var labels=repository.accountLabels(institution,selected.values().stream().filter(Objects::nonNull).distinct().toList());
             selected.forEach((kind,id)->{if(id!=null && labels.containsKey(id))currentMappings.put(kind,labels.get(id));});
         }
-        return new Editor(f,effective.orElse(null),choices,generated,Map.copyOf(currentMappings));
+        return Map.copyOf(currentMappings);
     }
     @Transactional public UUID savePolicy(AppUserPrincipal a,PolicyForm f){
         configure(a);require(f!=null && f.getRequestKey()!=null && f.getProductId()!=null && f.getEffectiveFrom()!=null && f.getManagementTiming()!=null && f.getInsuranceTiming()!=null,"input");

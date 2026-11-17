@@ -1,20 +1,9 @@
 <%@ page pageEncoding="UTF-8" %>
-<div class="md:col-span-2"><h3><spring:message code="charges.postingSetup" /></h3></div>
+<%@ include file="loan-product-charge-summary.jspf" %>
 <c:if test="${creatingLoanProduct}">
     <p class="md:col-span-2"><spring:message code="charges.generatedOnCreate" /></p>
     <label class="md:col-span-2"><input form="${chargeFormId}" type="checkbox" name="saveChargePolicy" value="true" ${chargePolicy.saveChargePolicy ? 'checked' : ''} /> <spring:message code="charges.saveWithProduct" /></label>
 </c:if>
-<c:if test="${not empty currentChargePolicy}">
-    <dl class="erp-detail-facts md:col-span-2">
-        <div><dt><spring:message code="charges.currentPolicy" /></dt><dd><c:out value="${currentChargePolicy.policyReference}" /></dd></div>
-        <div><dt><spring:message code="charges.effectiveFrom" /></dt><dd><c:out value="${appTime:display(currentChargePolicy.effectiveFrom())}" /></dd></div>
-        <div><dt><spring:message code="charges.feeTreatment" /></dt><dd><spring:message code="charges.treatment.${currentChargePolicy.accountingVersion}" /></dd></div>
-        <c:forEach items="${['APPLICATION','PROCESSING','RECEIVABLE','INSURANCE']}" var="currentChargeKind"><div><dt><spring:message code="charges.account.${currentChargeKind}" /></dt><dd><c:out value="${currentChargeMappings[currentChargeKind]}" default="-" /></dd></div></c:forEach>
-    </dl>
-</c:if>
-<c:forEach items="${generatedChargeAccounts}" var="generatedChargeAccount">
-    <div class="min-w-0 break-words"><span><spring:message code="charges.account.${generatedChargeAccount.component}" /></span>: <c:out value="${generatedChargeAccount.label}" /> - <span data-resource-status="${generatedChargeAccount.state}"><spring:message code="coav.state.${generatedChargeAccount.state}" /></span></div>
-</c:forEach>
 <input form="${chargeFormId}" type="hidden" name="requestKey" value="<c:out value='${chargePolicy.requestKey}' />" />
 <input form="${chargeFormId}" type="hidden" name="expectedVersion" value="<c:out value='${chargePolicy.expectedVersion}' />" />
 <label><spring:message code="charges.effectiveFrom" /><input form="${chargeFormId}" name="effectiveFrom" type="date" value="<c:out value='${chargePolicy.effectiveFrom}' />" class="aws-control" /></label>

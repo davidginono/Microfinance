@@ -100,6 +100,7 @@ class AdminControllerUserAccessSecurityTest {
     @Autowired private WebApplicationContext context;
     @Autowired private AdminService adminService;
     @Autowired private com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
+    @Autowired private com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges;
     @Autowired private AdminScopeService adminScopeService;
     @Autowired private SaccoStationRepository saccoStationRepository;
     @Autowired private SaccoRegistryService saccoRegistryService;
@@ -114,9 +115,10 @@ class AdminControllerUserAccessSecurityTest {
 
     @BeforeEach
     void setUp() {
-        Mockito.reset(groupApprovals,productAccounts,adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
+        Mockito.reset(loanCharges,groupApprovals,productAccounts,adminService, adminScopeService, saccoStationRepository, platformSessionSettingsService,
             platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService,
             stationOtpSettingsService);
+        when(loanCharges.editor(any(),any(),any())).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Editor(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm(),null,Map.of(),List.of(),Map.of()));
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -141,6 +143,42 @@ class AdminControllerUserAccessSecurityTest {
         verify(productAccounts).choices("SACCO-01","INTEREST","Maendeleo",0,null);
         mockMvc.perform(get("/admin/settings-controls/loan-product-accounts/INTEREST").with(authentication(authenticationFor(principal(Set.of(UserClaim.LOAN_PRODUCTS_VIEW)))))).andExpect(status().isForbidden());
         Mockito.verifyNoMoreInteractions(productAccounts);
+    }
+
+    @Test void productViewerSeesChargeMappingsWithoutGettingTheChargeEditor() throws Exception {
+        var actor=principal(Set.of(UserClaim.LOAN_PRODUCTS_VIEW));var id=UUID.randomUUID();
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(actor)).thenReturn("SACCO-01");
+        when(adminService.loanProduct("SACCO-01",id)).thenReturn(LoanProductSetting.builder().id(id).build());
+        var mappings=Map.of("APPLICATION","512001 - Application fee","PROCESSING","513001 - Processing fee");
+        when(loanCharges.accountSummary(actor,id)).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.AccountSummary(null,List.of(),mappings));
+        mockMvc.perform(get("/admin/settings-controls/loan-products/"+id+"/edit").param("saccoId","FOREIGN").with(authentication(authenticationFor(actor))))
+            .andExpect(status().isOk()).andExpect(view().name("admin/loan-product-edit"))
+            .andExpect(model().attribute("currentChargeMappings",mappings)).andExpect(model().attributeDoesNotExist("chargePolicy","chargeAccounts"));
+        verify(loanCharges).accountSummary(actor,id);verify(loanCharges,never()).editor(any(),any(),any());
+        doThrow(new org.springframework.security.access.AccessDeniedException("Configure required")).when(loanCharges).savePolicy(eq(actor),any());
+        mockMvc.perform(post("/admin/settings-controls/loan-products/"+id+"/charge-accounts").with(csrf()).with(authentication(authenticationFor(actor))))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test void approvalOnlyViewerDoesNotReceiveChargeAccountData() throws Exception {
+        var actor=principal(Set.of(UserClaim.APPROVAL_FLOW_VIEW));var id=UUID.randomUUID();
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(actor)).thenReturn("SACCO-01");
+        when(adminService.loanProduct("SACCO-01",id)).thenReturn(LoanProductSetting.builder().id(id).build());
+        mockMvc.perform(get("/admin/settings-controls/loan-products/"+id+"/edit").with(authentication(authenticationFor(actor))))
+            .andExpect(status().isOk()).andExpect(model().attributeDoesNotExist("currentChargeMappings","generatedChargeAccounts","chargePolicy"));
+        Mockito.verifyNoInteractions(loanCharges);
+    }
+
+    @Test void chargeConfigurerKeepsTheExistingIndependentEditor() throws Exception {
+        var actor=principal(Set.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));var id=UUID.randomUUID();
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01","ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(actor)).thenReturn("SACCO-01");
+        when(adminService.loanProduct("SACCO-01",id)).thenReturn(LoanProductSetting.builder().id(id).build());
+        mockMvc.perform(get("/admin/settings-controls/loan-products/"+id+"/edit").with(authentication(authenticationFor(actor))))
+            .andExpect(status().isOk()).andExpect(model().attributeExists("chargePolicy","chargeAccounts"));
+        verify(loanCharges).editor(actor,id,null);verify(loanCharges,never()).accountSummary(any(),any());
     }
 
     @Test void productWorkflowUsesThePathProductAndRequiresExplicitClaimsAndCsrf() throws Exception {
@@ -988,6 +1026,8 @@ class AdminControllerUserAccessSecurityTest {
             return Mockito.mock(com.sacco.mvp.clients.onboarding.service.OnboardingService.class);
         }
         @Bean com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts(){return Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanProductAccountService.class);}
+        @Bean com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges(){return Mockito.mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);}
+        @Bean com.sacco.mvp.accounting.charges.controller.LoanChargeController loanChargeController(com.sacco.mvp.accounting.charges.service.LoanChargeService charges){return new com.sacco.mvp.accounting.charges.controller.LoanChargeController(charges);}
         @Bean
         AdminController adminController(AdminService adminService,
                                         AdminScopeService adminScopeService,
@@ -998,6 +1038,7 @@ class AdminControllerUserAccessSecurityTest {
                                         NotificationInboxService notificationInboxService,
                                         LoanProductRequiredAttachmentService requiredAttachmentService,
                                         com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts,
+                                        com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges,
                                         SmsUsageManagementService smsUsageManagementService,
                                         StationOtpSettingsService stationOtpSettingsService,
                                         SaccoDataDeletionService saccoDataDeletionService,
@@ -1006,8 +1047,6 @@ class AdminControllerUserAccessSecurityTest {
                                         PlatformSupportContactSettingsService platformSupportContactSettingsService,
                                         PlatformEmailSettingsService platformEmailSettingsService,
                                         PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService) {
-            var loanCharges=org.mockito.Mockito.mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);
-            when(loanCharges.editor(any(),any(),any())).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Editor(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm(),null,Map.of(),List.of(),Map.of()));
             return new AdminController(
                 loanCharges,
                 adminService,

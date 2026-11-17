@@ -41,6 +41,7 @@ public final class LoanChargeDtos {
         public String getLabel(){return label;} public String getState(){return state;}
     }
     public record Editor(PolicyForm form,Policy current,Map<String,List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice>> accounts,List<GeneratedAccount> generated,Map<String,String> currentMappings) {}
+    public record AccountSummary(Policy current,List<GeneratedAccount> generated,Map<String,String> currentMappings) {}
     public record Term(UUID id,String kind,String basis,BigDecimal basisValue,BigDecimal amount,Timing timing,
         UUID receivableAccountId,UUID liabilityAccountId,String evidence,String provider,String verification) {}
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)

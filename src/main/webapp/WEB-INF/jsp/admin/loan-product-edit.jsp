@@ -190,6 +190,7 @@
                         <c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${product}" /><%@ include file="../fragments/loan-product-account-fields.jspf" %><c:set var="productAccountSection" value="${false}" />
                         <c:if test="${canSetChargeAccounts}"><c:set var="chargeFormId" value="productChargePolicyForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></c:if>
                         <c:if test="${not canSetChargeAccounts}">
+                            <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_VIEW')"><%@ include file="../fragments/loan-product-charge-summary.jspf" %></sec:authorize>
                             <p class="text-sm md:col-span-2"><spring:message code="charges.postingSetupPermission" /></p>
                         </c:if>
                     </div>

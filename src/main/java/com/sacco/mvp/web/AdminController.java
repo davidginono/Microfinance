@@ -116,7 +116,13 @@ public class AdminController {
         binder.setAllowedFields("requestKey","expectedVersion","effectiveFrom","enabled","managementTiming","insuranceTiming","receivableAccountId","applicationAccountId","processingAccountId","insuranceAccountId","policyReference","agreementReference","insurer","insurerVerification","allowCustom","customManagementLimit","saveChargePolicy");
     }
     private void productCharges(AppUserPrincipal actor,UUID product,Model model) {
-        if(!actor.getClaims().containsAll(List.of("LOAN_PRODUCTS_CONFIGURE","ACCOUNTING_ACCOUNTS_UPDATE")))return;
+        if(!actor.getClaims().containsAll(List.of("LOAN_PRODUCTS_CONFIGURE","ACCOUNTING_ACCOUNTS_UPDATE"))){
+            if(product!=null && actor.getClaims().contains("LOAN_PRODUCTS_VIEW")){
+                var summary=loanCharges.accountSummary(actor,product);
+                model.addAttribute("currentChargePolicy",summary.current());model.addAttribute("generatedChargeAccounts",summary.generated());model.addAttribute("currentChargeMappings",summary.currentMappings());
+            }
+            return;
+        }
         var editor=loanCharges.editor(actor,product,(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm)model.asMap().get("chargePolicy"));
         model.addAttribute("chargePolicy",editor.form());model.addAttribute("currentChargePolicy",editor.current());
         model.addAttribute("chargeAccounts",editor.accounts());model.addAttribute("generatedChargeAccounts",editor.generated());model.addAttribute("currentChargeMappings",editor.currentMappings());
