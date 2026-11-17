@@ -18,8 +18,8 @@ BEGIN
 
  SELECT pg_get_functiondef('loan_charge_validate(gl_journal)'::regprocedure) INTO definition;
  previous:=$old$FROM loan_charge_term WHERE loan_id=p.loan_id AND timing='DEDUCT'$old$;
- replacement:=$new$FROM loan_charge_term charge_term WHERE charge_term.loan_id=p.loan_id AND
-   (charge_term.timing='DEDUCT' OR EXISTS(SELECT 1 FROM loan_charge_event e WHERE e.term_id=charge_term.id
+ replacement:=$new$FROM loan_charge_term t WHERE t.loan_id=p.loan_id AND
+   (t.timing='DEDUCT' OR EXISTS(SELECT 1 FROM loan_charge_event e WHERE e.term_id=t.id
       AND e.posting_id=p.id AND e.journal_id=j.id AND e.kind='DEDUCT'))$new$;
  IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected funding charge reconciliation missing'; END IF;
  EXECUTE replace(definition,previous,replacement);
@@ -27,8 +27,8 @@ BEGIN
  SELECT pg_get_functiondef('loan_charge_lifecycle_guard()'::regprocedure) INTO definition;
  previous:=$old$IF agreed>0 AND (assessed IS DISTINCT FROM agreed OR withheld IS DISTINCT FROM$old$;
  replacement:=$new$withheld:=withheld+(SELECT coalesce(sum(e.amount),0) FROM loan_charge_event e
-    JOIN loan_charge_term charge_term ON charge_term.id=e.term_id WHERE e.loan_id=NEW.id AND e.journal_id=journal
-      AND e.kind='DEDUCT' AND charge_term.timing='SEPARATE');
+    JOIN loan_charge_term t ON t.id=e.term_id WHERE e.loan_id=NEW.id AND e.journal_id=journal
+      AND e.kind='DEDUCT' AND t.timing='SEPARATE');
   IF agreed>0 AND (assessed IS DISTINCT FROM agreed OR withheld IS DISTINCT FROM$new$;
  IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected funding charge lifecycle reconciliation missing'; END IF;
  EXECUTE replace(definition,previous,replacement);

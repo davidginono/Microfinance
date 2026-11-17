@@ -19,10 +19,29 @@ BEGIN
  EXECUTE replace(definition,previous,replacement);
 
  SELECT pg_get_functiondef('loan_charge_validate(gl_journal)'::regprocedure) INTO definition;
+ -- V164 is already deployed. Correct its ambiguous term alias forward, preserving its checksum.
+ previous:=$old$FROM loan_charge_term t WHERE t.loan_id=p.loan_id AND$old$;
+ replacement:=$new$FROM loan_charge_term charge_term WHERE charge_term.loan_id=p.loan_id AND$new$;
+ IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected V164 charge term alias missing'; END IF;
+ definition:=replace(definition,previous,replacement);
+ previous:=$old$(t.timing='DEDUCT' OR EXISTS(SELECT 1 FROM loan_charge_event e WHERE e.term_id=t.id$old$;
+ replacement:=$new$(charge_term.timing='DEDUCT' OR EXISTS(SELECT 1 FROM loan_charge_event e WHERE e.term_id=charge_term.id$new$;
+ IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected V164 charge timing alias missing'; END IF;
+ definition:=replace(definition,previous,replacement);
  previous:=$old$NOT EXISTS(SELECT 1 FROM gl_account WHERE id=p.money_account_id AND sacco_id=p.sacco_id AND type='ASSET' AND kind='POSTING' AND purpose IN('CASH','BANK','MOBILE_MONEY'))$old$;
  replacement:=$new$NOT (CASE WHEN p.kind='DISBURSEMENT' THEN gl_loan_disbursement_account(p.money_account_id,p.sacco_id)
    ELSE EXISTS(SELECT 1 FROM gl_account WHERE id=p.money_account_id AND sacco_id=p.sacco_id AND type='ASSET' AND kind='POSTING' AND purpose IN('CASH','BANK','MOBILE_MONEY')) END)$new$;
  IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected charged loan account guard missing'; END IF;
+ EXECUTE replace(definition,previous,replacement);
+
+ SELECT pg_get_functiondef('loan_charge_lifecycle_guard()'::regprocedure) INTO definition;
+ previous:=$old$JOIN loan_charge_term t ON t.id=e.term_id WHERE e.loan_id=NEW.id AND e.journal_id=journal$old$;
+ replacement:=$new$JOIN loan_charge_term charge_term ON charge_term.id=e.term_id WHERE e.loan_id=NEW.id AND e.journal_id=journal$new$;
+ IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected V164 charge lifecycle alias missing'; END IF;
+ definition:=replace(definition,previous,replacement);
+ previous:=$old$AND e.kind='DEDUCT' AND t.timing='SEPARATE'$old$;
+ replacement:=$new$AND e.kind='DEDUCT' AND charge_term.timing='SEPARATE'$new$;
+ IF strpos(definition,previous)=0 THEN RAISE EXCEPTION 'Expected V164 charge lifecycle timing missing'; END IF;
  EXECUTE replace(definition,previous,replacement);
 
  SELECT pg_get_functiondef('loan_topup_validate(gl_journal)'::regprocedure) INTO definition;
