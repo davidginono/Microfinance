@@ -163,6 +163,22 @@ class MemberLocaleInterceptorTest {
         verifyNoInteractions(settings);verify(registry,times(2)).defaultLanguage("SACCO-1");
     }
 
+    @Test
+    void selectedNavbarLanguageOverridesAdminDefaultAcrossRegisteredWorkspaces() throws Exception {
+        UUID id=UUID.randomUUID();var settings=mock(UserSettingsService.class);var registry=mock(SaccoRegistryService.class);
+        authenticateStaff(id,Position.MINOR_ADMIN);var interceptor=new MemberLocaleInterceptor(settings,registry);
+        var selected=new MockHttpServletRequest();interceptor.cacheUserLocale(selected,id,"sw");
+        var registrations=new RegisteredInterceptors();new WebConfig(interceptor).addInterceptors(registrations);
+        for(String path:java.util.List.of("/staff/dashboard","/admin/settings-controls","/finance/accounts","/reports/builder","/profile")) {
+            var request=new MockHttpServletRequest("GET",path);request.setSession(selected.getSession());
+            var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
+            request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);
+            org.springframework.web.util.ServletRequestPathUtils.parseAndCache(request);registrations.apply(request,new MockHttpServletResponse());
+            assertThat(resolver.resolveLocale(request)).isEqualTo(java.util.Locale.of("sw"));
+        }
+        verifyNoInteractions(settings,registry);
+    }
+
     private void authenticateStaff(UUID id,Position position) {
         Member member=Member.builder().id(id).saccoId("SACCO-1").stationId("B1").memberNo("STAFF-1")
             .fullName("Synthetic staff").status(com.sacco.mvp.domain.MemberStatus.ACTIVE).position(position).memberAccount(false).passwordHash("test-only").build();

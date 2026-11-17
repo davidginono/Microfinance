@@ -47,6 +47,10 @@ public class MemberLocaleInterceptor implements HandlerInterceptor {
     }
 
     private Locale resolveRequestLocale(HttpServletRequest request, AppUserPrincipal principal) {
+        Object selected = request.getSession().getAttribute(userLocaleSessionKey(principal.getMemberId()));
+        if (selected instanceof Locale locale) {
+            return locale;
+        }
         String path = request.getRequestURI();
         String contextPath = request.getContextPath();
         String adminPrefix = contextPath + "/admin/";

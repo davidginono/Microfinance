@@ -36,10 +36,25 @@ public class StaffSettingsController {
     @PostMapping("/settings/language")
     public String updateLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam String language,
+                                 @RequestParam(required = false) String returnTo,
                                  HttpServletRequest request,
                                  RedirectAttributes ra) {
         String savedLanguage = userSettingsService.updateLanguage(principal.getMemberId(), normalizeLanguage(language));
         memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), savedLanguage);
+        if (returnTo != null && returnTo.length() <= 2048) {
+            try {
+                var destination = java.net.URI.create(returnTo);
+                String path = destination.getPath();
+                if (!destination.isAbsolute() && destination.getRawAuthority() == null
+                    && path != null && path.startsWith("/") && !path.startsWith("//")
+                    && !returnTo.contains("\\") && path.indexOf('\\') < 0
+                    && returnTo.chars().noneMatch(Character::isISOControl) && path.chars().noneMatch(Character::isISOControl)) {
+                    return "redirect:" + returnTo;
+                }
+            } catch (IllegalArgumentException invalid) {
+                // Invalid destinations return to the language settings page.
+            }
+        }
         ra.addFlashAttribute("message", "Language preference updated.");
         return "redirect:/staff/settings";
     }

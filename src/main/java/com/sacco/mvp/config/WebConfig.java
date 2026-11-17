@@ -48,8 +48,7 @@ public class WebConfig implements WebMvcConfigurer {
         loginLocale.setParamName("lang");loginLocale.setHttpMethods("GET");
         registry.addInterceptor(loginLocale).addPathPatterns("/","/login","/system-admin/login");
         registry.addInterceptor(memberLocaleInterceptor)
-            .addPathPatterns("/admin/**", "/staff/**",
-                "/disbursement/**", "/repayments", "/repayments/**",
-                "/finance/payroll", "/finance/payroll/**", "/finance/groups", "/finance/groups/**");
+            .addPathPatterns("/**")
+            .excludePathPatterns("/css/**", "/js/**", "/images/**", "/fonts/**", "/icons/**", "/actuator/**");
     }
 }

@@ -3090,6 +3090,16 @@ body.aws-console {
     flex-shrink: 0;
 }
 
+.app-language-control { position: relative; margin: 0 6px; }
+.app-language-control > summary { display:flex; align-items:center; gap:2px; min-height:32px; padding:0 4px; color:#fff; cursor:pointer; list-style:none; font-size:13px; }
+.app-language-control > summary::-webkit-details-marker { display:none; }
+.app-language-control > summary svg { width:16px; height:16px; }
+.app-language-control > summary:focus-visible { outline:2px solid #539fe5; outline-offset:2px; }
+.app-language-menu { position:absolute; top:calc(100% + 4px); right:0; z-index:100; min-width:132px; margin:0; padding:4px 0; border:1px solid #879596; background:#fff; box-shadow:0 2px 6px #0003; }
+.aws-console .app-topbar .app-language-menu button { display:block; width:100%; border:0; background:#fff; color:#16191f; padding:8px 16px; text-align:left; font:inherit; font-size:14px; cursor:pointer; }
+.aws-console .app-topbar .app-language-menu button[aria-current=true] { color:#0972d3; font-weight:700; }
+.aws-console .app-topbar .app-language-menu button:is(:hover,:focus-visible) { background:#f2f8fd; }
+
 .app-station-selector,
 .app-notification-control,
 .app-profile-control,
