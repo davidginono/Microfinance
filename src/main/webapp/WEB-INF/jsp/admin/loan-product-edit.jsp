@@ -222,14 +222,16 @@
         <section class="product-builder-section product-config-step" data-product-config-step="workflow">
             <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
             <div class="product-builder-section-body" data-product-config-panel hidden>
+                <div class="product-guarantor-actions">
                 <c:set var="guarantorProduct" value="${product}" /><c:set var="guarantorFormId" value="loanProductConfigForm" />
                 <%@ include file="../fragments/loan-product-guarantor-field.jspf" %>
-                <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_UPDATE')"><div class="accounting-actions"><button type="submit" form="loanProductConfigForm" class="app-btn btn-launch"><spring:message code="admin.workspace.saveProduct" /></button></div></sec:authorize>
+                <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_UPDATE')"><button type="submit" form="loanProductConfigForm" class="app-btn btn-launch"><spring:message code="admin.workspace.saveProduct" /></button></sec:authorize>
+                </div>
                 <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')">
                 <form method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/approval' />" data-workspace-submit="recover" data-product-approval-form>
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
                     <%@ include file="../fragments/loan-product-approval-fields.jspf" %>
-                    <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_CONFIGURE')"><div class="accounting-actions"><button class="app-btn btn-launch"><spring:message code="common.save" /></button></div></sec:authorize>
+                    <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_CONFIGURE')"><div class="accounting-actions product-approval-actions"><button class="app-btn btn-launch"><spring:message code="common.save" /></button></div></sec:authorize>
                 </form>
                 </sec:authorize>
             </div>

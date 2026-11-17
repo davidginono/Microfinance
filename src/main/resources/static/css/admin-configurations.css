@@ -67,6 +67,11 @@
 .aws-console:has([data-admin-workspace]) .product-document-fields {display:grid;gap:20px;min-width:0;}
 .aws-console:has([data-admin-workspace]) .product-document-fields label {font-size:14px;line-height:20px;}
 .aws-console:has([data-admin-workspace]) .product-guarantor-count {display:flex;flex-direction:column;gap:8px;max-width:220px;}
+.aws-console:has([data-admin-workspace]) .product-guarantor-actions {display:flex;align-items:flex-end;flex-wrap:wrap;gap:12px;min-width:0;margin-bottom:20px;}
+.aws-console:has([data-admin-workspace]) .product-guarantor-actions>.product-guarantor-count {flex:0 1 220px;min-width:0;}
+.aws-console:has([data-admin-workspace]) .product-guarantor-actions>.app-btn {flex:none;}
+.aws-console:has([data-admin-workspace]) .product-guarantor-actions :is(.aws-control,.app-btn) {height:32px;}
+.aws-console:has([data-admin-workspace]) .product-approval-actions {display:flex;justify-content:flex-end;flex-wrap:wrap;gap:12px;padding-top:16px;}
 .aws-console:has([data-admin-workspace]) .product-document-options {display:grid;gap:12px;}
 .aws-console:has([data-admin-workspace]) .product-document-check {display:flex;flex-direction:row;align-items:flex-start;gap:8px;font-size:14px;font-weight:400;}
 .aws-console:has([data-admin-workspace]) .product-document-check input {flex:none;width:16px;height:16px;margin:2px 0 0;}
