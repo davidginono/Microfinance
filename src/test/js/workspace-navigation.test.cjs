@@ -117,6 +117,46 @@ test('recoverable platform POST keeps values on a server error, then commits onl
  }finally{dom.window.close();}
 });
 
+for(const notice of [
+ '<p class="coa-error" role="alert">Payment date is closed.</p>',
+ '<p class="coa-error" role="alert">Enter a reason to cancel.</p>',
+ '<p class="coa-error" role="alert">Enter a reason to withdraw.</p>',
+ '<p id="groupSetupForm.errors" class="coa-error">Check the group account.</p>',
+ '<p class="field-error" role="alert">Choose a valid document.</p>'
+])test('recoverable forms retain their live controls for an uninitialized server error: '+notice,async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  const main=d.querySelector('main'),form=d.querySelector('form'),button=form.querySelector('button');
+  form.method='post';form.action='/disbursement/loan-applications/loan/finalize';form.enctype='multipart/form-data';form.dataset.workspaceSubmit='recover';
+  form.insertAdjacentHTML('beforeend','<input type="hidden" name="requestKey" value="same-key"><input type="hidden" name="_csrf" value="csrf-token"><input type="date" name="date" value="2026-11-17"><textarea name="notes">Changed notes</textarea><select name="account"><option value="cash" selected>Cash</option></select><input type="checkbox" name="charge" value="one" checked><input type="file" name="attachments">');
+  const upload=form.elements.attachments,files=[new w.File(['proof'],'proof.pdf',{type:'application/pdf'})];
+  Object.defineProperty(upload,'files',{value:files});form.elements.name.value='Changed value';
+  form.requestSubmit(button);await until(()=>requests.some(r=>r.options.method==='POST'));
+  const destination=html('Returned form').replace('</main>','<dialog><p class="coa-error" role="alert">Print failed</p></dialog><p class="coa-error" role="alert" hidden>Unused error</p><p class="coa-error" role="alert"></p>'+notice+'</main>');
+  requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/admin/dashboard',headers:{get:()=> 'text/html'},text:async()=>destination});
+  await until(()=>!form.hasAttribute('aria-busy'));
+  assert.equal(d.querySelector('main'),main);assert.equal(form.elements.name.value,'Changed value');
+  assert.equal(form.elements.date.value,'2026-11-17');assert.equal(form.elements.notes.value,'Changed notes');assert.equal(form.elements.account.value,'cash');assert.equal(form.elements.charge.checked,true);
+  assert.equal(form.elements.attachments,upload);assert.equal(upload.files,files);assert.equal(upload.files[0].name,'proof.pdf');
+  assert.equal(form.elements.requestKey.value,'same-key');assert.equal(form.elements._csrf.value,'csrf-token');
+  assert.equal(form.querySelector('[data-workspace-form-error]').textContent,new w.DOMParser().parseFromString(notice,'text/html').body.textContent);
+  assert.equal(button.disabled,false);assert.equal(form.inert,false);assert.equal(requests.filter(r=>r.options.method==='POST').length,1);
+ }finally{dom.window.close();}
+});
+
+for(const mode of ['create','profile'])test('staff client '+mode+' passes validation to its live wizard without replacing values',async()=>{
+ const {dom,w,d,requests}=await setup({holdNavigation:true});
+ try{
+  const form=d.querySelector('form');form.dataset.onboardingForm=mode;form.dataset.workspaceSubmit='recover';form.method='post';form.action='/finance/clients/onboarding/new';form.elements.name.value='Edited client';
+  let returned;form.addEventListener('profile:validation-response',event=>{returned=event.detail;event.preventDefault();});
+  form.requestSubmit(form.querySelector('button'));await until(()=>requests.some(r=>r.options.method==='POST'));
+  const destination=html('Client form').replace('<form class="accounting-create-form">','<form data-onboarding-form="'+mode+'" class="accounting-create-form">').replace('</form>','<span class="field-error" id="name.errors">Check the name.</span></form>');
+  requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/finance/clients/onboarding/new',headers:{get:()=> 'text/html'},text:async()=>destination});
+  await until(()=>!form.hasAttribute('aria-busy'));
+  assert.equal(d.querySelector('form'),form);assert.equal(form.elements.name.value,'Edited client');assert.equal(returned?.dataset.onboardingForm,mode);assert.equal(returned.querySelector('.field-error').textContent,'Check the name.');assert.equal(form.querySelector('[data-workspace-form-error]'),null);
+ }finally{dom.window.close();}
+});
+
 test('loan review submission shows its server validation error instead of a hidden print preview error',async()=>{
  const {dom,w,d,requests}=await setup({holdNavigation:true});
  try{
@@ -140,7 +180,7 @@ for(const container of ['<div hidden>','<dialog>'])test('successful submission i
  try{
   const form=d.querySelector('form');form.method='post';form.action='/finance/loan-records/loan/submit-for-review';form.dataset.workspaceSubmit='recover';
   form.requestSubmit(form.querySelector('button'));await until(()=>requests.some(r=>r.options.method==='POST'));
-  const destination=html('Sent for review').replace('</main>',container+'<div data-message-type="error">Could not open the print preview. Refresh</div>'+(container==='<dialog>'?'</dialog>':'</div>')+'</main>');
+  const destination=html('Sent for review').replace('</main>',container+'<div class="coa-error" role="alert" data-message-type="error">Could not open the print preview. Refresh</div>'+(container==='<dialog>'?'</dialog>':'</div>')+'<p class="coa-error" role="alert"></p><p data-message-type="warning" role="alert">Keep the signed paper.</p></main>');
   requests.find(r=>r.options.method==='POST').resolve({ok:true,url:'http://localhost/finance/loan-records/loan',headers:{get:()=> 'text/html'},text:async()=>destination});
   await until(()=>w.location.pathname==='/finance/loan-records/loan');
   assert.equal(d.querySelector('h1').textContent,'Sent for review');assert.equal(d.querySelector('[data-workspace-form-error]'),null);

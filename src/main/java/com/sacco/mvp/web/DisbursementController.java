@@ -539,11 +539,11 @@ public class DisbursementController {
             return "redirect:/disbursement/archive?filter=DISBURSED";
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", ex.getMessage()!=null && (ex.getMessage().startsWith("simpleGroup.error.") || ex.getMessage().startsWith("kyc.error.") || ex.getMessage().startsWith("credit.error.") || ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("charges.error."))?message(ex.getMessage()):ex.getMessage());
-            ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);ra.addFlashAttribute("postingInterestAccountId",interestAccountId);ra.addFlashAttribute("postingSettlementEvidence",settlementEvidence);
-            ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
-            ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);
-            ra.addFlashAttribute("postingDeductChargeIds",deductChargeIds==null?List.of():deductChargeIds);
         } catch(org.springframework.dao.DataIntegrityViolationException ex){ra.addFlashAttribute("error",message("recording.error.duplicate"));}
+        ra.addFlashAttribute("disbursementRequestKey",requestKey);ra.addFlashAttribute("postingMoneyAccountId",moneyAccountId);ra.addFlashAttribute("postingPrincipalAccountId",principalAccountId);ra.addFlashAttribute("postingInterestAccountId",interestAccountId);ra.addFlashAttribute("postingSettlementEvidence",settlementEvidence);
+        ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
+        ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);
+        ra.addFlashAttribute("postingDeductChargeIds",deductChargeIds==null?List.of():deductChargeIds);
         return "redirect:/disbursement/loan-applications/" + id;
     }
 

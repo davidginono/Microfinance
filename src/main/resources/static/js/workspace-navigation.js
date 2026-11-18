@@ -350,8 +350,9 @@
             if(!page.body.matches('.aws-console') || !page.querySelector('.shell-main') || !page.querySelector('#appSidebar'))throw new Error('Workspace shell');
             if(recover){
                 const error=page.querySelector('[data-workspace-response-error],[data-toast-type="error"]') ||
-                    [...page.querySelectorAll('.shell-main [data-message-type="error"]')]
-                        .find(message=>!message.closest('[hidden],.hidden,[aria-hidden="true"],dialog:not([open]),template'));
+                    // Inspect server markup before presentation scripts add data-message-type.
+                    [...page.querySelectorAll('.shell-main :is([data-message-type="error"],[role="alert"]:not([data-message-type]),.coa-error,.loan-error-summary,.accounting-error-summary,.field-error)')]
+                        .find(message=>message.textContent.trim() && !message.closest('[hidden],.hidden,[aria-hidden="true"],dialog:not([open]),template'));
                 if(error){
                     const form=options.submission.form;
                     form.inert=false;
@@ -365,8 +366,9 @@
                         if(fields.length)window.FormValidation?.focusFirst(form);
                         return true;
                     }
-                    const returned=page.querySelector('form[data-onboarding-form="self"]');
-                    if(form.dataset.onboardingForm!=='self'||!returned||
+                    const returned=[...page.querySelectorAll('form[data-onboarding-form]')]
+                        .find(candidate=>candidate.dataset.onboardingForm===form.dataset.onboardingForm);
+                    if(!returned||
                         form.dispatchEvent(new CustomEvent('profile:validation-response',{cancelable:true,detail:returned}))) {
                         formError(form,error.dataset.toastMessage || error.textContent.trim());
                     }

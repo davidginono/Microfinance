@@ -68,6 +68,22 @@ class RecordedApplicationDisbursementTest {
             && f.getSettlementInterest().compareTo(new BigDecimal("20.00"))==0 && f.getSettlementSequence()==3L && interest.equals(f.getInterestAccountId()) && f.getEvidence().equals("Signed agreement")),eq(List.of()));
         verify(otp).consumeOtpById(token);
     }
+    @Test void duplicatePostingRetainsNonSecretDraftFieldsAndRequestKeyWithoutConsumingOtp(){
+        UUID interest=UUID.randomUUID(),charge=UUID.randomUUID();
+        when(recording.fundingQuote(eq(actor),eq(id),any(),anyList())).thenReturn(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.FundingQuote(new BigDecimal("990.00"),BigDecimal.TEN,BigDecimal.ZERO,null));
+        doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate")).when(recording).disburse(eq(actor),any(),anyList());
+        when(messages.getMessage(eq("recording.error.duplicate"),isNull(),eq("recording.error.duplicate"),any())).thenReturn("Already recorded");
+        var flash=new RedirectAttributesModelMap();
+        assertThat(controller.finalize(id,actor,date,due,new BigDecimal("990"),null,"Changed reference","Changed notes","123456",null,key,money,principal,interest,null,null,null,null,null,"Signed paper",true,List.of(),List.of(charge),flash)).isEqualTo("redirect:/disbursement/loan-applications/"+id);
+        assertThat(new LinkedHashMap<String,Object>(flash.getFlashAttributes())).containsEntry("error","Already recorded")
+            .containsEntry("disbursementRequestKey",key).containsEntry("postingMoneyAccountId",money)
+            .containsEntry("postingPrincipalAccountId",principal).containsEntry("postingInterestAccountId",interest)
+            .containsEntry("postingDisbursementReference","Changed reference").containsEntry("postingDisbursementNotes","Changed notes")
+            .containsEntry("postingDisbursementDate",date).containsEntry("postingFirstPaymentDate",due)
+            .containsEntry("postingSettlementEvidence","Signed paper").containsEntry("postingDeductChargeIds",List.of(charge))
+            .doesNotContainKeys("disbursementOtpCode","attachments","disbursementProofFile");
+        verify(otp,never()).consumeOtpById(any());
+    }
     @Test void disabledApprovalOtpDoesNotRequireOrConsumeAnOtpDuringTellerPosting(){
         reset(otp,members);
         when(otpSettings.requiresApprovalOtp(actor.getMemberId(),"I1","B1")).thenReturn(false);
