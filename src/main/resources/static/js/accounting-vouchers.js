@@ -25,6 +25,15 @@ const field=(row,suffix)=>row.querySelector('input[name$=".'+suffix+'"]');
 const moneyOnly=new Set(['CASH','BANK','MOBILE_MONEY']),pickers=new WeakMap();
 const loanMode=()=>form.querySelector('[data-receipt-purpose]')?.value==='LOAN_REPAYMENT';
 const activity=()=>form.elements.namedItem('activityId')?.value||'';
+const moneyCents=value=>{
+ const match=/^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(value);
+ if(!match||!(match[1]||match[2]))return null;
+ const fraction=match[2]||'',shift=2+Number(match[3]||0)-fraction.length;
+ if(!Number.isInteger(shift)||Math.abs(shift)>20)return null;
+ const digits=BigInt((match[1]||'0')+fraction),power=10n**BigInt(Math.abs(shift));
+ return shift>=0?digits*power:digits%power===0n?digits/power:null;
+};
+const showMoney=cents=>(cents/100n).toLocaleString(document.documentElement.lang||'en')+'.'+(cents%100n).toString().padStart(2,'0');
 function update(){
  const loan=loanMode();
  form.querySelectorAll('[data-loan-only]').forEach(el=>{el.hidden=!loan;el.querySelectorAll('input,button,select').forEach(c=>c.disabled=!loan);});
@@ -41,17 +50,28 @@ function update(){
    select.dataset.accountFor=entry.querySelector('input[name$=".accountId"]').name;
    const money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;
    select.dataset.purpose=form.dataset.kind==='JOURNAL'?'':money?'MONEY':'OTHER';
-   const same=entries.filter(e=>e.querySelector('[data-entry-side]').value===side),amount=entry.querySelector('input[name$=".amount"]');
-   amount.readOnly=same.length===1;if(amount.readOnly)amount.value=field(r,'amount').value;
+   const same=entries.filter(e=>e.querySelector('[data-entry-side]').value===side);
    entry.querySelector('[data-remove-entry]').disabled=same.length===1||!editable;
   });
+  const totals=r.querySelector('[data-split-totals]');
+  const rowAmount=field(r,'amount');rowAmount.setCustomValidity('');
+  if(totals){
+   totals.hidden=!split||!editable;
+   let debit=0n,credit=0n,complete=true;
+   entries.forEach(entry=>{const amount=moneyCents(entry.querySelector('input[name$=".amount"]').value);if(amount===null||amount<=0n)complete=false;else if(entry.querySelector('[data-entry-side]').value==='DEBIT')debit+=amount;else credit+=amount;});
+   totals.querySelector('[data-debit-total]').value=showMoney(debit);totals.querySelector('[data-credit-total]').value=showMoney(credit);
+   const balanced=complete&&debit===credit&&debit===moneyCents(rowAmount.value);
+   totals.querySelector('[data-balance-error]').hidden=!split||balanced;
+   if(split&&editable&&!balanced)rowAmount.setCustomValidity(form.dataset.balanceError);
+  }
   r.querySelectorAll('[data-add-entry]').forEach(b=>b.disabled=!editable||entries.length>=50);
  });
+ const moneyHeader=form.querySelector('[data-header-money-account]');
+ if(moneyHeader){const needed=loan||all.some(r=>!r.querySelector('[data-split-entry]'));moneyHeader.hidden=!needed;moneyHeader.querySelectorAll('input,select,button').forEach(c=>c.disabled=!needed);}
  bindChoices();form.querySelectorAll('[data-voucher-select]').forEach(select=>pickers.get(select)?.sync());
  form.querySelector('[data-add-row]').disabled=all.length>=50;
- let cents=0n;
- all.forEach(r=>{const match=/^(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(field(r,'amount').value);if(match){const fractional=match[2]||'',exponent=Number(match[3]||0),shift=2+exponent-fractional.length;if(Number.isInteger(exponent)&&shift>=0&&shift<=20)cents+=BigInt(match[1]+fractional)*10n**BigInt(shift);}});
- form.querySelector('[data-live-total]').value=(cents/100n).toLocaleString(document.documentElement.lang||'en')+'.'+(cents%100n).toString().padStart(2,'0');
+ const cents=all.reduce((sum,r)=>sum+(moneyCents(field(r,'amount').value)||0n),0n);
+ form.querySelector('[data-live-total]').value=showMoney(cents);
 }
 form.querySelector('[data-receipt-purpose]')?.addEventListener('change',()=>{
  rows.querySelectorAll('[data-split-entry]').forEach(entry=>entry.remove());
@@ -78,8 +98,9 @@ function addPosting(row,side,account='',label='',amount=''){
  for(const [name,value] of [['side',side],['accountId',account]]){const input=document.createElement('input');input.type='hidden';input.name=prefix+'.'+name;input.value=value;if(name==='side')input.dataset.entrySide='';holder.append(input);}
  const text=document.createElement('span');text.hidden=true;text.dataset.accountLabel='';text.textContent=label;holder.append(text);
  const select=document.createElement('select');select.className='aws-control';select.dataset.accountFor=prefix+'.accountId';select.dataset.entryAccount='';select.dataset.voucherSelect='';select.dataset.searchable='true';select.setAttribute('aria-label',title.textContent);select.add(new Option(form.dataset.chooseAccount,''));holder.append(select);
- const amountLabel=document.createElement('label');amountLabel.textContent=form.dataset.amountLabel;const input=document.createElement('input');input.type='number';input.className='aws-control';input.dataset.amountInput='true';input.name=prefix+'.amount';input.value=amount;input.min='0.01';input.step='0.01';amountLabel.append(input);
- const remove=document.createElement('button');remove.type='button';remove.className='app-btn btn-neutral';remove.dataset.removeEntry='';remove.textContent=form.dataset.removeEntry;
+ const amountLabel=document.createElement('label');amountLabel.textContent=form.dataset.amountLabel;const input=document.createElement('input');input.type='number';input.className='aws-control';input.dataset.amountInput='true';input.name=prefix+'.amount';input.value=amount;input.min='0.01';input.max='9999999999999999.99';input.step='0.01';input.inputMode='decimal';input.required=true;amountLabel.append(input);
+ const remove=document.createElement('button');remove.type='button';remove.className='app-btn btn-neutral erp-icon-btn';remove.dataset.removeEntry='';remove.setAttribute('aria-label',form.dataset.removeEntryLabel);remove.title=form.dataset.removeEntryLabel;
+ const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('width','16');icon.setAttribute('height','16');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('fill','none');icon.setAttribute('stroke','currentColor');icon.setAttribute('stroke-width','2');icon.setAttribute('aria-hidden','true');const path=document.createElementNS(icon.namespaceURI,'path');path.setAttribute('d','M18 6 6 18M6 6l12 12');icon.append(path);remove.append(icon);
  entry.append(field,amountLabel,remove);list.append(entry);
 }
 function bindChoices(){
@@ -102,20 +123,20 @@ function bindChoices(){
 }
 form.addEventListener('click',e=>{
  const clearClient=e.target.closest('[data-client-clear]');if(clearClient&&!loanMode()){form.elements.clientId.value='';clearClient.closest('.voucher-account-choice').querySelector('[data-account-label]').textContent='';pickers.get(form.querySelector('[data-voucher-client]'))?.reset();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
- const addEntry=e.target.closest('[data-add-entry]');if(addEntry){
+ const addEntry=e.target.closest('[data-add-entry]');if(addEntry&&!addEntry.disabled){
   const row=addEntry.closest('[data-voucher-row]'),list=row.querySelector('[data-split-list]');
   if(!list.children.length){
    for(const side of ['DEBIT','CREDIT']){
     const key=side==='DEBIT'?'debit':'credit',money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;
-    const input=money?form.elements.moneyAccountId:field(row,key+'AccountId'),holder=money?input?.closest('.voucher-account-choice'):input?.closest('.voucher-account-choice');
+    const input=money?form.elements.moneyAccountId:field(row,key+'AccountId'),holder=input?.closest('.voucher-account-choice');
     addPosting(row,side,input?.value||'',holder?.querySelector('[data-account-label]')?.textContent||'',field(row,'amount').value);
    }
    for(const side of ['debit','credit']){const input=field(row,side+'AccountId');if(input)input.value='';}
   }
   if(list.children.length<50)addPosting(row,addEntry.dataset.addEntry);
-  update();list.lastElementChild?.querySelector('select')?.focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;
+  update();const last=list.lastElementChild;(last?.querySelector('.neo-select-button')||last?.querySelector('select'))?.focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;
  }
- const removeEntry=e.target.closest('[data-remove-entry]');if(removeEntry&&!removeEntry.disabled){const row=removeEntry.closest('[data-voucher-row]');removeEntry.closest('[data-split-entry]').remove();update();row.querySelector('[data-add-entry]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
+ const removeEntry=e.target.closest('button[data-remove-entry]');if(removeEntry&&!removeEntry.disabled){const row=removeEntry.closest('[data-voucher-row]');removeEntry.closest('[data-split-entry]').remove();update();row.querySelector('[data-add-entry]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
  const remove=e.target.closest('[data-remove-row]');if(remove && rows.children.length>1){const previous=remove.closest('[data-voucher-row]').previousElementSibling;remove.closest('[data-voucher-row]').remove();update();(previous||rows.firstElementChild).querySelector('input[name$=".description"]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
  const manual=e.target.closest('[data-manual]');if(manual){const row=manual.closest('[data-voucher-row]');field(row,'transactionId').value='';field(row,'templateKey').value='';field(row,'component').value='TOTAL';row.querySelector('[data-mapping-label]').textContent='';pickers.get(row.querySelector('[data-mapping]'))?.reset();update();row.querySelector('[data-account-for]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
 

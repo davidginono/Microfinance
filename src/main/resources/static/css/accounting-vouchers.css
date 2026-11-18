@@ -29,5 +29,7 @@
 @keyframes voucher-number-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.voucher-number-spinner{animation-duration:1.8s}}
 
-.voucher-split-entry{padding:12px 0;border-top:1px solid #eaeded;align-items:end;grid-template-columns:minmax(0,2fr) minmax(100px,1fr) auto}.voucher-split-entry>button{width:max-content}.voucher-split-entry .voucher-account-choice{min-width:0}
-@media(max-width:640px){.voucher-form .voucher-split-entry{grid-template-columns:minmax(0,1fr)}}
+.aws-console .accounting-create-workspace .voucher-split-entry.accounting-grid{padding:16px 0;border-top:1px solid #eaeded;align-items:end;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) 32px;gap:12px;max-width:100%}
+.voucher-split-entry>button{width:32px;height:32px;align-self:end}.voucher-split-entry .voucher-account-choice{min-width:0}
+.voucher-split-totals{display:flex;gap:12px 24px;flex-wrap:wrap;padding:12px 0;font-variant-numeric:tabular-nums}.voucher-split-totals p{flex-basis:100%;margin:0}
+@media(max-width:640px){.aws-console .accounting-create-workspace .voucher-split-entry.accounting-grid{grid-template-columns:minmax(0,1fr) 32px}.voucher-split-entry>.voucher-field{grid-column:1/-1}}
