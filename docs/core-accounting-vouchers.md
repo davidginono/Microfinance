@@ -68,3 +68,5 @@ V170 allows existing purpose-OTHER posting accounts in the institution's designa
 Apply the forward migrations with a verified deployment backup. Verification uses disposable PostgreSQL databases; the operational server is not changed by the source update.
 
 Activity and transaction codes are generated on the server as ACT-000001 and TXN-000001 within each institution. V171 preserves existing codes, advances counters past matching existing codes, and records request keys/hashes so concurrent retries keep the same new record. Code fields are absent from creation forms; transaction setup selects an existing activity by name/code.
+
+Manual entry uses repeatable debit/credit entries with an amount beside each account. Its hidden transaction total is derived from debit entries and is checked against both sides by the existing server plan. Configured activities alone show the transaction picker and an editable transaction amount; loan repayment keeps its specialised amount and allocation path.

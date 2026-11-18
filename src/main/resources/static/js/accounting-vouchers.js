@@ -33,6 +33,7 @@ const moneyCents=value=>{
  const digits=BigInt((match[1]||'0')+fraction),power=10n**BigInt(Math.abs(shift));
  return shift>=0?digits*power:digits%power===0n?digits/power:null;
 };
+const rawMoney=cents=>(cents/100n).toString()+'.'+(cents%100n).toString().padStart(2,'0');
 const showMoney=cents=>(cents/100n).toLocaleString(document.documentElement.lang||'en')+'.'+(cents%100n).toString().padStart(2,'0');
 function update(){
  const loan=loanMode();
@@ -40,10 +41,17 @@ function update(){
  form.querySelectorAll('[data-other-only]').forEach(el=>{el.hidden=loan;if(el.matches('select')){el.disabled=loan;const wrapper=el.closest('.neo-select');if(wrapper)wrapper.hidden=loan;}el.querySelectorAll('input,button,select').forEach(c=>c.disabled=loan);});
  form.querySelector('[name="reference"]').maxLength=loan?80:160;
  const all=[...rows.children];
- all.forEach((r,i)=>{r.querySelector('[data-row-number]').textContent=i+1;r.querySelectorAll('[name]').forEach(el=>{el.name=el.name.replace(/rows\[\d+\]/,'rows['+i+']');el.removeAttribute('id');});r.querySelectorAll('[data-account-for]').forEach(b=>b.dataset.accountFor=b.dataset.accountFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelectorAll('[data-choice-for]').forEach(b=>b.dataset.choiceFor=b.dataset.choiceFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelector('[data-remove-row]').disabled=all.length===1;const mapped=!!field(r,'transactionId').value;r.querySelector('[data-manual]').hidden=loan||!mapped||!!activity();r.querySelectorAll('[data-manual-accounts]').forEach(el=>{el.hidden=loan||mapped||!!activity();el.querySelectorAll('input,button,select').forEach(c=>c.disabled=loan||mapped||!!activity());});r.querySelectorAll('[data-loan-choice="loans"]').forEach(b=>b.disabled=!loan||!form.elements.clientId.value);});
+ all.forEach((r,i)=>{r.querySelector('[data-row-number]').textContent=i+1;r.querySelectorAll('[name]').forEach(el=>{el.name=el.name.replace(/rows\[\d+\]/,'rows['+i+']');el.removeAttribute('id');});r.querySelectorAll('[data-account-for]').forEach(b=>b.dataset.accountFor=b.dataset.accountFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelectorAll('[data-choice-for]').forEach(b=>b.dataset.choiceFor=b.dataset.choiceFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelector('[data-remove-row]').disabled=all.length===1;const mapped=!!field(r,'transactionId').value;const choices=r.querySelector('[data-configured-transactions]');if(choices)choices.hidden=loan||!activity();const mapping=r.querySelector('[data-mapping]');mapping.disabled=loan||!activity();r.querySelectorAll('[data-manual-accounts]').forEach(el=>{el.hidden=loan||mapped||!!activity()||form.dataset.newVoucher==='true';el.querySelectorAll('input,button,select').forEach(c=>c.disabled=loan||mapped||!!activity()||form.dataset.newVoucher==='true');});r.querySelectorAll('[data-loan-choice="loans"]').forEach(b=>b.disabled=!loan||!form.elements.clientId.value);});
  all.forEach(r=>{
-  const entries=[...r.querySelectorAll('[data-split-entry]')],split=entries.length>0,mapped=!!field(r,'transactionId').value,editable=!loan&&!mapped&&!activity();
-  r.querySelectorAll('[data-pair-accounts]').forEach(el=>{el.hidden=!editable||split;el.querySelectorAll('input,select,button').forEach(c=>c.disabled=!editable||split);});
+  const mapped=!!field(r,'transactionId').value,direct=!loan&&!mapped&&!activity(),editable=direct&&form.dataset.newVoucher!=='true';
+  if(editable&&!r.querySelector('[data-split-entry]')){
+   for(const side of ['DEBIT','CREDIT']){const money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;const account=money?form.elements.moneyAccountId:field(r,side==='DEBIT'?'debitAccountId':'creditAccountId');addPosting(r,side,account?.value||'',account?.dataset.postingLabel||account?.closest('.voucher-account-choice')?.querySelector('[data-account-label]')?.textContent||'',field(r,'amount').value);}
+   for(const side of ['debit','credit']){const account=field(r,side+'AccountId');if(account)account.value='';}
+  }
+  const entries=[...r.querySelectorAll('[data-split-entry]')],split=entries.length>0;
+  const rowAmount=field(r,'amount'),amountLabel=r.querySelector('[data-transaction-amount]');
+  rowAmount.type=direct?'hidden':'number';rowAmount.required=!direct;rowAmount.dataset.amountInput=direct?'false':'true';if(amountLabel)amountLabel.hidden=direct;
+  if(!direct)window.AmountInputs?.refresh(rowAmount);
   entries.forEach((entry,n)=>{
    entry.querySelectorAll('[name]').forEach(el=>el.name=el.name.replace(/entries\[\d+\]/,'entries['+n+']'));
    const select=entry.querySelector('[data-entry-account]'),side=entry.querySelector('[data-entry-side]').value;
@@ -54,20 +62,21 @@ function update(){
    entry.querySelector('[data-remove-entry]').disabled=same.length===1||!editable;
   });
   const totals=r.querySelector('[data-split-totals]');
-  const rowAmount=field(r,'amount');rowAmount.setCustomValidity('');
+  rowAmount.setCustomValidity('');entries.forEach(entry=>entry.querySelector('input[name$=".amount"]').setCustomValidity(''));
   if(totals){
    totals.hidden=!split||!editable;
    let debit=0n,credit=0n,complete=true;
    entries.forEach(entry=>{const amount=moneyCents(entry.querySelector('input[name$=".amount"]').value);if(amount===null||amount<=0n)complete=false;else if(entry.querySelector('[data-entry-side]').value==='DEBIT')debit+=amount;else credit+=amount;});
    totals.querySelector('[data-debit-total]').value=showMoney(debit);totals.querySelector('[data-credit-total]').value=showMoney(credit);
-   const balanced=complete&&debit===credit&&debit===moneyCents(rowAmount.value);
-   totals.querySelector('[data-balance-error]').hidden=!split||balanced;
-   if(split&&editable&&!balanced)rowAmount.setCustomValidity(form.dataset.balanceError);
+   if(direct)rowAmount.value=rawMoney(debit);
+   const balanced=complete&&debit===credit&&debit>0n;
+   totals.querySelector('[data-balance-error]').hidden=!split||balanced||(debit===0n&&credit===0n);
+   if(split&&editable&&!balanced)entries[0].querySelector('input[name$=".amount"]').setCustomValidity(form.dataset.balanceError);
   }
   r.querySelectorAll('[data-add-entry]').forEach(b=>b.disabled=!editable||entries.length>=50);
  });
  const moneyHeader=form.querySelector('[data-header-money-account]');
- if(moneyHeader){const needed=loan||all.some(r=>!r.querySelector('[data-split-entry]'));moneyHeader.hidden=!needed;moneyHeader.querySelectorAll('input,select,button').forEach(c=>c.disabled=!needed);}
+ if(moneyHeader){const needed=loan||!!activity()||all.some(r=>!!field(r,'transactionId').value);moneyHeader.hidden=!needed;moneyHeader.querySelectorAll('input,select,button').forEach(c=>c.disabled=!needed);}
  bindChoices();form.querySelectorAll('[data-voucher-select]').forEach(select=>pickers.get(select)?.sync());
  form.querySelector('[data-add-row]').disabled=all.length>=50;
  const cents=all.reduce((sum,r)=>sum+(moneyCents(field(r,'amount').value)||0n),0n);
@@ -125,20 +134,12 @@ form.addEventListener('click',e=>{
  const clearClient=e.target.closest('[data-client-clear]');if(clearClient&&!loanMode()){form.elements.clientId.value='';clearClient.closest('.voucher-account-choice').querySelector('[data-account-label]').textContent='';pickers.get(form.querySelector('[data-voucher-client]'))?.reset();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
  const addEntry=e.target.closest('[data-add-entry]');if(addEntry&&!addEntry.disabled){
   const row=addEntry.closest('[data-voucher-row]'),list=row.querySelector('[data-split-list]');
-  if(!list.children.length){
-   for(const side of ['DEBIT','CREDIT']){
-    const key=side==='DEBIT'?'debit':'credit',money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;
-    const input=money?form.elements.moneyAccountId:field(row,key+'AccountId'),holder=input?.closest('.voucher-account-choice');
-    addPosting(row,side,input?.value||'',holder?.querySelector('[data-account-label]')?.textContent||'',field(row,'amount').value);
-   }
-   for(const side of ['debit','credit']){const input=field(row,side+'AccountId');if(input)input.value='';}
-  }
   if(list.children.length<50)addPosting(row,addEntry.dataset.addEntry);
   update();const last=list.lastElementChild;(last?.querySelector('.neo-select-button')||last?.querySelector('select'))?.focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;
  }
  const removeEntry=e.target.closest('button[data-remove-entry]');if(removeEntry&&!removeEntry.disabled){const row=removeEntry.closest('[data-voucher-row]');removeEntry.closest('[data-split-entry]').remove();update();row.querySelector('[data-add-entry]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
  const remove=e.target.closest('[data-remove-row]');if(remove && rows.children.length>1){const previous=remove.closest('[data-voucher-row]').previousElementSibling;remove.closest('[data-voucher-row]').remove();update();(previous||rows.firstElementChild).querySelector('input[name$=".description"]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
- const manual=e.target.closest('[data-manual]');if(manual){const row=manual.closest('[data-voucher-row]');field(row,'transactionId').value='';field(row,'templateKey').value='';field(row,'component').value='TOTAL';row.querySelector('[data-mapping-label]').textContent='';pickers.get(row.querySelector('[data-mapping]'))?.reset();update();row.querySelector('[data-account-for]').focus();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
+
 
 });
 update();
