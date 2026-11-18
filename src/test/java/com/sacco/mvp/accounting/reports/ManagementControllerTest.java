@@ -22,14 +22,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 class ManagementControllerTest {
-    BudgetService budgets;ManagementReportService reports;ManagementReportExcel excel;AuditService audit;AppUserPrincipal actor;MockMvc mvc;
+    BudgetService budgets;ManagementReportService reports;ManagementReportPdf pdf;ManagementReportExcel excel;AuditService audit;AppUserPrincipal actor;MockMvc mvc;
     final HttpSessionCsrfTokenRepository tokens=new HttpSessionCsrfTokenRepository();
     final UUID account=UUID.randomUUID(),id=UUID.randomUUID();
     @BeforeEach void setup(){
         budgets=mock(BudgetService.class);reports=mock(ManagementReportService.class);actor=mock(AppUserPrincipal.class);excel=mock(ManagementReportExcel.class);audit=mock(AuditService.class);when(actor.getSaccoId()).thenReturn("I1");when(actor.getStationId()).thenReturn("B1");when(actor.getMemberId()).thenReturn(UUID.randomUUID());
         var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(ManagementReportTest.DAY);when(clock.now()).thenReturn(ManagementReportTest.NOW);
         var csrfFilter=new CsrfFilter(tokens);csrfFilter.setRequestHandler(new CsrfTokenRequestAttributeHandler());
-        mvc=MockMvcBuilders.standaloneSetup(new BudgetController(budgets,clock),new ManagementReportController(reports,mock(ManagementReportPdf.class),excel,clock,audit))
+        pdf=mock(ManagementReportPdf.class);
+        var messages=new org.springframework.context.support.ResourceBundleMessageSource();
+        messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+        mvc=MockMvcBuilders.standaloneSetup(new BudgetController(budgets,clock),new ManagementReportController(reports,pdf,excel,clock,audit,messages))
             .addFilters(csrfFilter).setCustomArgumentResolvers(new HandlerMethodArgumentResolver(){public boolean supportsParameter(MethodParameter p){return p.getParameterType()==AppUserPrincipal.class;}public Object resolveArgument(MethodParameter p,ModelAndViewContainer m,NativeWebRequest r,WebDataBinderFactory b){return actor;}}).build();
     }
     org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder form(){var request=post("/finance/budgets").param("requestKey",UUID.randomUUID().toString()).param("accountId",account.toString()).param("year","2027").param("date","2026-10-15");for(int n=0;n<12;n++)request.param("amounts["+n+"]","10.01");return request;}
@@ -63,9 +66,48 @@ class ManagementControllerTest {
         assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/cashbook/pdf"))).hasRootCauseInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->mvc.perform(get("/reports/financial/operations/cashbook/print"))).hasRootCauseInstanceOf(AccessDeniedException.class);
     }
+    @Test void referencePreviewRendersThePdfCaptionsInHtmlAndPrintUsesTheFullReport()throws Exception{
+        var kind=Kind.LOAN_REPAYMENT_TRANSACTIONS;
+        var report=new LoanReportExcelTest().result(kind,1);
+        when(reports.report(eq(actor),eq(kind),any(),eq(false))).thenReturn(report);
+        when(reports.report(eq(actor),eq(kind),any(),eq(true))).thenReturn(report);
+        when(pdf.build(report,Locale.ENGLISH)).thenReturn(new byte[]{3,4});
+        String url="/reports/financial/operations/loan-repayment-transactions";
+        mvc.perform(get(url).param("run","true").locale(Locale.ENGLISH))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/management/report"))
+            .andExpect(model().attribute("report",report))
+            .andExpect(model().attribute("referenceHeadings",org.hamcrest.Matchers.hasEntry("date","Transaction\ndate")))
+            .andExpect(model().attribute("referenceWidths",List.of(67,77,67,72,86,94,72)));
+        verifyNoInteractions(pdf);
+        mvc.perform(get(url+"/print").locale(Locale.ENGLISH))
+            .andExpect(status().isOk()).andExpect(content().contentType("application/pdf")).andExpect(content().bytes(new byte[]{3,4}));
+    }
     @Test void unrelatedOperationalReportsHaveNoSpreadsheetEndpoint()throws Exception{
         for(var slug:List.of("cashbook","daily-collections"))mvc.perform(get("/reports/financial/operations/"+slug+"/excel")).andExpect(status().isNotFound());
         verify(reports,never()).report(any(),any(),any(),anyBoolean());
+    }
+    @Test void everyLoanReportUsesTheProductSelectorForPreviewAndExports()throws Exception{
+        var choice=new Choice(UUID.randomUUID(),"","Business loan");
+        for(var slug:List.of("disbursed-loans-audit","expected-repayments","loan-repayment-transactions","loan-portfolio","portfolio-risk","portfolio-analysis")){
+            var kind=ManagementReportController.kind(slug);
+            var result=new LoanReportExcelTest().result(kind,1);
+            var filter=new Parameters(ManagementReportTest.DAY.withDayOfMonth(1),ManagementReportTest.DAY,ManagementReportTest.NOW,null,null,null,"",0,choice.id());
+            when(reports.choices(actor,kind,"products","Business",0)).thenReturn(List.of(choice));
+            when(reports.selectedProduct(actor,kind,choice.id())).thenReturn(choice);
+            when(reports.report(actor,kind,filter,false)).thenReturn(result);
+            when(reports.report(actor,kind,filter,true)).thenReturn(result);
+            when(pdf.build(result,Locale.ENGLISH)).thenReturn(new byte[]{1});
+            when(excel.build(result,Locale.ENGLISH)).thenReturn(new byte[]{1});
+            String url="/reports/financial/operations/"+slug;
+            mvc.perform(get(url+"/choices/products").param("search","Business")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(choice.id().toString()));
+            mvc.perform(get(url).param("productId",choice.id().toString())).andExpect(status().isOk())
+                .andExpect(model().attribute("productChoice",choice));
+            for(var output:List.of("","/pdf","/print","/excel"))
+                mvc.perform(get(url+output).locale(Locale.ENGLISH).param("productId",choice.id().toString()).param("run","true")
+                    .param("from",filter.from().toString()).param("through",filter.through().toString()).param("cutoff",filter.cutoff().toString()))
+                    .andExpect(status().isOk());
+        }
     }
 
     @Test void spreadsheetRoutesKeepFiltersScopeCutoffAndAuditTheDownload()throws Exception{

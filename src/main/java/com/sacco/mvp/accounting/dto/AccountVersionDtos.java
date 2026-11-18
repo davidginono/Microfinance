@@ -41,7 +41,8 @@ public final class AccountVersionDtos {
     @Data public static class EditForm {
         private String name = "", nameSw = "", description = "", reason = "";
         private int revision;
-        private String cashSection="", equityComponent="", noteText="";
+        private String cashSection="", equityComponent="";
+        private String noteText;
         private Integer note;
     }
     @Data public static class PolicyForm {

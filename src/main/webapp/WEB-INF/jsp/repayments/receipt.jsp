@@ -22,7 +22,7 @@
     <div class="repayment-pagination repayment-no-print">
         <a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${receipt.loanApplicationId}' />"><spring:message code="repayment.loanRecord" /></a>
         <a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${receipt.loanApplicationId}/receipts/${receipt.id}/pdf' />"><spring:message code="voucher.pdf" /></a>
-        <a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${receipt.loanApplicationId}/receipts/${receipt.id}/print' />" target="_blank" rel="noopener"><spring:message code="repayment.print" /></a>
+        <a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${receipt.loanApplicationId}/receipts/${receipt.id}/print' />" data-print-action="true"><spring:message code="repayment.print" /></a>
         <c:if test="${not empty receipt.reverses}"><a class="app-btn btn-neutral" href="<c:url value='/repayments/loans/${receipt.loanApplicationId}/receipts/${receipt.reverses}' />"><spring:message code="repayment.original" /></a></c:if>
     </div>
 </article>

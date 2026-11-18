@@ -61,7 +61,7 @@ class FinanceWorkspaceSecurityTest {
         mvc.perform(post("/finance/test-boundary").with(user(actor)).with(csrf())).andExpect(status().isOk());
     }
 
-    @Test void onlyAccountantsReceiveDirectAccountingAndLoanRecordingDefaults() {
+    @Test void directAccountingDefaultsKeepTheExplicitAdministratorConfigurationException() {
         for (Position role : Position.values()) {
             var financial=UserClaim.defaultClaims(Set.of(role), true).stream().filter(claim ->
                 claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATE_")
@@ -72,6 +72,7 @@ class FinanceWorkspaceSecurityTest {
                 UserClaim.ACCOUNTING_BUSINESS_VIEW,UserClaim.ACCOUNTING_BUSINESS_CREATE,UserClaim.ACCOUNTING_BUSINESS_REVERSE,
                 UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,UserClaim.LOAN_RECORDING_DISBURSE,
                 UserClaim.LOAN_RECORDING_POST,UserClaim.LOAN_RECORDING_REVERSE,UserClaim.LOAN_RECORDING_EXPORT);
+            else if(Set.of(Position.ADMIN,Position.MINOR_ADMIN,Position.ICT_MANAGER).contains(role))assertThat(financial).containsExactly(UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
             else assertThat(financial).isEmpty();
         }
     }

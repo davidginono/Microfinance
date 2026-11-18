@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="<c:url value='/css/tailwind.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-components.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/shell.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/print-footer.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/resource-table.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/workspace-resources.css' />" />
     <link rel="stylesheet" href="<c:url value='/css/console-resource-details.css' />" />

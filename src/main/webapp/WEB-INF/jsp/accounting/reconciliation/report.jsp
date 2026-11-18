@@ -14,7 +14,7 @@
   <h1 class="erp-page-title"><spring:message code="reconciliation.title" /></h1>
   <c:if test="${not empty report and canExportReport}"><div class="report-page-actions" data-aws-action-pin="true">
         <c:forEach items="${['print','pdf']}" var="output"><c:url value="/reports/financial/sl-gl-reconciliation/${output}" var="outputUrl"><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="component" value="${filter.component}" /><c:param name="activityId" value="${filter.activityFilter}" /></c:url>
-          <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><report:reportExport format="${output}" /></a>
+          <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" data-print-action="${output eq 'print'}"><report:reportExport format="${output}" /></a>
         </c:forEach>
   </div></c:if>
 </div>

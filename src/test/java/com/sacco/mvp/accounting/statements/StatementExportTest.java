@@ -128,4 +128,39 @@ class StatementExportTest {
             }
         }
     }
+    @Test void equityUsesDatedMovementRowsAndConsistentNumericExports()throws Exception{
+        var base=snapshot();var components=List.of("account:Owner capital","fs.retainedEarnings");
+        var movements=List.of(
+            new EquityRow("fs.opening",Map.of(components.get(0),n("50"),components.get(1),n("20")),n("70"),true),
+            new EquityRow("fs.surplus",Map.of(components.get(0),n("0"),components.get(1),n("15")),n("15"),false),
+            new EquityRow("fs.movement.DISTRIBUTION",Map.of(components.get(0),n("0"),components.get(1),n("-5")),n("-5"),false),
+            new EquityRow("fs.movement.CONTRIBUTION",Map.of(components.get(0),n("10"),components.get(1),n("0")),n("10"),false),
+            new EquityRow("fs.closing",Map.of(components.get(0),n("60"),components.get(1),n("30")),n("90"),true));
+        var s=new Snapshot(3,base.id(),base.parameters(),base.generatedAt(),"I","B",base.institutionName(),base.branchName(),base.balances(),base.position(),base.income(),base.cashFlow(),components,movements,base.checks(),null,movements,List.of());
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
+            var doc=presentation.document(s,Kind.EQUITY,s.balances(),locale);
+            assertThat(doc.title()).isEqualTo(presentation.label("fs.equity.referenceTitle",locale));
+            assertThat(presentation.equityPeriod(s,locale)).contains("2026");
+            assertThat(doc.columns().getFirst().label()).isEmpty();
+            assertThat(doc.rows().getFirst().heading()).isFalse();assertThat(doc.rows().getFirst().total()).isFalse();
+            assertThat(doc.rows().getFirst().cells().getFirst().text()).startsWith(presentation.label("fs.equity.balanceAt",locale));
+            assertThat(doc.rows().get(1).cells().get(1).text()).isEmpty();
+            assertThat(doc.rows().get(2).cells().get(2).text()).isEqualTo("(5.00)");
+            assertThat(doc.rows().get(4).total()).isTrue();assertThat(doc.rows().get(4).cells().getLast().amount()).isEqualByComparingTo("90");
+            assertThat(doc.rows()).hasSize(11);
+            try(var pdf=Loader.loadPDF(exporter.export(s,doc,"PDF",locale))){
+                assertThat(pdf.getNumberOfPages()).isEqualTo(1);var text=new PDFTextStripper().getText(pdf);
+                assertThat(text).contains("Owner capital","(5.00)","90.00");assertThat(text).contains(doc.title(),presentation.equityPeriod(s,locale));assertThat(text.indexOf(s.institutionName())).isGreaterThan(text.indexOf(doc.title()));
+            }
+            try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,doc,"XLSX",locale)))){
+                var sheet=book.getSheetAt(0);assertThat(sheet.getNumMergedRegions()).isEqualTo(1);assertThat(sheet.getMergedRegion(0).getFirstRow()).isEqualTo(0);
+                assertThat(sheet.getRow(7).getCell(2).getNumericCellValue()).isEqualTo(-5);
+                assertThat(sheet.getRow(6).getCell(1).getCellStyle().getDataFormatString()).endsWith(";\"\"");
+                assertThat(sheet.getRow(7).getCell(2).getCellStyle().getBorderBottom()).isEqualTo(org.apache.poi.ss.usermodel.BorderStyle.THIN);
+                assertThat(book.getFontAt(sheet.getRow(0).getCell(0).getCellStyle().getFontIndex()).getColor()).isEqualTo(org.apache.poi.ss.usermodel.IndexedColors.RED.getIndex());
+                assertThat(sheet.getRow(0).getCell(0).getCellStyle().getBorderBottom()).isEqualTo(org.apache.poi.ss.usermodel.BorderStyle.NONE);
+            }
+        }
+    }
+
 }

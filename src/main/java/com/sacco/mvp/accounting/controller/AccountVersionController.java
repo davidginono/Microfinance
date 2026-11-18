@@ -19,7 +19,7 @@ import java.util.UUID;
 @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')")
 public class AccountVersionController {
     private final GeneralLedgerService ledger;
-    @InitBinder("versionForm") void bindVersion(WebDataBinder b) {b.setAllowedFields("name","description","reason","revision","cashSection","equityComponent","note","noteText");}
+    @InitBinder("versionForm") void bindVersion(WebDataBinder b) {b.setAllowedFields("name","description","reason","revision","cashSection","equityComponent");}
     @InitBinder("policyForm") void bindPolicy(WebDataBinder b) {b.setAllowedFields("version","createAutomatic","updateAutomatic","deactivateAutomatic","reactivateAutomatic","reason");}
     @GetMapping("/versions")
     String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="") String search,

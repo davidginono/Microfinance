@@ -7,9 +7,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title><c:out value="${document.title}" /></title>
-    <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" />
+    <link rel="stylesheet" href="<c:url value='/css/client-loan-statement.css' />" /><link rel="stylesheet" href="<c:url value='/css/print-footer.css' />" />
 </head>
-<body class="client-statement-print">
+<body data-print-document class="client-statement-print">
 <div class="statement-print-tools"><button type="button" class="report-print-action"><spring:message code="voucher.print" /></button></div>
 <main class="client-loan-statement">
 <%@ include file="statement-document.jspf" %>

@@ -1,5 +1,6 @@
 package com.sacco.mvp.accounting.statements.dto;
 
+import com.sacco.mvp.accounting.dto.GeneralLedgerDtos.Reporting;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
@@ -17,10 +18,12 @@ public final class StatementModels {
                           BigDecimal previousOpening,BigDecimal previousDebit,BigDecimal previousCredit,BigDecimal previousClosing) {
         public BigDecimal movement(){return debit.subtract(credit);}
         public BigDecimal previousMovement(){return previousDebit.subtract(previousCredit);}
-        public boolean money(){return Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);}
+        public boolean money(){
+            return Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose)
+                || "ASSET".equals(type) && mapping!=null && Reporting.CASH_EQUIVALENTS.equals(mapping.cashSection());
+        }
     }
     public record Cash(UUID journalId,LocalDate date,UUID accountId,String type,String purpose,BigDecimal debit,BigDecimal credit) {
-        public boolean money(){return Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);}
         public BigDecimal signed(){return debit.subtract(credit);}
     }
     public record Row(String key,String code,String label,int note,String section,List<UUID> accounts,BigDecimal current,BigDecimal previous,boolean total) {}

@@ -25,6 +25,20 @@ class StatementCalculatorTest {
         var result=StatementCalculator.calculate(List.of(bank,cash,capital),List.of(cash(journal,bank,"0","25"),cash(journal,cash,"25","0")),PERIOD);
         assertThat(result.cash().stream().filter(r->r.key().equals("cashMovement")).findFirst().orElseThrow().current()).isEqualByComparingTo("0");assertThat(result.checks()).extracting(Check::key).containsExactly("coverage");
     }
+    @Test void configuredCashEquivalentsIncludeBalancesAndExcludeInternalTransfers(){
+        var bank=balance("ASSET","BANK","CURRENT_ASSETS","OPERATING","100","0","25");
+        var equivalent=balance("ASSET","OTHER","CURRENT_ASSETS","CASH_EQUIVALENTS","0","35","0");
+        var capital=balance("EQUITY","CAPITAL","EQUITY","FINANCING","-100","0","0");
+        var income=balance("INCOME","INCOME","INCOME","OPERATING","0","0","10");
+        UUID transfer=UUID.randomUUID(),receipt=UUID.randomUUID();
+        var result=StatementCalculator.calculate(List.of(bank,equivalent,capital,income),
+            List.of(cash(transfer,bank,"0","25"),cash(transfer,equivalent,"25","0"),
+                cash(receipt,equivalent,"10","0"),cash(receipt,income,"0","10")),PERIOD);
+        assertThat(result.cash()).extracting(Row::section).containsExactly("OPERATING","TOTAL","TOTAL","TOTAL");
+        assertThat(result.cash()).extracting(Row::current)
+            .usingElementComparator(BigDecimal::compareTo).containsExactly(n("10"),n("10"),n("100"),n("110"));
+        assertThat(result.checks()).extracting(Check::key).containsExactly("coverage");
+    }
     @Test void ambiguousCompoundCashJournalsAreFlaggedWithoutInventingAllocations(){
         var bank=balance("ASSET","BANK","CURRENT_ASSETS","OPERATING","0","100","0");var expense=balance("EXPENSE","EXPENSE","EXPENSE","OPERATING","0","50","0");var income=balance("INCOME","INCOME","INCOME","OPERATING","0","0","150");UUID journal=UUID.randomUUID();
         var result=StatementCalculator.calculate(List.of(bank,expense,income),List.of(cash(journal,bank,"100","0"),cash(journal,expense,"50","0"),cash(journal,income,"0","150")),PERIOD);

@@ -28,7 +28,7 @@
             <c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" />
             <c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" />
           </c:url>
-          <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><report:reportExport format="${output}" /></a>
+          <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" data-print-action="${output eq 'print'}"><report:reportExport format="${output}" /></a>
         </c:forEach>
       </sec:authorize>
     </div>
@@ -76,15 +76,17 @@
 <div class="accounting-actions accounting-form-actions report-form-actions"><button type="submit" class="app-btn btn-launch"><spring:message code="management.run" /></button></div>
 </form>
 <script src="<c:url value='/js/loan-recording.js' />" defer></script>
-<script src="<c:url value='/js/management-reports.js' />" defer></script>
 </c:when>
 <c:otherwise>
 <section class="erp-table-wrap management-preview">
   <div class="app-table-titlebar"><h2 id="management-preview-title"><spring:message code="management.preview" /> <span class="app-table-count">(<c:out value="${report.count}" />)</span></h2></div>
-  <div class="management-canvas" role="region" aria-labelledby="management-preview-title" tabindex="0"><%@ include file="document.jspf" %></div>
+  <div class="management-canvas ${report.isReferenceLayout()?'management-canvas--reference':''}" role="region" aria-labelledby="management-preview-title" tabindex="0">
+    <%@ include file="document.jspf" %>
+  </div>
   <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
 </section>
 </c:otherwise>
 </c:choose>
+<script src="<c:url value='/js/management-reports.js' />" defer></script>
 </div>
 <%@ include file="../../fragments/footer.jspf" %>

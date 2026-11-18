@@ -22,6 +22,15 @@ tr{break-inside:avoid}
 .fs-print-trial h1{font-family:inherit;text-decoration:underline;text-underline-offset:3pt}
 .fs-print-trial th{text-decoration:underline}
 .fs-print-equity{font-family:'Courier New',monospace}
-.fs-print-equity h1{color:#e00000;font-weight:700}
+.fs-print-equity h1{color:#ff0000;font-weight:700;text-align:center;text-transform:none;width:54.6%;margin-bottom:14pt}
+.fs-print-equity .fs-equity-period{display:flex;margin:0 0 30pt;font-weight:700}
+.fs-print-equity .fs-equity-period span:first-child{width:11%;flex:none}
+.fs-print-equity th{text-align:center;padding-bottom:30pt}
+.fs-print-equity td{padding:1pt 6pt 1pt 0;border:0}
+.fs-print-equity td:first-child{font-weight:700}
+.fs-print-equity .fs-print-total td{padding-top:12pt;padding-bottom:6pt}
+.fs-print-equity .fs-print-total .fs-print-number{text-decoration:underline;text-underline-offset:2pt}
+.fs-print-equity .fs-print-section td{padding-top:20pt;padding-bottom:12pt}
+.fs-print-equity .fs-equity-scope{font-size:8pt;margin-top:18pt}
 footer{margin-top:12pt;break-inside:avoid}
 @media screen{body{padding:12mm}.fs-print-document{margin:0 auto 12mm;max-width:186mm}.fs-print-landscape{max-width:273mm}}

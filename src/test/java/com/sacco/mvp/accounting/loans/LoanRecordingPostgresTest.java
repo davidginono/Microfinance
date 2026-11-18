@@ -136,7 +136,7 @@ class LoanRecordingPostgresTest {
         var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(LocalDate.of(2026,9,1),TODAY,false);
         var now=OffsetDateTime.now();String group="Outstanding clients' loans";
         UUID run=UUID.randomUUID();repository.create(run,actor,period,now,UUID.randomUUID());repository.capture(run,actor,period,now);
-        var balances=repository.balances(run,institution,period);var calculated=com.sacco.mvp.accounting.statements.service.StatementCalculator.calculate(balances,repository.cash(run,period),period);
+        var balances=repository.balances(run,institution,period);var calculated=com.sacco.mvp.accounting.statements.service.StatementCalculator.calculate(balances,repository.cash(run,period,balances),period);
         var snapshot=new com.sacco.mvp.accounting.statements.dto.StatementModels.Snapshot(1,run,period,now,institution,"B1","Synthetic institution","Branch",balances,calculated.position(),calculated.income(),calculated.cash(),calculated.equityColumns(),calculated.equity(),calculated.checks());
         var selectedLine=snapshot.position().stream().filter(r->r.label().equals(group)).findFirst().orElseThrow();
         var statements=new com.sacco.mvp.accounting.statements.service.StatementService(null,null,null,null,null,null,null,null);

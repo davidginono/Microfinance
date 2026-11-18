@@ -168,7 +168,7 @@ public class GeneralLedgerService {
         String kind=group?"HEADING":form.getKind(),purpose=group?"OTHER":form.getPurpose();
         require(group || "POSTING".equals(kind),"accountClassification");
         require(group || Set.of("DEBIT","CREDIT").contains(form.getNormalBalance()) && PURPOSES.contains(purpose),"accountClassification");
-        var command=new AccountCommand(code,trim(form.getName()),parent.type(),group?normalBalance(parent.type()):form.getNormalBalance(),kind,purpose,parent.id(),trim(form.getNameSw()),trim(form.getDescription()),reporting(form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText()));
+        var command=new AccountCommand(code,trim(form.getName()),parent.type(),group?normalBalance(parent.type()):form.getNormalBalance(),kind,purpose,parent.id(),trim(form.getNameSw()),trim(form.getDescription()),reporting(parent.type(),form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText()));
         return createAccountVersion(actor,command,form.getRequestKey(),trim(form.getReason()),complete);
     }
     private Account onboardingParent(AppUserPrincipal actor,UUID id,boolean groups) {
@@ -189,11 +189,19 @@ public class GeneralLedgerService {
         require(ROOT_TYPES.get(Integer.parseInt(node.code().substring(0,1))-1).equals(parent.type()),"chartParent");
         return parent;
     }
-    private static Reporting reporting(String cash,String equity,Integer note,String text) {
+    private static Reporting reporting(String type,String cash,String equity,Integer note,String text) {
         cash=trim(cash);equity=trim(equity);text=trim(text);
-        require(Set.of("","OPERATING","INVESTING","FINANCING","UNCLASSIFIED").contains(cash) && equity.length()<=100 && text.length()<=2000 && (note==null || note>=0 && note<=999),"reporting");
+        boolean cashAllowed=Set.of("","OPERATING","INVESTING","FINANCING","UNCLASSIFIED").contains(cash)
+            || Reporting.CASH_EQUIVALENTS.equals(cash) && "ASSET".equals(type);
+        require(cashAllowed && equity.length()<=100 && text.length()<=2000 && (note==null || note>=0 && note<=999),"reporting");
         require(equity.chars().noneMatch(Character::isISOControl) && text.chars().noneMatch(c->Character.isISOControl(c)&&c!='\n'&&c!='\r'),"reporting");
         return cash.isEmpty() && equity.isEmpty() && note==null && text.isEmpty()?null:new Reporting(cash,equity,note,text);
+    }
+    private static Reporting versionReporting(Account account,EditForm form) {
+        var prior=account.reporting();
+        if(prior!=null && form.getNote()==null && form.getNoteText()==null)
+            return reporting(account.type(),form.getCashSection(),form.getEquityComponent(),prior.note(),prior.noteText());
+        return reporting(account.type(),form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText());
     }
     private static String normalBalance(String type) {return Set.of("ASSET","EXPENSE").contains(type)?"DEBIT":"CREDIT";}
     private static String trim(String value) {return value==null?"":value.strip();}
@@ -231,7 +239,7 @@ public class GeneralLedgerService {
         text(c.name(),160,"name");
         require(c.nameSw()==null || c.nameSw().length()<=160,"nameSw");
         require(c.description()==null || c.description().length()<=500,"description");
-        if(c.reporting()!=null)require(Objects.equals(c.reporting(),reporting(c.reporting().cashSection(),c.reporting().equityComponent(),c.reporting().note(),c.reporting().noteText())),"reporting");
+        if(c.reporting()!=null)require(Objects.equals(c.reporting(),reporting(c.type(),c.reporting().cashSection(),c.reporting().equityComponent(),c.reporting().note(),c.reporting().noteText())),"reporting");
         require(TYPES.contains(c.type()) && Set.of("DEBIT","CREDIT").contains(c.normalBalance()) && KINDS.contains(c.kind()) && PURPOSES.contains(c.purpose()),"accountClassification");
         if(c.parentId()!=null) {
             Account parent=books.account(actor.getSaccoId(),c.parentId()).orElseThrow(()->invalid("parent"));
@@ -302,7 +310,7 @@ public class GeneralLedgerService {
         require(current.id().equals(base),"versionStale");require(!books.openVersion(actor.getSaccoId(),account),"versionOpen");
         var a=current.proposed();var proposed=new Account(a.id(),a.code(),a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),operation.equals("REACTIVATE") || !operation.equals("DEACTIVATE") && a.active(),a.nameSw(),a.description(),a.reporting());
         var v=newDraft(actor,account,base,operation,a,proposed,key,hash);books.createVersion(actor.getSaccoId(),v);
-        return saveAccountVersion(actor,v.id(),versionForm(operation.equals("UPDATE")?new Account(a.id(),a.code(),form.getName(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),form.getDescription(),reporting(form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText())):proposed,form.getReason(),0),complete);
+        return saveAccountVersion(actor,v.id(),versionForm(operation.equals("UPDATE")?new Account(a.id(),a.code(),form.getName(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),form.getDescription(),versionReporting(a,form)):proposed,form.getReason(),0),complete);
     }
     private Version newDraft(AppUserPrincipal actor,UUID account,UUID base,String op,Account before,Account proposed,UUID key,String hash) {
         return new Version(UUID.randomUUID(),account,books.nextVersion(actor.getSaccoId(),account),base,op,"DRAFT",before,proposed,actor.getMemberId(),"",actor.getStationId(),"",0,0,"DRAFT",null,null,"",clock.now(),null,null,key,hash);
@@ -338,7 +346,7 @@ public class GeneralLedgerService {
         require(owner(actor,v) && v.state().equals("DRAFT"),"versionTransition");require(v.revision()==form.getRevision(),"versionStale");
         require(form.getReason()!=null && form.getReason().length()<=500 && form.getName()!=null && form.getName().length()<=160 && (form.getDescription()==null || form.getDescription().length()<=500),"versionInput");
         var a=v.proposed();boolean metadata=Set.of("CREATE","UPDATE").contains(v.operation());
-        var proposed=new Account(a.id(),a.code(),metadata?trim(form.getName()):a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),metadata?trim(form.getDescription()):a.description(),metadata?reporting(form.getCashSection(),form.getEquityComponent(),form.getNote(),form.getNoteText()):a.reporting());
+        var proposed=new Account(a.id(),a.code(),metadata?trim(form.getName()):a.name(),a.type(),a.normalBalance(),a.kind(),a.purpose(),a.parentId(),a.active(),a.nameSw(),metadata?trim(form.getDescription()):a.description(),metadata?versionReporting(a,form):a.reporting());
         books.saveVersionDraft(actor.getSaccoId(),v,proposed,trim(form.getReason()));v=books.version(actor.getSaccoId(),id).orElseThrow();
         versionEvent(actor,v,"DRAFT_SAVED",v.reason());
         if(complete) {

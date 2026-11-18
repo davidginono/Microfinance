@@ -77,11 +77,13 @@ public final class StatementCalculator {
     }
     private static List<Row> cash(List<Balance> accounts,List<Cash> lines,Parameters p,List<Check> checks){
         var byAccount=new HashMap<UUID,Balance>();accounts.forEach(a->byAccount.put(a.id(),a));
+        var moneyAccounts=new HashSet<UUID>();for(var account:accounts)if(account.money())moneyAccounts.add(account.id());
         var journals=new LinkedHashMap<UUID,List<Cash>>();lines.forEach(l->journals.computeIfAbsent(l.journalId(),k->new ArrayList<>()).add(l));
-        var values=new LinkedHashMap<String,BigDecimal[]>();var sources=new LinkedHashMap<String,Set<UUID>>();var labels=new HashMap<String,String>();boolean ambiguous=false,unmapped=false;
+        var values=new LinkedHashMap<String,BigDecimal[]>();var sources=new LinkedHashMap<String,Set<UUID>>();var labels=new HashMap<String,String>();
+        var operatingCash=new HashMap<UUID,BigDecimal[]>();boolean ambiguous=false,unmapped=false;
         for(var journal:journals.values()){
-            BigDecimal money=journal.stream().filter(Cash::money).map(Cash::signed).reduce(ZERO,BigDecimal::add);
-            var others=journal.stream().filter(l->!l.money()&&l.signed().signum()!=0).toList();
+            BigDecimal money=journal.stream().filter(l->moneyAccounts.contains(l.accountId())).map(Cash::signed).reduce(ZERO,BigDecimal::add);
+            var others=journal.stream().filter(l->!moneyAccounts.contains(l.accountId())&&l.signed().signum()!=0).toList();
             if(others.isEmpty())continue; // Transfers within cash equivalents never inflate any activity.
             if(money.signum()==0||others.stream().anyMatch(l->l.signed().signum()==money.signum())){ambiguous=true;continue;}
             if(others.stream().map(Cash::signed).reduce(money,BigDecimal::add).signum()!=0){ambiguous=true;continue;}
@@ -92,18 +94,54 @@ public final class StatementCalculator {
                 var amount=values.computeIfAbsent(key,k->new BigDecimal[]{ZERO,ZERO});
                 if(!line.date().isBefore(p.from())&&!line.date().isAfter(p.through()))amount[0]=amount[0].subtract(line.signed());
                 if(!line.date().isBefore(p.previousFrom())&&!line.date().isAfter(p.previousThrough()))amount[1]=amount[1].subtract(line.signed());
+                if("OPERATING".equals(section)){
+                    var operating=operatingCash.computeIfAbsent(line.accountId(),k->new BigDecimal[]{ZERO,ZERO});
+                    if(!line.date().isBefore(p.from())&&!line.date().isAfter(p.through()))operating[0]=operating[0].subtract(line.signed());
+                    if(!line.date().isBefore(p.previousFrom())&&!line.date().isAfter(p.previousThrough()))operating[1]=operating[1].subtract(line.signed());
+                }
             }
         }
         if(ambiguous)checks.add(new Check("cashAmbiguous",null));if(unmapped)checks.add(new Check("cashMappings",null));
         var result=new ArrayList<Row>();int n=0;
         for(var e:values.entrySet()){if(e.getValue()[0].signum()==0 && e.getValue()[1].signum()==0)continue;String[] key=e.getKey().split("\u001f",2);result.add(new Row("cash-"+(++n),"",labels.get(e.getKey()),0,key[0],List.copyOf(sources.get(e.getKey())),e.getValue()[0],e.getValue()[1],false));}
+        // Replace operating receipts/payments, never add surplus to their existing total.
+        result.removeIf(r->"OPERATING".equals(r.section()));
+        result.addAll(0,indirectOperating(accounts,operatingCash));
         BigDecimal movement=result.stream().map(Row::current).reduce(ZERO,BigDecimal::add),previousMovement=result.stream().map(Row::previous).reduce(ZERO,BigDecimal::add);
         BigDecimal opening=ZERO,closing=ZERO,previousOpening=ZERO,previousClosing=ZERO;
-        for(var a:accounts)if(a.money()){opening=opening.add(a.opening());closing=closing.add(a.closing());previousOpening=previousOpening.add(a.previousOpening());previousClosing=previousClosing.add(a.previousClosing());}
+        for(var a:accounts)if(moneyAccounts.contains(a.id())){opening=opening.add(a.opening());closing=closing.add(a.closing());previousOpening=previousOpening.add(a.previousOpening());previousClosing=previousClosing.add(a.previousClosing());}
         result.add(new Row("cashMovement","","fs.cashMovement",0,"TOTAL",List.of(),ambiguous?null:movement,ambiguous?null:previousMovement,true));
         result.add(new Row("cashOpening","","fs.cashOpening",0,"TOTAL",List.of(),opening,previousOpening,false));
         result.add(new Row("cashClosing","","fs.cashClosing",0,"TOTAL",List.of(),closing,previousClosing,true));
         difference(checks,"cash",opening.add(movement).subtract(closing));difference(checks,"previousCash",previousOpening.add(previousMovement).subtract(previousClosing));
+        return result;
+    }
+    private static List<Row> indirectOperating(List<Balance> accounts,Map<UUID,BigDecimal[]> operatingCash){
+        var result=new ArrayList<Row>();
+        result.add(new Row("cashSurplus","","fs.surplus",0,"OPERATING",List.of(),profit(accounts,false,false),profit(accounts,true,false),false));
+        var groups=new LinkedHashMap<String,List<Balance>>();
+        for(boolean income:List.of(true,false))for(var a:accounts){
+            if(a.money()||income!=Set.of("INCOME","EXPENSE").contains(a.type()))continue;
+            if(!income&&!operatingCash.containsKey(a.id()))continue;
+            var m=a.mapping();String family=m!=null&&m.groupId()!=null?m.groupId().toString():a.id().toString();
+            groups.computeIfAbsent((income?"cashAdjustment-":"cashOperatingBalance-")+a.type()+"-"+family,k->new ArrayList<>()).add(a);
+        }
+        for(var entry:groups.entrySet()){
+            BigDecimal current=ZERO,previous=ZERO;var members=entry.getValue();var first=members.getFirst();
+            boolean income=Set.of("INCOME","EXPENSE").contains(first.type());
+            for(var a:members){
+                var cash=operatingCash.getOrDefault(a.id(),new BigDecimal[]{ZERO,ZERO});
+                // Signed P&L movements reverse accrual/noncash recognition. Operating cash settled
+                // directly against those accounts cancels the reversal. Balance-sheet cash legs
+                // are included separately, once; write-offs, provisions and internal top-ups are
+                // not fabricated as collections/disbursements from raw opening/closing deltas.
+                current=current.add(cash[0]).add(income?a.movement():ZERO);
+                previous=previous.add(cash[1]).add(income?a.previousMovement():ZERO);
+            }
+            if(current.signum()==0&&previous.signum()==0)continue;
+            var m=first.mapping();String label=m==null?first.name():m.line();
+            result.add(new Row(entry.getKey(),m==null||m.groupCode()==null?"":m.groupCode(),label,0,"OPERATING",members.stream().map(Balance::id).toList(),current,previous,false));
+        }
         return result;
     }
     private static void difference(List<Check> checks,String key,BigDecimal value){if(value.signum()!=0)checks.add(new Check(key,value));}

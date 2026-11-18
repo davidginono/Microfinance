@@ -52,6 +52,40 @@ class LoanPortfolioReportPostgresTest {
         return new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,cutoff,null,null,null,"",page);
     }
     ManagementReportRepository management(){return new ManagementReportRepository(new NamedParameterJdbcTemplate(jdbc));}
+    @Test void productSelectorFiltersEveryLoanReportByProductIdWithinTheBranch(){
+        UUID selected=UUID.randomUUID(), other=UUID.randomUUID();
+        jdbc.update("""
+            insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,
+                guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at)
+            values(?,?,'DEVELOPMENT_LOAN',true,'ACTIVE','01','Business','{}',0,0.24,'FLAT_RATE','MONTHLY',1,12,now(),now()),
+                  (?,?,'DEVELOPMENT_LOAN',true,'ACTIVE','02','Business Plus','{}',0,0.24,'FLAT_RATE','MONTHLY',1,12,now(),now())
+            """,selected,institution,other,institution);
+        var matching=loan("B1","100.00","5.00",0,true);
+        var similar=loan("B1","200.00","5.00",0,true);
+        var differentBranch=loan("B2","300.00","5.00",0,true);
+        jdbc.update("update loan_applications set loan_product_setting_id=? where id in (?,?)",selected,matching.id(),differentBranch.id());
+        jdbc.update("update loan_applications set loan_product_setting_id=? where id=?",other,similar.id());
+        payment(matching,"B1","10.00","0.00",DAY,null,true);
+        payment(similar,"B1","20.00","0.00",DAY,null,true);
+        payment(differentBranch,"B2","30.00","0.00",DAY,null,true);
+        String loanNumber=jdbc.queryForObject("select loan_id from loan_applications where id=?",String.class,matching.id());
+        var filter=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            DAY.minusDays(100),DAY,OffsetDateTime.now(),null,null,null,"",0,selected);
+        var reports=management();
+        for(var kind:com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.values()){
+            if(!com.sacco.mvp.accounting.management.dto.ManagementReports.spreadsheetSupported(kind))continue;
+            var preview=reports.read(actor,kind,filter,false);
+            assertThat(preview.rows()).extracting(row->row.get("loanId"))
+                .as("selected product in %s",kind).containsExactly(loanNumber);
+            if(kind==com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DISBURSED_LOANS_AUDIT){
+                assertThat(preview.totals().get("netDisbursed")).isNull();
+                assertThat(preview.totals()).doesNotContainKey("principalInstallment");
+                assertThat(preview.rows().getFirst().get("principalInstallment")).isEqualTo(new BigDecimal("100.00"));
+            }
+            assertThat(reports.read(actor,kind,filter,true).rows()).extracting(row->row.get("loanId"))
+                .as("selected product in %s export",kind).containsExactly(loanNumber);
+        }
+    }
     @Test void futureInterestExclusionsAreNotCashAndReversalRestoresExpectedAmounts(){
         var loan=loan("B1","100.00","5.00",-30,true);
         var payment=payment(loan,"B1","100.00","0.00",DAY,null,true,"5.00");
@@ -72,6 +106,13 @@ class LoanPortfolioReportPostgresTest {
     }
     @Test void expectedRepaymentsUseUnpaidFutureTermsAndRecordedCutoffs(){
         var loan=loan("B1","100.00","5.00",0,true,new BigDecimal("40.00"));
+        UUID product=UUID.randomUUID();
+        jdbc.update("""
+            insert into loan_product_settings(id,sacco_id,loan_type,active,product_status,product_code,product_name,form_schema,
+                guarantors_required,interest_rate,interest_method,repayment_frequency,min_repayment_months,max_repayment_months,created_at,updated_at)
+            values(?,?,'DEVELOPMENT_LOAN',true,'ACTIVE','01','Synthetic loan','{}',0,0.24,'FLAT_RATE','MONTHLY',1,12,now(),now())
+            """,product,institution);
+        jdbc.update("update loan_applications set loan_product_setting_id=? where id=? and sacco_id=?",product,loan.id(),institution);
         loan("B2","900.00","9.00",0,true);
         var before=OffsetDateTime.now();
         payment(loan,"B1","10.00","5.00",DAY,null,true);
@@ -83,7 +124,10 @@ class LoanPortfolioReportPostgresTest {
         assertThat(now.totals().get("interestDue")).isZero();
         var old=management().read(actor,kind,reportParameters(DAY,DAY.plusDays(30),before,0),false);
         assertThat(old.totals().get("expectedTotal")).isEqualByComparingTo("105.00");
-        assertThat(now.rows()).allSatisfy(row->assertThat((BigDecimal)row.get("principalBalance")).isEqualByComparingTo("90.00"));
+        assertThat(now.rows()).allSatisfy(row->{
+            assertThat((BigDecimal)row.get("principalBalance")).isEqualByComparingTo("90.00");
+            assertThat(row).containsEntry("productCode","01");
+        });
     }
     @Test void repaymentTransactionsRetainSignedCorrectionsAndBalancesBeforeDateFilter(){
         var loan=loan("B1","100.00","5.00",0,true);
@@ -105,7 +149,10 @@ class LoanPortfolioReportPostgresTest {
         assertThat(result.count()).isEqualTo(2);assertThat(result.excluded()).isEqualTo(1);
         assertThat(result.totals().get("disbursed")).isEqualByComparingTo("100.00");
         assertThat(result.groups()).singleElement().satisfies(g->assertThat(g.name()).startsWith("2026-06 | "));
-        assertThat(result.rows()).allSatisfy(row->assertThat(row.get("disbursementAccount")).isNull());
+        assertThat(result.rows()).allSatisfy(row->{
+            assertThat(row.get("disbursementAccount")).isNull();
+            assertThat(row).containsEntry("institutionCode",institution).containsEntry("branchCode","B1");
+        });
     }
     @Test void expectedPreviewIsBoundedAndUnverifiedSchedulesNeverBecomeReceivables(){
         for(int n=0;n<28;n++)loan("B1","0.01","0.00",0,true);

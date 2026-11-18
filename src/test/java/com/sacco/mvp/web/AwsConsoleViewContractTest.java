@@ -171,6 +171,10 @@ class AwsConsoleViewContractTest {
                 if (isStatementDocumentPreview(path) && getForms.group().contains("/export")) continue;
                 if (getForms.group().contains("data-table-export-for=")
                     && getForms.group().contains("/documents/reports/")) continue;
+                // Report parameters are a focused creation form, not controls for a registry table.
+                if(path.equals(JSP_ROOT.resolve("accounting/management/report.jsp")) && getForms.group().contains("management-report-form")){
+                    assertThat(view).contains("management-parameters","management-filter-grid");continue;
+                }
                 // Selection-dependent GET commands open version proposals; they are not filter toolbars.
                 if (getForms.group().contains("data-table-command")
                     || getForms.group().contains("accounting-create-form")) continue;

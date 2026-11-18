@@ -29,7 +29,10 @@ public class ManagementReportService {
         return switch(category) {
             case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of());}
             case "clients" -> reports.clients(a,search,page,null);
-            case "products" -> {loanReport(kind);yield reports.products(a,search,page,null,customisedLabel());}
+            case "products" -> {
+                loanReport(kind);
+                yield reports.products(a,search,page,null,customisedLabel());
+            }
             default -> throw error("parameters");
         };
     }
@@ -53,8 +56,8 @@ public class ManagementReportService {
         return reports.products(a,"",0,id,customisedLabel()).stream().findFirst().orElseThrow(()->error("product"));
     }
     private String customisedLabel(){return messages.getMessage("management.customisedLoans",null,LocaleContextHolder.getLocale());}
-    private static void loanReport(Kind kind){check(kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS,"parameters");}
     private static void accountReport(Kind kind){check(kind==Kind.CASHBOOK || kind==Kind.DAILY_COLLECTIONS,"parameters");}
+    private static void loanReport(Kind kind){check(kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS,"parameters");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
     public Result report(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
         authorize(a,kind,export);validate(p,clock.today(),clock.now(),kind);

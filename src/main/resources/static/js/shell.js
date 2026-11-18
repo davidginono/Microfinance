@@ -14,7 +14,6 @@
     let exportDownloadActive = false;
     let exportPrintActive = false;
     const exportDownloadTimeoutMs = 60 * 1000;
-    const exportPrintFrameCleanupDelayMs = 2 * 60 * 1000;
     const legacyScrollRestoreStorageKey = 'Saccos:restore-scroll';
     const scrollRestoreStorageKeyPrefix = 'Saccos:restore-scroll:';
     const restoreStateMaxAgeMs = 24 * 60 * 60 * 1000;
@@ -294,7 +293,7 @@
             || /^(export|csv|xlsx?|pdf|excel|download)/.test(label);
     };
     const isConsolePrintAction = function (control) {
-        return !!control && control.getAttribute?.('data-print-action') === 'true';
+        return !!control && control.matches?.('[data-print-action]:not([data-print-action="false"])');
     };
     const ensureConsoleTableScroller = function (region, index) {
         const existingScroller = region.querySelector(':scope > .erp-table-scroll');
@@ -860,65 +859,6 @@
         }, 1000);
     };
 
-    const triggerBrowserPrint = function (blob, target, signal) {
-        return new Promise(function (resolve, reject) {
-            const objectUrl = window.URL.createObjectURL(blob);
-            const frame = document.createElement('iframe');
-            let cleaned = false;
-            const cleanup = function () {
-                if (cleaned) return;
-                cleaned = true;
-                signal.removeEventListener('abort', abort);
-                frame.remove();
-                window.URL.revokeObjectURL(objectUrl);
-            };
-            const abort = function () {
-                cleanup();
-                reject(new DOMException('Print preparation timed out', 'AbortError'));
-            };
-            signal.addEventListener('abort', abort, { once: true });
-            frame.setAttribute('aria-hidden', 'true');
-            frame.setAttribute('data-export-print-frame', 'true');
-            frame.title = 'Print export';
-            frame.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0';
-            frame.addEventListener('load', async function () {
-                try {
-                    if (!frame.contentWindow) throw new Error('Print frame is not available');
-                    if (blob.type.includes('html')) await frame.contentDocument.fonts.ready;
-                    if (signal.aborted) return;
-                    frame.contentWindow.addEventListener('afterprint', cleanup, { once: true });
-                    frame.contentWindow.focus();
-                    frame.contentWindow.print();
-                    signal.removeEventListener('abort', abort);
-                    window.setTimeout(cleanup, exportPrintFrameCleanupDelayMs);
-                    resolve();
-                } catch (error) {
-                    cleanup();
-                    reject(error);
-                }
-            }, { once: true });
-            frame.addEventListener('error', function () {
-                cleanup();
-                reject(new Error('Print document could not be loaded'));
-            }, { once: true });
-            if (blob.type.includes('html')) {
-                blob.text().then(function (html) {
-                    if (signal.aborted) return;
-                    const printable = new DOMParser().parseFromString(html, 'text/html');
-                    printable.querySelectorAll('script, base').forEach(function (node) { node.remove(); });
-                    const base = printable.createElement('base');
-                    base.href = target.toString();
-                    printable.head.prepend(base);
-                    frame.srcdoc = '<!DOCTYPE html>' + printable.documentElement.outerHTML;
-                    document.body.appendChild(frame);
-                }).catch(function (error) { cleanup(); reject(error); });
-            } else {
-                frame.src = objectUrl;
-                document.body.appendChild(frame);
-            }
-        });
-    };
-
     const downloadWithLocalLoading = async function (url, control = document.activeElement) {
         const target = new URL(url, window.location.href);
         if (target.origin !== window.location.origin) return;
@@ -985,14 +925,15 @@
         try {
             const response = await window.fetch(target.toString(), {
                 credentials: 'same-origin',
+                redirect: 'error',
                 signal: controller.signal
             });
-            const redirectedPath = response.redirected ? new URL(response.url, window.location.href).pathname : '';
-            if (!response.ok || /^\/(?:login|auth)(?:\/|$)/.test(redirectedPath)) {
+            if (!response.ok) {
                 throw new Error('Print request failed');
             }
             const blob = await response.blob();
-            await triggerBrowserPrint(blob, target, controller.signal);
+            const {printDocument} = await import('./browser-print.mjs');
+            await printDocument(blob, target, controller.signal);
         } catch (error) {
             if(controller.signal.aborted && !timedOut)return;
             if (typeof window.showToast === 'function') {
@@ -1031,7 +972,7 @@
         if (target.origin !== window.location.origin) {
             return null;
         }
-        if (!isConsoleDownloadAction(submitter)
+        if (!isConsoleDownloadAction(submitter) && !isConsolePrintAction(submitter)
             && !/\.(?:csv|pdf|xlsx?|zip)$/i.test(target.pathname)) {
             return null;
         }
@@ -1481,8 +1422,8 @@
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
             return;
         }
-        const printControl = event.target instanceof Element ? event.target.closest('[data-print-action="true"]') : null;
-        if (printControl && !printControl.matches('[target], [data-no-page-preloader="true"], [data-page-preloader="false"]')) {
+        const printControl = event.target instanceof Element ? event.target.closest('[data-print-action]:not([data-print-action="false"])') : null;
+        if (printControl) {
             const printUrl = resolvePrintControlUrl(printControl);
             if (printUrl) {
                 event.preventDefault();

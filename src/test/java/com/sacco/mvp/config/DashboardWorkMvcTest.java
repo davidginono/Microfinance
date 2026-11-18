@@ -34,9 +34,14 @@ class DashboardWorkMvcTest {
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(jsonPath("$.infolets").isArray());
         verify(work).read(a,3,new BigDecimal("400000"));
     }
-    @Test void missingClaimsOrBranchCannotReachTheReadService()throws Exception{
-        for(var a:List.of(actor("B1"),actor(null,UserClaim.LOAN_RECORDING_VIEW)))mvc.perform(get("/api/dashboard/work").with(user(a)).accept("application/json")).andExpect(status().isForbidden());
+    @Test void missingBranchCannotReachTheReadService()throws Exception{
+        for(var a:List.of(actor(null,UserClaim.LOAN_RECORDING_VIEW),actor("",UserClaim.LOAN_RECORDING_VIEW),actor(" ",UserClaim.LOAN_RECORDING_VIEW)))mvc.perform(get("/api/dashboard/work").with(user(a)).accept("application/json")).andExpect(status().isForbidden());
         verifyNoInteractions(work);
+    }
+    @Test void assignedStaffWithoutWorkClaimsReceivesAnEmptyDashboard()throws Exception{
+        var a=actor("B1");when(work.read(a,0,BigDecimal.ZERO)).thenReturn(new DashboardWorkService.Work(List.of(),"2026-11-18T09:00:00+03:00"));
+        mvc.perform(get("/api/dashboard/work").with(user(a)).accept("application/json")).andExpect(status().isOk()).andExpect(jsonPath("$.infolets").isEmpty());
+        verify(work).read(a,0,BigDecimal.ZERO);
     }
     @Configuration @EnableWebMvc static class Config {
         @Bean("access") @Primary AccessControlService access(){return new AccessControlService();}

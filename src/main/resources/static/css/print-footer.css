@@ -1,0 +1,13 @@
+/* Keep browser titles, timestamps, and URLs out of the report's own page layout. */
+@page {
+    @top-left {
+        content: "";
+        width: 100%;
+        height: 1px;
+    }
+    @bottom-left {
+        content: "";
+        width: 100%;
+        height: 1px;
+    }
+}

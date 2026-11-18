@@ -18,4 +18,9 @@
         <function-class>com.sacco.mvp.service.ApplicationTimestamps</function-class>
         <function-signature>java.lang.String display(java.lang.Object)</function-signature>
     </function>
+    <function>
+        <name>referenceDate</name>
+        <function-class>com.sacco.mvp.accounting.management.service.LoanReportReferenceText</function-class>
+        <function-signature>java.lang.String referenceDate(java.lang.Object, java.util.Locale)</function-signature>
+    </function>
 </taglib>

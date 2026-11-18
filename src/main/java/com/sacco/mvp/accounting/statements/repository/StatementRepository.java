@@ -4,6 +4,7 @@ import com.sacco.mvp.accounting.statements.dto.StatementModels.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Repository;
 import java.sql.*;
 import java.time.*;
@@ -77,16 +78,20 @@ public class StatementRepository {
             """,(r,n)->new Balance(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("type"),r.getString("purpose"),mapping(r),r.getBigDecimal("opening"),r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("closing"),r.getBigDecimal("previous_opening"),r.getBigDecimal("previous_debit"),r.getBigDecimal("previous_credit"),r.getBigDecimal("previous_closing")),
             p.from(),p.from(),p.through(),p.from(),p.through(),p.previousFrom(),p.previousFrom(),p.previousThrough(),p.previousFrom(),p.previousThrough(),p.previousThrough(),id,institution);
     }
-    public List<Cash> cash(UUID id,Parameters p){return jdbc.query("""
+    public List<Cash> cash(UUID id,Parameters p,List<Balance> balances){
+        var moneyAccounts=balances.stream().filter(Balance::money).map(Balance::id).toArray(UUID[]::new);
+        if(moneyAccounts.length==0)return List.of();
+        return jdbc.query("""
         select j.id,j.effective_date,l.account_id,a.type,a.purpose,sum(l.debit) debit,sum(l.credit) credit
         from statement_run_journal c join gl_journal j on j.id=c.journal_id
         join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
         join gl_account a on a.id=l.account_id and a.sacco_id=l.sacco_id
         where c.run_id=? and (j.effective_date between ? and ? or j.effective_date between ? and ?)
-        and exists(select 1 from gl_journal_line ml join gl_account ma on ma.id=ml.account_id and ma.sacco_id=ml.sacco_id
-                   where ml.journal_id=j.id and ma.purpose in ('CASH','BANK','MOBILE_MONEY'))
+        and exists(select 1 from gl_journal_line ml where ml.journal_id=j.id and ml.sacco_id=j.sacco_id
+                   and ml.station_id=j.station_id and ml.account_id=any(?))
         group by j.id,j.effective_date,l.account_id,a.type,a.purpose order by j.id,l.account_id limit 20001
-        """,(r,n)->new Cash(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getObject("account_id",UUID.class),r.getString("type"),r.getString("purpose"),r.getBigDecimal("debit"),r.getBigDecimal("credit")),id,p.from(),p.through(),p.previousFrom(),p.previousThrough());}
+        """,(r,n)->new Cash(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getObject("account_id",UUID.class),r.getString("type"),r.getString("purpose"),r.getBigDecimal("debit"),r.getBigDecimal("credit")),id,p.from(),p.through(),p.previousFrom(),p.previousThrough(),new SqlArrayValue("uuid", (Object[])moneyAccounts));
+    }
     public void payload(UUID id,String value,String checksum){jdbc.update("update statement_run set payload=?,checksum=? where id=? and payload is null",value,checksum,id);}
     public Optional<Stored> find(UUID id,AppUserPrincipal a){return jdbc.query("select * from statement_run where id=? and sacco_id=? and station_id=?",this::stored,id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Stored> history(AppUserPrincipal a,int page,String sort,boolean wideAllowed){String order=switch(sort){case "oldest"->"generated_at asc,id";case "from"->"date_from asc,id";case "from_desc"->"date_from desc,id";case "through"->"date_through asc,id";case "through_desc"->"date_through desc,id";case "status"->"saved_at nulls first,id";case "status_desc"->"saved_at desc nulls last,id";default->"generated_at desc,id";};return jdbc.query("select id,date_from,date_through,generated_at,institution_wide,saved_at,null::text payload,null::text checksum from statement_run where sacco_id=? and station_id=? and (not institution_wide or ?) and payload is not null order by "+order+" limit 31 offset ?",this::stored,a.getSaccoId(),a.getStationId(),wideAllowed,page*30);}
@@ -123,7 +128,7 @@ public class StatementRepository {
     // Keep earlier immutable documents while serving the current, simplified layout.
     public Optional<Artifact> artifact(UUID id,Kind kind,String format,String language){return jdbc.query("select bytes,checksum from statement_run_artifact where run_id=? and kind=? and format=? and language=?",(r,n)->new Artifact(r.getBytes(1),r.getString(2)),id,artifactKind(kind),format,language).stream().findFirst();}
     public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,artifactKind(kind),format,language,bytes,checksum);}
-    private static String artifactKind(Kind kind){return kind.name()+"_V3";}
+    private static String artifactKind(Kind kind){return kind.name()+(kind==Kind.EQUITY?"_V6":"_V3");}
     private Stored stored(ResultSet r,int n)throws SQLException{return new Stored(r.getObject("id",UUID.class),r.getObject("date_from",LocalDate.class),r.getObject("date_through",LocalDate.class),r.getObject("generated_at",OffsetDateTime.class),r.getBoolean("institution_wide"),r.getObject("saved_at")!=null,r.getString("payload"),r.getString("checksum"));}
     private Mapping mapping(ResultSet r)throws SQLException{return new Mapping(r.getObject("id",UUID.class),r.getString("line_name"),r.getString("section"),r.getString("cash_section"),r.getString("equity_component"),r.getInt("note_no"),r.getString("note_text"),r.getObject("group_id",UUID.class),r.getString("group_code"));}
     private String source(ResultSet r)throws SQLException{if(r.getObject("voucher_id")!=null)return "/finance/vouchers/"+switch(r.getString("voucher_type")){case "RECEIPT"->"receipts";case "PAYMENT"->"payments";default->"journals";}+"/"+r.getObject("voucher_id");return null;}

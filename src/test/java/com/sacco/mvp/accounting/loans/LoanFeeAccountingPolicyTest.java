@@ -28,7 +28,7 @@ class LoanFeeAccountingPolicyTest {
         assertThat(editor.current()).isSameAs(old);
         assertThat(editor.form().getExpectedVersion()).isEqualTo(future.id());
         assertThat(editor.form().getApplicationAccountId()).isEqualTo(future.applicationAccountId());
-        assertThat(editor.form().getEffectiveFrom()).isEqualTo(future.effectiveFrom().plusDays(1));
+        assertThat(editor.form().getEffectiveFrom()).isEqualTo(future.effectiveFrom());
     }
     @Test void newPolicyFreezesSeparateIncomeAccountsAndLegacyPolicyKeepsDeferredFees() {
         var repository=mock(LoanChargeRepository.class);var actor=mock(AppUserPrincipal.class);

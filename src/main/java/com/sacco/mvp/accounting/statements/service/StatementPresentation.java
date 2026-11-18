@@ -18,6 +18,7 @@ public class StatementPresentation {
     public record Document(String title,String style,List<Column> columns,List<DisplayRow> rows,int detailsBefore,boolean asAt) {}
     private String title(Snapshot snapshot,Kind kind,Locale locale){
         String title=label("fs.title."+kind,locale);
+        if(kind==Kind.EQUITY)return label("fs.equity.referenceTitle",locale);
         return kind==Kind.POSITION||kind==Kind.TRIAL?title+" "+snapshot.parameters().through().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu",locale)):title;
     }
     public String label(String text,Locale locale){return text!=null&&text.startsWith("fs.")?messages.getMessage(text,null,text,locale):text;}
@@ -31,11 +32,14 @@ public class StatementPresentation {
             return new Document(title(s,kind,locale),"trial",columns,rows,2,true);
         }
         if(kind==Kind.EQUITY){
-            columns.add(new Column(label("fs.description",locale),false,.28f));float width=.72f/(s.equityColumns().size()+1);
-            for(String c:s.equityColumns())columns.add(new Column(component(s,c,locale),true,width));columns.add(new Column(label("fs.equityTotal",locale),true,width));
-            if(s.version()>=3)rows.add(period(s.parameters().from(),s.parameters().through(),columns.size(),locale));
-            for(var r:s.equity()){var cells=new ArrayList<Cell>();cells.add(cell(movement(s,r.label(),locale)));for(String c:s.equityColumns())cells.add(cell(r.values().get(c)));cells.add(cell(r.total()));rows.add(new DisplayRow(cells,r.summary(),false,null));}
-            if(s.version()>=3&&s.previousEquity()!=null){rows.add(period(s.parameters().previousFrom(),s.parameters().previousThrough(),columns.size(),locale));for(var r:s.previousEquity()){var cells=new ArrayList<Cell>();cells.add(cell(movement(s,r.label(),locale)));for(String c:s.equityColumns())cells.add(cell(r.values().get(c)));cells.add(cell(r.total()));rows.add(new DisplayRow(cells,r.summary(),false,null));}}
+            float descriptionWidth=.235f;
+            columns.add(new Column("",false,descriptionWidth));float width=(1-descriptionWidth)/(s.equityColumns().size()+1);
+            for(String c:s.equityColumns())columns.add(new Column(component(s,c,locale).replace(" / "," /\n"),true,width));columns.add(new Column(label("fs.equityTotal",locale),true,width));
+            equityRows(s,s.equity(),s.parameters().from(),s.parameters().through(),rows,locale);
+            if(s.version()>=3&&s.previousEquity()!=null){
+                rows.add(period(s.parameters().previousFrom(),s.parameters().previousThrough(),columns.size(),locale));
+                equityRows(s,s.previousEquity(),s.parameters().previousFrom(),s.parameters().previousThrough(),rows,locale);
+            }
             return new Document(title(s,kind,locale),"equity",columns,rows,-1,false);
         }
         for(var c:List.of(new Column(label("fs.account",locale),false,.12f),new Column(label("fs.description",locale),false,.40f),new Column(label("fs.notes",locale),false,.08f),new Column(label("fs.current",locale),true,.20f),new Column(label("fs.previous",locale),true,.20f)))columns.add(c);
@@ -64,12 +68,37 @@ public class StatementPresentation {
                 var members=source.stream().filter(r->section.equals(r.section())&&!(kind==Kind.POSITION&&r.key().equals("assets"))).toList();if(members.isEmpty() && !(s.version()>=2 && kind==Kind.INCOME && Set.of("INCOME","EXPENSE").contains(section)))continue;
                 if(!"TOTAL".equals(section))rows.add(row(false,true,null,"",label("fs.section."+section,locale),"","",""));
                 BigDecimal current=BigDecimal.ZERO,previous=BigDecimal.ZERO;
-                for(var r:members){rows.add(row(r.total(),false,r.accounts().isEmpty()?null:base+"/trial?kind="+kind+"&line="+r.key(),r.code(),label(r.label(),locale),r.note()==0?"":Integer.toString(r.note()),r.current()==null?label("fs.unavailable",locale):r.current(),r.previous()==null?label("fs.unavailable",locale):r.previous()));if(r.current()!=null)current=current.add(r.current());if(r.previous()!=null)previous=previous.add(r.previous());}
-                if(!Set.of("TOTAL","UNCLASSIFIED").contains(section))rows.add(row(true,false,null,"",label(s.version()>=2 && kind==Kind.INCOME?(section.equals("INCOME")?"fs.incomeTotal":"fs.expensesTotal"):"fs.total",locale),"",current,previous));
+                for(var r:members){rows.add(row(r.total(),false,r.accounts().isEmpty()?null:base+"/trial?kind="+kind+"&line="+r.key(),r.code(),cashLabel(r,locale),r.note()==0?"":Integer.toString(r.note()),r.current()==null?label("fs.unavailable",locale):r.current(),r.previous()==null?label("fs.unavailable",locale):r.previous()));if(r.current()!=null)current=current.add(r.current());if(r.previous()!=null)previous=previous.add(r.previous());}
+                if(!Set.of("TOTAL","UNCLASSIFIED").contains(section)){
+                    boolean uncertain=kind==Kind.CASH_FLOW&&s.version()>=4&&s.checks().stream().anyMatch(c->c.key().equals("cashAmbiguous"));
+                    String totalLabel=kind==Kind.CASH_FLOW&&s.version()>=4?"fs.cashTotal."+section:s.version()>=2&&kind==Kind.INCOME?(section.equals("INCOME")?"fs.incomeTotal":"fs.expensesTotal"):"fs.total";
+                    rows.add(row(true,false,null,"",label(totalLabel,locale),"",uncertain?label("fs.unavailable",locale):current,uncertain?label("fs.unavailable",locale):previous));
+                }
             }
         }
         return new Document(title(s,kind,locale),"statement",columns,rows,3,kind==Kind.POSITION);
     }
+    private String cashLabel(Row row,Locale locale){
+        String prefix=row.key().startsWith("cashAdjustment-")?"fs.cashAdjustment":row.key().startsWith("cashOperatingBalance-")?"fs.cashOperatingBalance":null;
+        return prefix==null?label(row.label(),locale):label(prefix,locale)+" — "+label(row.label(),locale);
+    }
+    public String equityPeriod(Snapshot s,Locale locale){return s.parameters().through().format(java.time.format.DateTimeFormatter.ofPattern("dd-MMM-uuuu",locale)).toUpperCase(locale);}
+    private static String equityDate(java.time.LocalDate date,Locale locale){return date.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM uuuu",locale));}
+    private void equityRows(Snapshot snapshot,List<EquityRow> source,java.time.LocalDate from,java.time.LocalDate through,List<DisplayRow> rows,Locale locale){
+        for(var r:source){
+            String name=switch(r.label()){
+                case "fs.opening" -> label("fs.equity.balanceAt",locale)+" "+equityDate(from,locale);
+                case "fs.closing" -> label("fs.equity.balanceAt",locale)+" "+equityDate(through,locale);
+                case "fs.surplus" -> label("fs.equity.profit",locale);
+                default -> movement(snapshot,r.label(),locale);
+            };
+            var cells=new ArrayList<Cell>();cells.add(cell(name));
+            for(String column:snapshot.equityColumns())cells.add(equityAmount(r.values().get(column),locale));
+            cells.add(equityAmount(r.total(),locale));
+            rows.add(new DisplayRow(cells,r.label().equals("fs.closing"),false,null));
+        }
+    }
+    private Cell equityAmount(BigDecimal amount,Locale locale){return amount==null?cell(label("fs.unavailable",locale)):amount.signum()==0?new Cell("",amount):cell(amount);}
     private String component(Snapshot s,String key,Locale locale){
         if(key.startsWith("component:")&&s.setup()!=null){var c=s.setup().components().get(Integer.parseInt(key.substring(10)));return local(c.name(),c.nameSw(),locale);}
         return key.startsWith("account:")?key.substring(8):label(key,locale);

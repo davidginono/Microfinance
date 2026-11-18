@@ -161,6 +161,7 @@ class AdminControllerUserAccessSecurityTest {
             platformEmailSettingsService, platformSmsGatewaySettingsService, saccoRegistryService, smsUsageManagementService,
             stationOtpSettingsService);
         when(loanCharges.editor(any(),any(),any())).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Editor(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm(),null,Map.of(),List.of(),Map.of()));
+        when(loanCharges.accountEditor(any(),any(),any())).thenReturn(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Editor(new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm(),null,Map.of(),List.of(),Map.of()));
         when(platformSessionSettingsService.policy()).thenReturn(new SessionTimeoutPolicy(30, 1_800_000L, 60_000L, false));
         when(platformSessionSettingsService.settings()).thenReturn(platformSessionSettings(30));
         mockMvc = MockMvcBuilders.webAppContextSetup(context)
@@ -198,7 +199,7 @@ class AdminControllerUserAccessSecurityTest {
             .andExpect(status().isOk()).andExpect(view().name("admin/loan-product-edit"))
             .andExpect(model().attribute("currentChargeMappings",mappings)).andExpect(model().attributeDoesNotExist("chargePolicy","chargeAccounts"));
         verify(loanCharges).accountSummary(actor,id);verify(loanCharges,never()).editor(any(),any(),any());
-        doThrow(new org.springframework.security.access.AccessDeniedException("Configure required")).when(loanCharges).savePolicy(eq(actor),any());
+        doThrow(new org.springframework.security.access.AccessDeniedException("Configure required")).when(loanCharges).saveAccountMappings(eq(actor),any());
         mockMvc.perform(post("/admin/settings-controls/loan-products/"+id+"/charge-accounts").with(csrf()).with(authentication(authenticationFor(actor))))
             .andExpect(status().isForbidden());
     }
@@ -220,7 +221,7 @@ class AdminControllerUserAccessSecurityTest {
         when(adminService.loanProduct("SACCO-01",id)).thenReturn(LoanProductSetting.builder().id(id).build());
         mockMvc.perform(get("/admin/settings-controls/loan-products/"+id+"/edit").with(authentication(authenticationFor(actor))))
             .andExpect(status().isOk()).andExpect(model().attributeExists("chargePolicy","chargeAccounts"));
-        verify(loanCharges).editor(actor,id,null);verify(loanCharges,never()).accountSummary(any(),any());
+        verify(loanCharges).accountEditor(actor,id,null);verify(loanCharges,never()).accountSummary(any(),any());
     }
 
     @Test void productWorkflowUsesThePathProductAndRequiresExplicitClaimsAndCsrf() throws Exception {

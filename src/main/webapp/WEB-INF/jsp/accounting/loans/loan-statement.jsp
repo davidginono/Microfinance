@@ -12,7 +12,7 @@
  </nav>
  <div class="erp-page-header erp-detail-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="recording.statement" /></h1>
  <sec:authorize access="@access.has(principal,'LOAN_RECORDING_EXPORT')"><div class="report-page-actions" data-aws-action-pin="true">
- <a class="app-btn btn-neutral" target="_blank" href="<c:url value='${statementBase}/print' />"><report:reportExport format="print" /></a>
+ <a class="app-btn btn-neutral" data-print-action="true" href="<c:url value='${statementBase}/print' />"><report:reportExport format="print" /></a>
  <a class="app-btn btn-neutral" href="<c:url value='${statementBase}/pdf' />"><report:reportExport format="pdf" /></a>
  </div></sec:authorize></div>
  <div class="statement-preview-scroll" tabindex="0" role="region" aria-label="<spring:message code='recording.statement' />">

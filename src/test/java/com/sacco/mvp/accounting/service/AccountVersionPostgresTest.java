@@ -119,6 +119,16 @@ class AccountVersionPostgresTest {
         assertThat(reports.balances(run,institution,period)).filteredOn(b->b.id().equals(posting)).singleElement().satisfies(b->{assertThat(b.mapping().cashSection()).isEqualTo("INVESTING");assertThat(b.mapping().note()).isEqualTo(6);assertThat(b.mapping().groupId()).isEqualTo(family);});
         assertThat(ledger.accountVersionDetails(maker,current.id(),0,0).version().proposed().reporting()).isNull();
         assertThatThrownBy(()->jdbc.update("update gl_account_version set snapshot=jsonb_set(snapshot,'{reporting,cashSection}','\"OPERATING\"') where id=?",pending)).hasMessageContaining("immutable");
+        var categoryChange=new EditForm();categoryChange.setName(proposal.proposed().name());
+        categoryChange.setCashSection(Reporting.CASH_EQUIVALENTS);categoryChange.setReason("Classify the family as cash equivalents");
+        UUID cashVersion=ledger.proposeAccountVersion(maker,family,pending,"UPDATE",UUID.randomUUID(),categoryChange,true);
+        ledger.accountVersionAction(reviewer,cashVersion,version(cashVersion).revision(),"APPROVE","Reviewed cash-equivalent category");
+        assertThat(reports.balances(run,institution,period)).filteredOn(b->b.id().equals(posting)).singleElement().satisfies(b->{
+            assertThat(b.money()).isTrue();
+            assertThat(b.mapping().cashSection()).isEqualTo(Reporting.CASH_EQUIVALENTS);
+            assertThat(b.mapping().note()).isEqualTo(6);
+            assertThat(b.mapping().noteText()).isEqualTo("Synthetic note");
+        });
     }
     @Test void defaultSectionsAreStableAndProtectedWithoutGrantingAccountCreation() {
         var reader=emptyChartReader();var admin=operator("B1",EnumSet.allOf(UserClaim.class));
@@ -407,7 +417,8 @@ class AccountVersionPostgresTest {
         assertThatThrownBy(()->ledger.accountVersionRegister(maker,"","","code","asc",0,10000)).isInstanceOf(IllegalArgumentException.class);
     }
     @Test void newJournalLinesRetainTheApprovedAccountVersionAcrossRenames(){
-        UUID account=ledger.onboardAccount(maker,form(family,"111050","Original cash name"),false);
+        var cashForm=form(family,"111050","Original cash name");cashForm.setCashSection(Reporting.CASH_EQUIVALENTS);
+        UUID account=ledger.onboardAccount(maker,cashForm,false);
         UUID capital=ledger.createAccount(maker,new AccountCommand("CAPITAL","Capital","EQUITY","CREDIT","POSTING","CAPITAL",null));
         var clock=mock(ApplicationClock.class);when(clock.now()).thenReturn(now);when(clock.today()).thenReturn(now.toLocalDate());
         var repo=new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build());
@@ -420,6 +431,12 @@ class AccountVersionPostgresTest {
         assertThat(jdbc.queryForObject("select v.snapshot->>'name' from gl_journal_line l join gl_account_version v on v.id=l.account_version_id where l.journal_id=? and l.account_id=?",String.class,posted.journalId(),account)).isEqualTo("Original cash name");
         assertThat(vouchers.view(maker,com.sacco.mvp.accounting.dto.VoucherDtos.Type.JOURNAL,posted.id()).transactions().getFirst().debit().name()).isEqualTo("Original cash name");
         assertThat(ledger.accountCurrent(maker,account).proposed().name()).isEqualTo("New cash name");
+        var reports=new com.sacco.mvp.accounting.statements.repository.StatementRepository(jdbc);
+        var period=new com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters(now.toLocalDate().withDayOfMonth(1),now.toLocalDate(),false);
+        UUID run=UUID.randomUUID();reports.create(run,maker,period,now,UUID.randomUUID());
+        assertThat(reports.capture(run,maker,period,now)).isEqualTo(1);
+        var balances=reports.balances(run,institution,period);
+        assertThat(reports.cash(run,period,balances)).hasSize(2).allSatisfy(line->assertThat(line.journalId()).isEqualTo(posted.journalId()));
     }
     @Test void generatedFeeAccountsUseIncomeAndRequireTheirOwnIndependentApprovals() {
         ledger.configureAccountApproval(maker,policy(false,true,true,true));var product=product();

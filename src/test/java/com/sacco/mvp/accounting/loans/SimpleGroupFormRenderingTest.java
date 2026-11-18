@@ -23,12 +23,15 @@ class SimpleGroupFormRenderingTest {
         try(var fragments=Files.list(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans"))){
             for(var file:fragments.filter(path->path.toString().endsWith(".jspf")).toList())Files.copy(file,temporary.resolve(file.getFileName()));
         }
+        Files.createDirectories(temporary.resolve("WEB-INF"));
+        Files.copy(Path.of("src/main/webapp/WEB-INF/application-time.tld"),temporary.resolve("WEB-INF/application-time.tld"));
         String recording=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/record-form.jsp"));
         int labels=recording.indexOf("<form:form");
         String formOpening=recording.substring(labels,recording.indexOf("<form:hidden",labels));
         Files.writeString(temporary.resolve("form.jsp"),"""
             <%@ page pageEncoding="UTF-8" %>
             <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+            <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
             <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
             <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
             <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>

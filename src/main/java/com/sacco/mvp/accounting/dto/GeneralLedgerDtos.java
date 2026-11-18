@@ -7,7 +7,9 @@ import java.util.UUID;
 public final class GeneralLedgerDtos {
     private GeneralLedgerDtos() { }
     public record ProductAccountVersions(AccountVersionDtos.Version principal,AccountVersionDtos.Version interest) {}
-    public record Reporting(String cashSection, String equityComponent, Integer note, String noteText) {}
+    public record Reporting(String cashSection, String equityComponent, Integer note, String noteText) {
+        public static final String CASH_EQUIVALENTS = "CASH_EQUIVALENTS";
+    }
     public record AccountCommand(String code, String name, String type, String normalBalance,
                                  String kind, String purpose, UUID parentId, String nameSw, String description, @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) Reporting reporting) {
         public AccountCommand(String code,String name,String type,String normalBalance,String kind,String purpose,UUID parentId,String nameSw,String description) {

@@ -10,6 +10,7 @@
 .management-filter-grid label{display:flex;flex-direction:column;gap:.3rem;min-width:0}
 .management-filter-grid :is(input,select,.neo-select){width:100%;min-width:0;max-width:100%}
 .management-canvas{min-width:0;max-height:72vh;overflow:auto}.management-pager{padding:.75rem 1rem;justify-content:flex-end}
+.management-canvas--reference{position:relative;contain:inline-size;scrollbar-gutter:stable}
 .reference-document{padding:24px;color:#000;background:#fff;font:12px/1.4 'Courier New',Courier,monospace;min-width:1320px}
 .reference-document header{position:relative;margin-bottom:24px}.reference-document h2{text-align:center;font:700 18px/1.3 Arial,sans-serif;margin:0 0 14px}
 .reference-document header p{margin:5px 0}.reference-stamp{text-align:right}.reference-basis{font:11px/1.5 Arial,sans-serif;max-width:1100px;margin:8px 0}
@@ -24,18 +25,66 @@
 @page{size:A3 landscape;margin:12mm}
 @media print{.reference-print-controls{display:none}.reference-document,.reference-CASHBOOK{min-width:0;padding:0;font-size:7.5pt}.reference-document h2{font-size:14pt}.reference-table th{font-size:8pt}.reference-table td{padding:3px}.reference-table .reference-money{text-align:right}.reference-table thead{display:table-header-group}.reference-table tfoot{display:table-row-group}.reference-table tr{break-inside:avoid}.reference-group{break-after:avoid}.reference-basis{font-size:7pt}.reference-stamp{text-align:right}}
 
-.reference-DISBURSED_LOANS_AUDIT h2,.reference-LOAN_REPAYMENT_TRANSACTIONS h2{text-decoration:underline;text-underline-offset:3px}
-.reference-EXPECTED_REPAYMENTS{min-width:1180px}.reference-EXPECTED_REPAYMENTS h2{font-weight:400;font-size:14pt}
-.reference-LOAN_REPAYMENT_TRANSACTIONS thead{background:#eee}
-.reference-LOAN_REPAYMENT_TRANSACTIONS h2{font-family:'Times New Roman',Times,serif}.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-table th{font-family:Arial,sans-serif}
-
-.reference-source-layout{font-size:10pt;line-height:12pt}.reference-DISBURSED_LOANS_AUDIT h2{font-size:11pt;margin-bottom:4pt}.reference-source-layout header{display:flex;flex-direction:column;margin-bottom:26px}.reference-source-layout h2{width:50%;white-space:pre-line}.reference-source-layout header p:first-of-type{order:2}.reference-source-layout header p:nth-of-type(2){order:1}.reference-source-layout .reference-stamp{position:absolute;right:0;top:0;margin:0;max-width:44%;font-size:10pt}
-.reference-source-layout .reference-table th{width:auto;font-size:10pt}.reference-source-layout .reference-table td{padding:3px 4px}.reference-source-group{margin-top:24px}.reference-source-group:first-of-type{margin-top:0}.reference-source-layout .reference-table .reference-money{white-space:normal;overflow-wrap:anywhere}.reference-product-group,.reference-month,.reference-audit-group{font-family:'Times New Roman',Times,serif;font-size:13px}.reference-product-group{margin:0 0 14px}.reference-month{margin:0 0 24px}.reference-month em{margin-left:36px;font-weight:bold}.reference-audit-group{display:flex;align-items:baseline;justify-content:space-between;gap:24px;margin-bottom:8px}.reference-audit-group p{margin:0}.reference-audit-group strong,.reference-product-group strong{margin-right:20px}
-.reference-LOAN_REPAYMENT_TRANSACTIONS{width:820px;min-width:820px;margin-inline:auto}.reference-LOAN_REPAYMENT_TRANSACTIONS h2{width:80%;font-size:12pt}.reference-client-facts,.reference-loan-facts{display:grid;font-family:Arial,sans-serif;gap:14px;margin:0 0 24px}.reference-client-facts{grid-template-columns:1.2fr 2.3fr 1.5fr}.reference-client-facts>div{display:flex;gap:8px;min-width:0}.reference-client-facts dt{font-weight:bold;white-space:nowrap}.reference-client-facts dd{margin:0;overflow-wrap:anywhere}.reference-loan-facts{grid-template-columns:1fr 2fr 2fr 1.7fr;text-align:center;margin-bottom:18px}.reference-loan-facts dt{font-weight:bold;margin:0 0 8px}.reference-loan-facts dd{margin:0;overflow-wrap:anywhere}.reference-entry{display:block;font-size:10pt;line-height:12pt;margin-top:0;overflow-wrap:anywhere}.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-table th{font-size:10pt}
-@page loan-audit{size:legal landscape;margin:12mm;@bottom-center{content:counter(page) " / " counter(pages);font:10pt 'Courier New',monospace}}@page loan-expected{size:legal landscape;margin:12mm;@bottom-center{content:counter(page) " / " counter(pages);font:10pt 'Courier New',monospace}}@page loan-transactions{size:letter portrait;margin:12mm;@bottom-center{content:counter(page);font:10pt Arial,sans-serif}}
-@media print{.reference-DISBURSED_LOANS_AUDIT{page:loan-audit}.reference-EXPECTED_REPAYMENTS{page:loan-expected}.reference-LOAN_REPAYMENT_TRANSACTIONS{page:loan-transactions;width:auto;min-width:0;max-width:none;margin:0}.reference-source-layout .reference-table th{font-size:10pt;line-height:12pt;padding:0 3pt 8pt}.reference-source-layout .reference-table td{line-height:12pt;padding:0 3pt}.reference-DISBURSED_LOANS_AUDIT h2{font-size:11pt}.reference-LOAN_REPAYMENT_TRANSACTIONS h2{font-size:12pt}.reference-client-facts,.reference-loan-facts{font-size:10pt;gap:9px}.reference-source-group{break-inside:auto}.reference-client-facts,.reference-loan-facts,.reference-audit-group,.reference-product-group,.reference-month{break-after:avoid}.reference-entry{font-size:10pt;line-height:12pt;margin-top:0}.reference-source-layout .reference-stamp{font-size:7pt}}
-
-.reference-client-facts dt,.reference-loan-facts dt,.reference-product-group strong{text-transform:uppercase}
-
-.reference-DISBURSED_LOANS_AUDIT .reference-stamp{top:14pt}.reference-EXPECTED_REPAYMENTS .reference-stamp{top:4pt}
-.reference-LOAN_REPAYMENT_TRANSACTIONS header{display:grid;grid-template-columns:60% 40%;align-items:start;margin-bottom:4pt}.reference-LOAN_REPAYMENT_TRANSACTIONS header h2{grid-column:1/-1;grid-row:1/4;align-self:start;margin-bottom:6pt}.reference-LOAN_REPAYMENT_TRANSACTIONS header p:first-of-type{grid-column:2;grid-row:2;margin:0;text-align:right;font-size:8pt;line-height:12pt}.reference-LOAN_REPAYMENT_TRANSACTIONS header p:nth-of-type(2){grid-column:2;grid-row:3;margin:0;text-align:right;font-size:8pt;line-height:12pt}.reference-LOAN_REPAYMENT_TRANSACTIONS header .reference-stamp{position:static;grid-column:2;grid-row:1;max-width:none;margin:0;font-size:10pt;line-height:12pt}
+/* Reference reports use the same Legal and Letter dimensions as their PDFs. */
+.reference-source-layout {
+  box-sizing:border-box; width:1008pt; min-width:1008pt; margin-inline:auto; padding:0;
+  font-size:10pt; line-height:13.5pt;
+}
+.reference-source-layout .reference-sheet-header {position:relative; block-size:68pt; margin:0;}
+.reference-source-layout .reference-sheet-header :is(h2,p) {position:absolute; margin:0; white-space:pre-wrap;}
+.reference-sheet-header h2 {inset-inline-start:0; width:510pt; font-size:14pt; font-weight:400; inset-block-start:8pt;}
+.reference-sheet-header .reference-stamp {inset-inline-start:543pt; inset-block-start:17pt;}
+.reference-sheet-header .reference-scope {inset-inline-start:20pt; inset-block-start:39pt; inline-size:345pt;}
+.reference-sheet-header .reference-period {inset-inline-start:382pt; inset-block-start:39pt;}
+.reference-header-details {margin:0 9pt 6pt; font-size:9pt; line-height:11pt;}
+.reference-header-details p {margin:0;}
+.reference-source-layout .reference-table {width:var(--reference-table-width); margin-inline-start:var(--reference-table-start);}
+.reference-source-layout .reference-table th {width:auto; font-size:10pt; line-height:11pt; padding:0 4pt 3pt 0; white-space:pre-line;}
+.reference-source-layout .reference-table td {padding:0 4pt 0 0; overflow-wrap:anywhere;}
+.reference-source-layout .reference-table .reference-money {text-align:right; white-space:normal;}
+.reference-source-layout .reference-table th.reference-money {text-align:center; white-space:pre-line;}
+.reference-source-layout .reference-total td {padding-block:8pt 10pt;}
+.reference-source-group + .reference-source-group {margin-block-start:24pt;}
+.reference-source-layout .reference-basis {margin-inline-start:var(--reference-table-start);}
+.reference-DISBURSED_LOANS_AUDIT {--reference-table-start:0pt; --reference-table-width:1000pt;}
+.reference-DISBURSED_LOANS_AUDIT .reference-sheet-header {block-size:50pt;}
+.reference-DISBURSED_LOANS_AUDIT .reference-sheet-header h2 {width:532pt; font-size:11pt; font-weight:bold; inset-block-start:0; text-decoration:underline;}
+.reference-DISBURSED_LOANS_AUDIT .reference-stamp {inset-inline-start:432pt;}
+.reference-DISBURSED_LOANS_AUDIT .reference-period {inset-inline-start:22pt; inset-block-start:21pt;}
+.reference-DISBURSED_LOANS_AUDIT .reference-table th:first-child {padding-inline-end:0;}
+.reference-audit-facts,.reference-product-facts {display:grid; font:bold 10pt/12pt 'Times New Roman',Times,serif;}
+.reference-audit-facts p,.reference-product-facts dd {margin:0; overflow-wrap:anywhere;}
+.reference-audit-facts strong {margin-inline-end:4pt;}
+.reference-audit-month {margin:0 10pt 20pt 22pt; grid-template-columns:248pt 1fr;}
+.reference-audit-month em {margin-inline-start:8pt;}
+.reference-audit-institution {margin:0 10pt 24pt 14pt;}
+.reference-audit-branch {margin:0 10pt 10pt 27pt; grid-template-columns:351pt 1fr;}
+.reference-EXPECTED_REPAYMENTS {--reference-table-start:9pt; --reference-table-width:781pt;}
+.reference-EXPECTED_REPAYMENTS .reference-table th:nth-child(3) {text-align:center;}
+.reference-EXPECTED_REPAYMENTS .reference-table :is(th,td):nth-child(8) {padding-inline-end:75pt;}
+.reference-product-facts {grid-template-columns:85pt 59pt 112pt 1fr; margin:0 10pt 15pt 9pt; text-transform:uppercase;}
+.reference-LOAN_REPAYMENT_TRANSACTIONS {
+  --reference-table-start:9pt; --reference-table-width:535pt;
+  width:612pt; min-width:612pt; font:10pt/12pt Arial,sans-serif;
+}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-sheet-header {block-size:76pt;}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-sheet-header h2 {
+  width:512pt; inset-block-start:30pt; font:bold 12pt/14pt 'Times New Roman',Times,serif; text-decoration:underline;
+}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-stamp {
+  inset-inline-start:368pt; inset-block-start:30pt; font:10pt/12pt 'Courier New',Courier,monospace;
+}
+.reference-client-facts,.reference-loan-facts {display:grid; margin-inline-start:9pt;}
+.reference-client-facts {grid-template-columns:130pt 266pt 198pt; margin-block:0 20pt;}
+.reference-client-facts>div {display:flex; gap:9pt; padding-inline-end:8pt;}
+.reference-client-facts dt,.reference-loan-facts dt {font-weight:bold; text-transform:uppercase;}
+.reference-client-facts dd,.reference-loan-facts dd {margin:0; overflow-wrap:anywhere;}
+.reference-loan-facts {grid-template-columns:67pt 126pt 160pt 182pt; margin-block:0 10pt;}
+.reference-loan-facts dt {margin-block-end:6pt;}
+.reference-loan-facts :is(dt,dd) {padding-inline-end:4pt;}
+.reference-loan-facts div:nth-child(n+3) {text-align:center;}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-table thead {background:#eaeaea;}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-table thead th {font-family:Arial,sans-serif; text-align:left; padding:2pt 4pt 6pt 0;}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-table thead th:nth-child(n+6) {text-align:center;}
+.reference-LOAN_REPAYMENT_TRANSACTIONS .reference-table th:last-child {background:#ffdfbf;}
+.reference-entry {display:block;}

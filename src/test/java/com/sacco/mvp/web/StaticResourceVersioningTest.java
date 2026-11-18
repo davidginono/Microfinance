@@ -47,7 +47,11 @@ class StaticResourceVersioningTest {
 
     @Configuration(proxyBeanMethods = false)
     static class TestConfig {
-        @Bean MemberLocaleInterceptor memberLocaleInterceptor() { return mock(MemberLocaleInterceptor.class); }
+        @Bean MemberLocaleInterceptor memberLocaleInterceptor() {
+            var interceptor=mock(MemberLocaleInterceptor.class);
+            org.mockito.Mockito.when(interceptor.preHandle(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any())).thenReturn(true);
+            return interceptor;
+        }
     }
 
     @RestController

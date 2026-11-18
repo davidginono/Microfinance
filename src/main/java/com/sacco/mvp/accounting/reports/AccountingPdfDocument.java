@@ -43,13 +43,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
         firstPage=document.getNumberOfPages();
         this.style=style;
         sourceLayout=style==Style.REPAYMENT||style==Style.AUDIT||style==Style.EXPECTED;referenceRows=sourceLayout||style==Style.REFERENCE;
-        // Point positions measured on the Legal and Letter reference pages.
-        sourceEdges=switch(style){
-            case AUDIT -> new float[]{4,23,85,226,279,540,630,706,783,856,906,948,1000};
-            case EXPECTED -> new float[]{9,54,94,242,333,416,500,577,710,790};
-            case REPAYMENT -> new float[]{9,76,153,220,292,378,472,544};
-            default -> new float[0];
-        };
+        sourceEdges=sourceEdges(style);
         bodyFont=style==Style.ORIGINAL?font:new PDType1Font(referenceRows&&style!=Style.REPAYMENT?FontName.COURIER:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY?FontName.COURIER:FontName.HELVETICA);
         headingFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REPAYMENT?FontName.HELVETICA_BOLD:style==Style.REFERENCE||style==Style.AUDIT||style==Style.EXPECTED?FontName.TIMES_BOLD:style==Style.TRIAL?FontName.TIMES_BOLD:style==Style.EQUITY?FontName.COURIER_BOLD:FontName.HELVETICA_BOLD);
         titleFont=style==Style.ORIGINAL?font:new PDType1Font(style==Style.REPAYMENT?FontName.TIMES_BOLD:style==Style.EXPECTED?FontName.HELVETICA:style==Style.TRIAL?FontName.TIMES_ROMAN:style==Style.EQUITY||style==Style.ACCOUNT||style==Style.REFERENCE||style==Style.AUDIT?FontName.HELVETICA_BOLD:FontName.HELVETICA);
@@ -58,11 +52,19 @@ public final class AccountingPdfDocument implements AutoCloseable {
         size=landscape?new PDRectangle(paper.getHeight(),paper.getWidth()):paper;
         next();document.getDocumentInformation().setTitle(title);
     }
-    public float width(){return sourceLayout?sourceEdges[sourceEdges.length-1]-sourceEdges[0]:size.getWidth()-64;}
-    private float tableLeft(){return sourceLayout?sourceEdges[0]:32;}
+    /** Column boundaries measured in points on the Legal and Letter reference pages. */
+    public static float[] sourceEdges(Style style) {
+        return switch(style){
+            case AUDIT -> new float[]{0,23,85,226,267,334,442,538,636,707,783,856,895,940,1000};
+            case EXPECTED -> new float[]{9,54,94,243,333,416,500,577,723,790};
+            case REPAYMENT -> new float[]{9,76,153,220,292,378,472,544};
+            default -> new float[0];
+        };
+    }
+    public float width(){return sourceLayout?sourceEdges[sourceEdges.length-1]-sourceEdges[0]:size.getWidth()-(style==Style.EQUITY?40:64);}
+    private float tableLeft(){return sourceLayout?sourceEdges[0]:style==Style.EQUITY?20:32;}
     private float columnWidth(int column){return sourceLayout?sourceEdges[column+1]-sourceEdges[column]:width()*weights[column];}
     private float rowRight(int column,float left){
-        if(style==Style.AUDIT && column==4)return 419;
         if(style==Style.EXPECTED && column==7)return 648;
         return left+columnWidth(column)-(sourceLayout?4:5);
     }
@@ -78,13 +80,24 @@ public final class AccountingPdfDocument implements AutoCloseable {
             if(!headers.isEmpty())header();
             return;
         }
+        if(style==Style.EQUITY){
+            y=size.getHeight()-22;
+            for(String part:wrap(title,14,width()*.546f,titleFont)){
+                float titleWidth=face(part,titleFont).getStringWidth(part)*14/1000;
+                drawWith(part,tableLeft()+width()*.273f-titleWidth/2,y,14,titleFont,false,false,true);y-=19;
+            }
+            for(String part:wrap(context.getFirst(),9,width(),headingFont)){draw(part,tableLeft(),y,9,true,false);y-=12;}
+            y-=24;
+            if(!headers.isEmpty())header();
+            return;
+        }
         y=size.getHeight()-36;
         float left=logo==null?32:115,headingWidth=size.getWidth()-32-left;
         if(logo!=null){float scale=Math.min(70f/logo.getWidth(),45f/logo.getHeight());stream.drawImage(logo,32,y-45,logo.getWidth()*scale,logo.getHeight()*scale);}
         float titlePoint=14;
         for(String line:wrap(title,titlePoint,headingWidth)){
             float titleWidth=face(line,titleFont).getStringWidth(line)*titlePoint/1000,x=left+(headingWidth-titleWidth)/2;
-            drawWith(line,x,y,titlePoint,titleFont,style==Style.ORIGINAL,false,style==Style.EQUITY);
+            drawWith(line,x,y,titlePoint,titleFont,style==Style.ORIGINAL,false,false);
             if(style==Style.TRIAL||style==Style.ACCOUNT)line(x,x+titleWidth,y-2);
             y-=titlePoint+5;
         }
@@ -120,11 +133,10 @@ public final class AccountingPdfDocument implements AutoCloseable {
             float scope=sourceDetail(context.get(1),20,height-48,345,10);
             float period=sourceDetail(context.get(0),382,height-48,600,10);
             y=Math.min(Math.min(scope,period)-14,height-74);
-        }else{
-            float scope=sourceDetail(context.get(1),368,stampBottom-1,235,8);
-            float period=sourceDetail(context.get(0),368,scope,176,8);
-            y=Math.min(period-5,height-85);
-        }
+        }else y=Math.min(stampBottom-18,height-85);
+        for(int detail=3;detail<context.size();detail++)
+            y=sourceDetail(context.get(detail),tableLeft()+9,y,size.getWidth()-tableLeft()-24,9);
+        if(context.size()>3)y-=6;
     }
     private float sourceDetail(String value,float x,float baseline,float maxWidth,float point)throws IOException {
         for(String part:wrap(value,point,maxWidth)){
@@ -135,7 +147,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
     }
     /** Reference metadata stays above its table and repeats on continuation pages. */
     public void sourceGroup(List<String> labels,List<String> values)throws IOException {
-        if(!sourceLayout||labels.size()!=values.size()||values.size()!=(style==Style.REPAYMENT?7:style==Style.AUDIT?3:1))throw new IllegalArgumentException("Group metadata mismatch");
+        if(!sourceLayout||labels.size()!=values.size()||values.size()!=(style==Style.EXPECTED?2:style==Style.AUDIT?5:7))throw new IllegalArgumentException("Group metadata mismatch");
         groupLabels=style==Style.REPAYMENT||style==Style.EXPECTED?labels.stream().map(v->v.toUpperCase(Locale.ROOT)).toList():List.copyOf(labels);groupValues=List.copyOf(values);
         // Repayment rows can carry several lines of receipt and correction references.
         float reserve=style==Style.REPAYMENT?205:120;
@@ -154,9 +166,8 @@ public final class AccountingPdfDocument implements AutoCloseable {
             }
             return identityLines*12+20+labelLines*12+6+valueLines*12+10;
         }
-        if(style==Style.AUDIT)return 68+12*(wrap(context.get(1),10,960,headingFont).size()-1)
-            +12*Math.max(auditField(1,335).size(),auditField(2,610).size())+10;
-        return wrap(groupLabels.getFirst()+"      "+groupValues.getFirst(),10,width(),headingFont).size()*14+14;
+        if(style==Style.AUDIT)return auditGroup(false);
+        return expectedGroupHeight();
     }
     private List<String> repaymentIdentityValue(int column)throws IOException {
         float slotWidth=REPAYMENT_IDENTITY[column+1]-REPAYMENT_IDENTITY[column];
@@ -169,6 +180,30 @@ public final class AccountingPdfDocument implements AutoCloseable {
     }
     private List<String> auditField(int index,float maxWidth)throws IOException {
         return wrap(groupLabels.get(index)+"   "+groupValues.get(index),10,maxWidth,headingFont);
+    }
+    private float auditGroup(boolean drawFields)throws IOException {
+        float baseline=y;
+        float[][] edges={{22,270,998},{14,998},{27,378,998}};
+        float[] gaps={20,24,10};
+        int field=0;
+        for(int row=0;row<edges.length;row++){
+            int lines=1;
+            for(int slot=0;slot<edges[row].length-1;slot++,field++){
+                float x=edges[row][slot];
+                if(field==0){
+                    if(drawFields){
+                        draw(groupLabels.getFirst(),x,baseline,10,true,false);
+                        drawWith(groupValues.getFirst(),140,baseline,11,metadataFont,false,false,false);
+                    }
+                    continue;
+                }
+                var parts=auditField(field,edges[row][slot+1]-x-8);
+                lines=Math.max(lines,parts.size());
+                if(drawFields)for(int n=0;n<parts.size();n++)draw(parts.get(n),x,baseline-n*12,10,true,false);
+            }
+            baseline-=lines*12+gaps[row];
+        }
+        return y-baseline;
     }
     private void drawSourceGroup()throws IOException {
         if(style==Style.REPAYMENT){
@@ -198,20 +233,21 @@ public final class AccountingPdfDocument implements AutoCloseable {
             }
             y-=labelLines*12+6+valueLines*12+10;
         }else if(style==Style.AUDIT){
-            draw(groupLabels.get(0),22,y,10,true,false);
-            drawWith(groupValues.get(0),140,y,11,metadataFont,false,false,false);
-            y-=32;
-            var scope=wrap(context.get(1),10,960,headingFont);
-            for(int n=0;n<scope.size();n++)draw(scope.get(n),14,y-n*12,10,true,false);
-            y-=36+12*(scope.size()-1);
-            var product=auditField(1,335);var account=auditField(2,610);
-            for(int n=0;n<product.size();n++)draw(product.get(n),27,y-n*12,10,true,false);
-            for(int n=0;n<account.size();n++)draw(account.get(n),378,y-n*12,10,true,false);
-            y-=Math.max(product.size(),account.size())*12+10;
+            y-=auditGroup(true);
         }else {
-            for(String line:wrap(groupLabels.getFirst()+"      "+groupValues.getFirst(),10,width(),headingFont)){draw(line,9,y,10,true,false);y-=14;}
-            y-=14;
+            float[] positions={9,94,153,265,790};
+            for(int n=0;n<4;n++){
+                String value=n%2==0?groupLabels.get(n/2):groupValues.get(n/2);
+                var parts=wrap(value,10,positions[n+1]-positions[n]-4,headingFont);
+                for(int p=0;p<parts.size();p++)draw(parts.get(p),positions[n],y-p*14,10,true,false);
+            }
+            y-=expectedGroupHeight();
         }
+    }
+    private float expectedGroupHeight()throws IOException {
+        int lines=Math.max(wrap(groupValues.get(0),10,55,headingFont).size(),wrap(groupValues.get(1),10,521,headingFont).size());
+        lines=Math.max(lines,wrap(groupLabels.get(1),10,108,headingFont).size());
+        return lines*14+13;
     }
     private void drawCentered(String value,float center,float baseline,float point,PDFont preferred,float minLeft)throws IOException {
         float halfWidth=face(value,preferred).getStringWidth(value)*point/2000;
@@ -223,7 +259,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
         header();
     }
     private void header()throws IOException {
-        var lines=new ArrayList<List<String>>();int count=1;float point=sourceLayout?10:8;
+        var lines=new ArrayList<List<String>>();int count=1;float point=sourceLayout?10:style==Style.EQUITY?9:8;
         for(int i=0;i<headers.size();i++){
             float max=style==Style.AUDIT && i==0?columnWidth(i)-1:rowWidth(i);
             var value=sourceLayout?wrap(headers.get(i),point,max,headingFont):wrap(headers.get(i),point,columnWidth(i)-10);
@@ -232,13 +268,13 @@ public final class AccountingPdfDocument implements AutoCloseable {
         if(y-count*12-10<55)nextWithoutHeader();
         if(style==Style.ORIGINAL)rule(y+10);
         if(style==Style.ACCOUNT||style==Style.REPAYMENT){
-            stream.setNonStrokingColor(style==Style.REPAYMENT?.92f:.85f);
+            stream.setNonStrokingColor(style==Style.REPAYMENT?234/255f:.85f);
             if(style==Style.REPAYMENT)stream.addRect(tableLeft(),y-count*12+2,width(),count*12+7);
             else stream.addRect(32,y-count*12-2,width(),count*12+12);
             stream.fill();
             if(style==Style.REPAYMENT){
                 float highlight=sourceEdges[headers.size()-1];
-                stream.setNonStrokingColor(1f,.87f,.75f);
+                stream.setNonStrokingColor(1f,223/255f,191/255f);
                 stream.addRect(highlight,y-count*12+2,sourceEdges[headers.size()]-highlight,count*12+7);
                 stream.fill();
             }
@@ -247,21 +283,24 @@ public final class AccountingPdfDocument implements AutoCloseable {
         for(int i=0;i<lines.size();i++){
             for(int n=0;n<lines.get(i).size();n++){
                 String label=lines.get(i).get(n);float edge=numeric[i]?rowRight(i,x):x;
-                if(sourceLayout && numeric[i] && style!=Style.REPAYMENT)drawCentered(label,(x+edge)/2,y-n*11,point,headingFont,x);
+                if(style==Style.EQUITY)drawCentered(label,x+columnWidth(i)/2,y-n*12,point,headingFont,x);
+                else if(style==Style.EXPECTED && i==2)drawCentered(label,164,y-n*11,point,headingFont,x);
+                else if(sourceLayout && numeric[i] && (style!=Style.REPAYMENT || i>=5))drawCentered(label,(x+edge)/2,y-n*11,point,headingFont,x);
                 else draw(label,sourceLayout?x:edge,y-n*(sourceLayout?11:12),point,true,!sourceLayout && numeric[i]);
                 if(style==Style.TRIAL){float length=face(label,headingFont).getStringWidth(label)*8/1000;line(numeric[i]?edge-length:edge,numeric[i]?edge:edge+length,y-n*12-2);}
             }x+=columnWidth(i);
         }
         if(sourceLayout)y-=count*11+(style==Style.REPAYMENT?12:4);
-        else {y-=count*12+4;if(style==Style.ORIGINAL)rule(y);y-=style==Style.ORIGINAL?12:4;}
+        else {y-=count*12+4;if(style==Style.ORIGINAL)rule(y);y-=style==Style.ORIGINAL?12:style==Style.EQUITY?28:4;}
     }
     private void nextWithoutHeader()throws IOException {var saved=headers;headers=List.of();next();headers=saved;}
     public void row(List<String> values,boolean total)throws IOException {
+        if(style==Style.EQUITY && total)y-=10;
         var lines=new ArrayList<List<String>>();var points=new ArrayList<Float>();int count=1;
-        float leading=sourceLayout?(style==Style.REPAYMENT?12:13.5f):referenceRows?10:13;
+        float leading=sourceLayout?(style==Style.REPAYMENT?12:13.5f):referenceRows?10:style==Style.EQUITY?12:13;
         PDFont rowFont=total?headingFont:bodyFont;
         for(int i=0;i<values.size();i++){
-            float max=rowWidth(i),point=sourceLayout?10:referenceRows?7.5f:numeric[i]?8:9;
+            float max=rowWidth(i),point=sourceLayout?10:referenceRows?7.5f:style==Style.EQUITY?9:numeric[i]?8:9;
             if(total && i==0 && sourceLayout){
                 int firstAmount=style==Style.AUDIT?4:style==Style.EXPECTED?5:2;
                 max=sourceEdges[firstAmount]-sourceEdges[0]-4;
@@ -286,7 +325,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
                 for(int n=0;n<take && offset+n<lines.get(i).size();n++){
                     String part=lines.get(i).get(offset+n);
                     float baseline=y-n*leading;
-                    draw(part,edge,baseline,points.get(i),total,numeric[i]);
+                    draw(part,edge,baseline,points.get(i),total || style==Style.EQUITY && i==0,numeric[i]);
                     if(total && sourceLayout && numeric[i] && !part.isBlank()){
                         float textWidth=face(part,headingFont).getStringWidth(part)*points.get(i)/1000;
                         line(edge-textWidth,edge,baseline-2);
@@ -322,8 +361,6 @@ public final class AccountingPdfDocument implements AutoCloseable {
     public void endTable(){headers=List.of();groupLabels=List.of();groupValues=List.of();}
     public void sourcePageNumbers(String pattern){sourcePageNumber=pattern;}
     public void sourceTotalsGap(){if(style==Style.AUDIT)y-=17;}
-    /** Keep provenance intact on its own page, leaving the financial face uncluttered. */
-    public void appendix(String title)throws IOException {endTable();next();section(title);}
     private void rule(float top)throws IOException {stream.setStrokingColor(110/255f);stream.setLineWidth(.5f);stream.moveTo(32,top);stream.lineTo(size.getWidth()-32,top);stream.stroke();}
     private void line(float left,float right,float top)throws IOException {stream.setStrokingColor(0);stream.setLineWidth(.5f);stream.moveTo(left,top);stream.lineTo(right,top);stream.stroke();}
     private PDFont face(String value,PDFont preferred)throws IOException {try{preferred.encode(value);return preferred;}catch(IllegalArgumentException unavailable){return font;}}

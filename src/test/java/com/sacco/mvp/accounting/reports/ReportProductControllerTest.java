@@ -24,6 +24,7 @@ class ReportProductControllerTest {
         var result=new Result(kind,p,"Institution","Branch",List.of(),List.of(),List.of(),Map.of(),0,0,false,"","");
         when(f.reports.report(eq(f.actor),eq(kind),any(),anyBoolean())).thenReturn(result);
         when(f.excel.build(eq(result),any())).thenReturn(new byte[]{2});
+        when(f.pdf.build(eq(result),any())).thenReturn(new byte[]{1});
         for(String suffix:List.of("","/pdf","/print","/excel"))f.mvc.perform(get(url+suffix).locale(Locale.ENGLISH).param("productId",id.toString()).param("run","true")).andExpect(status().isOk());
         var captured=ArgumentCaptor.forClass(Parameters.class);verify(f.reports,times(4)).report(eq(f.actor),eq(kind),captured.capture(),anyBoolean());
         assertThat(captured.getAllValues()).allSatisfy(value->assertThat(value.productId()).isEqualTo(id));
