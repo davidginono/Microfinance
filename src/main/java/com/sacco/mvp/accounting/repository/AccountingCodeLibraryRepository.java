@@ -43,9 +43,19 @@ public class AccountingCodeLibraryRepository {
         String order=switch(direction) {case "asc"->" asc";case "desc"->" desc";default->throw new IllegalArgumentException("library.error.validation");};
         return (Set.of("activity","template").contains(sort)?column:prefix+column)+order;
     }
-    public UUID createActivity(String institution,CodeForm form,UUID actor,OffsetDateTime now) {
+    public UUID createActivity(String institution,CodeForm form,UUID actor,OffsetDateTime now,String hash) {
         UUID id=UUID.randomUUID();
-        jdbc.update("insert into gl_activity(id,sacco_id,code,name,name_sw,description,created_by,created_at) values(?,?,?,?,?,?,?,?)",id,institution,form.getCode(),form.getName(),form.getNameSw(),form.getDescription(),actor,now);return id;
+        jdbc.update("insert into gl_activity(id,sacco_id,code,name,name_sw,description,created_by,created_at,creation_key,creation_hash) values(?,?,?,?,?,?,?,?,?,?)",id,institution,form.getCode(),form.getName(),form.getNameSw(),form.getDescription(),actor,now,form.getRequestKey(),hash);return id;
+    }
+    public void lockCreation(String institution,String kind,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LIBRARY/"+institution+"/"+kind+"/"+key);}
+    public record Creation(UUID id,String code,UUID actor,String hash) {}
+    public Optional<Creation> creation(String institution,boolean transaction,UUID key){
+        String table=transaction?"gl_transaction_code":"gl_activity";
+        return jdbc.query("select id,code,created_by,creation_hash from "+table+" where sacco_id=? and creation_key=?",(r,n)->new Creation(r.getObject("id",UUID.class),r.getString("code"),r.getObject("created_by",UUID.class),r.getString("creation_hash")),institution,key).stream().findFirst();
+    }
+    public String nextCode(String institution,boolean transaction){
+        Long number=jdbc.queryForObject("insert into gl_library_code_counter(sacco_id,kind,last_number) values(?,?,1) on conflict(sacco_id,kind) do update set last_number=gl_library_code_counter.last_number+1 returning last_number",Long.class,institution,transaction?"TRANSACTION":"ACTIVITY");
+        return (transaction?"TXN-":"ACT-")+String.format(Locale.ROOT,"%06d",number);
     }
     public boolean activeTransactions(String institution,UUID activity) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from gl_transaction_code where sacco_id=? and activity_id=? and active)",Boolean.class,institution,activity));
@@ -61,13 +71,13 @@ public class AccountingCodeLibraryRepository {
     public Optional<TransactionCode> transaction(String institution,UUID id,boolean lock) {
         return jdbc.query(TRANSACTION+" where t.sacco_id=? and t.id=?"+(lock?" for update of t":""),this::transaction,institution,id).stream().findFirst();
     }
-    public UUID createTransaction(String institution,CodeForm form,UUID actor,OffsetDateTime now) {
+    public UUID createTransaction(String institution,CodeForm form,UUID actor,OffsetDateTime now,String hash) {
         UUID id=UUID.randomUUID();
-        jdbc.update("insert into gl_transaction_code(id,sacco_id,activity_id,code,name,name_sw,description,source_event,created_by,created_at) values(?,?,?,?,?,?,?,?,?,?)",id,institution,form.getActivityId(),form.getCode(),form.getName(),form.getNameSw(),form.getDescription(),form.getSourceEvent(),actor,now);return id;
+        jdbc.update("insert into gl_transaction_code(id,sacco_id,activity_id,code,name,name_sw,description,source_event,created_by,created_at,creation_key,creation_hash) values(?,?,?,?,?,?,?,?,?,?,?,?)",id,institution,form.getActivityId(),form.getCode(),form.getName(),form.getNameSw(),form.getDescription(),form.getSourceEvent(),actor,now,form.getRequestKey(),hash);return id;
     }
     public void transactionState(String institution,UUID id,boolean active) {jdbc.update("update gl_transaction_code set active=? where sacco_id=? and id=?",active,institution,id);}
     public List<AccountChoice> accounts(String institution,String search,int offset) {
-        return jdbc.query("select code,name,name_sw,kind from gl_account where sacco_id=? and active and kind<>'HEADING' and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) order by code,id limit 26 offset ?",
+        return jdbc.query("select code,name,name_sw,kind from gl_account where sacco_id=? and active and kind='POSTING' and not gl_account_requires_loan_source(id) and (strpos(lower(code),?)>0 or strpos(lower(name),?)>0 or strpos(lower(coalesce(name_sw,'')),?)>0) order by code,id limit 26 offset ?",
             (r,n)->new AccountChoice(r.getString("code"),r.getString("name"),r.getString("name_sw"),r.getString("kind")),institution,search,search,search,offset);
     }
     public List<TemplateAccount> lockAccounts(String institution,List<String> codes) {

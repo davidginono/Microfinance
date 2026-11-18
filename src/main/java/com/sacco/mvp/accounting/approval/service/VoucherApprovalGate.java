@@ -45,6 +45,11 @@ public class VoucherApprovalGate {
     }
     public String formHash(Type type,Form form) { return digest(type.name()+repository.write(form)); }
     public String planHash(Preview plan) {
+        if(plan.rows().stream().anyMatch(r->r.split())){
+            var rows=plan.rows().stream().map(r->List.of(r.lineNo(),r.transactionId()==null?"":r.transactionId().toString(),r.templateKey()==null?"":r.templateKey().toString(),r.component(),r.description(),r.amount().setScale(2).toPlainString(),
+                r.postings().stream().map(e->List.of(e.side(),e.account().id(),e.account().code(),e.account().name(),e.amount().setScale(2).toPlainString())).toList())).toList();
+            return digest("SPLIT_V1/"+repository.write(rows));
+        }
         var rows=plan.rows().stream().map(r->List.of(r.lineNo(),r.transactionId()==null?"":r.transactionId().toString(),
             r.templateKey()==null?"":r.templateKey().toString(),r.component(),r.description(),r.amount().setScale(2).toPlainString(),
             r.debit().id(),r.debit().code(),r.debit().name(),r.credit().id(),r.credit().code(),r.credit().name())).toList();
@@ -63,8 +68,16 @@ public class VoucherApprovalGate {
             require(r.getAmount()==null || (r.getAmount().scale()>=-16 && r.getAmount().scale()<=2 && r.getAmount().precision()-r.getAmount().scale()<=16),"amount");
             var copy=new RowForm();copy.setDescription(text(r.getDescription(),500));copy.setAmount(r.getAmount()==null?null:r.getAmount().setScale(2));
             copy.setDebitAccountId(r.getDebitAccountId());copy.setCreditAccountId(r.getCreditAccountId());copy.setTransactionId(r.getTransactionId());copy.setTemplateKey(r.getTemplateKey());
-            copy.setComponent(text(r.getComponent(),20));rows.add(copy);
+            copy.setComponent(text(r.getComponent(),20));
+            if(r.getEntries()!=null && !r.getEntries().isEmpty()){
+                require(r.getEntries().size()<=50,"limit");var entries=new ArrayList<com.sacco.mvp.accounting.dto.VoucherDtos.EntryForm>();
+                for(var e:r.getEntries()){require(e!=null,"ordinaryOnly");var entry=new com.sacco.mvp.accounting.dto.VoucherDtos.EntryForm();entry.setSide(text(e.getSide(),6));entry.setAccountId(e.getAccountId());
+                    require(e.getAmount()==null || (e.getAmount().scale()>=-16 && e.getAmount().scale()<=2 && e.getAmount().precision()-e.getAmount().scale()<=16),"amount");entry.setAmount(e.getAmount()==null?null:e.getAmount().setScale(2));entries.add(entry);}
+                copy.setEntries(entries);
+            }
+            rows.add(copy);
         }
+        require(rows.stream().mapToInt(r->r.getEntries().isEmpty()?2:r.getEntries().size()).sum()<=500,"limit");
         f.setRows(rows);return f;
     }
     private static String digest(String value) {

@@ -39,7 +39,7 @@
             if (form.method.toLowerCase() !== 'get' || form.hasAttribute('data-picker-search')) return;
             const input = [...form.querySelectorAll('input')].find(field =>
                 /^(search|searchId|parentSearch|accountSearch|q|query|keyword|term)$/i.test(field.name)
-                && ['text', 'search'].includes(field.type) && !field.hasAttribute('data-library-lookup'));
+                && ['text', 'search'].includes(field.type));
             if (!input || form.querySelector('[name="format"], [data-download-action], [data-print-action]')) return;
             const finder = form.closest('.coa-parent-picker')?.querySelector('.erp-table-wrap');
             let controller, version = 0, submitting = false;

@@ -174,11 +174,15 @@ public class VoucherWorkflowService {
         if(f.getEffectiveDate()==null || f.getEffectiveDate().isAfter(clock.today()))result.add(new Issue("effectiveDate","voucher.error.date"));
         if(type!=Type.JOURNAL && f.getParty().isBlank())result.add(new Issue("party","approval.error.requiredField"));
         if(f.getReference().isBlank())result.add(new Issue("reference","approval.error.requiredField"));
-        if(type!=Type.JOURNAL && f.getMoneyAccountId()==null)result.add(new Issue("moneyAccountId","voucher.error.moneyAccount"));
+        if(type!=Type.JOURNAL && f.getMoneyAccountId()==null && f.getRows().stream().anyMatch(r->r.getEntries()==null || r.getEntries().isEmpty()))result.add(new Issue("moneyAccountId","voucher.error.moneyAccount"));
         for(int n=0;n<f.getRows().size();n++) {var r=f.getRows().get(n);String p="rows["+n+"].";
             if(r.getDescription().isBlank())result.add(new Issue(p+"description","approval.error.requiredField"));
             if(r.getAmount()==null || r.getAmount().signum()<=0)result.add(new Issue(p+"amount","voucher.error.amount"));
-            if(r.getTransactionId()==null) {
+            if(r.getEntries()!=null && !r.getEntries().isEmpty()){
+                for(int e=0;e<r.getEntries().size();e++){var entry=r.getEntries().get(e);String path=p+"entries["+e+"].";
+                    if(entry.getAccountId()==null)result.add(new Issue(path+"accountId","voucher.error.account"));
+                    if(entry.getAmount()==null || entry.getAmount().signum()<=0)result.add(new Issue(path+"amount","voucher.error.amount"));}
+            }else if(r.getTransactionId()==null) {
                 if(type!=Type.RECEIPT && r.getDebitAccountId()==null)result.add(new Issue(p+"debitAccountId","voucher.error.account"));
                 if(type!=Type.PAYMENT && r.getCreditAccountId()==null)result.add(new Issue(p+"creditAccountId","voucher.error.account"));
             }
@@ -242,8 +246,10 @@ public class VoucherWorkflowService {
             .forEach(m->names.put(m.getId(),m.getFullName()));return names;
     }
     @Transactional(readOnly=true)
-    public List<Account> accounts(AppUserPrincipal a,UUID id,String search,int page) {
-        var d=details(a,id);require(d.actions().contains("EDIT"),"transition");return vouchers.accounts(a,d.workflow().type(),search,page);
+    public List<Account> accounts(AppUserPrincipal a,UUID id,String search,int page) {return accounts(a,id,search,page,"");}
+    @Transactional(readOnly=true)
+    public List<Account> accounts(AppUserPrincipal a,UUID id,String search,int page,String purpose) {
+        var d=details(a,id);require(d.actions().contains("EDIT"),"transition");return vouchers.accounts(a,d.workflow().type(),search,page,purpose);
     }
     @Transactional(readOnly=true)
     public List<Client> clients(AppUserPrincipal a,UUID id,String search,int page){var d=details(a,id);require(d.actions().contains("EDIT"),"transition");return vouchers.clients(a,d.workflow().type(),search,page);}

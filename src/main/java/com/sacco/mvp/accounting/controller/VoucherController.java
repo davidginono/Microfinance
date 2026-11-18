@@ -37,7 +37,7 @@ public class VoucherController {
     public static Type type(String kind){return switch(kind){case "receipts"->Type.RECEIPT;case "payments"->Type.PAYMENT;case "journals"->Type.JOURNAL;default->throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);};}
     @InitBinder("voucherForm") void binder(WebDataBinder binder){
         binder.setAutoGrowCollectionLimit(50);
-        binder.setAllowedFields("requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId");
+        binder.setAllowedFields("requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @GetMapping
     public String list(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
@@ -111,7 +111,7 @@ public class VoucherController {
     @GetMapping("/{id}/print")
     public ResponseEntity<byte[]> print(@PathVariable String kind,@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,Locale locale){return pdf(kind,id,true,actor,locale);}
     @GetMapping("/accounts") @ResponseBody
-    public List<Account> accounts(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return vouchers.accounts(actor,type(kind),search,page);}
+    public List<Account> accounts(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="") String purpose){return vouchers.accounts(actor,type(kind),search,page,purpose);}
     @GetMapping("/transactions") @ResponseBody
     public List<Mapping> transactions(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID activityId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return vouchers.mappings(actor,type(kind),activityId,search,page);}
     @GetMapping("/activities") @ResponseBody

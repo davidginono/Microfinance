@@ -13,11 +13,10 @@
     <section class="accounting-form accounting-create-card"><h2><spring:message code="${empty activity?'library.activityDetails':'library.transactionDetails'}" /></h2>
         <c:url value="${empty activity?'/finance/library/activities':'/finance/library/activities/'}${empty activity?'':activity.id}${empty activity?'':'/transactions'}" var="saveUrl" />
         <form:form method="post" modelAttribute="codeForm" action="${saveUrl}" cssClass="accounting-create-form">
-            <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>
+            <form:hidden path="requestKey" />
+                        <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" cssClass="coa-error" element="p" /></div>
             <div class="accounting-grid">
-                <label><spring:message code="library.code" /><form:input path="code" cssClass="aws-control" maxlength="40" pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,39}" required="required" /><small><spring:message code="library.codeHelp" /></small><form:errors path="code" cssClass="coa-error" /></label>
                 <label><spring:message code="library.name" /><form:input path="name" cssClass="aws-control" maxlength="160" required="required" /><form:errors path="name" cssClass="coa-error" /></label>
-                <c:if test="${not empty activity}"><label><spring:message code="library.sourceEvent" /><form:select path="sourceEvent" cssClass="aws-control"><c:forEach items="${sourceEvents}" var="event"><form:option value="${event}"><spring:message code="library.event.${event}" /></form:option></c:forEach></form:select><small><spring:message code="library.eventHelp" /></small><form:errors path="sourceEvent" cssClass="coa-error" /></label></c:if>
 
             </div>
             <details class="accounting-additional" ${not empty codeForm.description?'open':''}><summary><spring:message code="coa.additionalSettings" /></summary><label class="coa-wide"><spring:message code="coa.description" /><form:textarea path="description" cssClass="aws-control" maxlength="500" rows="2" /><form:errors path="description" cssClass="coa-error" /></label></details>

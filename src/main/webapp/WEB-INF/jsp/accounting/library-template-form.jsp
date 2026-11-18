@@ -11,15 +11,6 @@
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${templateTitle}" /></h1></div>
 <div class="accounting-workspace accounting-create-workspace">
     <dl class="accounting-context accounting-form"><div><dt><spring:message code="library.transaction" /></dt><dd><c:out value="${transaction.code}" /> · <c:out value="${pageContext.response.locale.language=='sw' and not empty transaction.nameSw?transaction.nameSw:transaction.name}" /></dd></div><div><dt><spring:message code="library.sourceEvent" /></dt><dd><spring:message code="library.event.${transaction.sourceEvent}" /></dd></div></dl>
-    <p><spring:message code="library.templateHelp" /></p>
-    <details class="coa-parent-picker"><summary><spring:message code="library.findAccounts" /></summary>
-        <section data-resource-table="accounting-library-template-form-1" class="erp-table-wrap" data-aws-table-region>
-            <form method="get" class="erp-table-toolbar coa-filters" action="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><label class="erp-table-toolbar__search"><spring:message code="coa.search" /><input class="aws-control" name="accountSearch" value="<c:out value='${accountSearch}' />" maxlength="100" /></label><button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button></form>
-            <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="library-account-codes"><table data-table-sort-mode="none" data-table-sort-reason="picker" class="erp-table"><thead><tr><th><spring:message code="accounting.code" /></th><th><spring:message code="accounting.name" /></th><th><spring:message code="accounting.kind" /></th></tr></thead><tbody><c:forEach items="${accountChoices.rows}" var="a"><tr><td><c:out value="${a.code}" /></td><td><c:out value="${pageContext.response.locale.language=='sw' and not empty a.nameSw?a.nameSw:a.name}" /></td><td><spring:message code="accounting.option.${a.kind}" /></td></tr></c:forEach><c:if test="${empty accountChoices.rows}"><tr><td colspan="3"><spring:message code="coa.empty" /></td></tr></c:if></tbody></table></div>
-            <div data-table-pagination data-page="${accountChoices.page}" data-table-for="accounting-library-template-form-1" class="erp-table-footer accounting-actions"><c:if test="${accountChoices.page>0}"><c:url value="/finance/library/transactions/${transaction.id}/template" var="previous"><c:param name="accountPage" value="${accountChoices.page-1}" /><c:param name="accountSearch" value="${accountSearch}" /></c:url><a data-page-direction="previous" class="app-btn btn-neutral" href="<c:out value='${previous}' />"><spring:message code="common.previous" /></a></c:if><span><spring:message code="coa.page" arguments="${accountChoices.page+1}" /></span><c:if test="${accountChoices.hasNext}"><c:url value="/finance/library/transactions/${transaction.id}/template" var="next"><c:param name="accountPage" value="${accountChoices.page+1}" /><c:param name="accountSearch" value="${accountSearch}" /></c:url><a data-page-direction="next" class="app-btn btn-neutral" href="<c:out value='${next}' />"><spring:message code="common.next" /></a></c:if></div>
-        </section>
-    </details>
-    <datalist id="library-account-codes"><c:forEach items="${accountChoices.rows}" var="a"><option value="<c:out value='${a.code}' />"><c:out value="${a.name}" /></option></c:forEach></datalist>
     <section class="accounting-form accounting-create-card"><h2><spring:message code="library.involvedAccounts" /></h2>
         <c:url value="/finance/library/transactions/${transaction.id}/template" var="saveUrl" />
         <form:form method="post" modelAttribute="templateForm" action="${saveUrl}" id="library-template-form" cssClass="accounting-create-form">
@@ -28,11 +19,11 @@
             <c:url value="/finance/library/lookup/accounts" var="accountLookupUrl" />
             <c:set var="ruleForms" value="${templateForm.rules}" /><c:set var="rulePrefix" value="" />
             <%@ include file="library-rule-fields.jspf" %>
-            <p class="library-lookup-status" role="status" data-lookup-failure="<spring:message code='library.lookupUnavailable' />"></p>
             <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/library/transactions/${transaction.id}' />"><spring:message code="common.cancel" /></a><button class="app-btn btn-launch" ${not transaction.active?'disabled':''}><spring:message code="library.saveTemplate" /></button></div>
         </form:form>
     </section>
 </div>
+<script src="<c:url value='/js/voucher-selects.js' />" defer></script>
 <script src="<c:url value='/js/accounting-library.js' />" defer></script>
 <%@ include file="accounting-form-support.jspf" %>
 <%@ include file="../fragments/footer.jspf" %>

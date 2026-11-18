@@ -104,3 +104,40 @@ test('configured receipt types filter transactions, reset old mappings and prese
   await open(type);options().find(o=>o.textContent==='Manual accounts').click();assert.equal(d.querySelector('[name=activityId]').value,'');assert.equal(d.querySelector('[data-manual-accounts]').hidden,false);assert.equal(submits,0);
  }finally{dom.window.close();}
 });
+
+test('ordinary split controls keep sides, account choices and amounts when adding and removing entries',async()=>{
+ const {dom,w,d}=await setup(false,()=>response([{id:'cash',code:'111001',name:'Cash',purpose:'CASH'}]));
+ try{
+  const form=d.querySelector('form'),row=d.querySelector('[data-voucher-row]');Object.assign(form.dataset,{kind:'RECEIPT',debitLabel:'Debit',creditLabel:'Credit',amountLabel:'Amount (TZS)',chooseAccount:'Choose',removeEntry:'Remove entry'});
+  row.querySelector('[data-manual-accounts]').dataset.pairAccounts='';
+  row.insertAdjacentHTML('beforeend','<div data-manual-accounts><div data-split-list></div><button type="button" data-add-entry="DEBIT">Add debit</button><button type="button" data-add-entry="CREDIT">Add credit</button></div>');
+  form.elements.moneyAccountId.value='cash';form.elements['rows[0].creditAccountId'].value='capital';form.elements['rows[0].amount'].value='100.00';
+  row.querySelector('[data-add-entry="DEBIT"]').click();
+  assert.equal(row.querySelectorAll('[data-split-entry]').length,3);assert.equal(form.elements.namedItem('rows[0].debitAccountId'),null);assert.equal(form.elements['rows[0].creditAccountId'].value,'');
+  assert.equal(form.elements['rows[0].entries[0].side'].value,'DEBIT');assert.equal(form.elements['rows[0].entries[0].accountId'].value,'cash');
+  assert.equal(form.elements['rows[0].entries[1].accountId'].value,'capital');assert.equal(form.elements['rows[0].entries[1].amount'].readOnly,true);
+  assert.equal(form.elements['rows[0].entries[2].amount'].readOnly,false);assert.equal(row.querySelectorAll('[data-entry-account]')[2].dataset.purpose,'MONEY');
+  row.querySelector('[data-add-entry="CREDIT"]').click();assert.equal(row.querySelectorAll('[data-split-entry]').length,4);
+  row.querySelectorAll('[data-remove-entry]')[2].click();assert.equal(row.querySelectorAll('[data-split-entry]').length,3);
+  assert.equal(form.elements['rows[0].entries[2].side'].value,'CREDIT');assert.equal(form.elements['rows[0].entries[0].amount'].readOnly,true);
+  form.elements['rows[0].amount'].value='120.00';form.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(form.elements['rows[0].entries[0].amount'].value,'120.00');
+ }finally{dom.window.close();}
+});
+test('cash account dropdown sends the purpose filter to the server before paging',async()=>{
+ const {dom,d,calls,open}=await setup(false,()=>response([{id:'cash',code:'111001',name:'Cash',purpose:'CASH'}]));
+ try{await open(d.querySelector('[data-money-only]'));const url=new URL(calls.find(url=>url.includes('/accounts')));assert.equal(url.searchParams.get('purpose'),'MONEY');assert.equal(url.searchParams.get('page'),'0');}finally{dom.window.close();}
+});
+
+test('approval totals count transactions once when debit and credit entry amounts are present',async()=>{
+ const {dom,w,d}=await setup(true);
+ try{
+  const form=d.querySelector('form'),row=d.querySelector('[data-editor-line]');row.insertAdjacentHTML('beforeend','<td><input name="rows[0].entries[0].amount" value="0.60"><input name="rows[0].entries[1].amount" value="0.40"><input name="rows[0].entries[2].amount" value="1.00"></td>');
+  form.insertAdjacentHTML('beforeend','<output data-editor-total></output>');form.dispatchEvent(new w.Event('input',{bubbles:true}));
+  assert.equal(d.querySelector('[data-editor-total]').textContent,'1.00');
+ }finally{dom.window.close();}
+});
+
+test('cash-family Other-purpose choices remain selectable without changing their purpose',async()=>{
+ const {dom,d,open,options}=await setup(false,()=>response([{id:'family-bank',code:'111001',name:'Family bank',purpose:'OTHER',moneyEligible:true}]));
+ try{await open(d.querySelector('[data-money-only]'));const option=options().find(o=>o.textContent.includes('Family bank'));assert.ok(option);option.click();assert.equal(d.querySelector('[name=moneyAccountId]').value,'family-bank');}finally{dom.window.close();}
+});

@@ -37,4 +37,18 @@ class VoucherValidationTest {
   assertThat(gate.canonical(f,f.getRequestKey()).getActivityId()).isEqualTo(f.getActivityId());
   assertThat(mapper.writeValueAsString(f)).contains(f.getActivityId().toString());
  }
+ @Test void splitEntryAmountsSidesAndBoundsAreValidatedBeforePlanning(){
+  var f=form();var r=f.getRows().getFirst();var debit=new EntryForm();debit.setSide("DEBIT");debit.setAmount(new BigDecimal("1.01"));var credit=new EntryForm();credit.setSide("CREDIT");credit.setAmount(new BigDecimal("1.01"));r.setEntries(List.of(debit,credit));
+  assertThatCode(()->VoucherService.validate(f,Type.JOURNAL,today)).doesNotThrowAnyException();
+  debit.setSide(null);assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.entries");debit.setSide("DEBIT");
+  debit.setAmount(new BigDecimal("0.001"));assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.amount");debit.setAmount(new BigDecimal("1.01"));
+  r.setEntries(Collections.nCopies(51,debit));assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.entries");
+  r.setEntries(List.of(debit,credit));r.setTransactionId(UUID.randomUUID());assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.template");
+ }
+ @Test void legacyFormSerializationOmitsEmptyEntriesAndSplitSnapshotsCopyEntries(){
+  var mapper=tools.jackson.databind.json.JsonMapper.builder().findAndAddModules().build();var f=form();assertThat(mapper.writeValueAsString(f)).doesNotContain("entries");
+  var e=new EntryForm();e.setSide("DEBIT");e.setAccountId(UUID.randomUUID());e.setAmount(new BigDecimal("1.01"));f.getRows().getFirst().setEntries(List.of(e));
+  var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(null,null);var copy=gate.canonical(f,f.getRequestKey());
+  e.setAmount(BigDecimal.TEN);assertThat(copy.getRows().getFirst().getEntries().getFirst().getAmount()).isEqualByComparingTo("1.01");
+ }
 }

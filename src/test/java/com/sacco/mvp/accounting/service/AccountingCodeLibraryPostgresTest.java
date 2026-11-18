@@ -86,23 +86,34 @@ class AccountingCodeLibraryPostgresTest {
         assertThat(jdbc.queryForObject("select account_id from gl_transaction_template_line where transaction_id=? and side='CREDIT'",UUID.class,upgradeTransaction)).isEqualTo(upgradeExpense);
     }
     @Test void transactionOnboardingSavesAccountsAtomicallyAndRollsBackOnFailure() {
-        service.createActivity(actor,code("OPS",null));
-        var form=onboarding("OPS","PAY","EXPENSE","CASH");UUID id=service.onboardTransaction(actor,form);
+        var parent=code("OPS",null);service.createActivity(actor,parent);
+        var form=onboarding(parent.getCode(),"PAY","EXPENSE","CASH");UUID id=service.onboardTransaction(actor,form);
         assertThat(service.transaction(actor,id).hasTemplate()).isTrue();assertThat(service.template(actor,id).rules().getFirst().debitCode()).isEqualTo("EXPENSE");
-        assertThatThrownBy(()->service.onboardTransaction(actor,onboarding("OPS","FAILED","UNKNOWN","CASH"))).hasMessage("library.error.templateAccount");
+        assertThatThrownBy(()->service.onboardTransaction(actor,onboarding(parent.getCode(),"FAILED","UNKNOWN","CASH"))).hasMessage("library.error.templateAccount");
         assertThat(service.transactionRegister(actor,null,"FAILED","",0).rows()).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from gl_transaction_template where sacco_id=?",Integer.class,institution)).isEqualTo(1);
         assertThatThrownBy(()->service.onboardTransaction(actor,onboarding("FOREIGN","FOREIGN-PAY","EXPENSE","CASH"))).hasMessage("library.error.activityCode");
-        assertThatThrownBy(()->service.onboardTransaction(actor,form)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        assertThat(service.onboardTransaction(actor,form)).isEqualTo(id);
         assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isZero();
+    }
+    @Test void generatedCodesAreTenantScopedConcurrentAndBindRetriesToTheOriginalInput()throws Exception{
+        var first=code("IGNORED",null);UUID activity=service.createActivity(actor,first);assertThat(first.getCode()).isEqualTo("ACT-000001");
+        assertThat(service.createActivity(actor,first)).isEqualTo(activity);first.setName("Changed");assertThatThrownBy(()->service.createActivity(actor,first)).hasMessage("library.error.changedRetry");
+        var transaction=code("IGNORED",activity);UUID saved=service.createTransaction(actor,transaction);assertThat(transaction.getCode()).isEqualTo("TXN-000001");assertThat(service.createTransaction(actor,transaction)).isEqualTo(saved);
+        var form=code("Concurrent",null);try(var pool=Executors.newFixedThreadPool(2)){
+            var a=pool.submit(()->service.createActivity(actor,form));var b=pool.submit(()->service.createActivity(actor,form));assertThat(a.get(30,TimeUnit.SECONDS)).isEqualTo(b.get(30,TimeUnit.SECONDS));
+        }
+        assertThat(jdbc.queryForObject("select count(*) from gl_activity where sacco_id=? and creation_key=?",Integer.class,institution,form.getRequestKey())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select last_number from gl_library_code_counter where sacco_id=? and kind='ACTIVITY'",Long.class,institution)).isEqualTo(2);
     }
     @Test void transactionRegisterStaysScopedAndBoundedAcrossActivities() {
         UUID first=service.createActivity(actor,code("OPS",null)),second=service.createActivity(actor,code("BANK",null));
         for(int n=0;n<30;n++) {var form=code("PAY"+n,n%2==0?first:second);form.setSourceEvent(n%2==0?"MANUAL_JOURNAL":"EXPENSE");service.createTransaction(actor,form);}
         var page=service.transactionRegister(actor,null,"PAY","",0);assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
-        assertThat(service.transactionRegister(actor,null,"PAY","",1).rows()).hasSize(5);
+        assertThat(java.util.stream.Stream.concat(page.rows().stream(),service.transactionRegister(actor,null,"PAY","",1).rows().stream()).filter(c->!c.systemManaged()).toList()).hasSize(30);
         assertThat(service.transactionRegister(actor,first,"","",0).rows()).hasSize(15).allMatch(c->c.activityId().equals(first));
-        assertThat(service.transactionRegister(actor,null,"","ACTIVE","EXPENSE",0).rows()).hasSize(15).allMatch(c->c.sourceEvent().equals("EXPENSE"));
+        assertThat(service.transactionRegister(actor,null,"","ACTIVE","EXPENSE",0).rows()).isEmpty();
+        assertThat(service.transactionRegister(actor,null,"","ACTIVE","MANUAL_JOURNAL",0).rows()).hasSize(25).allMatch(c->c.sourceEvent().equals("MANUAL_JOURNAL"));
         assertThat(service.transactionRegister(actor,first,"","ACTIVE","EXPENSE",0).rows()).isEmpty();
         assertThatThrownBy(()->service.transactionRegister(actor,null,"","","UNKNOWN",0)).hasMessage("library.error.sourceEvent");
         assertThatThrownBy(()->service.transactionRegister(actor,UUID.randomUUID(),"","",0)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
@@ -132,7 +143,8 @@ class AccountingCodeLibraryPostgresTest {
         assertThatThrownBy(()->service.saveTemplate(actor,transaction,template(null,"EXPENSE","CASH"))).hasMessage("library.error.templateAccount");
         ledger.reactivateAccount(actor,expense);
         var specialized=code("REPAY",activity);specialized.setSourceEvent("REPAYMENT");UUID repay=service.createTransaction(actor,specialized);
-        var parts=template(null,"PRINCIPAL","CASH");parts.getRules().getFirst().setComponent("PRINCIPAL");service.saveTemplate(actor,repay,parts);
+        var parts=template(null,"PRINCIPAL","CASH");parts.getRules().getFirst().setComponent("PRINCIPAL");assertThatThrownBy(()->service.saveTemplate(actor,repay,parts)).hasMessage("library.error.components");
+        assertThat(service.transaction(actor,repay).sourceEvent()).isEqualTo("MANUAL_JOURNAL");
     }
     @Test void scopesAllRecordsAndChecksCurrentClaims() {
         UUID activity=service.createActivity(actor,code("PRIVATE",null)),transaction=service.createTransaction(actor,code("PRIVATE-PAY",activity));
@@ -163,8 +175,8 @@ class AccountingCodeLibraryPostgresTest {
         doThrow(new IllegalStateException("Audit failed")).when(audit).logEvent(anyString(),any(),anyString(),any(),any(),anyString(),anyString(),anyString(),anyString(),anyString(),anyMap());
         assertThatThrownBy(()->service.saveTemplate(actor,transaction,template(null,"EXPENSE","CASH"))).isInstanceOf(IllegalStateException.class);
         assertThat(service.transaction(actor,transaction).hasTemplate()).isFalse();assertThat(service.template(actor,transaction)).isNull();reset(audit);
-        assertThatThrownBy(()->service.createActivity(actor,code("ops",null))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
-        assertThatThrownBy(()->service.createTransaction(actor,code("PAY",activity))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        var duplicate=code("ops",null);UUID another=service.createActivity(actor,duplicate);assertThat(another).isNotEqualTo(activity);assertThat(duplicate.getCode()).matches("ACT-[0-9]{6}");
+        var next=code("PAY",activity);UUID nextId=service.createTransaction(actor,next);assertThat(nextId).isNotEqualTo(transaction);assertThat(next.getCode()).matches("TXN-[0-9]{6}");
     }
     @Test void concurrentRetriesSaveOnceAndStaleWritesCannotReplaceConfiguration() throws Exception {
         UUID activity=service.createActivity(actor,code("OPS",null)),transaction=service.createTransaction(actor,code("PAY",activity));

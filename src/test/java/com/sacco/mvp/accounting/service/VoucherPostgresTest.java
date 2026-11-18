@@ -89,6 +89,100 @@ class VoucherPostgresTest {
   when(claims.effectiveClaims(anyMap())).thenAnswer(inv->{Map<UUID,UserClaimService.ClaimSubject> subjects=inv.getArgument(0);var out=new HashMap<UUID,Set<UserClaim>>();subjects.forEach((id,subject)->out.put(id,claims.effectiveClaims(id,subject.staffRoles(),subject.memberAccess())));return out;});
   actor=operator("B1");cash=account("CASH","ASSET","DEBIT","POSTING","CASH");capital=account("CAPITAL","EQUITY","CREDIT","POSTING","CAPITAL");expense=account("EXPENSE","EXPENSE","DEBIT","POSTING","OTHER");control=account("LOAN","ASSET","DEBIT","POSTING","LOAN_PRINCIPAL");
  }
+ @Test void splitJournalPostsOnceReversesEveryEntryAndKeepsEvidenceImmutable(){
+  var f=split(Type.JOURNAL);var v=service.post(actor,Type.JOURNAL,f);
+  assertThat(v.total()).isEqualByComparingTo("100.00");assertThat(v.transactionCount()).isEqualTo(1);
+  assertThat(v.transactions().getFirst().postings()).hasSize(3);
+  assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(v.id());
+  assertThat(jdbc.queryForObject("select count(*) from gl_journal_line where journal_id=?",Integer.class,v.journalId())).isEqualTo(3);
+  UUID transaction=v.transactions().getFirst().id();
+  assertThatThrownBy(()->jdbc.update("update accounting_voucher_entry set amount=1 where transaction_id=?",transaction)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+  assertThatThrownBy(()->jdbc.update("delete from accounting_voucher_entry where transaction_id=?",transaction)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+  assertThatThrownBy(()->jdbc.update("insert into accounting_voucher_entry select transaction_id,sacco_id,station_id,4,'CREDIT',?, 'X','X',1 from accounting_voucher_entry where transaction_id=? limit 1",control,transaction)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+  var reversed=service.reverse(operator("B1"),Type.JOURNAL,v.id(),UUID.randomUUID(),day,"Wrong entry");
+  assertThat(reversed.transactions().getFirst().postings()).containsExactlyElementsOf(v.transactions().getFirst().postings().stream().map(Entry::reversed).toList());
+  assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,v.journalId(),reversed.journalId())).isEqualByComparingTo("0");
+ }
+ @Test void receiptsAndPaymentsCanSplitBothSidesAndProtectEveryMoneyReference(){
+  UUID bank=account("BANK","ASSET","DEBIT","POSTING","BANK"),other=account("OTHER_EXPENSE","EXPENSE","DEBIT","POSTING","OTHER");
+  for(var type:List.of(Type.RECEIPT,Type.PAYMENT)){
+   var f=split(type);var row=f.getRows().getFirst();
+   row.setEntries(type==Type.RECEIPT?List.of(entry("DEBIT",cash,"60"),entry("DEBIT",bank,"40"),entry("CREDIT",capital,"100")):
+    List.of(entry("DEBIT",expense,"30"),entry("DEBIT",other,"70"),entry("CREDIT",cash,"60"),entry("CREDIT",bank,"40")));
+   var v=service.post(actor,type,f);assertThat(v.total()).isEqualByComparingTo("100");
+   assertThat(jdbc.queryForObject("select count(*) from accounting_voucher_money_reference where voucher_id=?",Integer.class,v.id())).isEqualTo(2);
+   var collision=form(type);collision.setMoneyAccountId(bank);collision.setReference(f.getReference());
+   assertThatThrownBy(()->service.post(actor,type,collision)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+   var reverse=service.reverse(operator("B1"),type,v.id(),UUID.randomUUID(),day,"Wrong split");
+   assertThat(reverse.transactions().getFirst().postings()).hasSize(row.getEntries().size());
+  }
+ }
+ @Test void splitValidationRejectsUnbalancedProtectedInactiveAndWrongDirectionAccounts(){
+  var unbalanced=split(Type.JOURNAL);unbalanced.getRows().getFirst().getEntries().getFirst().setAmount(new BigDecimal("99"));
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,unbalanced)).hasMessage("voucher.error.balance");
+  var f=split(Type.JOURNAL);var protectedForm=f;f.getRows().getFirst().getEntries().getFirst().setAccountId(control);
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,protectedForm)).hasMessage("voucher.error.account");
+  var wrong=split(Type.RECEIPT);wrong.getRows().getFirst().getEntries().getFirst().setAccountId(expense);
+  assertThatThrownBy(()->service.preview(actor,Type.RECEIPT,wrong)).hasMessage("voucher.error.moneyAccount");
+  var inactive=split(Type.JOURNAL);UUID inactiveId=UUID.randomUUID();
+  jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,maker_id,created_at,active) values(?,?, 'INACTIVE','Inactive','EXPENSE','DEBIT','POSTING','OTHER',?,?,false)",inactiveId,institution,actor.getMemberId(),now);
+  inactive.getRows().getFirst().getEntries().getFirst().setAccountId(inactiveId);
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,inactive)).hasMessage("voucher.error.account");
+ }
+ @Test void splitApprovalFreezesEveryAccountAndAmount(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));
+  var form=split(Type.JOURNAL);UUID id=workflows.capture(actor,Type.JOURNAL,form);
+  var saved=workflows.details(actor,id).items().getFirst().form();assertThat(saved.getRows().getFirst().getEntries()).hasSize(3);
+  assertThat(service.reviewAccounts(actor,Type.JOURNAL,saved)).containsKey("rows[0].entries[0].accountId");
+  command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
+  assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
+ }
+ @Test void databaseRejectsPerTransactionImbalanceEvenWhenTheWholeJournalBalances(){
+  var f=form(Type.JOURNAL);var repository=new VoucherRepository(jdbc);
+  assertThatThrownBy(()->tx.executeWithoutResult(status->{
+   UUID period=repository.period(institution,day,actor.getMemberId(),now);
+   var debit=new Account(expense,"EXPENSE","Synthetic EXPENSE","OTHER");var credit=new Account(capital,"CAPITAL","Synthetic CAPITAL","CAPITAL");
+   var first=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","First",new BigDecimal("100"),null,null,List.of(new Entry("DEBIT",debit,new BigDecimal("100")),new Entry("CREDIT",credit,new BigDecimal("90"))));
+   var second=new Transaction(UUID.randomUUID(),2,null,null,"","TOTAL","Second",new BigDecimal("100"),null,null,List.of(new Entry("DEBIT",debit,new BigDecimal("90")),new Entry("CREDIT",credit,new BigDecimal("100"))));
+   var v=new Voucher(UUID.randomUUID(),"QA-"+UUID.randomUUID(),Type.JOURNAL,day,"","REF","","",null,new BigDecimal("200"),2,UUID.randomUUID(),actor.getMemberId(),"",now,null,null,"","",List.of(first,second));
+   repository.insert(v,institution,"B1",f,"0".repeat(64),period,null);
+  })).hasStackTraceContaining("Each voucher transaction must balance");
+ }
+ @Test void concurrentSplitRetriesCreateOneVoucher()throws Exception{
+  var f=split(Type.JOURNAL);var executor=Executors.newFixedThreadPool(2);
+  try{var first=executor.submit(()->service.post(actor,Type.JOURNAL,f));var second=executor.submit(()->service.post(actor,Type.JOURNAL,f));assertThat(first.get(30,TimeUnit.SECONDS).id()).isEqualTo(second.get(30,TimeUnit.SECONDS).id());}
+  finally{executor.shutdownNow();}
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=? and request_key=?",Integer.class,institution,f.getRequestKey())).isEqualTo(1);
+ }
+ @Test void cashFamilyAccountsWithOtherPurposeWorkWithoutReclassification(){
+  var clock=mock(ApplicationClock.class);when(clock.now()).thenReturn(now);when(clock.today()).thenReturn(day);
+  var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
+  tx.executeWithoutResult(status->ledger.initializeChart(actor));
+  UUID group=jdbc.queryForObject("select id from gl_cash_bank_group where sacco_id=?",UUID.class,institution),money=UUID.randomUUID();
+  jdbc.update("insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at) values(?,?,'111001','Branch bank','ASSET','DEBIT','POSTING','OTHER',?,?,?)",money,institution,group,actor.getMemberId(),now);
+  UUID version=jdbc.queryForObject("select current_version_id from gl_account where id=?",UUID.class,money);
+  assertThat(service.accounts(actor,Type.PAYMENT,"",0,"MONEY")).anyMatch(a->a.id().equals(money) && a.moneyEligible() && a.purpose().equals("OTHER"));
+  assertThat(service.accounts(actor,Type.PAYMENT,"",0,"OTHER")).noneMatch(a->a.id().equals(money));
+  for(var type:List.of(Type.RECEIPT,Type.PAYMENT)){
+   var pair=form(type);pair.setMoneyAccountId(money);assertThat(service.post(actor,type,pair).moneyAccountId()).isEqualTo(money);
+   var split=split(type);split.setMoneyAccountId(money);split.getRows().getFirst().getEntries().stream().filter(e->e.getAccountId().equals(cash)).forEach(e->e.setAccountId(money));
+   assertThat(service.post(actor,type,split).transactions().getFirst().postings()).anyMatch(e->e.account().id().equals(money));
+  }
+  assertThat(jdbc.queryForMap("select purpose,current_version_id from gl_account where id=?",money)).containsEntry("purpose","OTHER").containsEntry("current_version_id",version);
+ }
+ @Test void moneyLookupFiltersBeforePagingAndStillRejectsInvalidPurposes(){
+  for(int n=0;n<30;n++)account("A"+n,"EXPENSE","DEBIT","POSTING","OTHER");
+  assertThat(service.accounts(actor,Type.PAYMENT,"",0,"MONEY")).extracting(Account::id).contains(cash);
+  assertThat(service.accounts(actor,Type.PAYMENT,"",0,"MONEY")).allMatch(a->a.purpose().equals("CASH"));
+  assertThatThrownBy(()->service.accounts(actor,Type.PAYMENT,"",0,"SQL")).hasMessage("voucher.error.filter");
+ }
+ Form split(Type type){
+  var f=form(type);var r=new RowForm();r.setDescription("Split transaction");r.setAmount(new BigDecimal("100.00"));
+  UUID second=account("SPLIT_"+UUID.randomUUID().toString().substring(0,8),"EQUITY","CREDIT","POSTING","CAPITAL");
+  r.setEntries(List.of(entry("DEBIT",type==Type.RECEIPT?cash:expense,"100.00"),entry("CREDIT",type==Type.PAYMENT?cash:capital,"60.00"),entry("CREDIT",type==Type.PAYMENT?account("BANK_"+UUID.randomUUID().toString().substring(0,8),"ASSET","DEBIT","POSTING","BANK"):second,"40.00")));
+  f.setRows(List.of(r));return f;
+ }
+ EntryForm entry(String side,UUID account,String amount){var e=new EntryForm();e.setSide(side);e.setAccountId(account);e.setAmount(new BigDecimal(amount));return e;}
  @Test void postsMultipleRowsDirectlyWithExactTotalsAndImmutableBalancedJournal(){
   var f=form(Type.RECEIPT);var v=service.post(actor,Type.RECEIPT,f);
   assertThat(v.total()).isEqualByComparingTo("30.03");assertThat(v.transactions()).hasSize(2);
@@ -220,7 +314,7 @@ class VoucherPostgresTest {
   tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   // Searches must match the visible component and both account codes/names, without broadening scope.
   var lookup=new VoucherRepository(jdbc);
-  for(String query:List.of("receive","operating income","total","cash","synthetic capital"))
+  for(String query:List.of(transactionForm.getCode().toLowerCase(Locale.ROOT),"operating income","total","cash","synthetic capital"))
    assertThat(lookup.mappings(institution,query,0)).singleElement().satisfies(m->assertThat(m.transactionId()).isEqualTo(transaction));
   assertThat(lookup.mappings("OTHER-INSTITUTION","total",0)).isEmpty();
   assertThat(lookup.mappings(institution,"no-match",0)).isEmpty();
@@ -249,8 +343,8 @@ class VoucherPostgresTest {
   assertThat(service.post(actor,Type.RECEIPT,f).id()).isEqualTo(v.id());
   f.setRequestKey(UUID.randomUUID());f.setReference("New reference");assertThatThrownBy(()->service.post(actor,Type.RECEIPT,f)).hasMessage("voucher.error.staleTemplate");
   template.setExpectedRequestKey(library.template(actor,transaction).requestKey());template.setRequestKey(UUID.randomUUID());rule.setComponent("INTEREST");
-  tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
-  assertThat(lookup.mappings(institution,"interest",0)).singleElement().satisfies(m->assertThat(m.component()).isEqualTo("INTEREST"));
+  assertThatThrownBy(()->tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template))).hasMessage("library.error.components");
+  assertThat(lookup.mappings(institution,"interest",0)).isEmpty();
  }
  @Test void loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly(){
   var accounts=new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc);

@@ -48,7 +48,7 @@
     function messages(scope) {
         const candidates=[...(scope.matches?.(messageSelector)?[scope]:[]),...scope.querySelectorAll(messageSelector)];
         candidates.forEach(message=>{
-            if(message.matches('.sr-only,.erp-field-error,.field-error,.app-loading-spinner,.kyc-contact-result,.library-lookup-status,.voucher-number-output,[data-resource-status],[data-choice-error],[data-save-status],[data-batch-progress],[data-code-status],[data-work-status]')
+            if(message.matches('.sr-only,.erp-field-error,.field-error,.app-loading-spinner,.kyc-contact-result,.voucher-number-output,[data-resource-status],[data-choice-error],[data-save-status],[data-batch-progress],[data-code-status],[data-work-status]')
                 || message.closest('.sr-only,[role="progressbar"]') || message.querySelector('[data-resource-status]'))return;
             if(message.matches('.dashboard-data-status') && message.getAttribute('role')!=='alert')return;
             if(!message.textContent.trim())return;

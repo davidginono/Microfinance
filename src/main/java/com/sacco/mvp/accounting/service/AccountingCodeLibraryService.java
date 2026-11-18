@@ -56,7 +56,10 @@ public class AccountingCodeLibraryService {
     }
     @Transactional
     public UUID createActivity(AppUserPrincipal actor,CodeForm form) {
-        authorize(actor,"CREATE");validateCode(form);UUID id=library.createActivity(actor.getSaccoId(),form,actor.getMemberId(),clock.now());
+        authorize(actor,"CREATE");prepareCreation(form);String hash=creationHash(form);
+        library.lockCreation(actor.getSaccoId(),"ACTIVITY",form.getRequestKey());var prior=library.creation(actor.getSaccoId(),false,form.getRequestKey());
+        if(prior.isPresent()){require(prior.get().actor().equals(actor.getMemberId()) && prior.get().hash().equals(hash),"changedRetry");form.setCode(prior.get().code());return prior.get().id();}
+        form.setCode(library.nextCode(actor.getSaccoId(),false));UUID id=library.createActivity(actor.getSaccoId(),form,actor.getMemberId(),clock.now(),hash);
         event(actor,id,"ACTIVITY_CREATED");return id;
     }
     @Transactional
@@ -86,7 +89,9 @@ public class AccountingCodeLibraryService {
     @Transactional
     public UUID onboardTransaction(AppUserPrincipal actor,TransactionForm form) {
         authorize(actor,"CREATE");authorize(actor,"UPDATE");
-        require(form!=null && form.getTemplate()!=null,"validation");validateCode(form);validateTemplate(form.getTemplate());
+        require(form!=null && form.getTemplate()!=null,"validation");
+        form.setSourceEvent("MANUAL_JOURNAL");require(form.getTemplate().getRules()!=null && form.getTemplate().getRules().size()==1,"rules");
+        form.getTemplate().getRules().getFirst().setComponent("TOTAL");prepareCreation(form);validateTemplate(form.getTemplate());
         require(form.getTemplate().getExpectedRequestKey()==null,"staleTemplate");
         form.setActivityCode(clean(form.getActivityCode()).toUpperCase(Locale.ROOT));
         var parent=library.activityByCode(actor.getSaccoId(),form.getActivityCode()).orElseThrow(()->new IllegalArgumentException("library.error.activityCode"));
@@ -100,9 +105,11 @@ public class AccountingCodeLibraryService {
     }
     @Transactional
     public UUID createTransaction(AppUserPrincipal actor,CodeForm form) {
-        authorize(actor,"CREATE");validateCode(form);var parent=activity(actor,form.getActivityId(),true);require(!parent.systemManaged(),"systemManaged");require(parent.active(),"inactiveActivity");
+        authorize(actor,"CREATE");form.setSourceEvent("MANUAL_JOURNAL");prepareCreation(form);var parent=activity(actor,form.getActivityId(),true);require(!parent.systemManaged(),"systemManaged");require(parent.active(),"inactiveActivity");
         require(Arrays.stream(AccountingEvent.values()).anyMatch(e->e.name().equals(form.getSourceEvent())),"sourceEvent");
-        UUID id=library.createTransaction(actor.getSaccoId(),form,actor.getMemberId(),clock.now());event(actor,id,"TRANSACTION_CODE_CREATED");return id;
+        String hash=creationHash(form);library.lockCreation(actor.getSaccoId(),"TRANSACTION",form.getRequestKey());var prior=library.creation(actor.getSaccoId(),true,form.getRequestKey());
+        if(prior.isPresent()){require(prior.get().actor().equals(actor.getMemberId()) && prior.get().hash().equals(hash),"changedRetry");form.setCode(prior.get().code());return prior.get().id();}
+        form.setCode(library.nextCode(actor.getSaccoId(),true));UUID id=library.createTransaction(actor.getSaccoId(),form,actor.getMemberId(),clock.now(),hash);event(actor,id,"TRANSACTION_CODE_CREATED");return id;
     }
     @Transactional
     public void activityState(AppUserPrincipal actor,UUID id,boolean active) {
@@ -121,6 +128,10 @@ public class AccountingCodeLibraryService {
         authorize(actor,"VIEW");validateQuery(search,"",page);return slice(library.accounts(actor.getSaccoId(),term(search),page*25),page);
     }
     @Transactional(readOnly=true)
+    public List<Activity> activityLookup(AppUserPrincipal actor,String search,int page){authorize(actor,"VIEW");validateQuery(search,"",page);return library.activities(actor.getSaccoId(),term(search),"ACTIVE",page*25);}
+    @Transactional(readOnly=true)
+    public List<AccountChoice> accountLookup(AppUserPrincipal actor,String search,int page){authorize(actor,"VIEW");validateQuery(search,"",page);return library.accounts(actor.getSaccoId(),term(search),page*25);}
+    @Transactional(readOnly=true)
     public Template template(AppUserPrincipal actor,UUID transaction) {
         authorize(actor,"VIEW");transaction(actor,transaction,false);
         return library.template(actor.getSaccoId(),transaction)
@@ -133,10 +144,13 @@ public class AccountingCodeLibraryService {
         String hash=hash(form);var prior=library.request(actor.getSaccoId(),id,form.getRequestKey());
         if(prior.isPresent()) {require(prior.get().actor().equals(actor.getMemberId()) && prior.get().hash().equals(hash),"changedRetry");return id;}
         require(parent.active() && code.active(),"inactiveTransaction");var current=library.template(actor.getSaccoId(),id);
+        var oldComponents=current.map(t->library.rules(actor.getSaccoId(),id).stream().map(Rule::component).collect(java.util.stream.Collectors.toSet())).orElse(Set.of("TOTAL"));
+        if(oldComponents.equals(Set.of("TOTAL")))require(form.getRules().size()==1 && "TOTAL".equals(form.getRules().getFirst().getComponent()),"components");
+        else require(form.getRules().stream().map(RuleForm::getComponent).collect(java.util.stream.Collectors.toSet()).equals(oldComponents),"components");
         require(Objects.equals(form.getExpectedRequestKey(),current.map(Template::requestKey).orElse(null)),"staleTemplate");
         var accountCodes=form.getRules().stream().flatMap(r->java.util.stream.Stream.of(r.getDebitCode(),r.getCreditCode())).distinct().sorted().toList();
         var accounts=library.lockAccounts(actor.getSaccoId(),accountCodes);
-        require(accounts.size()==accountCodes.size() && accounts.stream().allMatch(a->a.active() && !"HEADING".equals(a.kind())),"templateAccount");
+        require(accounts.size()==accountCodes.size() && accounts.stream().allMatch(a->a.active() && "POSTING".equals(a.kind())),"templateAccount");
         require(!"MANUAL_JOURNAL".equals(code.sourceEvent()) || accounts.stream().noneMatch(AccountingCodeLibraryRepository.TemplateAccount::loanOwned),"manualControl");
         library.saveTemplate(actor.getSaccoId(),code,form,hash,accounts,actor.getMemberId());event(actor,id,"TEMPLATE_SAVED");return id;
     }
@@ -148,6 +162,12 @@ public class AccountingCodeLibraryService {
     private static String term(String value) {return value.strip().toLowerCase(Locale.ROOT);}
     private static void validateQuery(String search,String state,int page) {
         require(search!=null && search.length()<=100 && state!=null && Set.of("","ACTIVE","INACTIVE").contains(state) && page>=0 && page<=10000,"query");
+    }
+    private static void prepareCreation(CodeForm form){require(form!=null && form.getRequestKey()!=null,"validation");form.setSourceEvent("MANUAL_JOURNAL");form.setCode("AUTO");validateCode(form);}
+    private static String creationHash(CodeForm form){
+        var values=List.of(Objects.toString(form.getActivityId(),""),form.getName(),form.getNameSw(),form.getDescription(),Objects.toString(form.getSourceEvent(),""));
+        String canonical=values.stream().map(value->value.length()+":"+value).collect(java.util.stream.Collectors.joining());
+        try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}
     }
     private static void validateCode(CodeForm form) {
         require(form!=null,"validation");form.setCode(clean(form.getCode()).toUpperCase(Locale.ROOT));form.setName(clean(form.getName()));form.setNameSw(clean(form.getNameSw()));form.setDescription(clean(form.getDescription()));

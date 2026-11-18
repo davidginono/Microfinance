@@ -28,3 +28,6 @@
 .voucher-number-retry{width:max-content}
 @keyframes voucher-number-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.voucher-number-spinner{animation-duration:1.8s}}
+
+.voucher-split-entry{padding:12px 0;border-top:1px solid #eaeded;align-items:end;grid-template-columns:minmax(0,2fr) minmax(100px,1fr) auto}.voucher-split-entry>button{width:max-content}.voucher-split-entry .voucher-account-choice{min-width:0}
+@media(max-width:640px){.voucher-form .voucher-split-entry{grid-template-columns:minmax(0,1fr)}}

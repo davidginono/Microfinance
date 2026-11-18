@@ -50,17 +50,14 @@ public class VoucherPdfService {
             String description=t.description();if(!t.transactionName().isBlank())description+="\n"+t.transactionName();
             if(!"TOTAL".equals(t.component()))description+="\n"+label("library.component."+t.component(),locale);
             if(receipt){rows.add(List.of(Integer.toString(t.lineNo()),description,money(t.amount(),locale)));continue;}
-            var first=t.debit().id().equals(v.moneyAccountId())?t.debit():t.credit();
-            var second=first==t.debit()?t.credit():t.debit();
-            for(var account:List.of(first,second)){
-                boolean debit=account==t.debit();String amount=money(t.amount(),locale);
-                var row=List.of(Integer.toString(rows.size()+1),description,account.code()+" - "+account.name(),debit?amount:"",debit?"":amount,amount);
-                rows.add(receipt?row:row.subList(0,5));
+            for(var entry:t.postings().stream().sorted(java.util.Comparator.comparingInt(e->e.account().id().equals(v.moneyAccountId())?0:1)).toList()){
+                boolean debit="DEBIT".equals(entry.side());String amount=money(entry.amount(),locale);var account=entry.account();
+                rows.add(List.of(Integer.toString(rows.size()+1),description,account.code()+" - "+account.name(),debit?amount:"",debit?"":amount));
             }
         }
-        var moneyAccount=v.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit(),t.credit()))
+        var moneyAccount=v.transactions().stream().flatMap(t->t.postings().stream().map(e->e.account()))
             .filter(a->a.id().equals(v.moneyAccountId())).findFirst();
-        String account=moneyAccount.map(a->a.code()+" - "+a.name()).orElse("");
+        String account=v.transactions().stream().flatMap(t->t.postings().stream()).filter(e->e.side().equals(v.reversesId()==null?"CREDIT":"DEBIT")).map(e->e.account().code()+" - "+e.account().name()).distinct().collect(java.util.stream.Collectors.joining("; "));
         String channel=moneyAccount.map(a->a.purpose()).orElse("");
         var totals=new ArrayList<Field>();
         if(!receipt){totals.add(field("voucher.print.totalDebit",money(v.total(),locale),locale));totals.add(field("voucher.print.totalCredit",money(v.total(),locale),locale));}
@@ -119,7 +116,7 @@ public class VoucherPdfService {
             for(var t:v.transactions()){
                 String text=t.description();if(!t.transactionName().isBlank())text+="\n"+t.transactionName();
                 if(!"TOTAL".equals(t.component()))text+="\n"+label("library.component."+t.component(),locale);
-                String accounts=label("accounting.debit",locale)+": "+t.debit().code()+" - "+t.debit().name()+"\n"+label("accounting.credit",locale)+": "+t.credit().code()+" - "+t.credit().name();
+                String accounts=t.postings().stream().map(e->label("DEBIT".equals(e.side())?"accounting.debit":"accounting.credit",locale)+": "+e.account().code()+" - "+e.account().name()+" · "+money(e.amount())).collect(java.util.stream.Collectors.joining("\n"));
                 var lines=wrap(text,9,v.type().name().equals("RECEIPT")?239:176);var refs=wrap(accounts,8,v.type().name().equals("RECEIPT")?147:115);int n=0;int count=Math.max(lines.size(),refs.size());
                 while(n<count){
                     if(y<95){page();tableHeader();}
@@ -169,7 +166,7 @@ public class VoucherPdfService {
             String value=money(v.total());right(553,y,Math.min(11,140*1000/font.getStringWidth(value)),ink,value);
             y-=lines.size()*13;rule(y+3);y-=13;
         }
-        private String moneyAccount(){if(v.moneyAccountId()==null)return label("voucher.title.JOURNAL",locale);return v.transactions().stream().flatMap(t->java.util.stream.Stream.of(t.debit(),t.credit())).filter(a->a.id().equals(v.moneyAccountId())).findFirst().map(a->a.code()+" - "+a.name()).orElse("-");}
+        private String moneyAccount(){if(v.moneyAccountId()==null)return label("voucher.title.JOURNAL",locale);return v.transactions().stream().flatMap(t->t.postings().stream().map(e->e.account())).filter(a->a.id().equals(v.moneyAccountId())).findFirst().map(a->a.code()+" - "+a.name()).orElse("-");}
         private void tableHeader()throws IOException{
             fill(36,y-38,523,38,new Color(235,235,235));draw(44,y-20,8,ink,"#");draw(66,y-20,8,ink,label("voucher.print.particulars",locale));
             draw(v.type().name().equals("RECEIPT")?315:253,y-20,8,ink,label("voucher.print.ledger",locale));

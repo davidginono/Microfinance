@@ -33,7 +33,10 @@ public class VoucherRepository {
             and (?='' or (case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher r where r.reverses_id=v.id) then 'REVERSED' else 'POSTED' end)=?)
             """+" order by "+order+" limit ? offset ?",this::voucher,institution,branch,type.name(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
-    public List<Account> accounts(String institution,String search,int offset){return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING'"+ORDINARY_ACCOUNT+" and (strpos(lower(code||' '||name),?)>0) order by code,id limit 26 offset ?",this::account,institution,search.toLowerCase(Locale.ROOT),offset);}
+    public List<Account> accounts(String institution,String search,int offset){return accounts(institution,search,offset,"");}
+    public List<Account> accounts(String institution,String search,int offset,String purpose){
+        String filter="MONEY".equals(purpose)?" and gl_loan_disbursement_account(id,sacco_id)":"OTHER".equals(purpose)?" and not gl_loan_disbursement_account(id,sacco_id)":"";
+        return jdbc.query("select id,code,name,purpose,gl_loan_disbursement_account(id,sacco_id) money_eligible from gl_account where sacco_id=? and active and kind='POSTING'"+ORDINARY_ACCOUNT+filter+" and (strpos(lower(code||' '||name),?)>0) order by code,id limit 26 offset ?",this::account,institution,search.toLowerCase(Locale.ROOT),offset);}
     public List<Client> clients(String institution,String branch,String search,int offset){return jdbc.query("select id,member_no,full_name from members where sacco_id=? and station_id=? and is_member and status='ACTIVE' and strpos(lower(member_no||' '||full_name),?)>0 order by member_no,id limit 26 offset ?",(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name")),institution,branch,search.toLowerCase(Locale.ROOT),offset);}
     public Optional<Client> client(String institution,String branch,UUID id,boolean lock){return jdbc.query("select id,member_no,full_name from members where id=? and sacco_id=? and station_id=? and is_member and status='ACTIVE'"+(lock?" for share":""),(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name")),id,institution,branch).stream().findFirst();}
     public List<Account> lockAccounts(String institution,List<UUID> ids){
@@ -42,7 +45,7 @@ public class VoucherRepository {
     public List<Account> selectedAccounts(String institution,List<UUID> ids,boolean lock){
         if(ids.isEmpty())return List.of();
         var args=new ArrayList<Object>();args.add(institution);args.addAll(ids);
-        return jdbc.query("select id,code,name,purpose from gl_account where sacco_id=? and active and kind='POSTING'"+ORDINARY_ACCOUNT+" and id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by id"+(lock?" for share":""),this::account,args.toArray());
+        return jdbc.query("select id,code,name,purpose,gl_loan_disbursement_account(id,sacco_id) money_eligible from gl_account where sacco_id=? and active and kind='POSTING' and (purpose not in ('CASH','BANK','MOBILE_MONEY') or type='ASSET')"+ORDINARY_ACCOUNT+" and id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") order by id"+(lock?" for share":""),this::account,args.toArray());
     }
     public List<Mapping> mappings(String institution,String search,int offset){return mappingQuery(institution,null,search,offset,false);}
     public List<Activity> activities(String institution,String search,int offset){
@@ -69,8 +72,8 @@ public class VoucherRepository {
         if(!lock && ids==null)args.add(offset);
         return jdbc.query("""
             select t.id,t.code||' - '||t.name transaction_name,p.request_key,d.component,
-            da.id debit_id,da.code debit_code,da.name debit_name,da.purpose debit_purpose,
-            ca.id credit_id,ca.code credit_code,ca.name credit_name,ca.purpose credit_purpose
+            da.id debit_id,da.code debit_code,da.name debit_name,da.purpose debit_purpose,gl_loan_disbursement_account(da.id,da.sacco_id) debit_money,
+            ca.id credit_id,ca.code credit_code,ca.name credit_name,ca.purpose credit_purpose,gl_loan_disbursement_account(ca.id,ca.sacco_id) credit_money
             from gl_transaction_code t join gl_activity a on a.id=t.activity_id and a.sacco_id=t.sacco_id
             join gl_transaction_template p on p.transaction_id=t.id and p.sacco_id=t.sacco_id
             join gl_transaction_template_line d on d.transaction_id=t.id and d.sacco_id=t.sacco_id and d.side='DEBIT'
@@ -82,8 +85,8 @@ public class VoucherRepository {
                 and (g.principal_account_id in (da.id,ca.id) or g.interest_account_id in (da.id,ca.id)))
             """+filter+" order by t.id,d.component"+(lock?" for share of a,t,p,d,c,da,ca":ids==null?" limit 26 offset ?":" limit 250"),
             (r,n)->new Mapping(r.getObject("id",UUID.class),r.getObject("request_key",UUID.class),r.getString("transaction_name"),r.getString("component"),
-                new Account(r.getObject("debit_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),r.getString("debit_purpose")),
-                new Account(r.getObject("credit_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),r.getString("credit_purpose"))),args.toArray());
+                new Account(r.getObject("debit_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),r.getString("debit_purpose"),r.getBoolean("debit_money")),
+                new Account(r.getObject("credit_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),r.getString("credit_purpose"),r.getBoolean("credit_money"))),args.toArray());
     }
     public UUID period(String institution,LocalDate date,UUID actor,OffsetDateTime now){
         var existing=jdbc.queryForList("select id,state from accounting_period where sacco_id=? and starts_on<=? and ends_on>=? for share",institution,date,date);
@@ -132,19 +135,32 @@ public class VoucherRepository {
             insert into accounting_voucher(id,sacco_id,station_id,number,type,request_key,payload_hash,effective_date,party,reference,description,evidence,money_account_id,total,transaction_count,journal_id,posted_by,posted_at,reverses_id,client_id,client_number)
             values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,v.id(),institution,branch,v.number(),v.type().name(),f.getRequestKey(),hash,v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedAt(),v.reversesId(),v.clientId(),v.clientNumber());
-        var transactions=new ArrayList<Object[]>();var lines=new ArrayList<Object[]>();
+        var transactions=new ArrayList<Object[]>();var lines=new ArrayList<Object[]>();var entries=new ArrayList<Object[]>();
+        var moneyIds=new TreeSet<UUID>();
         for(var t:v.transactions()){
-            transactions.add(new Object[]{t.id(),v.id(),institution,branch,t.lineNo(),t.transactionId(),t.templateKey(),t.component(),t.description(),t.amount(),t.debit().id(),t.credit().id(),t.debit().code(),t.debit().name(),t.credit().code(),t.credit().name(),t.transactionName()});
-            lines.add(new Object[]{UUID.randomUUID(),v.journalId(),institution,branch,t.debit().id(),t.amount(),java.math.BigDecimal.ZERO});
-            lines.add(new Object[]{UUID.randomUUID(),v.journalId(),institution,branch,t.credit().id(),java.math.BigDecimal.ZERO,t.amount()});
+            transactions.add(new Object[]{t.id(),v.id(),institution,branch,t.lineNo(),t.transactionId(),t.templateKey(),t.component(),t.description(),t.amount(),t.debit()==null?null:t.debit().id(),t.credit()==null?null:t.credit().id(),t.debit()==null?null:t.debit().code(),t.debit()==null?null:t.debit().name(),t.credit()==null?null:t.credit().code(),t.credit()==null?null:t.credit().name(),t.transactionName(),t.split()?2:1});
+            int n=0;for(var entry:t.postings()){
+                boolean debit="DEBIT".equals(entry.side());var account=entry.account();
+                lines.add(new Object[]{UUID.randomUUID(),v.journalId(),institution,branch,account.id(),debit?entry.amount():java.math.BigDecimal.ZERO,debit?java.math.BigDecimal.ZERO:entry.amount()});
+                if(t.split())entries.add(new Object[]{t.id(),institution,branch,++n,entry.side(),account.id(),account.code(),account.name(),entry.amount()});
+                if(v.type()!=Type.JOURNAL && (v.type()==Type.RECEIPT?debit:!debit))moneyIds.add(account.id());
+            }
         }
-        jdbc.batchUpdate("insert into accounting_voucher_transaction(id,voucher_id,sacco_id,station_id,line_no,transaction_id,template_key,component,description,amount,debit_account_id,credit_account_id,debit_code,debit_name,credit_code,credit_name,transaction_name) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",transactions);
+        jdbc.batchUpdate("insert into accounting_voucher_transaction(id,voucher_id,sacco_id,station_id,line_no,transaction_id,template_key,component,description,amount,debit_account_id,credit_account_id,debit_code,debit_name,credit_code,credit_name,transaction_name,entry_format) values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",transactions);
+        if(!entries.isEmpty())jdbc.batchUpdate("insert into accounting_voucher_entry(transaction_id,sacco_id,station_id,entry_no,side,account_id,account_code,account_name,amount) values(?,?,?,?,?,?,?,?,?)",entries);
+        if(v.reversesId()==null && !moneyIds.isEmpty())jdbc.batchUpdate("insert into accounting_voucher_money_reference(voucher_id,sacco_id,station_id,account_id,reference) values(?,?,?,?,?)",moneyIds.stream().map(id->new Object[]{v.id(),institution,branch,id,v.reference()}).toList());
         jdbc.batchUpdate("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,?)",lines);
         jdbc.update("insert into accounting_outbox(id,journal_id,sacco_id,station_id,event_type,created_at) values(?,?,?,?,?,?)",UUID.randomUUID(),v.journalId(),institution,branch,"CORE_"+v.type(),v.postedAt());
         jdbc.update("update gl_journal set state='POSTED',posted_at=? where id=?",v.postedAt(),v.journalId());
     }
-    public List<Transaction> transactions(UUID id){return jdbc.query("select * from accounting_voucher_transaction where voucher_id=? order by line_no limit 50",(r,n)->new Transaction(r.getObject("id",UUID.class),r.getInt("line_no"),r.getObject("transaction_id",UUID.class),r.getObject("template_key",UUID.class),r.getString("transaction_name"),r.getString("component"),r.getString("description"),r.getBigDecimal("amount"),new Account(r.getObject("debit_account_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),""),new Account(r.getObject("credit_account_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),"")),id);}
-    private Account account(ResultSet r,int n)throws SQLException{return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("purpose"));}
+    public List<Transaction> transactions(UUID id){
+        var entries=new HashMap<UUID,List<Entry>>();
+        jdbc.query("select e.*,a.purpose from accounting_voucher_entry e join accounting_voucher_transaction t on t.id=e.transaction_id join gl_account a on a.id=e.account_id where t.voucher_id=? order by t.line_no,e.entry_no limit 500",r->{
+            entries.computeIfAbsent(r.getObject("transaction_id",UUID.class),key->new ArrayList<>()).add(new Entry(r.getString("side"),new Account(r.getObject("account_id",UUID.class),r.getString("account_code"),r.getString("account_name"),r.getString("purpose")),r.getBigDecimal("amount")));
+        },id);
+        return jdbc.query("select * from accounting_voucher_transaction where voucher_id=? order by line_no limit 50",(r,n)->new Transaction(r.getObject("id",UUID.class),r.getInt("line_no"),r.getObject("transaction_id",UUID.class),r.getObject("template_key",UUID.class),r.getString("transaction_name"),r.getString("component"),r.getString("description"),r.getBigDecimal("amount"),r.getObject("debit_account_id")==null?null:new Account(r.getObject("debit_account_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),""),r.getObject("credit_account_id")==null?null:new Account(r.getObject("credit_account_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),""),List.copyOf(entries.getOrDefault(r.getObject("id",UUID.class),List.of()))),id);
+    }
+    private Account account(ResultSet r,int n)throws SQLException{return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("purpose"),r.getBoolean("money_eligible"));}
     private Voucher voucher(ResultSet r,int n)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.valueOf(r.getString("type")),r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("client_id",UUID.class),r.getString("client_number"));}
     private record ReservationRow(String institution,String branch,String type,LocalDate date,String number,OffsetDateTime consumedAt){}
 }

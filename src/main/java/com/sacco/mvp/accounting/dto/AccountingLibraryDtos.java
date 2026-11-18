@@ -14,6 +14,7 @@ public final class AccountingLibraryDtos {
     public record Rule(String component,String debitCode,String debitName,String creditCode,String creditName) { }
     public record AccountChoice(String code,String name,String nameSw,String kind) { }
     @Data public static class CodeForm {
+        private UUID requestKey=UUID.randomUUID();
         private UUID activityId;
         private String code,name,nameSw,description;
         private String sourceEvent="MANUAL_JOURNAL";

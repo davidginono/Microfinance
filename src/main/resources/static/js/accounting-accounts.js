@@ -59,7 +59,7 @@
         const row = document.createElement('tr');
         row.dataset.treeParent = parent.dataset.id; row.dataset.depth = Number(parent.dataset.depth || 0) + 1;
         const cell = row.insertCell(); cell.colSpan = 8; cell.className = 'coa-tree-message';
-        const message = document.createElement('span'); message.textContent = text; message.setAttribute('role', retry ? 'alert' : 'status'); cell.append(message);
+        if(text){const message = document.createElement('span'); message.textContent = text; message.setAttribute('role', retry ? 'alert' : 'status'); cell.append(message);}
         if (retry) {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'app-btn btn-neutral';
             button.dataset.coaRetry = ''; button.textContent = register.dataset.retry; cell.append(button);
@@ -71,9 +71,9 @@
         parent.dataset.loading = 'true'; parent.setAttribute('aria-busy', 'true');
         let anchor = placeholder;
         if (!anchor) {
-            anchor = branchMessage(parent, register.dataset.loading, false); parent.after(anchor);
-        } else anchor.querySelector('button').disabled = true;
-        const pendingCell=anchor.cells[0];
+            anchor = branchMessage(parent, "", false); parent.after(anchor);
+        }
+        const pendingCell=anchor.cells[0];pendingCell.replaceChildren();
         const branchSpinner=window.AppLoading?.status(register.dataset.loading,true);
         if(branchSpinner){branchSpinner.classList.add('coa-branch-loading');pendingCell.prepend(branchSpinner);}
         refreshBranches();

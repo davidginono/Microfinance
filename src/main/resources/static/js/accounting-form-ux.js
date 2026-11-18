@@ -63,10 +63,6 @@
         if (!submitting && !discarding && (state.restoredErrors || values(form) !== state.initial)) { event.preventDefault(); confirmDiscard(() => {
             form.reset();
             form.querySelectorAll('select').forEach(select => select.dispatchEvent(new Event('change', {bubbles:true})));
-            const rows = form.querySelectorAll('.library-rule');
-            rows.forEach((row, index) => { if (index > 0) row.remove(); });
-            form.querySelectorAll('.library-remove').forEach(button => button.disabled = true);
-            const add = form.querySelector('#library-add-rule'); if (add) add.disabled = false;
             state.initial = values(form); state.restoredErrors = false; discarding = false; event.detail.close();
         }); }
     });

@@ -21,12 +21,12 @@ import java.util.UUID;
 @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_VIEW')")
 public class AccountingCodeLibraryController {
     private final AccountingCodeLibraryService library;
-    @InitBinder("codeForm") void bindCode(WebDataBinder binder) {binder.setAllowedFields("code","name","nameSw","description","sourceEvent");}
+    @InitBinder("codeForm") void bindCode(WebDataBinder binder) {binder.setAllowedFields("requestKey","name","nameSw","description");}
     @InitBinder("templateForm") void bindTemplate(WebDataBinder binder) {
         binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("requestKey","expectedRequestKey","rules[*].component","rules[*].debitCode","rules[*].creditCode");
     }
     @InitBinder("transactionForm") void bindTransaction(WebDataBinder binder) {
-        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("activityCode","code","name","description","sourceEvent","template.requestKey","template.rules[*].component","template.rules[*].debitCode","template.rules[*].creditCode");
+        binder.setAutoGrowCollectionLimit(5);binder.setAllowedFields("requestKey","activityCode","name","description","template.requestKey","template.rules[*].debitCode","template.rules[*].creditCode");
     }
     @GetMapping
     String activities(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,
@@ -71,7 +71,7 @@ public class AccountingCodeLibraryController {
     @PostMapping("/activities") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String saveActivity(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("codeForm") CodeForm form,BindingResult errors,Model model,RedirectAttributes flash) {
         if(!errors.hasErrors())try {library.createActivity(actor,form);created(flash,form);return "redirect:/finance/library";}
-        catch(IllegalArgumentException failure){codeError(errors,key(failure));}catch(DataIntegrityViolationException failure){errors.rejectValue("code","library.error.duplicate");}
+        catch(IllegalArgumentException failure){codeError(errors,key(failure));}catch(DataIntegrityViolationException failure){errors.reject("library.error.conflict");}
         model.addAttribute("modalOpen",true);return register(actor,false,null,"","",0,model);
     }
     @PostMapping("/transactions") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE') and @access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
@@ -82,18 +82,18 @@ public class AccountingCodeLibraryController {
         model.addAttribute("modalOpen",true);return register(actor,true,null,"","",0,model);
     }
     @GetMapping(value="/lookup/activities",produces="application/json") @ResponseBody
-    java.util.List<Activity> activityChoices(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search) {
-        return library.activities(actor,search,"ACTIVE",0).rows();
+    java.util.List<Activity> activityChoices(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {
+        return library.activityLookup(actor,search,page);
     }
     @GetMapping(value="/lookup/accounts",produces="application/json") @ResponseBody
-    java.util.List<AccountChoice> accountChoices(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search) {
-        return library.accounts(actor,search,0).rows();
+    java.util.List<AccountChoice> accountChoices(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {
+        return library.accountLookup(actor,search,page);
     }
     @PostMapping("/activities/{id}/transactions") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_CREATE')")
     String saveTransaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@ModelAttribute("codeForm") CodeForm form,BindingResult errors,Model model,RedirectAttributes flash) {
         form.setActivityId(id);
         if(!errors.hasErrors())try {UUID transaction=library.createTransaction(actor,form);success(flash);return "redirect:/finance/library/transactions/"+transaction;}
-        catch(IllegalArgumentException failure){codeError(errors,key(failure));}catch(DataIntegrityViolationException failure){errors.rejectValue("code","library.error.duplicate");}
+        catch(IllegalArgumentException failure){codeError(errors,key(failure));}catch(DataIntegrityViolationException failure){errors.reject("library.error.conflict");}
         return codeForm(model,library.activity(actor,id));
     }
     @GetMapping("/transactions/{id}")
@@ -154,11 +154,10 @@ public class AccountingCodeLibraryController {
     private String templateForm(AppUserPrincipal actor,UUID id,String search,int page,Model model) {
         if(model.getAttribute("templateForm") instanceof TemplateForm form && (form.getRules()==null || form.getRules().isEmpty()))
             form.setRules(new java.util.ArrayList<>(java.util.List.of(new RuleForm())));
-        model.addAttribute("transaction",library.transaction(actor,id));model.addAttribute("components",AccountingCodeLibraryService.COMPONENTS);
-        model.addAttribute("accountChoices",library.accounts(actor,search,page));model.addAttribute("accountSearch",search);return "accounting/library-template-form";
+        model.addAttribute("transaction",library.transaction(actor,id));return "accounting/library-template-form";
     }
     private String codeForm(Model model,Activity activity) {
-        model.addAttribute("activity",activity);model.addAttribute("sourceEvents",Arrays.stream(AccountingEvent.values()).map(Enum::name).toList());return "accounting/library-code-form";
+        model.addAttribute("activity",activity);return "accounting/library-code-form";
     }
     private String register(AppUserPrincipal actor,boolean transactions,UUID activityId,String search,String state,int page,Model model) {
         return register(actor,transactions,activityId,search,state,page,30,"code","asc",model);
@@ -175,8 +174,6 @@ public class AccountingCodeLibraryController {
             var form=(TransactionForm)model.getAttribute("transactionForm");
             if(form.getTemplate().getRules()==null)form.getTemplate().setRules(new java.util.ArrayList<>());
             if(form.getTemplate().getRules().isEmpty())form.getTemplate().getRules().add(new RuleForm());
-            model.addAttribute("activityChoices",library.activities(actor,"","ACTIVE",0));model.addAttribute("accountChoices",library.accounts(actor,"",0));
-            model.addAttribute("components",AccountingCodeLibraryService.COMPONENTS);model.addAttribute("sourceEvents",Arrays.stream(AccountingEvent.values()).map(Enum::name).toList());
         } else {
             model.addAttribute("records",library.activities(actor,search,state,page,size,sort,direction));
             if(!model.containsAttribute("codeForm"))model.addAttribute("codeForm",new CodeForm());

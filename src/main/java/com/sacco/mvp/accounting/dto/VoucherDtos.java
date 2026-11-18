@@ -28,14 +28,34 @@ public final class VoucherDtos {
         private String component="TOTAL",description="";
         @com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
         private BigDecimal amount;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+        private List<EntryForm> entries=new ArrayList<>();
     }
-    public record Account(UUID id,String code,String name,String purpose) {}
+    @Data public static class EntryForm {
+        private String side;
+        private UUID accountId;
+        @com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING)
+        private BigDecimal amount;
+    }
+    public record Entry(String side,Account account,BigDecimal amount) {
+        public Entry reversed(){return new Entry("DEBIT".equals(side)?"CREDIT":"DEBIT",account,amount);}
+    }
+    public record Account(UUID id,String code,String name,String purpose,boolean moneyEligible) {
+        public Account(UUID id,String code,String name,String purpose){this(id,code,name,purpose,Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose));}
+    }
     public record Client(UUID id,String number,String name) {}
     public record Activity(UUID id,String name,String nameSw) {}
     public record NumberReservation(String number) {}
     public record Mapping(UUID transactionId,UUID templateKey,String transactionName,String component,Account debit,Account credit) {}
     public record Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,
-                              String description,BigDecimal amount,Account debit,Account credit) {}
+                              String description,BigDecimal amount,Account debit,Account credit,List<Entry> entries) {
+        public Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,
+                           String description,BigDecimal amount,Account debit,Account credit) {
+            this(id,lineNo,transactionId,templateKey,transactionName,component,description,amount,debit,credit,List.of());
+        }
+        public List<Entry> postings(){return entries==null || entries.isEmpty()?List.of(new Entry("DEBIT",debit,amount),new Entry("CREDIT",credit,amount)):entries;}
+        public boolean split(){return entries!=null && !entries.isEmpty();}
+    }
     public record Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
                           String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
                           String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,

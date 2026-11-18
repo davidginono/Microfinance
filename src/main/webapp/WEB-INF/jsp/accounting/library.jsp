@@ -67,5 +67,6 @@
     <c:if test="${not isActivity}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><%@ include file="library-transaction-modal.jspf" %></sec:authorize></c:if>
 </sec:authorize>
 <%@ include file="accounting-form-support.jspf" %>
+<script src="<c:url value='/js/voucher-selects.js' />" defer></script>
 <script src="<c:url value='/js/accounting-library.js' />" defer></script>
 <%@ include file="../fragments/footer.jspf" %>

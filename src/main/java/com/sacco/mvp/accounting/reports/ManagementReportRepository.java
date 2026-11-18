@@ -93,12 +93,13 @@ public class ManagementReportRepository {
     private static Map<String,BigDecimal> totals(Map<String,Object> row,List<String> fields){var out=new LinkedHashMap<String,BigDecimal>();for(var k:fields)out.put(k,(BigDecimal)row.get(k));return out;}
     private static final String DAILY=CASH_RANGE+"""
         receipts as (
-          select v.id,v.sacco_id,v.station_id,v.effective_date,v.posted_at,v.number,v.reference,v.party,v.money_account_id,v.posted_by,v.client_id,
+          select v.id,v.sacco_id,v.station_id,v.effective_date,v.posted_at,v.number,v.reference,v.party,e.account_id money_account_id,v.posted_by,v.client_id,
             t.line_no,t.description,t.transaction_name,tc.code transaction_code,coalesce(ac.code||' — '||ac.name,'@general') activity,t.component,
             null::text loan_id,v.client_number,null::text phone,
-            case when v.reverses_id is null then 0 else t.amount end debit,
-            case when v.reverses_id is null then t.amount else 0 end credit
+            case when v.reverses_id is null then 0 else e.amount end debit,
+            case when v.reverses_id is null then e.amount else 0 end credit
           from accounting_voucher v join accounting_voucher_transaction t on t.voucher_id=v.id and t.sacco_id=v.sacco_id and t.station_id=v.station_id
+          join accounting_voucher_posting e on e.transaction_id=t.id and e.side=case when v.reverses_id is null then 'DEBIT' else 'CREDIT' end
           join gl_journal j on j.id=v.journal_id and j.sacco_id=v.sacco_id and j.station_id=v.station_id and j.state='POSTED' and j.posted_at<=:cutoff
           left join gl_transaction_code tc on tc.id=t.transaction_id and tc.sacco_id=v.sacco_id
           left join gl_activity ac on ac.id=tc.activity_id and ac.sacco_id=tc.sacco_id
@@ -128,7 +129,7 @@ public class ManagementReportRepository {
             and p.recorded_at<=:cutoff and p.effective_date between :from and :through and part.amount>0
             and not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
         ), report_rows as (
-          select r.effective_date::text||' | '||r.activity as "groupName",r.posted_at::text||r.id::text||lpad(r.line_no::text,3,'0') as "rowOrder",
+          select r.effective_date::text||' | '||r.activity as "groupName",r.posted_at::text||r.id::text||lpad(r.line_no::text,3,'0')||r.money_account_id::text as "rowOrder",
             r.client_number as "clientNumber",r.loan_id as "loanId",r.component,r.party as name,r.reference as "documentReference",r.number as "documentNumber",r.effective_date as "receiptDate",
             case when r.transaction_name is null then r.description else r.transaction_name||' — '||r.description end as transaction,r.transaction_code as "transactionCode",r.debit,r.credit,r.phone,u.full_name as "recordedBy"
           from receipts r join gl_account b on b.id=r.money_account_id and b.sacco_id=r.sacco_id join members u on u.id=r.posted_by
