@@ -22,7 +22,7 @@
 <section class="erp-table-wrap" data-resource-table="sl-gl-reconciliation" data-aws-table-region>
   <div class="app-table-titlebar"><h2><spring:message code="reconciliation.discrepancies" /><c:if test="${not empty report}"> <span class="app-table-count">(<c:out value="${report.count}" />)</span></c:if></h2>
   </div>
-  <form method="get" action="<c:url value='/reports/financial/sl-gl-reconciliation' />" class="resource-table-filters" data-reconciliation-query data-aws-filter-toolbar>
+  <form method="get" action="<c:url value='/reports/financial/sl-gl-reconciliation' />" id="reconciliation-report-parameters" class="resource-table-filters" data-reconciliation-query data-aws-filter-toolbar>
     <input type="hidden" name="run" value="true" /><input type="hidden" name="cutoff" value="<c:out value='${filter.cutoff}' />" />
     <label><spring:message code="reconciliation.check" /><select class="aws-control" name="component"><c:forEach items="${['ALL','PRINCIPAL','ALLOWANCE','INTEREST_COLLECTIONS','INTEREST_RECEIVABLE']}" var="check"><option value="${check}" ${filter.component==check?'selected':''}><spring:message code="reconciliation.component.${check}" /></option></c:forEach><c:if test="${canViewGroupAttribution}"><option value="GROUP_ATTRIBUTION" ${filter.component=='GROUP_ATTRIBUTION'?'selected':''}><spring:message code="reconciliation.component.GROUP_ATTRIBUTION" /></option></c:if></select></label>
     <label><spring:message code="management.from" /><input class="aws-control" type="date" name="from" value="<c:out value='${filter.from}' />" max="${today}" required /></label>
@@ -34,7 +34,6 @@
         <c:forEach items="${activities}" var="activity" end="24"><c:if test="${activity.id!=filter.activityId}"><option value="${activity.id}"><c:out value="${pageContext.response.locale.language=='sw' and not empty activity.nameSw?activity.nameSw:activity.name}" /></option></c:if></c:forEach>
       </select><span class="coa-error" role="status" data-choice-error data-error="<spring:message code='recording.lookupError' />" data-search-label="<spring:message code='reconciliation.activity' />"></span>
     </label>
-    <div class="resource-table-filter-actions"><button class="app-btn btn-neutral"><spring:message code="management.run" /></button><a class="app-btn btn-neutral" href="<c:url value='/reports/financial/sl-gl-reconciliation' />"><spring:message code="common.clear" /></a></div>
   </form>
   <div class="reconciliation-canvas">
     <c:choose><c:when test="${not empty report}"><%@ include file="document.jspf" %></c:when><c:otherwise>
@@ -48,6 +47,7 @@
     </c:if></c:forEach>
   </div>
 </section>
+<div class="accounting-actions accounting-form-actions report-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/reports/financial/sl-gl-reconciliation' />"><spring:message code="common.clear" /></a><button type="submit" form="reconciliation-report-parameters" class="app-btn btn-launch"><spring:message code="management.run" /></button></div>
 <c:if test="${not empty report}"><div class="reconciliation-basis reconciliation-screen-note"><p><spring:message code="reconciliation.screenNote" /></p></div></c:if>
 </div>
 <script src="<c:url value='/js/loan-recording.js' />" defer></script><script src="<c:url value='/js/sl-gl-reconciliation.js' />" defer></script>

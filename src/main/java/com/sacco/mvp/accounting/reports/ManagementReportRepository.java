@@ -51,8 +51,18 @@ public class ManagementReportRepository {
         String code=row.getString(2),name=row.getString(3);
         return new Choice(row.getObject(1,UUID.class),code,name,code+" — "+name);
     }
+    public List<Choice> products(AppUserPrincipal a,String search,int page,UUID selected) {
+        var p=parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT))
+            .addValue("selected",selected,Types.OTHER).addValue("offset",selected==null?page*25:0);
+        return jdbc.query("""
+            select id,coalesce(product_name,loan_type) label from loan_product_settings
+            where sacco_id=:institution and (cast(:selected as uuid) is null or id=:selected)
+              and (cast(:selected as uuid) is not null or strpos(lower(coalesce(product_name,loan_type)),:search)>0)
+            order by coalesce(display_order,2147483647),id limit 26 offset :offset
+            """,p,(r,n)->new Choice(r.getObject("id",UUID.class),"",r.getString("label")));
+    }
     public String[] identity(AppUserPrincipal a){return jdbc.queryForObject("select i.sacco_name,coalesce(nullif(s.address_location,''),s.station_id) from registered_saccos i join sacco_stations s on s.sacco_id=i.sacco_id where s.sacco_id=:institution and s.station_id=:branch",parameters(a,null),(r,n)->new String[]{r.getString(1),r.getString(2)});}
-    private MapSqlParameterSource parameters(AppUserPrincipal a,Parameters p){var m=new MapSqlParameterSource("institution",a.getSaccoId()).addValue("branch",a.getStationId()).addValue("wide",false);if(p!=null)m.addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.cutoff()).addValue("clientId",p.clientId(),java.sql.Types.OTHER).addValue("product",p.product().toLowerCase(Locale.ROOT));return m;}
+    private MapSqlParameterSource parameters(AppUserPrincipal a,Parameters p){var m=new MapSqlParameterSource("institution",a.getSaccoId()).addValue("branch",a.getStationId()).addValue("wide",false);if(p!=null)m.addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.cutoff()).addValue("clientId",p.clientId(),java.sql.Types.OTHER).addValue("productId",p.productId(),Types.OTHER).addValue("product",p.productId()==null?p.product().toLowerCase(Locale.ROOT):"");return m;}
     public record Data(List<Map<String,Object>> rows,List<Group> groups,Map<String,BigDecimal> totals,long count,long excluded) {}
     public Data read(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
         var m=parameters(a,p).addValue("startAccount",p.startAccount(),Types.OTHER)
@@ -160,6 +170,7 @@ public class ManagementReportRepository {
     private static final String CLIENT_FILTER="""
         (cast(:clientId as uuid) is null or m.id=:clientId)
         and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)
+        and (cast(:productId as uuid) is null or a.loan_product_setting_id=:productId)
         """;
     private static String disbursements(){
         return LoanPortfolioReportRepository.SOURCE+"""
@@ -241,6 +252,6 @@ public class ManagementReportRepository {
         values.put("overdue","e.overdue_principal+e.overdue_interest");
         values.put("referenceProvision","round(e.principal*(case when e.dpd<=30 then 0 when e.dpd<=90 then .10 when e.dpd<=180 then .30 when e.dpd<=365 then .50 else 1 end),2)");
         String money=values.entrySet().stream().map(v->"case when e.complete then "+v.getValue()+" else null end as \""+v.getKey()+"\"").reduce((x,y)->x+","+y).orElseThrow();
-        return LoanPortfolioReportRepository.SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where (cast(:clientId as uuid) is null or m.id=:clientId) and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)"+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
+        return LoanPortfolioReportRepository.SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where (cast(:clientId as uuid) is null or m.id=:clientId) and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0) and (cast(:productId as uuid) is null or a.loan_product_setting_id=:productId)"+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
     }
 }

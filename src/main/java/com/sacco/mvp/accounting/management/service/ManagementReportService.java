@@ -26,6 +26,7 @@ public class ManagementReportService {
         return switch(category) {
             case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of());}
             case "clients" -> reports.clients(a,search,page,null);
+            case "products" -> {loanReport(kind);yield reports.products(a,search,page,null);}
             default -> throw error("parameters");
         };
     }
@@ -44,6 +45,11 @@ public class ManagementReportService {
     @Transactional(readOnly=true) public Choice selectedClient(AppUserPrincipal a,Kind kind,UUID id) {
         authorize(a,kind,false);return id==null?null:reports.clients(a,"",0,id).stream().findFirst().orElseThrow(()->error("client"));
     }
+    @Transactional(readOnly=true) public Choice selectedProduct(AppUserPrincipal a,Kind kind,UUID id) {
+        authorize(a,kind,false);loanReport(kind);
+        return reports.products(a,"",0,id).stream().findFirst().orElseThrow(()->error("product"));
+    }
+    private static void loanReport(Kind kind){check(kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS,"parameters");}
     private static void accountReport(Kind kind){check(kind==Kind.CASHBOOK || kind==Kind.DAILY_COLLECTIONS,"parameters");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
     public Result report(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
@@ -55,10 +61,11 @@ public class ManagementReportService {
             check(start==null || end==null || start.code().compareTo(end.code())<=0,"range");
             String accountSelection=start==null?(end==null?"":"≤ "+end.label()):end==null?"≥ "+start.label():start.label()+" → "+end.label();
             var client=selectedClient(a,kind,p.clientId());
+            var product=p.productId()==null?null:selectedProduct(a,kind,p.productId());
             var data=reports.read(a,kind,p,export);
             check(data.groups().size()<=1000 && (!export || data.rows().size()<=5000),"large");
             var identity=reports.identity(a);
-            return new Result(kind,p,identity[0],identity[1],com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),
+            return new Result(kind,product==null?p:p.withProductName(product.name()),identity[0],identity[1],com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),
                 export?data.rows():data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),!export && data.rows().size()>25,accountSelection,client==null?"":client.getLabel());
         });
     }

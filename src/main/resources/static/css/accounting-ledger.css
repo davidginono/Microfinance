@@ -48,3 +48,7 @@
 #coa-register .coa-tree-toggle > .console-icon{width:12px;height:12px;flex:0 0 12px}
 #coa-register .coa-tree-toggle[aria-expanded="true"] > .console-icon{transform:rotate(90deg)}
 #coa-register [data-heading="false"] .coa-tree-code{padding-left:calc(min(var(--coa-depth,0),16)*1rem + 28px + .35rem)}#coa-register .coa-tree-message{padding:.75rem 1rem;color:#5f6b78}#coa-register .coa-tree-message .app-btn{margin-left:.75rem}#coa-register tr[hidden]{display:none!important}
+
+/* Report parameter forms keep their primary action outside the section frame. */
+.management-report-form{display:grid;gap:1rem;min-width:0}
+.accounting-actions.report-form-actions{border:0;padding:0;margin:0}

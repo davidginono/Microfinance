@@ -10,7 +10,15 @@ public final class ManagementReports {
     private ManagementReports() {}
     public enum Kind { DAILY_COLLECTIONS, CASHBOOK, LOAN_PORTFOLIO, PORTFOLIO_RISK, PORTFOLIO_ANALYSIS, DISBURSED_LOANS_AUDIT, EXPECTED_REPAYMENTS, LOAN_REPAYMENT_TRANSACTIONS }
     public record Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, UUID startAccount,
-            UUID endAccount, UUID clientId, String product, int page) {}
+            UUID endAccount, UUID clientId, String product, int page, UUID productId) {
+        public Parameters(LocalDate from, LocalDate through, OffsetDateTime cutoff, UUID startAccount,
+                UUID endAccount, UUID clientId, String product, int page) {
+            this(from,through,cutoff,startAccount,endAccount,clientId,product,page,null);
+        }
+        public Parameters withProductName(String name) {
+            return new Parameters(from,through,cutoff,startAccount,endAccount,clientId,name,page,productId);
+        }
+    }
     public record Choice(UUID id, String code, String name, String label) {
         public Choice(UUID id,String code,String name){this(id,code,name,name);}
         public String getLabel(){return label;}

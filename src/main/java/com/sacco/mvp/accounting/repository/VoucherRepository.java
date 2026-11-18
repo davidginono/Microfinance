@@ -46,7 +46,7 @@ public class VoucherRepository {
     }
     public List<Mapping> mappings(String institution,String search,int offset){return mappingQuery(institution,null,search,offset,false);}
     public List<Activity> activities(String institution,String search,int offset){
-        return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and active and strpos(lower(code||' '||name||' '||coalesce(name_sw,'')),?)>0 order by code,id limit 26 offset ?",
+        return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and active and code<>'SYSTEM.LOAN_REPAYMENT' and strpos(lower(code||' '||name||' '||coalesce(name_sw,'')),?)>0 order by code,id limit 26 offset ?",
             (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw")),institution,search.toLowerCase(Locale.ROOT),offset);
     }
     public Optional<Activity> activity(String institution,UUID id){

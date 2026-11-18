@@ -16,7 +16,7 @@
     <c:url value="/reports/financial/operations/${reportName}" var="parametersUrl">
       <c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" />
       <c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" />
-      <c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" />
+      <c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" />
     </c:url>
     <div class="report-page-actions" data-aws-action-pin="true">
       <a class="app-btn btn-neutral" href="<c:out value='${parametersUrl}' />"><spring:message code="management.editParameters" /></a>
@@ -26,7 +26,7 @@
             <c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" />
             <c:param name="cutoff" value="${filter.cutoff}" />
             <c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" />
-            <c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" />
+            <c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" />
           </c:url>
           <a class="app-btn btn-neutral" href="<c:out value='${outputUrl}' />" ${output=='print'?'target="_blank" rel="noopener"':''}><report:reportExport format="${output}" /></a>
         </c:forEach>
@@ -37,7 +37,8 @@
 <c:choose>
 <c:when test="${empty report}">
 <c:url value="/reports/financial/operations/${reportName}" var="runUrl" />
-<form method="get" action="<c:out value='${runUrl}' />" class="erp-panel management-parameters">
+<form method="get" action="<c:out value='${runUrl}' />" class="management-report-form">
+<section class="erp-panel management-parameters">
   <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="management.parameters" /></h2></div>
   <c:if test="${not empty formError}"><p class="coa-error" role="alert" tabindex="-1"><spring:message code="${formError}" /></p></c:if>
   <input type="hidden" name="run" value="true" />
@@ -59,8 +60,20 @@
       </c:forEach>
     </c:if>
     <label data-loan-choice data-choice-url="<c:url value='/reports/financial/operations/${reportName}/choices/clients' />"><spring:message code="management.client" /><select class="aws-control" name="clientId" data-choice-select data-searchable="true"><option value="" data-empty-option="true"><spring:message code="management.allClients" /></option><c:if test="${not empty clientChoice}"><option selected value="${clientChoice.id}"><c:out value="${clientChoice.getLabel()}" /></option></c:if></select><%@ include file="../loans/choice-search.jspf" %></label>
-    <c:if test="${kind!='DAILY_COLLECTIONS' and kind!='CASHBOOK'}"><label><spring:message code="management.productSearch" /><input class="aws-control" name="product" maxlength="100" value="<c:out value='${filter.product}' />" /></label></c:if>
-  </div><div class="accounting-form-actions"><button class="app-btn btn-neutral"><spring:message code="management.run" /></button></div>
+    <c:if test="${kind!='DAILY_COLLECTIONS' and kind!='CASHBOOK'}">
+      <c:url value="/reports/financial/operations/${reportName}/choices/products" var="productLookup" />
+      <label data-loan-choice data-lazy-choice data-choice-url="<c:out value='${productLookup}' />">
+        <spring:message code="management.productSearch" />
+        <select class="aws-control" name="productId" data-choice-select data-searchable="true">
+          <option value="" data-empty-option="true"><spring:message code="reports.allProducts" /></option>
+          <c:if test="${not empty productChoice}"><option selected value="${productChoice.id}"><c:out value="${productChoice.getLabel()}" /></option></c:if>
+        </select>
+        <%@ include file="../loans/choice-search.jspf" %>
+      </label>
+    </c:if>
+  </div>
+</section>
+<div class="accounting-actions accounting-form-actions report-form-actions"><button type="submit" class="app-btn btn-launch"><spring:message code="management.run" /></button></div>
 </form>
 <script src="<c:url value='/js/loan-recording.js' />" defer></script>
 <script src="<c:url value='/js/management-reports.js' />" defer></script>
@@ -69,7 +82,7 @@
 <section class="erp-table-wrap management-preview">
   <div class="app-table-titlebar"><h2 id="management-preview-title"><spring:message code="management.preview" /> <span class="app-table-count">(<c:out value="${report.count}" />)</span></h2></div>
   <div class="management-canvas" role="region" aria-labelledby="management-preview-title" tabindex="0"><%@ include file="document.jspf" %></div>
-  <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
+  <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
 </section>
 </c:otherwise>
 </c:choose>

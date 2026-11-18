@@ -51,7 +51,7 @@
       </div>
     </section>
     <p class="portfolio-field-help"><spring:message code="financial.portfolio.shortBasis" /></p>
-    <div class="accounting-actions accounting-form-actions"><button class="app-btn btn-primary" type="submit"><spring:message code="financial.report.run" /></button></div>
+    <div class="accounting-actions accounting-form-actions report-form-actions"><button class="app-btn btn-launch" type="submit"><spring:message code="financial.report.run" /></button></div>
   </form>
 </div>
 <script src="<c:url value='/js/loan-portfolio-report.js' />" defer></script>
