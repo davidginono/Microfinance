@@ -60,6 +60,8 @@ class AccessMatrixJspRenderingTest {
         var response=render(source,Map.of("users",List.of(user),"usersPage",new org.springframework.data.domain.PageImpl<>(List.of(user)),
             "staffPositions",List.of(com.sacco.mvp.domain.Position.CREDIT_OFFICER),"canEditUsers",true,"selectedPageSize",25));
         assertThat(response.body()).contains("STAFF-10001","Synthetic staff","/admin/users/"+user.getAccountId()+"/edit");
+        assertThat(response.body()).contains("data-staff-registration", "staffRegistration.fullName", "staff-email-status", "staff-phone-status", "data-staff-csrf")
+            .doesNotContain("/profile/complete", "kyc.workspaceRequired");
     }
 
     private HttpResponse<String> render(String source,Map<String,Object> attributes) throws Exception {

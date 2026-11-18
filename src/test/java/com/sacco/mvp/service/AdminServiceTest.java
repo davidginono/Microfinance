@@ -767,7 +767,7 @@ class AdminServiceTest {
             "ST-1",
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
-            "Mary Manager",
+            "Mary Jane Manager",
             " Existing@Example.com ",
             "255700000005",
             List.of(Position.MANAGER)
@@ -778,6 +778,64 @@ class AdminServiceTest {
         verify(memberRepository).existsByEmailIgnoreCase("existing@example.com");
         verify(memberRepository, never()).save(any(Member.class));
         assertThat(issuedInvitationCount.get()).isZero();
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "Asha Mushi", "Asha Jane Mary Mushi", "Asha 123 Mushi", "Asha <Jane> Mushi"})
+    void staffRegistrationRequiresExactlyThreeNamesBeforeLookingUpContacts(String name) {
+        assertThatThrownBy(() -> adminService.createUser("I1", "B1", UUID.randomUUID(), Set.of(Position.ADMIN),
+            name, "asha@example.invalid", "255712345678", List.of(Position.CREDIT_OFFICER)))
+            .hasMessage("staffRegistration.nameInvalid");
+        verifyNoInteractions(memberRepository);
+    }
+
+    @Test
+    void contactAvailabilityNormalizesContactsAndReturnsNoAccountDetails() {
+        var actor = staffRegistrar();
+        when(memberRepository.existsByEmailIgnoreCase("asha@example.invalid")).thenReturn(true);
+        when(memberRepository.existsByPhone("255712345678")).thenReturn(true);
+        assertThat(adminService.staffContactAvailable(actor, "email", " Asha@Example.Invalid ")).isFalse();
+        assertThat(adminService.staffContactAvailable(actor, "phone", "0712345678")).isFalse();
+        assertThat(adminService.staffContactAvailable(actor, "email", "new@example.invalid")).isTrue();
+        verify(memberRepository, never()).findByEmailIgnoreCase(any());
+        verify(memberRepository, never()).findByPhone(any());
+    }
+
+    @Test
+    void contactAvailabilityRejectsInvalidValuesAndStaleAssignments() {
+        var actor = staffRegistrar();
+        for (var request : List.of(new String[]{"email", "bad"}, new String[]{"email", "x".repeat(161)},
+            new String[]{"phone", "invalid255712345678"}, new String[]{"phone", ""}, new String[]{"other", "value"})) {
+            assertThatThrownBy(() -> adminService.staffContactAvailable(actor, request[0], request[1]))
+                .isInstanceOf(IllegalArgumentException.class);
+        }
+        verify(memberRepository, never()).existsByEmailIgnoreCase(any());
+        verify(memberRepository, never()).existsByPhone(any());
+        when(memberRepository.findById(actor.getMemberId())).thenReturn(Optional.of(Member.builder()
+            .id(actor.getMemberId()).saccoId("I1").stationId("OTHER").status(MemberStatus.ACTIVE)
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).build()));
+        assertThatThrownBy(() -> adminService.staffContactAvailable(actor, "email", "asha@example.invalid"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+
+    @Test
+    void contactAvailabilityRequiresAnExplicitCreateClaim() {
+        assertThatThrownBy(() -> adminService.staffContactAvailable(null, "email", "asha@example.invalid"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        var member = Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
+            .position(Position.ICT_MANAGER).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
+        var actor = new com.sacco.mvp.security.AppUserPrincipal(member, Set.of());
+        assertThatThrownBy(() -> adminService.staffContactAvailable(actor, "email", "asha@example.invalid"))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(memberRepository);
+    }
+
+    private com.sacco.mvp.security.AppUserPrincipal staffRegistrar() {
+        var member = Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
+            .position(Position.ICT_MANAGER).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();
+        when(memberRepository.findById(member.getId())).thenReturn(Optional.of(member));
+        return new com.sacco.mvp.security.AppUserPrincipal(member, Set.of(UserClaim.USER_ACCESS_CREATE));
     }
 
     @Test
@@ -1560,7 +1618,7 @@ class AdminServiceTest {
             null,
             adminId,
             Set.of(Position.ADMIN),
-            "Mary Manager",
+            "Mary Jane Manager",
             "manager@example.com",
             "255700000001",
             List.of(Position.MANAGER)
@@ -1573,6 +1631,13 @@ class AdminServiceTest {
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getMemberNo()).isEqualTo("STAFF-10002");
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getStatus()).isEqualTo(MemberStatus.INVITED);
         org.assertj.core.api.Assertions.assertThat(lastInvitedMember.get().getPasswordHash()).isEqualTo("OTP_ONLY_LOGIN");
+        assertThat(lastInvitedMember.get().getFullName()).isEqualTo("MARY JANE MANAGER");
+        assertThat(lastInvitedMember.get().getSignatureText()).isNull();
+        assertThat(lastInvitedMember.get().getSignatureRegisteredAt()).isNull();
+        var contactLocks = inOrder(memberRepository);
+        contactLocks.verify(memberRepository).lockClientRegistrationIdentity("CLIENT_REGISTRATION_EMAIL/manager@example.com");
+        contactLocks.verify(memberRepository).lockClientRegistrationIdentity("CLIENT_REGISTRATION_PHONE/255700000001");
+        contactLocks.verify(memberRepository).findByEmailIgnoreCase("manager@example.com");
         verify(memberAccessClaimRepository).deleteByMemberId(lastInvitedMember.get().getId());
         verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_DOCUMENTS_VIEW));
@@ -1591,7 +1656,7 @@ class AdminServiceTest {
             null,
             adminId,
             Set.of(Position.ADMIN),
-            "Mary Manager",
+            "Mary Jane Manager",
             "manager@example.com",
             "255700000001",
             List.of(Position.MANAGER)
@@ -1628,7 +1693,7 @@ class AdminServiceTest {
             "ST-1",
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
-            "Existing Member",
+            "Existing Client Member",
             "member@example.com",
             "255700000003",
             List.of(Position.MANAGER)
@@ -1655,13 +1720,13 @@ class AdminServiceTest {
             null,
             UUID.randomUUID(),
             Set.of(Position.ADMIN),
-            "No Phone",
+            "No Phone Staff",
             "no-phone@example.com",
             null,
             List.of(Position.MANAGER)
         ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("Enter the staff member phone number.");
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("staffRegistration.phoneInvalid");
 
         verify(memberRepository, never()).save(any(Member.class));
     }

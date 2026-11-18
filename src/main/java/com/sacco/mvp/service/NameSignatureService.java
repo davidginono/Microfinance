@@ -6,6 +6,15 @@ import java.util.Locale;
 
 @Service
 public class NameSignatureService {
+    public String requireStaffFullName(String value) {
+        String normalized = value == null ? "" : value.strip().replaceAll("(?U)\\s+", " ");
+        String name = "\\p{L}[\\p{L}\\p{M}]*(?:['’-]\\p{L}[\\p{L}\\p{M}]*)*";
+        if (normalized.length() > 120 || !normalized.matches(name + " " + name + " " + name)) {
+            throw new IllegalStateException("staffRegistration.nameInvalid");
+        }
+        return normalized.toUpperCase(Locale.ROOT);
+    }
+
     public String requireFullName(String value, String blankMessage) {
         String normalized = normalizeSpaces(value);
         if (normalized.isBlank()) {

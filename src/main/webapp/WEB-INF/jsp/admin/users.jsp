@@ -194,23 +194,33 @@
                 </button>
             </div>
 
-            <form action="/admin/users" method="post" data-workspace-submit="recover" class="app-modal-body admin-staff-create-form grid gap-4 md:grid-cols-2">
-                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+            <form action="/admin/users" method="post" data-workspace-submit="recover" data-staff-registration
+                  data-contact-check-url="<c:url value='/admin/users/contact-availability' />"
+                  data-checking="<spring:message code='staffRegistration.checking' htmlEscape='true' />"
+                  data-available="<spring:message code='staffRegistration.available' htmlEscape='true' />"
+                  data-used="<spring:message code='staffRegistration.used' htmlEscape='true' />"
+                  data-failed="<spring:message code='staffRegistration.failed' htmlEscape='true' />"
+                  data-name-invalid="<spring:message code='staffRegistration.nameInvalid' htmlEscape='true' />"
+                  data-email-invalid="<spring:message code='staffRegistration.emailInvalid' htmlEscape='true' />"
+                  data-phone-invalid="<spring:message code='staffRegistration.phoneInvalid' htmlEscape='true' />"
+                  class="app-modal-body admin-staff-create-form grid gap-4 md:grid-cols-2">
+                <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" data-staff-csrf />
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <spring:message code="admin.workspace.fullName" />
-                    <input name="fullName" type="text" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
+                    <spring:message code="staffRegistration.fullName" />
+                    <input name="fullName" type="text" value="<c:out value='${staffRegistrationValues.fullName}' />" maxlength="120" required autocapitalize="characters" spellcheck="false" data-uppercase-input class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm uppercase text-slate-800" />
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="admin.workspace.email" />
-                    <input name="email" type="email" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <input name="email" type="email" value="<c:out value='${staffRegistrationValues.email}' />" maxlength="160" required aria-describedby="staff-email-status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <span id="staff-email-status" role="status" aria-live="polite" aria-atomic="true" class="mt-1 block text-sm font-normal normal-case tracking-normal"></span>
                 </label>
 
                 <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="admin.workspace.phone" />
-                    <input name="phone" type="tel" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
-                    <span class="mt-1 block text-[11px] font-normal normal-case tracking-normal text-slate-500"><spring:message code="admin.minorAdmins.phoneHelp" text="Use Tanzania format: 255 followed by 9 digits, for example 255746359369. Do not start with 0." /></span>
+                    <input name="phone" type="tel" value="<c:out value='${staffRegistrationValues.phone}' />" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" aria-describedby="staff-phone-status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
+                    <span id="staff-phone-status" role="status" aria-live="polite" aria-atomic="true" class="mt-1 block text-sm font-normal normal-case tracking-normal"></span>
                 </label>
 
                 <fieldset class="md:col-span-2 m-0 min-w-0 border-0 p-0">
@@ -221,6 +231,7 @@
                                 <input type="checkbox"
                                        name="positions"
                                        value="${position}"
+                                       <c:if test="${not empty staffRegistrationValues and staffRegistrationValues.positions.contains(position)}">checked</c:if>
                                        data-staff-role-checkbox="create-user"
                                        class="h-4 w-4 rounded border-slate-300 text-sacco-blue focus:ring-sacco-blue" />
                                 <span>${position.displayName}</span>
@@ -305,8 +316,10 @@
         document.querySelectorAll('[data-user-modal-close]').forEach((button) => {
             button.addEventListener('click', closeAllUserModals);
         });
+        <c:if test="${not empty staffRegistrationValues}">openUserModal('create-user');</c:if>
     })();
 </script>
 
 <%@ include file="../accounting/accounting-form-support.jspf" %>
+<script src="<c:url value='/js/staff-registration.js' />" defer></script>
 <%@ include file="../fragments/footer.jspf" %>

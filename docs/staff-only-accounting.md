@@ -12,6 +12,8 @@ Staff enter their assigned workspace directly. The retired institution selector 
 
 Named group offices, direct authentication landings, bounded work queues and existing report links are described in [Staff offices](staff-offices.md). Personal profile completion is optional for staff workspace access.
 
+Staff registration requires three names, an email address and a phone number. Contact availability is checked after a typing pause and again on save. Staff activate their invitation and enter their assigned workspace without a further profile-completion step. Availability responses contain no matching account details; an existing scoped client can still receive staff access through the existing identity checks.
+
 Legacy role identifiers remain on existing assignments where frozen voucher rules and historical evidence reference them. The cutover adds their current group equivalent without granting permissions: Minor Administrator → ICT Manager; Chairperson → Finance Manager; Board/Credit Committee → Credit Officer; Disbursement Officer → Accounts Clerk. The user editor presents the current groups and retains a legacy alias only while its corresponding assignment remains selected.
 
 Historical manager, board, guarantor and reversal entities remain where reports, evidence joins or archival queries still use them. Their retired workspaces and write services are removed.

@@ -54,6 +54,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.test.context.junit.jupiter.web.SpringJUnitWebConfig;
@@ -97,6 +98,47 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringJUnitWebConfig(AdminControllerUserAccessSecurityTest.TestConfig.class)
 class AdminControllerUserAccessSecurityTest {
+    @Test void contactChecksRequireCreatePermissionAndCsrfAndIgnoreSubmittedScope() throws Exception {
+        var actor = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_CREATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        String url = "/admin/users/contact-availability";
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor))).param("field", "email").param("value", "asha@example.invalid"))
+            .andExpect(status().isForbidden());
+        mockMvc.perform(post(url).with(authentication(authenticationFor(principal(Set.of(UserClaim.USER_ACCESS_VIEW))))).with(csrf())
+                .param("field", "email").param("value", "asha@example.invalid"))
+            .andExpect(status().isForbidden());
+        verify(adminService, never()).staffContactAvailable(any(), any(), any());
+        when(adminService.staffContactAvailable(actor, "email", "asha@example.invalid")).thenReturn(true);
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor))).with(csrf()).accept(MediaType.APPLICATION_JSON)
+                .param("field", "email").param("value", "asha@example.invalid").param("saccoId", "OTHER").param("stationId", "OTHER"))
+            .andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Cache-Control", "no-store"))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("{\"available\":true}"));
+        verify(adminService).staffContactAvailable(actor, "email", "asha@example.invalid");
+        when(adminService.staffContactAvailable(actor, "phone", "bad")).thenThrow(new IllegalArgumentException("staffRegistration.phoneInvalid"));
+        mockMvc.perform(post(url).with(authentication(authenticationFor(actor))).with(csrf()).accept(MediaType.APPLICATION_JSON)
+                .param("field", "phone").param("value", "bad"))
+            .andExpect(status().isBadRequest())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().json("{}"));
+    }
+
+    @Test void staffRegistrationFailureKeepsEnteredValuesAndGroupChoice() throws Exception {
+        var actor = principal(Set.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_CREATE));
+        when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
+        when(adminScopeService.currentSaccoId(actor)).thenReturn("SACCO-01");
+        when(adminScopeService.currentStationId(actor)).thenReturn("ST-1");
+        when(adminService.createUser(eq("SACCO-01"), eq("ST-1"), eq(actor.getMemberId()), any(),
+            eq("Asha Mushi"), eq("asha@example.invalid"), eq("255712345678"), eq(List.of(Position.CREDIT_OFFICER))))
+            .thenThrow(new IllegalStateException("staffRegistration.nameInvalid"));
+        mockMvc.perform(post("/admin/users").with(authentication(authenticationFor(actor))).with(csrf())
+                .param("fullName", "Asha Mushi").param("email", "asha@example.invalid").param("phone", "255712345678")
+                .param("positions", "CREDIT_OFFICER"))
+            .andExpect(redirectedUrl("/admin/users"))
+            .andExpect(flash().attribute("staffRegistrationValues", Map.of("fullName", "Asha Mushi", "email", "asha@example.invalid",
+                "phone", "255712345678", "positions", List.of(Position.CREDIT_OFFICER))))
+            .andExpect(flash().attribute("error", "Enter three names using letters, up to 120 characters."));
+    }
+
     @Autowired private WebApplicationContext context;
     @Autowired private AdminService adminService;
     @Autowired private com.sacco.mvp.accounting.loans.service.LoanProductAccountService productAccounts;
@@ -1019,7 +1061,7 @@ class AdminControllerUserAccessSecurityTest {
     @Configuration
     @EnableWebMvc
     @EnableWebSecurity
-    @Import(SecurityConfig.class)
+    @Import({SecurityConfig.class, com.sacco.mvp.staffregistration.controller.StaffRegistrationApiController.class})
     static class TestConfig {
         @Bean
         com.sacco.mvp.clients.onboarding.service.OnboardingService onboardingService() {

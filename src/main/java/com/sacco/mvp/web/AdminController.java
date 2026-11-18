@@ -1049,7 +1049,10 @@ public class AdminController {
                 ? "staffOnboarding.assigned" : "staffOnboarding.invited",new Object[]{createdUser.getStaffNo()},
                 org.springframework.context.i18n.LocaleContextHolder.getLocale()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            ra.addFlashAttribute("error", ex.getMessage());
+            ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(),
+                org.springframework.context.i18n.LocaleContextHolder.getLocale()));
+            ra.addFlashAttribute("staffRegistrationValues", Map.of("fullName", fullName, "email", email,
+                "phone", phone == null ? "" : phone, "positions", positions == null ? List.of() : positions));
         }
         return "redirect:/admin/users";
     }

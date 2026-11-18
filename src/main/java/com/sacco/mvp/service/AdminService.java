@@ -217,12 +217,49 @@ public class AdminService {
             saccoId,
             normalizeOptional(stationId),
             adminId,
-            fullName,
-            email,
-            phone,
+            nameSignatureService.requireStaffFullName(fullName),
+            staffRegistrationEmail(email),
+            staffRegistrationPhone(phone),
             staffRoles,
             "ADMIN_CREATE_STAFF_USER"
         );
+    }
+
+    @Transactional(readOnly = true, timeout = 5)
+    public boolean staffContactAvailable(com.sacco.mvp.security.AppUserPrincipal actor, String field, String value) {
+        if (actor == null || !actor.isStaffSession() || actor.isPlatformIdentity()
+            || !actor.getClaims().contains(UserClaim.USER_ACCESS_CREATE.name())
+            || actor.getSaccoId() == null || actor.getSaccoId().isBlank()
+            || actor.getStationId() == null || actor.getStationId().isBlank()) {
+            throw new org.springframework.security.access.AccessDeniedException("Staff registration unavailable");
+        }
+        memberRepository.findById(actor.getMemberId())
+            .filter(member -> member.getStatus() == MemberStatus.ACTIVE && member.isStaffAccessActive())
+            .filter(member -> java.util.Objects.equals(actor.getSaccoId(), member.getSaccoId())
+                && java.util.Objects.equals(actor.getStationId(), member.getStationId()))
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Staff registration unavailable"));
+        // Contacts identify accounts globally. Return availability only, never the matching identity or scope.
+        return switch (field) {
+            case "email" -> !memberRepository.existsByEmailIgnoreCase(staffRegistrationEmail(value));
+            case "phone" -> !memberRepository.existsByPhone(staffRegistrationPhone(value));
+            default -> throw new IllegalArgumentException("staffRegistration.contactInvalid");
+        };
+    }
+
+    private String staffRegistrationEmail(String value) {
+        if (value == null || value.length() > 160) throw new IllegalArgumentException("staffRegistration.emailInvalid");
+        String email = value.trim().toLowerCase(Locale.ROOT);
+        if (!email.matches("[^\\s@]+@[^\\s@]+\\.[^\\s@]+")) {
+            throw new IllegalArgumentException("staffRegistration.emailInvalid");
+        }
+        return email;
+    }
+
+    private String staffRegistrationPhone(String value) {
+        if (value == null || value.length() > 32 || !value.matches("\\+?[0-9 ()-]+") || TanzaniaPhoneNumber.normalizeOptional(value) == null) {
+            throw new IllegalArgumentException("staffRegistration.phoneInvalid");
+        }
+        return TanzaniaPhoneNumber.normalizeRequired(value);
     }
 
     @Transactional
@@ -1980,6 +2017,8 @@ public class AdminService {
         if (normalizedPhone == null) {
             throw new IllegalStateException("Enter the staff member phone number.");
         }
+        java.util.stream.Stream.of("CLIENT_REGISTRATION_EMAIL/" + normalizedEmail, "CLIENT_REGISTRATION_PHONE/" + normalizedPhone)
+            .sorted().forEach(memberRepository::lockClientRegistrationIdentity);
         Optional<Member> existingLocalMember = findLocalMemberByIdentity(normalizedEmail, normalizedPhone);
 
         if (existingLocalMember.isPresent() && existingLocalMember.get().isMemberAccess()) {
