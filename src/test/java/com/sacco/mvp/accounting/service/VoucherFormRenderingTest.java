@@ -45,6 +45,11 @@ class VoucherFormRenderingTest {
                 var form=new Form();form.setEffectiveDate(java.time.LocalDate.of(2026,11,18));
                 if(request.getParameter("split")!=null){var debit=new EntryForm();debit.setSide("DEBIT");debit.setAmount(java.math.BigDecimal.ONE);var credit=new EntryForm();credit.setSide("CREDIT");credit.setAmount(java.math.BigDecimal.ONE);form.getRows().getFirst().setEntries(List.of(debit,credit));}
                 request.setAttribute("voucherForm",form);request.setAttribute("voucherType",request.getParameter("type"));request.setAttribute("base","/finance/vouchers/test");
+                if(request.getParameter("split")!=null){
+                    var amount=java.math.BigDecimal.ONE;
+                    var debit=new Account(UUID.randomUUID(),"111001","Test bank","BANK");var credit=new Account(UUID.randomUUID(),"411001","Test account","OTHER");
+                    request.setAttribute("preview",new Preview(List.of(new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Test transaction",amount,debit,credit)),amount));
+                }
                 request.setAttribute("selectedAccounts",Map.of());request.getRequestDispatcher("/form.jsp").forward(request,response);
             }
         });context.addServletMappingDecoded("/form","form");
@@ -56,7 +61,8 @@ class VoucherFormRenderingTest {
                 assertThat(response.body()).doesNotContain("<spring:message","&lt;spring:message");
                 var locale=Locale.forLanguageTag(language);
                 assertThat(response.body()).contains("data-debit-label=\""+messages.getMessage("accounting.debit",null,locale)+"\"","data-credit-label=\""+messages.getMessage("accounting.credit",null,locale)+"\"","data-remove-entry-label=\""+messages.getMessage("voucher.removeEntry",null,locale)+"\"");
-                if(!split.isEmpty())assertThat(response.body()).contains("name=\"rows[0].entries[1].amount\"","data-split-totals");
+                if(!split.isEmpty())assertThat(response.body()).contains("name=\"rows[0].entries[1].amount\"","data-split-totals","data-resource-status=\"SUCCESS\"",messages.getMessage("voucher.balanced",null,locale));
+                else assertThat(response.body()).doesNotContain("voucher-preview-status");
                 String output=System.getProperty("microfinance.voucher.render-output");
                 if(output!=null){Files.createDirectories(Path.of(output));Files.writeString(Path.of(output,language+"-"+type+(split.isEmpty()?"-new":"-split")+".html"),response.body());}
             }
