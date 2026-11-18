@@ -98,7 +98,7 @@ public class StatementPresentation {
     public Document ledger(Snapshot s,Balance b,List<Activity> activity,Locale locale){
         var columns=List.of(new Column(label("fs.date",locale),false,.12f),new Column(label("fs.accountNumber",locale),false,.16f),new Column(label("fs.description",locale),false,.32f),new Column(label("fs.debit",locale),true,.13f),new Column(label("fs.credit",locale),true,.13f),new Column(label("fs.balance",locale),true,.14f));
         var rows=new ArrayList<DisplayRow>();rows.add(row(true,false,null,"","",label("fs.opening",locale),"","",b.opening()));
-        for(var a:activity)rows.add(row(false,false,a.sourceUrl(),a.date(),a.accountNumber()==null||a.accountNumber().isBlank()?label("fs.unavailable",locale):a.accountNumber(),a.description(),a.debit(),a.credit(),b.opening().add(a.running())));
+        for(var a:activity)rows.add(row(false,false,a.sourceUrl(),a.date(),a.accountNumber()==null||a.accountNumber().isBlank()?b.code():a.accountNumber(),a.description(),a.debit(),a.credit(),b.opening().add(a.running())));
         rows.add(row(true,false,null,"","",label("fs.periodTotal",locale),b.debit(),b.credit(),b.closing()));
         return new Document(label("fs.title.LEDGER",locale)+" — "+b.code()+" "+b.name(),"trial",columns,rows,-1,false);
     }

@@ -90,20 +90,24 @@ class StatementExportTest {
         var s=snapshot();var account=s.balances().getFirst();
         var activity=List.of(new Activity(UUID.randomUUID(),PERIOD.from(),"LN-000123","Loan transaction",n("10"),n("0"),n("10"),null),
             new Activity(UUID.randomUUID(),PERIOD.from(),"CL-000045","Client transaction",n("0"),n("2"),n("8"),null),
-            new Activity(UUID.randomUUID(),PERIOD.from(),null,"Unlinked transaction",n("1"),n("0"),n("9"),null));
+            new Activity(UUID.randomUUID(),PERIOD.from(),null,"Unlinked transaction",n("1"),n("0"),n("9"),null),
+            new Activity(UUID.randomUUID(),PERIOD.from(),"","Empty account number",n("0"),n("1"),n("8"),null),
+            new Activity(UUID.randomUUID(),PERIOD.from(),"  ","Blank account number",n("2"),n("0"),n("10"),null));
         for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
             var document=presentation.ledger(s,account,activity,locale);String heading=presentation.label("fs.accountNumber",locale);
             assertThat(document.columns().get(1).label()).isEqualTo(heading);
             assertThat(document.rows().get(1).cells().get(1).text()).isEqualTo("LN-000123");
             assertThat(document.rows().get(2).cells().get(1).text()).isEqualTo("CL-000045");
-            assertThat(document.rows().get(3).cells().get(1).text()).isEqualTo(presentation.label("fs.unavailable",locale));
+            for(int row=3;row<=5;row++)assertThat(document.rows().get(row).cells().get(1).text()).isEqualTo(account.code());
+            assertThat(document.rows().get(3).cells().get(3).amount()).isEqualByComparingTo("1.00");
+            assertThat(document.rows().get(3).cells().get(5).amount()).isEqualByComparingTo(account.opening().add(n("9")));
             try(var pdf=Loader.loadPDF(exporter.export(s,document,"PDF",locale))){
                 String text=new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ").toLowerCase(locale);
-                assertThat(text).contains(heading.toLowerCase(locale),"ln-000123","cl-000045").doesNotContain(presentation.label("fs.reference",locale).toLowerCase(locale));
+                assertThat(text).contains(heading.toLowerCase(locale),"ln-000123","cl-000045",account.code().toLowerCase(locale)).doesNotContain(presentation.label("fs.reference",locale).toLowerCase(locale),presentation.label("fs.unavailable",locale).toLowerCase(locale));
             }
             try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,document,"XLSX",locale)))){
                 var numbers=new ArrayList<String>();for(var row:book.getSheetAt(0)){var cell=row.getCell(1);if(cell!=null&&cell.getCellType()==CellType.STRING)numbers.add(cell.getStringCellValue());}
-                assertThat(numbers).contains(heading,"LN-000123","CL-000045",presentation.label("fs.unavailable",locale)).doesNotContain(presentation.label("fs.reference",locale));
+                assertThat(numbers).contains(heading,"LN-000123","CL-000045",account.code()).doesNotContain(presentation.label("fs.reference",locale),presentation.label("fs.unavailable",locale));
             }
         }
     }
