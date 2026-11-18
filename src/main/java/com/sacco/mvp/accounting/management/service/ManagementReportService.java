@@ -6,6 +6,8 @@ import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 import java.util.*;
@@ -16,6 +18,7 @@ public class ManagementReportService {
     private final GeneralLedgerService guard;
     private final ApplicationClock clock;
     private final ReportExportLimiter limiter;
+    private final MessageSource messages;
     public void authorize(AppUserPrincipal a,Kind kind,boolean export){
         guard.requireActor(a,"FINANCIAL_REPORTS_VIEW");
         guard.requireActor(a,switch(kind){case DAILY_COLLECTIONS->"ACCOUNTING_BUSINESS_VIEW";case CASHBOOK->"ACCOUNTING_JOURNALS_VIEW";default->"LOAN_REPORTS_VIEW";});
@@ -26,7 +29,7 @@ public class ManagementReportService {
         return switch(category) {
             case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of());}
             case "clients" -> reports.clients(a,search,page,null);
-            case "products" -> {loanReport(kind);yield reports.products(a,search,page,null);}
+            case "products" -> {loanReport(kind);yield reports.products(a,search,page,null,customisedLabel());}
             default -> throw error("parameters");
         };
     }
@@ -47,8 +50,9 @@ public class ManagementReportService {
     }
     @Transactional(readOnly=true) public Choice selectedProduct(AppUserPrincipal a,Kind kind,UUID id) {
         authorize(a,kind,false);loanReport(kind);
-        return reports.products(a,"",0,id).stream().findFirst().orElseThrow(()->error("product"));
+        return reports.products(a,"",0,id,customisedLabel()).stream().findFirst().orElseThrow(()->error("product"));
     }
+    private String customisedLabel(){return messages.getMessage("management.customisedLoans",null,LocaleContextHolder.getLocale());}
     private static void loanReport(Kind kind){check(kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS,"parameters");}
     private static void accountReport(Kind kind){check(kind==Kind.CASHBOOK || kind==Kind.DAILY_COLLECTIONS,"parameters");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)

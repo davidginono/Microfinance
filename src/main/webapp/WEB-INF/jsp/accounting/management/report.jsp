@@ -65,7 +65,7 @@
       <label data-loan-choice data-lazy-choice data-choice-url="<c:out value='${productLookup}' />">
         <spring:message code="management.productSearch" />
         <select class="aws-control" name="productId" data-choice-select data-searchable="true">
-          <option value="" data-empty-option="true"><spring:message code="reports.allProducts" /></option>
+          <option value="" data-empty-option="true"><spring:message code="management.allLoans" /></option>
           <c:if test="${not empty productChoice}"><option selected value="${productChoice.id}"><c:out value="${productChoice.getLabel()}" /></option></c:if>
         </select>
         <%@ include file="../loans/choice-search.jspf" %>

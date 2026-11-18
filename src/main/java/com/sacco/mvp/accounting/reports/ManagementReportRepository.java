@@ -51,14 +51,14 @@ public class ManagementReportRepository {
         String code=row.getString(2),name=row.getString(3);
         return new Choice(row.getObject(1,UUID.class),code,name,code+" — "+name);
     }
-    public List<Choice> products(AppUserPrincipal a,String search,int page,UUID selected) {
+    public List<Choice> products(AppUserPrincipal a,String search,int page,UUID selected,String customisedLabel) {
         var p=parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT))
-            .addValue("selected",selected,Types.OTHER).addValue("offset",selected==null?page*25:0);
+            .addValue("selected",selected,Types.OTHER).addValue("offset",selected==null?page*25:0).addValue("customisedLabel",customisedLabel);
         return jdbc.query("""
-            select id,coalesce(product_name,loan_type) label from loan_product_settings
+            select id,case when custom_recording_configuration then :customisedLabel else coalesce(product_name,loan_type) end label from loan_product_settings
             where sacco_id=:institution and (cast(:selected as uuid) is null or id=:selected)
-              and (cast(:selected as uuid) is not null or strpos(lower(coalesce(product_name,loan_type)),:search)>0)
-            order by coalesce(display_order,2147483647),id limit 26 offset :offset
+              and (cast(:selected as uuid) is not null or strpos(lower(case when custom_recording_configuration then :customisedLabel else coalesce(product_name,loan_type) end),:search)>0)
+            order by custom_recording_configuration desc,coalesce(display_order,2147483647),id limit 26 offset :offset
             """,p,(r,n)->new Choice(r.getObject("id",UUID.class),"",r.getString("label")));
     }
     public String[] identity(AppUserPrincipal a){return jdbc.queryForObject("select i.sacco_name,coalesce(nullif(s.address_location,''),s.station_id) from registered_saccos i join sacco_stations s on s.sacco_id=i.sacco_id where s.sacco_id=:institution and s.station_id=:branch",parameters(a,null),(r,n)->new String[]{r.getString(1),r.getString(2)});}

@@ -62,7 +62,7 @@ class ManagementReportTest {
         var clock=org.mockito.Mockito.mock(com.sacco.mvp.service.ApplicationClock.class);
         org.mockito.Mockito.when(clock.today()).thenReturn(DAY);
         org.mockito.Mockito.when(clock.now()).thenReturn(NOW);
-        var service=new ManagementReportService(repository,guard,clock,new ReportExportLimiter(1));
+        var service=new ManagementReportService(repository,guard,clock,new ReportExportLimiter(1),new ResourceBundleMessageSource());
         UUID start=UUID.randomUUID(),end=UUID.randomUUID();
         assertThatThrownBy(()->service.selectedRange(actor,Kind.CASHBOOK,start,null)).hasMessage("management.error.cashBankAccount");
         org.mockito.Mockito.verify(guard).requireActor(actor,"FINANCIAL_REPORTS_VIEW");
