@@ -5,7 +5,6 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 <%@ include file="../fragments/dashboard-support.jspf" %>
-<nav class="erp-page-path" aria-label="<spring:message code='office.path' />"><span aria-current="page"><spring:message code="menu.dashboard" /></span></nav>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="menu.dashboard" /></h1></div>
 <c:choose><c:when test="${empty personalDashboard.activities and empty personalDashboard.administration}">
     <section class="erp-panel"><div class="erp-panel-body"><p><spring:message code="office.noWorkAssigned" /></p></div></section>
