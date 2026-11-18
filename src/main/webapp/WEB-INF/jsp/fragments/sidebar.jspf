@@ -30,6 +30,7 @@
         </div>
         <nav id="shellSidebarNavigation" class="shell-sidebar-scroll flex-1 space-y-1.5 px-2 pb-2 pt-0 lg:space-y-2 lg:px-3 lg:pb-3 lg:pt-0" data-view-position-key="sidebar-navigation">
             <c:if test="${staffWorkspace}">
+                <%@ include file="staff-offices.jspf" %>
                 <sec:authorize access="@access.has(principal,'GUARANTOR_CAPACITY_VIEW')"><a href="<c:url value='/finance/credit/guarantors'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/guarantors')?'shell-nav-active':''}"><spring:message code="credit.title.guarantors"/></a></sec:authorize>
                 <sec:authorize access="@access.has(principal,'COLLATERAL_VIEW')"><a href="<c:url value='/finance/credit/collateral'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/collateral')?'shell-nav-active':''}"><spring:message code="credit.title.collateral"/></a></sec:authorize>
                 <sec:authorize access="@access.has(principal,'COLLECTIONS_VIEW')"><a href="<c:url value='/finance/credit/collections'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/credit/collections')?'shell-nav-active':''}"><spring:message code="credit.title.collections"/></a></sec:authorize>
@@ -109,17 +110,10 @@
             </c:if>
 
             <c:if test="${staffWorkspace}">
-                <%@ include file="staff-offices.jspf" %>
 
             <sec:authorize access="@access.hasAny(principal, 'GROUP_LENDING_VIEW', 'LOAN_RECORDING_VIEW', 'LOAN_ADJUSTMENTS_VIEW', 'ACCOUNTING_ACCOUNTS_VIEW', 'ACCOUNTING_JOURNALS_VIEW', 'FINANCIAL_REPORTS_VIEW', 'ACCOUNTING_BUSINESS_VIEW', 'ACCOUNTING_RECONCILIATION_VIEW', 'VOUCHER_WORKSPACE_VIEW', 'VOUCHER_RULE_VIEW', 'ACCOUNTING_ACCOUNT_RULES_VIEW', 'PAYROLL_DEDUCTIONS_VIEW', 'APPROVAL_FLOW_VIEW')">
                 <%@ include file="finance-navigation.jspf" %>
             </sec:authorize>
-            <sec:authorize access="@access.canAccessDisbursementArea(principal)">
-                <div class="shell-sidebar-nav-heading"><span><spring:message code="office.funding" /></span></div>
-                <a href="<c:url value='/disbursement/loan-applications' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri, '/disbursement/loan-applications') ? 'shell-nav-active' : ''}"><spring:message code="menu.disbursementQueue" /></a>
-                <a href="<c:url value='/disbursement/archive' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq '/disbursement/archive' ? 'shell-nav-active' : ''}"><spring:message code="menu.disbursementArchive" /></a>
-            </sec:authorize>
-                <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_VIEW')"><a href="<c:url value='/finance/clients/onboarding'/>" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/clients/onboarding')?'shell-nav-active':''}"><spring:message code="kyc.title"/></a></sec:authorize>
             </c:if>
 
             <c:if test="${staffWorkspace}">

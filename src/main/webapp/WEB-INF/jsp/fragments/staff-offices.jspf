@@ -13,6 +13,7 @@
         </c:forEach>
     </div>
 </c:forEach>
+<%@ include file="office-activities.jspf" %>
 <sec:authorize access="@access.hasAny(principal,'USER_ACCESS_VIEW','SUPPORT_VIEW','OUTBOX_VIEW','SMS_USAGE_VIEW')"><div class="shell-sidebar-nav-heading"><span><spring:message code="admin.tools" /></span></div></sec:authorize>
 <sec:authorize access="@access.has(principal,'USER_ACCESS_VIEW')"><a href="<c:url value='/admin/users' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/users') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.usersRoles" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'SUPPORT_VIEW')"><a href="<c:url value='/admin/incidents' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/incidents') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.incidents" /></a></sec:authorize>
