@@ -50,7 +50,6 @@
 .aws-console .resource-table-record-actions { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .aws-console [data-resource-table] :focus-visible { outline:2px solid #0073bb; outline-offset:2px; }
 .aws-console dialog.resource-table-preferences { position:fixed; inset:0; margin:auto; width:min(800px,calc(100vw - 24px)); max-height:calc(100dvh - 32px); padding:0; border:1px solid #d5dbdb; border-radius:2px; color:#16191f; background:white; box-shadow:0 2px 8px rgba(0,28,36,.16); }
-.aws-console dialog.resource-table-preferences::backdrop { background:rgba(255,255,255,.82); backdrop-filter:none; }
 .resource-table-dialog-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #eaeded; background:#fafafa; }
 .resource-table-dialog-header h2 { margin:0; font-size:18px; font-weight:700; }
 .resource-table-dialog-header button { min-width:28px; border:0; padding:4px; }

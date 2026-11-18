@@ -552,11 +552,6 @@ body.aws-auth-shell .forgot-password-dialog {
     box-shadow: 0 2px 8px rgba(0, 28, 36, .16) !important;
 }
 
-body.aws-auth-shell #forgotPasswordModal {
-    background: rgba(255, 255, 255, .82);
-    backdrop-filter: none;
-}
-
 body.aws-auth-shell .forgot-password-dialog > div:first-child {
     background: #fafafa;
 }

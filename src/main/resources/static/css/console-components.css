@@ -3,6 +3,17 @@
  * Workspace surfaces and the shared shell own the current AWS visual system.
  */
 
+/* One backdrop for shared overlays and native dialogs, including authentication. */
+.app-modal-overlay,
+.repayment-schedule-modal-overlay,
+.session-timeout-overlay,
+#forgotPasswordModal,
+dialog::backdrop {
+    background: rgba(0, 0, 0, .4);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+}
+
 /* Source: src/main/webapp/WEB-INF/jsp/disbursement/archive.jsp */
 .disbursement-archive-search-form {
         width: 100%;
@@ -2629,9 +2640,6 @@ html.session-timeout-active,
         box-sizing: border-box;
         min-height: 100dvh;
         padding: clamp(0.75rem, 2vw, 1.5rem);
-        background: rgba(255, 255, 255, 0.82);
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
         isolation: isolate;
         overscroll-behavior: contain;
         transition: opacity 220ms ease-out;
@@ -2797,12 +2805,6 @@ html.session-timeout-active,
         border-top: 1px solid #e2e8f0;
         background: #ffffff;
         padding: 0.75rem 1rem;
-    }
-
-    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-        .session-timeout-overlay {
-            background: rgba(255, 255, 255, 0.82);
-        }
     }
 
     @keyframes session-timeout-icon-alert {
@@ -3519,8 +3521,6 @@ html.session-timeout-active,
         align-items: center;
         justify-content: center;
         padding: 1.5rem;
-        background: rgba(255, 255, 255, 0.82);
-        backdrop-filter: none;
     }
 
     .app-modal-overlay.is-open {
@@ -3544,7 +3544,6 @@ html.session-timeout-active,
     }
 
     dialog.app-modal-panel:not([open]) { display: none; }
-    dialog.app-modal-panel::backdrop { background: rgba(255, 255, 255, 0.82); backdrop-filter: none; }
 
     .app-modal-scroll {
         display: flex;
@@ -3701,7 +3700,6 @@ html.session-timeout-active,
         justify-content: center;
         box-sizing: border-box;
         padding: 0.75rem;
-        background: rgba(15, 23, 42, 0.52);
     }
 
     .repayment-schedule-modal-overlay.is-open {

@@ -1817,11 +1817,6 @@ body.aws-console table.erp-table :is(th, td).text-center {
     outline-offset: -2px;
 }
 
-.app-modal-overlay {
-    background: rgba(255, 255, 255, .82) !important;
-    backdrop-filter: none !important;
-}
-
 .app-modal-header {
     min-height: 56px;
     border-color: var(--aws-line) !important;
@@ -2281,8 +2276,6 @@ body.aws-console {
 
 .session-timeout-overlay {
     padding: 16px !important;
-    background: rgba(255, 255, 255, .82) !important;
-    backdrop-filter: none !important;
 }
 
 .session-timeout-panel {
