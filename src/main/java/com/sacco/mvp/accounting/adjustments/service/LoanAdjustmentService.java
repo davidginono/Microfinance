@@ -54,6 +54,7 @@ public class LoanAdjustmentService {
                 amount=c.writtenOff();debit=c.principalAccount();credit=c.allowanceAccount();allowanceChange=amount;principalChange=amount;reverses=c.writeOffJournal();
             }
             case DISBURSEMENT_REVERSAL -> {
+                check(!adjustments.hasRepaymentHistory(c.id()),"repayments");
                 charges.checkFundingCorrection(a,c.id());
                 active(c);check(c.sequence()==1 && c.outstanding().compareTo(c.principal())==0,"repayments");
                 check(c.allowance().signum()==0 && c.writtenOff().signum()==0,"allowanceFirst");
@@ -71,6 +72,7 @@ public class LoanAdjustmentService {
         if(!q.state().equals("PENDING")){check(adjustments.decisionRetry(a,id,key,approve,reason.strip()),"decided");return id;}
         check(!q.requestedBy().equals(a.getMemberId()),"independent");
         if(approve){
+            if(q.kind()==Kind.DISBURSEMENT_REVERSAL)check(!adjustments.hasRepaymentHistory(c.id()),"repayments");
             check(q.sequence()==c.sequence() && Objects.equals(q.lastAdjustment(),c.lastAdjustment()) && q.outstanding().compareTo(c.outstanding())==0 && q.allowance().compareTo(c.allowance())==0 && q.writtenOff().compareTo(c.writtenOff())==0,"changed");
             var f=new Form();f.setDate(q.date());date(f,c);
             if(q.kind()==Kind.DISBURSEMENT_REVERSAL)check(!c.disbursedBy().equals(a.getMemberId()),"independent");

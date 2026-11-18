@@ -14,6 +14,7 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class LoanAdjustmentRepository {
     private final JdbcTemplate jdbc;
+    public boolean hasRepaymentHistory(UUID loan) {return Boolean.TRUE.equals(jdbc.queryForObject("select loan_has_repayment_history(?)",Boolean.class,loan));}
     private static final String SELECT="""
         select q.*,a.loan_id number,m.full_name client,u.full_name requester,
         coalesce(d.decision,'PENDING') state,d.actor_id decided_by,v.full_name reviewer,d.reason decision_reason,

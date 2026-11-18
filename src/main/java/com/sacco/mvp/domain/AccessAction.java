@@ -5,6 +5,7 @@ public enum AccessAction {
     VALIDATE("Validate"), POST("Post"), INITIATE("Initiate"), WITHDRAW("Withdraw"), HOLD("Hold"), FORCE_APPROVE("Force approve"), ESCALATED_APPROVE("Escalated approval"),
     ADD("Add"),
     CREATE("Create"),
+    CANCEL("Cancel loan"),
     UPDATE("Update"),
     APPROVE("Approve"),
     WAIVE("Waive interest"),
