@@ -140,8 +140,9 @@
         };
         panels.forEach((panel,index)=>{
             const heading=panel.querySelector('h2,h3,summary');
+            const tabLabel=heading.cloneNode(true);tabLabel.querySelectorAll('.app-table-count').forEach(counter=>counter.remove());
             if(!panel.id)panel.id='detail-section-'+(panel.dataset.resourceTable || index);
-            const button=document.createElement('button');button.type='button';button.id=panel.id+'-tab';button.textContent=heading.textContent.trim();button.setAttribute('role','tab');button.setAttribute('aria-controls',panel.id);
+            const button=document.createElement('button');button.type='button';button.id=panel.id+'-tab';button.textContent=tabLabel.textContent.trim();button.setAttribute('role','tab');button.setAttribute('aria-controls',panel.id);
             panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',button.id);panel.tabIndex=0;
             const disclosure=panel.tagName==='DETAILS'?panel:panel.querySelector(':scope > details');if(disclosure)disclosure.open=true;
             button.addEventListener('click',()=>activate(panel.id));
