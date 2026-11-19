@@ -232,6 +232,7 @@ public class DisbursementController {
                 row.put("loanId", entry.loan().getLoanId() == null ? "-" : entry.loan().getLoanId());
                 row.put("applicationNumber", entry.loan().getApplicationNumber() == null ? "-" : entry.loan().getApplicationNumber().toString());
                 row.put("loanProductName", loanProductDisplayService.displayName(entry.loan(), loanProductNames));
+                row.put("loanFor", entry.loan().getApplicantMemberId()==null?"GROUP":"INDIVIDUAL");
                 row.put("applicantName", borrowerNames.getOrDefault(entry.loan().getId(), "-"));
                 row.put("amount", entry.loan().getAmount() == null ? "-" : entry.loan().getAmount().toPlainString());
                 row.put("disbursedAt", entry.loan().getDisbursementDate() == null ? "-" : entry.loan().getDisbursementDate().toString());

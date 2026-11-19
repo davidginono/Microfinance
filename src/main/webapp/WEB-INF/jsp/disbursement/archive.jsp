@@ -52,6 +52,7 @@
         <tr>
             <th data-table-order="loan"><spring:message code="loan.loanId" text="Loan ID" /></th>
             <th data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th data-table-order="loanFor"><spring:message code="simpleGroup.loanFor" /></th>
             <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
             <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
             <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
@@ -65,6 +66,7 @@
             <tr>
                 <td><c:choose><c:when test="${not empty row.loanId and row.loanId != '-'}"><a class="resource-table-id-link" href="<c:url value='/disbursement/loan-applications/${row.id}' />"><c:out value="${row.loanId}" /></a></c:when><c:otherwise><c:out value="${row.loanId}" /></c:otherwise></c:choose></td>
                 <td><a class="resource-table-id-link" href="<c:url value='/disbursement/loan-applications/${row.id}' />">${row.applicationNumber}</a></td>
+                <td><spring:message code="recording.loanFor.${row.loanFor}" /></td>
                 <td><c:out value="${row.loanProductName}" /></td>
                 <td>${row.applicantName}</td>
                 <td><fmt:formatNumber value="${row.amount}" minFractionDigits="0" maxFractionDigits="2" /></td>
@@ -89,7 +91,7 @@
         </c:forEach>
         <c:if test="${empty archiveRows}">
             <tr>
-                <td colspan="8" class="px-3 py-8 text-center text-slate-500">
+                <td colspan="9" class="px-3 py-8 text-center text-slate-500">
                     <spring:message code="disbursement.archive.empty" text="No disbursed loans matched the current filter." />
                 </td>
             </tr>

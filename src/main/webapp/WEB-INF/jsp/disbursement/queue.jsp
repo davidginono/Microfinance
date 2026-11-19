@@ -36,6 +36,7 @@
         <thead>
         <tr>
             <th data-table-order="number"><spring:message code="loan.applicationId" text="Loan Application ID" /></th>
+            <th data-table-order="loanFor"><spring:message code="simpleGroup.loanFor" /></th>
             <th data-table-order="product"><spring:message code="reports.loanProduct" text="Loan Product" /></th>
             <th data-table-order="applicant"><spring:message code="common.applicant" text="Applicant" /></th>
             <th data-table-order="amount"><spring:message code="common.amount" text="Amount" /></th>
@@ -48,6 +49,7 @@
         <c:forEach items="${apps}" var="app">
             <tr>
                 <td class="px-3 py-2"><a class="resource-table-id-link" href="<c:url value='/disbursement/loan-applications/${app.id}' />">${app.applicationNumber}</a></td>
+                <td class="px-3 py-2"><spring:message code="recording.loanFor.${empty app.applicantMemberId?'GROUP':'INDIVIDUAL'}" /></td>
                 <td class="px-3 py-2">
                     <c:out value="${applicationProductNames[app.id]}" />
                 </td>
@@ -72,7 +74,7 @@
         </c:forEach>
         <c:if test="${empty apps}">
             <tr>
-                <td colspan="7" class="px-3 py-8 text-center text-slate-500">
+                <td colspan="8" class="px-3 py-8 text-center text-slate-500">
                     No loan applications found for the ${fn:toLowerCase(currentFilterLabel)} filter.
                 </td>
             </tr>

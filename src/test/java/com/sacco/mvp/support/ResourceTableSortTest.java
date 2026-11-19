@@ -12,6 +12,17 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ResourceTableSortTest {
+    @Test void disbursementLoanForSortUsesTheRecordedBorrowerBeforePagination() {
+        request("disbursement-queue-1.loanFor","asc");
+        assertThat(new ResourceTableSort.LoanQueue().rewrite("select l.id from LoanApplication l where l.saccoId=:institution and l.stationId=:branch order by l.createdAt asc",Sort.unsorted()).stripTrailing())
+            .contains("where l.saccoId=:institution and l.stationId=:branch")
+            .endsWith("order by case when l.applicantMemberId is null then 'GROUP' else 'INDIVIDUAL' end asc nulls last,l.id asc");
+        request("disbursement-archive-1.loanFor","desc");
+        assertThat(new ResourceTableSort.StaffArchives().rewrite("select r.* from manager_reviews r join loan_applications l on l.id=r.loan_application_id where l.sacco_id=:institution and l.station_id=:branch order by r.id limit 50 offset 100",Sort.unsorted()))
+            .contains("where l.sacco_id=:institution and l.station_id=:branch")
+            .endsWith("order by case when l.applicant_member_id is null then 'GROUP' else 'INDIVIDUAL' end desc nulls last,r.id desc limit 50 offset 100");
+    }
+
     @AfterEach void clearRequest() { RequestContextHolder.resetRequestAttributes(); }
 
     private void request(String column, String direction) {

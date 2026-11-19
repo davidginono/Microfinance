@@ -50,7 +50,7 @@ class RegisterColumnSortingTest {
         when(actor.getSaccoId()).thenReturn("institution"); when(actor.getStationId()).thenReturn("branch");
         var product = UUID.randomUUID(); var today = LocalDate.of(2026,10,14);
         for (boolean posting : List.of(false,true)) {
-            for (String column : List.of("number", "product", "client", "date", "amount", "status", posting?"reference":"balance")) {
+            for (String column : List.of("number", "loanFor", "product", "client", "date", "amount", "status", posting?"reference":"balance")) {
                 for (String direction : List.of("asc", "desc")) {
                     var jdbc = mock(JdbcTemplate.class); var repository = new LoanRecordingRepository(jdbc);
                     var filter = new LoanRecordingDtos.Filter("client", today.minusDays(10), today, "", column+"_"+direction, 2, null, product);
