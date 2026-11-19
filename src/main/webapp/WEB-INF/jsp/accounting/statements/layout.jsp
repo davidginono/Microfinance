@@ -1,11 +1,11 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="layout-support.jspf" %>
-<div class="accounting-workspace statement-layout">
+<div class="accounting-workspace statement-layout" data-resource-details-page>
 <%@ include file="feedback.jspf" %>
 <c:if test="${param.unchanged=='true'}"><div data-workspace-flashbar><div class="app-toast app-toast-info console-message" data-app-toast data-toast-type="info" role="status"><p data-toast-text><spring:message code="fs.layout.unchanged" /></p><button type="button" class="app-toast-close" data-feedback-dismiss aria-label="<spring:message code='form.notification.dismiss' />">×</button></div></div></c:if>
 <h1 class="erp-page-title" data-aws-page-header><spring:message code="fs.layout.title" /></h1>
 <p class="fs-layout-scope"><spring:message code="fs.layout.scope" /></p>
-<section class="erp-table-wrap" data-resource-table="statement-layout-groups" data-table-selection="single" data-layout-register>
+<section id="layout-groups" class="erp-table-wrap" data-resource-table="statement-layout-groups" data-table-selection="single" data-layout-register>
 <div class="app-table-titlebar"><h2><spring:message code="fs.layout.groups" /></h2><div class="app-table-toolbar">
 <button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="edit" disabled><spring:message code="common.edit" /></button><button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="remove" disabled><spring:message code="fs.layout.remove" /></button>
 <c:choose><c:when test="${layout.groups.size()>=9}"><button type="button" class="app-btn btn-launch" disabled title="<spring:message code='fs.layout.groupLimit' />"><spring:message code="fs.layout.addGroup" /></button></c:when><c:otherwise><a class="app-btn btn-launch" href="<c:url value='/reports/financial/statements/layout/groups/new' />"><spring:message code="fs.layout.addGroup" /></a></c:otherwise></c:choose>
@@ -16,7 +16,7 @@
 <c:if test="${empty layout.groups}"><tr><td colspan="4"><span class="resource-table-empty-message"><spring:message code="fs.layout.noGroups" /></span></td></tr></c:if>
 </tbody></table></div><div data-table-pagination data-page="0" data-table-for="statement-layout-groups"></div><p class="sr-only" aria-live="polite" data-layout-selection></p>
 </section>
-<section class="erp-table-wrap" data-resource-table="statement-layout-movements" data-table-selection="single" data-layout-register>
+<section id="layout-movements" class="erp-table-wrap" data-resource-table="statement-layout-movements" data-table-selection="single" data-layout-register>
 <div class="app-table-titlebar"><h2><spring:message code="fs.layout.movementRows" /></h2><div class="app-table-toolbar">
 <button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="edit" disabled><spring:message code="common.edit" /></button>
 <c:choose><c:when test="${layout.movementRows.size()>=movementRowsLimit and not empty movementRowsLimit}"><button type="button" class="app-btn btn-launch" disabled title="<spring:message code='fs.layout.movementRowsLimit' />"><spring:message code="fs.layout.addMovementRow" /></button></c:when><c:otherwise><a class="app-btn btn-launch" href="<c:url value='/reports/financial/statements/layout/movement-rows/new' />"><spring:message code="fs.layout.addMovementRow" /></a></c:otherwise></c:choose>
@@ -30,7 +30,7 @@
 <c:if test="${empty layout.movementRows}"><tr><td colspan="3"><span class="resource-table-empty-message"><spring:message code="fs.layout.noMovementRows" /></span></td></tr></c:if>
 </tbody></table></div><div data-table-pagination data-page="0" data-table-for="statement-layout-movements"></div><p class="sr-only" aria-live="polite" data-layout-selection></p>
 </section>
-<section class="erp-table-wrap" data-resource-table="statement-layout-notes" data-table-selection="single" data-layout-register>
+<section id="layout-notes" class="erp-table-wrap" data-resource-table="statement-layout-notes" data-table-selection="single" data-layout-register>
 <div class="app-table-titlebar"><h2><spring:message code="fs.notes" /></h2><div class="app-table-toolbar">
 <button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="edit" disabled><spring:message code="common.edit" /></button><button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="remove" disabled><spring:message code="fs.layout.remove" /></button>
 <c:choose><c:when test="${layout.notes.size()>=30}"><button type="button" class="app-btn btn-launch" disabled title="<spring:message code='fs.layout.noteLimit' />"><spring:message code="fs.layout.addNote" /></button></c:when><c:otherwise><a class="app-btn btn-launch" href="<c:url value='/reports/financial/statements/layout/notes/new' />"><spring:message code="fs.layout.addNote" /></a></c:otherwise></c:choose>
