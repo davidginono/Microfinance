@@ -73,7 +73,7 @@ public class VoucherService {
     public List<Account> accounts(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return accounts(actor,type,search,page,"");}
     @Transactional(readOnly=true)
     public List<Account> accounts(AppUserPrincipal actor,Type type,String search,int page,String purpose){
-        authorize(actor,type,"CREATE");query(search,page);require(Set.of("","MONEY","OTHER").contains(purpose),"","filter");
+        authorize(actor,type,"CREATE");query(search,page);require(Set.of("","MONEY","OTHER","EXPENSE").contains(purpose),"","filter");
         return vouchers.accounts(actor.getSaccoId(),search,page*25,purpose);
     }
     @Transactional(readOnly=true)
@@ -215,7 +215,11 @@ public class VoucherService {
             BigDecimal amount=row.getAmount().setScale(2,RoundingMode.UNNECESSARY);total=total.add(amount);
             result.add(new Transaction(UUID.randomUUID(),++n,row.getTransactionId(),template,name,row.getComponent(),row.getDescription().strip(),amount,debit,credit));
         }
-        require(total.precision()<=18,"","amount");return new Preview(List.copyOf(result),total);
+        require(total.precision()<=18,"","amount");
+        var entries=new ArrayList<Map<String,Object>>();
+        for(var transaction:result)for(var entry:transaction.postings())entries.add(Map.of("row",transaction.id(),"account",entry.account().id(),"side",entry.side(),"amount",entry.amount()));
+        vouchers.validatePettyCash(actor.getSaccoId(),actor.getStationId(),f.getEffectiveDate(),type,json.writeValueAsString(entries));
+        return new Preview(List.copyOf(result),total);
     }
     static void validate(Form f,Type type,LocalDate today){
         require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");

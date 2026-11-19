@@ -36,7 +36,7 @@ function update(){
  all.forEach(r=>{
   const mapped=!!field(r,'transactionId').value,direct=!loan&&!mapped&&!activity(),editable=direct&&form.dataset.newVoucher!=='true';
   if(editable&&!r.querySelector('[data-split-entry]')){
-   for(const side of ['DEBIT','CREDIT']){const money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;const account=money?form.elements.moneyAccountId:field(r,side==='DEBIT'?'debitAccountId':'creditAccountId');addPosting(r,side,account?.value||'',account?.dataset.postingLabel||account?.closest('.voucher-account-choice')?.querySelector('[data-account-label]')?.textContent||'',field(r,'amount').value);}
+   for(const side of ['DEBIT','CREDIT']){const money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;const account=money?form.elements.moneyAccountId:field(r,side==='DEBIT'?'debitAccountId':'creditAccountId');addPosting(r,side,(money&&form.dataset.pettyCash==='true'?form.dataset.pettyAccount:account?.value)||'',account?.dataset.postingLabel||account?.closest('.voucher-account-choice')?.querySelector('[data-account-label]')?.textContent||'',field(r,'amount').value);}
    for(const side of ['debit','credit']){const account=field(r,side+'AccountId');if(account)account.value='';}
   }
   const entries=[...r.querySelectorAll('[data-split-entry]')],split=entries.length>0;
@@ -48,7 +48,7 @@ function update(){
    const select=entry.querySelector('[data-entry-account]'),side=entry.querySelector('[data-entry-side]').value;
    select.dataset.accountFor=entry.querySelector('input[name$=".accountId"]').name;
    const money=form.dataset.kind==='RECEIPT'?side==='DEBIT':form.dataset.kind==='PAYMENT'?side==='CREDIT':false;
-   select.dataset.purpose=form.dataset.kind==='JOURNAL'?'':money?'MONEY':'OTHER';
+   select.dataset.purpose=form.dataset.kind==='JOURNAL'?'':money?'MONEY':form.dataset.pettyCash==='true'?'EXPENSE':'OTHER';
    const same=entries.filter(e=>e.querySelector('[data-entry-side]').value===side);
    entry.querySelector('[data-remove-entry]').disabled=same.length===1||!editable;
   });
@@ -56,7 +56,7 @@ function update(){
   if(totals){
    totals.hidden=!split||!editable;
   }
-  r.querySelectorAll('[data-add-entry]').forEach(b=>b.disabled=!editable||entries.length>=50);
+  r.querySelectorAll('[data-add-entry]').forEach(b=>b.disabled=!editable||entries.length>=50||(form.dataset.pettyCash==='true'&&b.dataset.addEntry==='DEBIT'));
  });
  window.VoucherBalance.refresh(form);
  const moneyHeader=form.querySelector('[data-header-money-account]');

@@ -12,6 +12,19 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class VoucherRepository {
     private final JdbcTemplate jdbc;
+    public void validatePettyCash(String institution,String branch,java.time.LocalDate day,Type type,String entries){
+        var issue=jdbc.queryForObject("select petty_cash_plan_issue(?,?,?,?,?::jsonb)",String.class,institution,branch,day,type.name(),entries);
+        if(issue!=null)throw pettyIssue(issue);
+    }
+    private static RuntimeException pettyError(org.springframework.dao.DataAccessException e){
+        String message=e.getMostSpecificCause().getMessage();
+        return message!=null && message.contains("petty.error.")?pettyIssue(message):e;
+    }
+    private static Invalid pettyIssue(String message){
+        for(String code:List.of("expense","topup","scope","coverage","funds","reversal"))
+            if(message!=null && message.contains("petty.error."+code))return new Invalid("","petty"+Character.toUpperCase(code.charAt(0))+code.substring(1));
+        return new Invalid("","request");
+    }
     private static final String ORDINARY_ACCOUNT=" and not gl_account_requires_loan_source(gl_account.id)";
     private static final String HEAD="""
         select v.*,m.full_name posted_by_name,i.sacco_name institution_name,
@@ -35,7 +48,7 @@ public class VoucherRepository {
     }
     public List<Account> accounts(String institution,String search,int offset){return accounts(institution,search,offset,"");}
     public List<Account> accounts(String institution,String search,int offset,String purpose){
-        String filter="MONEY".equals(purpose)?" and gl_loan_disbursement_account(id,sacco_id)":"OTHER".equals(purpose)?" and not gl_loan_disbursement_account(id,sacco_id)":"";
+        String filter="EXPENSE".equals(purpose)?" and type='EXPENSE'":"MONEY".equals(purpose)?" and gl_loan_disbursement_account(id,sacco_id)":"OTHER".equals(purpose)?" and not gl_loan_disbursement_account(id,sacco_id)":"";
         return jdbc.query("select id,code,name,purpose,gl_loan_disbursement_account(id,sacco_id) money_eligible from gl_account where sacco_id=? and active and kind='POSTING'"+ORDINARY_ACCOUNT+filter+" and (strpos(lower(code||' '||name),?)>0) order by code,id limit 26 offset ?",this::account,institution,search.toLowerCase(Locale.ROOT),offset);}
     public List<Client> clients(String institution,String branch,String search,int offset){return jdbc.query("select id,member_no,full_name from members where sacco_id=? and station_id=? and is_member and status='ACTIVE' and strpos(lower(member_no||' '||full_name),?)>0 order by member_no,id limit 26 offset ?",(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name")),institution,branch,search.toLowerCase(Locale.ROOT),offset);}
     public Optional<Client> client(String institution,String branch,UUID id,boolean lock){return jdbc.query("select id,member_no,full_name from members where id=? and sacco_id=? and station_id=? and is_member and status='ACTIVE'"+(lock?" for share":""),(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name")),id,institution,branch).stream().findFirst();}
@@ -152,6 +165,8 @@ public class VoucherRepository {
         jdbc.batchUpdate("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,?)",lines);
         jdbc.update("insert into accounting_outbox(id,journal_id,sacco_id,station_id,event_type,created_at) values(?,?,?,?,?,?)",UUID.randomUUID(),v.journalId(),institution,branch,"CORE_"+v.type(),v.postedAt());
         jdbc.update("update gl_journal set state='POSTED',posted_at=? where id=?",v.postedAt(),v.journalId());
+        try{jdbc.execute("set constraints petty_cash_post immediate");jdbc.execute("set constraints petty_cash_post deferred");}
+        catch(org.springframework.dao.DataAccessException e){throw pettyError(e);}
     }
     public List<Transaction> transactions(UUID id){
         var entries=new HashMap<UUID,List<Entry>>();

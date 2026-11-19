@@ -60,6 +60,115 @@ class VoucherPostgresTest {
   documents=transactional(new com.sacco.mvp.accounting.approval.service.VoucherDocumentService(workflowRepository,workflows,clock,audit),manager);
 
  }
+ com.sacco.mvp.accounting.pettycash.service.PettyCashService petty(){
+  var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate());when(clock.now()).thenReturn(now);
+  var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
+  return transactional(new com.sacco.mvp.accounting.pettycash.service.PettyCashService(new com.sacco.mvp.accounting.pettycash.repository.PettyCashRepository(jdbc),ledger,clock,audit),tx.getTransactionManager());
+ }
+ void pettySetup(){petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(cash,"New unused fund evidence"));}
+ Form pettyForm(Type type,String amount){var f=form(type);f.setEffectiveDate(now.toLocalDate());var row=f.getRows().getFirst();row.setAmount(new BigDecimal(amount));f.setRows(new ArrayList<>(List.of(row)));return f;}
+ Voucher pettyTopup(String amount){var f=pettyForm(Type.JOURNAL,amount);f.getRows().getFirst().setDebitAccountId(cash);f.getRows().getFirst().setCreditAccountId(account("B-"+UUID.randomUUID(),"ASSET","DEBIT","POSTING","BANK"));return service.post(actor,Type.JOURNAL,f);}
+ @Test void pettyCashPostsOnceAndReadsExactSplitAmountsAndLinkedReversals(){
+  pettySetup();var topup=pettyTopup("100");UUID bank=account("SPLIT_BANK","ASSET","DEBIT","POSTING","BANK");
+  var f=pettyForm(Type.PAYMENT,"50");f.getRows().getFirst().setDebitAccountId(null);f.getRows().getFirst().setCreditAccountId(null);f.getRows().getFirst().setEntries(List.of(entry("DEBIT",expense,"50"),entry("CREDIT",cash,"30"),entry("CREDIT",bank,"20")));
+  var payment=service.post(actor,Type.PAYMENT,f);assertThat(service.post(actor,Type.PAYMENT,f).id()).isEqualTo(payment.id());
+  var q=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(now.toLocalDate(),now.toLocalDate(),"expenses","","date_asc",0,10);
+  var result=petty().workspace(actor,q);assertThat(result.rows()).hasSize(1);assertThat(result.rows().getFirst().paid()).isEqualByComparingTo("30");
+  assertThat(result.balances().opening()).isZero();assertThat(result.balances().current()).isEqualByComparingTo("70");
+  var reversal=service.reverse(operator("B1"),Type.PAYMENT,payment.id(),UUID.randomUUID(),now.toLocalDate(),"Wrong expense");
+  result=petty().workspace(actor,q);assertThat(result.rows()).hasSize(2);assertThat(result.rows()).anySatisfy(r->{assertThat(r.voucherId()).isEqualTo(reversal.id());assertThat(r.paid()).isEqualByComparingTo("-30");});
+  assertThat(result.balances().current()).isEqualByComparingTo("100");
+  var movement=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(q.from(),q.through(),"movements","","date_asc",0,10);
+  assertThat(petty().workspace(actor,movement).rows()).hasSize(3);
+  var searched=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(q.from(),q.through(),"movements",payment.number(),"date_asc",0,10);
+  assertThat(petty().workspace(actor,searched).balances()).isEqualTo(petty().workspace(actor,movement).balances());
+ }
+ @Test void pettyCashBlocksNonExpensesAmbiguousSplitsCrossBranchAndFundingRemoval(){
+  pettySetup();var topup=pettyTopup("100");
+  for(String type:List.of("ASSET","LIABILITY")){
+   var bad=pettyForm(Type.PAYMENT,"10");bad.getRows().getFirst().setDebitAccountId(account("BAD-"+type,type,"DEBIT","POSTING","OTHER"));
+   assertThatThrownBy(()->service.preview(actor,Type.PAYMENT,bad)).hasMessage("voucher.error.pettyExpense");
+  }
+  var split=pettyForm(Type.PAYMENT,"20");UUID other=account("EXP2","EXPENSE","DEBIT","POSTING","OTHER");
+  split.getRows().getFirst().setDebitAccountId(null);split.getRows().getFirst().setCreditAccountId(null);split.getRows().getFirst().setEntries(List.of(entry("DEBIT",expense,"10"),entry("DEBIT",other,"10"),entry("CREDIT",cash,"20")));
+  assertThatThrownBy(()->service.post(actor,Type.PAYMENT,split)).hasMessage("voucher.error.pettyExpense");
+  assertThatThrownBy(()->service.post(operator("B2"),Type.PAYMENT,pettyForm(Type.PAYMENT,"10"))).hasMessage("voucher.error.pettyScope");
+  service.post(actor,Type.PAYMENT,pettyForm(Type.PAYMENT,"75"));
+  assertThatThrownBy(()->service.post(actor,Type.PAYMENT,pettyForm(Type.PAYMENT,"26"))).hasMessage("voucher.error.pettyFunds");
+  assertThatThrownBy(()->service.reverse(operator("B1"),Type.JOURNAL,topup.id(),UUID.randomUUID(),now.toLocalDate(),"Remove funding")).hasMessage("voucher.error.pettyFunds");
+  var transfer=pettyForm(Type.JOURNAL,"1");transfer.getRows().getFirst().setDebitAccountId(capital);transfer.getRows().getFirst().setCreditAccountId(cash);
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,transfer)).hasMessage("voucher.error.pettyTopup");
+ }
+ @Test void pettyCashRejectsMissingOpeningHistoryAndFreezesDesignation(){
+  service.post(actor,Type.RECEIPT,form(Type.RECEIPT));
+  assertThatThrownBy(this::pettySetup).hasMessage("petty.error.coverage");
+  cash=account("NEW_CASH","ASSET","DEBIT","POSTING","CASH");pettySetup();pettySetup();
+  UUID replacement=account("REPLACEMENT","ASSET","DEBIT","POSTING","CASH");
+  assertThatThrownBy(()->petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(replacement,"Evidence"))).hasMessage("petty.error.fixed");
+  assertThatThrownBy(()->jdbc.update("delete from petty_cash_fund where account_id=?",cash)).isInstanceOf(org.springframework.dao.DataAccessException.class);
+  assertThatThrownBy(()->jdbc.execute("truncate petty_cash_fund")).isInstanceOf(org.springframework.dao.DataAccessException.class);
+  var early=pettyForm(Type.PAYMENT,"1");early.setEffectiveDate(now.toLocalDate().minusDays(1));
+  assertThatThrownBy(()->service.preview(actor,Type.PAYMENT,early)).hasMessage("voucher.error.pettyCoverage");
+  var q=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(day,now.toLocalDate(),"expenses","","date_asc",0,10);
+  assertThat(petty().workspace(actor,q).balances().opening()).isNull();
+ }
+ @Test void concurrentPettyCashExpensesCannotSpendTheSameMoney()throws Exception{
+  pettySetup();pettyTopup("100");var pool=Executors.newFixedThreadPool(2);var start=new CountDownLatch(1);
+  try{
+   var tasks=new ArrayList<Future<Boolean>>();for(int n=0;n<2;n++)tasks.add(pool.submit(()->{start.await();try{service.post(actor,Type.PAYMENT,pettyForm(Type.PAYMENT,"75"));return true;}catch(Invalid e){assertThat(e).hasMessage("voucher.error.pettyFunds");return false;}}));
+   start.countDown();var outcomes=new ArrayList<Boolean>();for(var task:tasks)outcomes.add(task.get(45,TimeUnit.SECONDS));assertThat(outcomes).containsExactlyInAnyOrder(true,false);
+  }finally{pool.shutdownNow();}
+  assertThat(jdbc.queryForObject("select sum(l.debit-l.credit) from gl_journal_line l join gl_journal j on j.id=l.journal_id where j.state='POSTED' and l.account_id=?",BigDecimal.class,cash)).isEqualByComparingTo("25");
+ }
+ @Test void pettyCashPendingPaymentsDoNotMoveMoneyAndFollowExistingApproval(){
+  pettySetup();pettyTopup("100");var reviewer=approver(Position.MANAGER);
+  var rules=new RuleForm();rules.setType(Type.PAYMENT);rules.setRules(List.of(rule("SINGLE",false,Position.MANAGER,1)));workflows.configure(actor,rules);
+  UUID id=workflows.capture(actor,Type.PAYMENT,pettyForm(Type.PAYMENT,"40"));
+  var other=pettyForm(Type.PAYMENT,"5");var r=other.getRows().getFirst();r.setDebitAccountId(null);r.setCreditAccountId(null);
+  r.setEntries(List.of(entry("DEBIT",expense,"5"),entry("CREDIT",account("PENDING_BANK","ASSET","DEBIT","POSTING","BANK"),"5")));
+  workflows.capture(actor,Type.PAYMENT,other); // A stale header cannot classify a bank-only split as petty cash.
+  assertThat(petty().pending(actor,0,10,"number_asc","")).extracting(p->p.id()).containsExactly(id);
+  var q=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(now.toLocalDate(),now.toLocalDate(),"expenses","","date_asc",0,10);
+  assertThat(petty().workspace(actor,q).balances().current()).isEqualByComparingTo("100");assertThat(petty().workspace(actor,q).rows()).isEmpty();
+  command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
+  assertThat(petty().pending(actor,0,10,"number_asc","")).isEmpty();assertThat(petty().workspace(actor,q).balances().current()).isEqualByComparingTo("60");
+ }
+ @Test void pettyCashDatabaseGuardRejectsAnUncheckedOutgoingJournal(){
+  pettySetup();pettyTopup("100");
+  assertThatThrownBy(()->tx.execute(s->{
+   var repository=new VoucherRepository(jdbc);var f=pettyForm(Type.JOURNAL,"1");
+   var number=repository.reserveNumber(institution,"B1",Type.JOURNAL,f.getEffectiveDate(),f.getRequestKey(),now).number();
+   var debit=new Account(capital,"CAPITAL","Capital","CAPITAL");var credit=new Account(cash,"CASH","Petty cash","CASH");
+   var row=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Unchecked journal",BigDecimal.ONE,debit,credit);
+   var v=new Voucher(UUID.randomUUID(),number,Type.JOURNAL,f.getEffectiveDate(),"","UNCHECKED","Unchecked journal","Evidence",null,BigDecimal.ONE,1,UUID.randomUUID(),actor.getMemberId(),"",now,null,null,"","",List.of(row));
+   var period=repository.period(institution,f.getEffectiveDate(),actor.getMemberId(),now);
+   repository.insert(v,institution,"B1",f,"0".repeat(64),period,null);return null;
+  })).hasMessage("voucher.error.pettyTopup");
+ }
+ @Test void pettyCashApprovalValidationStoresInsufficientFundsWithoutAbortingTheDraft(){
+  pettySetup();pettyTopup("100");
+  UUID id=workflows.capture(actor,Type.PAYMENT,pettyForm(Type.PAYMENT,"101"),false);
+  workflows.validate(actor,id,version(id));var details=workflows.details(actor,id);
+  assertThat(details.workflow().validation()).isEqualTo("ERROR");
+  assertThat(details.items().getFirst().issues()).anySatisfy(issue->assertThat(issue.code()).isEqualTo("voucher.error.pettyFunds"));
+  assertThat(jdbc.queryForObject("select sum(l.debit-l.credit) from gl_journal_line l join gl_journal j on j.id=l.journal_id where l.account_id=? and j.state='POSTED'",BigDecimal.class,cash)).isEqualByComparingTo("100");
+ }
+ @Test void pettyCashReadsRejectRevokedLiveClaims(){
+  pettySetup();when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(EnumSet.noneOf(UserClaim.class));
+  var q=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(day,now.toLocalDate(),"expenses","","date_asc",0,10);
+  assertThatThrownBy(()->petty().workspace(actor,q)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+ }
+ @Test void pettyCashBackdatingCannotOverdrawALaterDay(){
+  pettySetup();pettyTopup("100");
+  var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate().plusDays(4));when(clock.now()).thenReturn(now.plusDays(4));
+  var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
+  var later=transactional(new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger)),tx.getTransactionManager());
+  var payment=pettyForm(Type.PAYMENT,"90");payment.setEffectiveDate(now.toLocalDate().plusDays(2));later.post(actor,Type.PAYMENT,payment);
+  var funding=pettyForm(Type.JOURNAL,"100");funding.setEffectiveDate(now.toLocalDate().plusDays(3));funding.getRows().getFirst().setDebitAccountId(cash);funding.getRows().getFirst().setCreditAccountId(account("LATER_BANK","ASSET","DEBIT","POSTING","BANK"));later.post(actor,Type.JOURNAL,funding);
+  // Today's balance is 110, but this payment would leave -1 before the later top-up.
+  var backdated=pettyForm(Type.PAYMENT,"11");backdated.setEffectiveDate(now.toLocalDate().plusDays(1));
+  assertThatThrownBy(()->later.post(actor,Type.PAYMENT,backdated)).hasMessage("voucher.error.pettyFunds");
+ }
  @Test void statusCardAgeBucketsMatchScopedRowsAndCountsAtBoundaries(){
   java.util.function.Function<OffsetDateTime,UUID> draft=date->tx.execute(status->workflowRepository.create(actor,UUID.randomUUID(),Type.JOURNAL,"SINGLE","Card filter fixture",date).id());
   UUID fresh=draft.apply(now),seven=draft.apply(now.minusDays(7)),eight=draft.apply(now.minusDays(7).minusSeconds(1)),fourteen=draft.apply(now.minusDays(14)),older=draft.apply(now.minusDays(14).minusSeconds(1));

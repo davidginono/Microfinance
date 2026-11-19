@@ -32,12 +32,13 @@ public class VoucherController {
     private final com.sacco.mvp.accounting.service.LoanReceiptPdfService loanPdf;
     private final com.sacco.mvp.accounting.approval.service.VoucherApprovalGate approvalGate;
     private final com.sacco.mvp.accounting.approval.service.VoucherWorkflowService approvalWorkflows;
+    private final com.sacco.mvp.accounting.pettycash.service.PettyCashService pettyCash;
     @ExceptionHandler({Invalid.class, org.springframework.beans.InvalidPropertyException.class})
     public ResponseEntity<String> invalidRequest(RuntimeException invalid){return ResponseEntity.badRequest().cacheControl(CacheControl.noStore()).body("Invalid voucher request");}
     public static Type type(String kind){return switch(kind){case "receipts"->Type.RECEIPT;case "payments"->Type.PAYMENT;case "journals"->Type.JOURNAL;default->throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);};}
     @InitBinder("voucherForm") void binder(WebDataBinder binder){
         binder.setAutoGrowCollectionLimit(50);
-        binder.setAllowedFields("requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
+        binder.setAllowedFields("pettyCash","requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @GetMapping
     public String list(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
@@ -49,11 +50,17 @@ public class VoucherController {
         model.addAttribute("vouchers",type(kind)==Type.RECEIPT?loanReceipts.list(actor,filter):vouchers.list(actor,type(kind),filter));return "accounting/vouchers/register";
     }
     @GetMapping("/new")
-    public String create(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="OTHER") String purpose,@RequestParam(required=false) UUID loanId,Model model){
+    public String create(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="OTHER") String purpose,@RequestParam(required=false) UUID loanId,@RequestParam(defaultValue="false") boolean pettyCash,Model model){
         vouchers.authorize(actor,type(kind),"CREATE");var f=new Form();f.setEffectiveDate(clock.today());
         if(!Set.of("OTHER","LOAN_REPAYMENT").contains(purpose) || (type(kind)!=Type.RECEIPT && !"OTHER".equals(purpose)))throw new Invalid("","request");
         f.setReceiptPurpose(purpose);if(loanId!=null){if(!"LOAN_REPAYMENT".equals(purpose))throw new Invalid("","request");loanReceipts.prefill(actor,f,loanId);}
-        model.addAttribute("voucherForm",f);model.addAttribute("newVoucherForm",true);formContext(kind,actor,f,model);return "accounting/vouchers/form";
+        if(pettyCash){
+            if(type(kind)!=Type.PAYMENT)throw new Invalid("","request");
+            var fund=this.pettyCash.expenseFund(actor);f.setPettyCash(true);f.setMoneyAccountId(fund.accountId());
+            var debit=new EntryForm();debit.setSide("DEBIT");var credit=new EntryForm();credit.setSide("CREDIT");credit.setAccountId(fund.accountId());
+            f.getRows().getFirst().setEntries(new ArrayList<>(List.of(debit,credit)));
+        }
+        model.addAttribute("voucherForm",f);model.addAttribute("newVoucherForm",!pettyCash);formContext(kind,actor,f,model);return "accounting/vouchers/form";
     }
     @PostMapping("/number") @ResponseBody
     public ResponseEntity<NumberReservation> number(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
@@ -120,7 +127,7 @@ public class VoucherController {
     public List<Client> clients(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return vouchers.clients(actor,type(kind),search,page);}
     @GetMapping("/loan-choices/{category}") @ResponseBody
     public List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice> loanChoices(@PathVariable String kind,@PathVariable String category,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID clientId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){if(type(kind)!=Type.RECEIPT)throw new Invalid("","request");return loanReceipts.choices(actor,category,clientId,search,page);}
-    private void formContext(String kind,AppUserPrincipal actor,Form form,Model model){context(kind,model);model.addAttribute("voucherActivity",vouchers.selectedActivity(actor,type(kind),form.getActivityId()).orElse(null));model.addAttribute("approvalRequired",!"LOAN_REPAYMENT".equals(form.getReceiptPurpose()) && approvalGate.required(actor,type(kind)));model.addAttribute("selectedAccounts",vouchers.selectedAccounts(actor,type(kind),form));if(!"LOAN_REPAYMENT".equals(form.getReceiptPurpose()))model.addAttribute("voucherClient",vouchers.selectedClient(actor,type(kind),form.getClientId()).orElse(null));if(type(kind)==Type.RECEIPT){model.addAttribute("canLoanReceipt",loanReceipts.available(actor,"POST") && loanReceipts.available(actor,"VIEW"));if("LOAN_REPAYMENT".equals(form.getReceiptPurpose())){model.addAttribute("repaymentPolicy",loanReceipts.defaults(actor,form));model.addAttribute("loanLabels",loanReceipts.selected(actor,form));}}}
+    private void formContext(String kind,AppUserPrincipal actor,Form form,Model model){if(form.isPettyCash() && type(kind)==Type.PAYMENT && form.getMoneyAccountId()==null)form.setMoneyAccountId(pettyCash.expenseFund(actor).accountId());context(kind,model);model.addAttribute("voucherActivity",vouchers.selectedActivity(actor,type(kind),form.getActivityId()).orElse(null));model.addAttribute("approvalRequired",!"LOAN_REPAYMENT".equals(form.getReceiptPurpose()) && approvalGate.required(actor,type(kind)));model.addAttribute("selectedAccounts",vouchers.selectedAccounts(actor,type(kind),form));if(!"LOAN_REPAYMENT".equals(form.getReceiptPurpose()))model.addAttribute("voucherClient",vouchers.selectedClient(actor,type(kind),form.getClientId()).orElse(null));if(type(kind)==Type.RECEIPT){model.addAttribute("canLoanReceipt",loanReceipts.available(actor,"POST") && loanReceipts.available(actor,"VIEW"));if("LOAN_REPAYMENT".equals(form.getReceiptPurpose())){model.addAttribute("repaymentPolicy",loanReceipts.defaults(actor,form));model.addAttribute("loanLabels",loanReceipts.selected(actor,form));}}}
     private void loanDetails(AppUserPrincipal actor,LoanReceipt receipt,Model model){model.addAttribute("receipt",receipt);model.addAttribute("voucher",receipt.header());model.addAttribute("canReverseLoanReceipt",!receipt.header().postedBy().equals(actor.getMemberId()) && loanReceipts.canReverse(actor,receipt));model.addAttribute("reverseKey",UUID.randomUUID());model.addAttribute("today",clock.today());}
     private String accountingError(IllegalArgumentException ex){return ex.getMessage()!=null && (ex.getMessage().startsWith("approval.error.") || ex.getMessage().startsWith("recording.error.") || ex.getMessage().startsWith("repayment.error.") || ex.getMessage().startsWith("voucher.error.") || ex.getMessage().startsWith("charges.error.") || ex.getMessage().startsWith("prepayment.error.") || ex.getMessage().startsWith("group.error."))?ex.getMessage():"voucher.error.request";}
     private void context(String kind,Model model){model.addAttribute("voucherType",type(kind).name());model.addAttribute("voucherKind",kind);model.addAttribute("base","/finance/vouchers/"+kind);model.addAttribute("viewClaim",type(kind)==Type.JOURNAL?"ACCOUNTING_JOURNALS_VIEW":"ACCOUNTING_BUSINESS_VIEW");model.addAttribute("createClaim",type(kind)==Type.JOURNAL?"ACCOUNTING_JOURNALS_CREATE":"ACCOUNTING_BUSINESS_CREATE");model.addAttribute("reverseClaim",type(kind)==Type.JOURNAL?"ACCOUNTING_JOURNALS_REVERSE":"ACCOUNTING_BUSINESS_REVERSE");}

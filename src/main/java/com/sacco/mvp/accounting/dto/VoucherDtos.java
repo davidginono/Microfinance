@@ -14,6 +14,8 @@ public final class VoucherDtos {
         private LocalDate effectiveDate;
         private String party="",reference="",description="",evidence="";
         private UUID moneyAccountId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+        private boolean pettyCash;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private UUID activityId;
         private String receiptPurpose="OTHER";
