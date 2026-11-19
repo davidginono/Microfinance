@@ -25,16 +25,7 @@ const field=(row,suffix)=>row.querySelector('input[name$=".'+suffix+'"]');
 const moneyOnly=new Set(['CASH','BANK','MOBILE_MONEY']),pickers=new WeakMap();
 const loanMode=()=>form.querySelector('[data-receipt-purpose]')?.value==='LOAN_REPAYMENT';
 const activity=()=>form.elements.namedItem('activityId')?.value||'';
-const moneyCents=value=>{
- const match=/^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(value);
- if(!match||!(match[1]||match[2]))return null;
- const fraction=match[2]||'',shift=2+Number(match[3]||0)-fraction.length;
- if(!Number.isInteger(shift)||Math.abs(shift)>20)return null;
- const digits=BigInt((match[1]||'0')+fraction),power=10n**BigInt(Math.abs(shift));
- return shift>=0?digits*power:digits%power===0n?digits/power:null;
-};
-const rawMoney=cents=>(cents/100n).toString()+'.'+(cents%100n).toString().padStart(2,'0');
-const showMoney=cents=>(cents/100n).toLocaleString(document.documentElement.lang||'en')+'.'+(cents%100n).toString().padStart(2,'0');
+const moneyCents=window.VoucherBalance.cents,showMoney=window.VoucherBalance.format;
 function update(){
  const loan=loanMode();
  form.querySelectorAll('[data-loan-only]').forEach(el=>{el.hidden=!loan;el.querySelectorAll('input,button,select').forEach(c=>c.disabled=!loan);});
@@ -62,19 +53,12 @@ function update(){
    entry.querySelector('[data-remove-entry]').disabled=same.length===1||!editable;
   });
   const totals=r.querySelector('[data-split-totals]');
-  rowAmount.setCustomValidity('');entries.forEach(entry=>entry.querySelector('input[name$=".amount"]').setCustomValidity(''));
   if(totals){
    totals.hidden=!split||!editable;
-   let debit=0n,credit=0n,complete=true;
-   entries.forEach(entry=>{const amount=moneyCents(entry.querySelector('input[name$=".amount"]').value);if(amount===null||amount<=0n)complete=false;else if(entry.querySelector('[data-entry-side]').value==='DEBIT')debit+=amount;else credit+=amount;});
-   totals.querySelector('[data-debit-total]').value=showMoney(debit);totals.querySelector('[data-credit-total]').value=showMoney(credit);
-   if(direct)rowAmount.value=rawMoney(debit);
-   const balanced=complete&&debit===credit&&debit>0n;
-   totals.querySelector('[data-balance-error]').hidden=!split||balanced||(debit===0n&&credit===0n);
-   if(split&&editable&&!balanced)entries[0].querySelector('input[name$=".amount"]').setCustomValidity(form.dataset.balanceError);
   }
   r.querySelectorAll('[data-add-entry]').forEach(b=>b.disabled=!editable||entries.length>=50);
  });
+ window.VoucherBalance.refresh(form);
  const moneyHeader=form.querySelector('[data-header-money-account]');
  if(moneyHeader){const needed=loan||!!activity()||all.some(r=>!!field(r,'transactionId').value);moneyHeader.hidden=!needed;moneyHeader.querySelectorAll('input,select,button').forEach(c=>c.disabled=!needed);}
  bindChoices();form.querySelectorAll('[data-voucher-select]').forEach(select=>pickers.get(select)?.sync());
@@ -143,6 +127,7 @@ form.addEventListener('click',e=>{
 
 });
 update();
+window.VoucherBalance.bind(form);
 const numberOutput=form.querySelector('[data-voucher-number]');
 if(numberOutput){
  const numberValue=numberOutput.querySelector('[data-voucher-number-value]'),retry=form.querySelector('[data-retry-voucher-number]'),date=form.querySelector('[name="effectiveDate"]');

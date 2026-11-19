@@ -60,6 +60,7 @@ class VoucherFormRenderingTest {
                 assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
                 assertThat(response.body()).doesNotContain("<spring:message","&lt;spring:message");
                 var locale=Locale.forLanguageTag(language);
+                assertThat(response.body()).contains("data-voucher-balance-error",messages.getMessage("voucher.balanceError",null,locale),messages.getMessage("voucher.error.balance",null,locale));
                 assertThat(response.body()).contains("data-debit-label=\""+messages.getMessage("accounting.debit",null,locale)+"\"","data-credit-label=\""+messages.getMessage("accounting.credit",null,locale)+"\"","data-remove-entry-label=\""+messages.getMessage("voucher.removeEntry",null,locale)+"\"");
                 if(!split.isEmpty())assertThat(response.body()).contains("name=\"rows[0].entries[1].amount\"","data-split-totals","data-resource-status=\"SUCCESS\"",messages.getMessage("voucher.balanced",null,locale));
                 else assertThat(response.body()).doesNotContain("voucher-preview-status");

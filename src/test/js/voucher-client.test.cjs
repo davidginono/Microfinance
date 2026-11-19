@@ -18,7 +18,7 @@ async function setup(approval=false,fetcher,activityTypes=false,numbering=false,
  w.HTMLElement.prototype.scrollIntoView=function(){};w.fetch=async(url,options)=>{calls.push(String(url));return fetcher?fetcher(new URL(url),options):response([{id:'client-1',name:'Synthetic client',number:'CL-001',label:'Synthetic client'}]);};
  w.eval(read('live-search.js'));w.eval(read('select-enhancer.js'));
  if(d.readyState!=='complete')await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));
- w.eval(read('voucher-selects.js'));w.eval(read(approval?'voucher-approval.js':'accounting-vouchers.js'));await tick();
+ w.eval(read('voucher-selects.js'));w.eval(read('voucher-balance.js'));w.eval(read(approval?'voucher-approval.js':'accounting-vouchers.js'));await tick();
  const open=async control=>{await tick();control.closest('.neo-select').querySelector('button').click();await tick();};
  const options=()=>[...d.querySelectorAll('.neo-select--open')].flatMap(wrapper=>{const button=wrapper.querySelector('button');return [...d.querySelectorAll('#'+button.getAttribute('aria-controls')+' .neo-select-option')];});
  return {dom,w,d,calls,open,options};
