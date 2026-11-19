@@ -75,3 +75,17 @@ Verification for this cleanup:
 Browser automation was not repeated after the user's earlier stop. Component, source-contract and Jasper checks cover this change; authenticated visual acceptance remains unverified. The local app uses the verified classes and updated resources in `target/resource-details-cleanup-build` on port 8081.
 
 The updated local app started successfully. Login returned HTTP 200, and startup confirmed that no database migration was necessary.
+
+## Registry and list cleanup (19 November 2026)
+
+Reviewed 29 register/list workspace views. Seventeen now render their single primary title in the native table header instead of supplying a separate page heading for JavaScript to replace. This covers incidents, archives, notifications, the outbox, institution/branch records, groups, loan/client ledgers, budgets, adjustments, statement history, voucher approvals and payroll feedback. Title IDs and table references remain stable. Creation-mode headings and distinct summary sections remain; budget currency, employer context and selected approval status remain visible.
+
+Removed the routine account-version scope explanation and six orphaned English/Kiswahili labels at source. Existing filters, selection, sorting, pagination, native forms, CSRF, permission gates, financial notices, errors and recovery controls are unchanged. No controller, service, query, financial record, database migration or shared JavaScript change was required.
+
+Verification includes exact before/after comparison of native forms, buttons and table-control markers across all 17 title changes, the existing JavaScript table/title/group/notification/form-action checks, JSP compilation and UI/table/MVC contract checks. Browser automation was not repeated after the user's earlier stop; authenticated visual acceptance remains unverified.
+
+- JavaScript checks: 67 passed, zero failures/skips (`resource-table`, `resource-table-title`, `group-lending`, `notification-display`, `form-action-placement`).
+- Jasper and Java source/MVC contracts: 39 passed, zero failures/errors/skips. Compiled the 18 affected JSPs with the shared shell. Ran `ChartOfAccountsJspCompilationTest`, `AdminConfigurationUiContractTest`, `AwsConsoleViewContractTest`, `TableSortingCoverageTest`, `FileUploadControlViewContractTest`, `PayrollFeedbackMvcTest`, `AdminUsersJspLayoutTest` and `AdminMinorAdminsJspLayoutTest` through `surefire:test` using the existing unchanged compiled Java sources in `target/resource-details-cleanup-build`.
+- English/Kiswahili orphan-label checks and `git diff --check` passed.
+
+The updated local app started on port 8081; the login page returned HTTP 200. No schema migration was needed.

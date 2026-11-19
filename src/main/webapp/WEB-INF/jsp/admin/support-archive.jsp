@@ -6,10 +6,10 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.support.archiveBreadcrumb" text="Admin Tools / Support / Sent Archive" /></p>
-    <h1 class="erp-page-title" id="admin-support-archive-title"><spring:message code="admin.support.archiveTitle" text="Sent Support Archive" /></h1>
 </div>
 
 <section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-support-archive-1" data-table-title-id="admin-support-archive-title">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="admin-support-archive-title"><spring:message code="admin.support.archiveTitle" text="Sent Support Archive" /></h2></div>
     <form method="get" action="/admin/support/archive" class="erp-filter-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-support-archive-1">
         <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">
             <spring:message code="common.fromDate" text="From Date" />

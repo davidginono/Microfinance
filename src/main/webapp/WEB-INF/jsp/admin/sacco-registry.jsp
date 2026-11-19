@@ -7,7 +7,6 @@
 
 <spring:message code="admin.saccoRegistry.saccoRegistration" text="Institution Registry" var="SaccoRegistrationLabel" />
 <spring:message code="admin.saccoRegistry.stationRegistry" text="Branch Registry" var="StationRegistryLabel" />
-<spring:message code="admin.saccoRegistry.currentSaccoStations" text="Current Institution Branches" var="currentSaccoStationsLabel" />
 <spring:message code="admin.saccoRegistry.editSacco" text="Edit Institution" var="editSaccoLabel" />
 <spring:message code="admin.saccoRegistry.editStations" text="Edit Branches" var="editStationsLabel" />
 <spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" var="saveChangesLabel" />
@@ -16,14 +15,13 @@
 <c:if test="${not createMode}">
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.tools" text="Admin Tools" /> / ${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</p>
-    <h1 class="erp-page-title" id="admin-sacco-registry-title">${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</h1>
 </div>
 
 <div class="erp-panel">
     <div class="erp-panel-header">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div data-resource-header-source>
-                <h2 class="erp-panel-title" data-table-heading-for="admin-sacco-registry-1">${superAdmin ? SaccoRegistrationLabel : currentSaccoStationsLabel}</h2>
+                <h2 class="erp-panel-title" data-table-heading-for="admin-sacco-registry-1" data-workspace-title id="admin-sacco-registry-title">${superAdmin ? SaccoRegistrationLabel : StationRegistryLabel}</h2>
             </div>
             <c:if test="${superAdmin}">
                 <div class="flex flex-wrap gap-2" data-table-toolbar-for="admin-sacco-registry-1" data-resource-header-source>

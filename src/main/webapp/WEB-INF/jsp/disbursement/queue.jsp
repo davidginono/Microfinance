@@ -8,10 +8,10 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.queue.breadcrumb" text="Disbursement Panel / Queue" /></p>
-    <h1 class="erp-page-title" id="disbursement-queue-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h1>
 </div>
 
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-table-sync-query="true" data-resource-table="disbursement-queue-1" data-resource-split data-table-title-id="disbursement-queue-title">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="disbursement-queue-title"><spring:message code="disbursement.queue.title" text="Disbursement Queue" /></h2></div>
 <form action="/disbursement/loan-applications" method="get" class="erp-filter-form disbursement-queue-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="disbursement-queue-1">
             <input type="hidden" name="filter" value="${currentFilterKey}" />
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">

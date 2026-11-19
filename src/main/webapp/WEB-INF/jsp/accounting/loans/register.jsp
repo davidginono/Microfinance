@@ -4,8 +4,8 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
 <sec:authorize access="@access.has(principal,'LOAN_ADJUSTMENTS_VIEW') and @access.has(principal,'LOAN_ADJUSTMENTS_CREATE')" var="canCancelFunded" />
-<div class="accounting-workspace" data-can-cancel-funded="${canCancelFunded}" data-voucher-register data-base="<c:url value='${base}' />"><div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="recording.register.${kind}" /></h1></div>
-<section data-resource-table="accounting-loans-register-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar voucher-toolbar"><h2 class="erp-panel-title"><spring:message code="${kind=='LOAN'?'admin.dashboard.applications':'voucher.records'}" /></h2><div class="accounting-actions">
+<div class="accounting-workspace" data-can-cancel-funded="${canCancelFunded}" data-voucher-register data-base="<c:url value='${base}' />">
+<section data-resource-table="accounting-loans-register-1" data-table-selection="single" class="erp-table-wrap" data-aws-table-region><div class="app-table-titlebar voucher-toolbar"><h2 class="erp-panel-title" data-workspace-title><spring:message code="recording.register.${kind}" /></h2><div class="accounting-actions">
 <c:if test="${kind=='LOAN'}"><sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><button class="app-btn btn-neutral" data-table-command data-selection-action="topup" disabled><spring:message code="recording.topUp.create" /></button></sec:authorize></c:if>
 <c:if test="${kind=='LOAN'}"><sec:authorize access="@access.has(principal,'LOAN_RECORDING_CANCEL')"><button class="app-btn btn-neutral" data-table-command data-selection-action="cancel" disabled><spring:message code="cancellation.title" /></button></sec:authorize></c:if>
 <button class="app-btn btn-neutral" data-table-command data-selection-action="details" disabled><spring:message code="common.view" /></button>

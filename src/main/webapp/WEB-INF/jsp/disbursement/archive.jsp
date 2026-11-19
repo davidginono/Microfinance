@@ -8,10 +8,10 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.archive.breadcrumb" text="Disbursement Panel / Archive" /></p>
-    <h1 class="erp-page-title" id="disbursement-archive-title"><spring:message code="disbursement.archive.title" text="Disbursement Archive" /></h1>
 </div>
 
 <section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." aria-label="Disbursement Archive results" data-table-sync-query="true" data-resource-table="disbursement-archive-1" data-resource-split data-table-title-id="disbursement-archive-title">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="disbursement-archive-title"><spring:message code="disbursement.archive.title" text="Disbursement Archive" /></h2></div>
 <form action="/disbursement/archive" method="get" class="erp-filter-form disbursement-archive-search-form aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="disbursement-archive-1">
             <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <spring:message code="common.status" />

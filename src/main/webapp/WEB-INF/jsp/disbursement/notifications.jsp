@@ -6,7 +6,6 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="disbursement.notifications.breadcrumb" text="Disbursement Panel / Notifications" /></p>
-    <h1 class="erp-page-title" id="disbursement-notifications-title"><spring:message code="notifications.title" text="Notifications" /></h1>
 </div>
 <div class="mb-3 flex items-center justify-end">
     <form action="/disbursement/notifications/mark-all-read" method="post" class="m-0" data-table-toolbar-for="disbursement-notifications-1">
@@ -15,6 +14,7 @@
     </form>
 </div>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="disbursement-notifications-1" data-table-title-id="disbursement-notifications-title">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="disbursement-notifications-title"><spring:message code="notifications.title" text="Notifications" /></h2></div>
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

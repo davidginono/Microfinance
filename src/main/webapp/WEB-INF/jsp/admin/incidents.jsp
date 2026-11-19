@@ -7,10 +7,10 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.incidents.breadcrumb" text="Admin Tools / Incidents" /></p>
-    <h1 class="erp-page-title" id="admin-incidents-title"><spring:message code="admin.incidents.title" text="Incidents" /></h1>
 </div>
 
 <section class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="admin-incidents-1" data-resource-split data-table-title-id="admin-incidents-title">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="admin-incidents-title"><spring:message code="admin.incidents.title" text="Incidents" /></h2></div>
     <form action="/admin/incidents" method="get" class="admin-filter-form admin-filter-bar aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="admin-incidents-1">
         <c:if test="${superAdminScopeFilters}">
             <div class="admin-filter-field min-w-0">

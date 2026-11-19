@@ -5,9 +5,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
 
-<div class="erp-page-header" data-aws-page-header>
-    <h1 class="erp-page-title" id="staff-notifications-title"><spring:message code="notifications.title" text="Notifications" /></h1>
-</div>
+
 <div class="mb-3 flex items-center justify-end">
     <form action="/staff/notifications/mark-all-read" method="post" class="m-0" data-table-toolbar-for="staff-notifications-1">
         <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -15,6 +13,7 @@
     </form>
 </div>
 <div class="erp-table-wrap" data-aws-table-region data-loading-label="Loading results..." data-resource-table="staff-notifications-1" data-table-title-id="staff-notifications-title">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="staff-notifications-title"><spring:message code="notifications.title" text="Notifications" /></h2></div>
     <div class="erp-table-scroll">
     <table class="erp-table">
         <thead>

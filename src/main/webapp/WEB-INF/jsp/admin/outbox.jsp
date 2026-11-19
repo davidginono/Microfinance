@@ -8,11 +8,10 @@
 
 <div class="erp-page-header" data-aws-page-header>
     <p class="erp-breadcrumb"><spring:message code="admin.outbox.breadcrumb" text="Admin Tools / Outbox Monitor" /></p>
-    <h1 class="erp-page-title" id="admin-outbox-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h1>
 </div>
 <section class="erp-table-wrap admin-register-shell" aria-label="Outbox monitor results" data-resource-table="admin-outbox-1" data-table-page-size="${selectedPageSize}" data-table-page-size-options="25 50 100">
     <div class="app-table-titlebar">
-        <div class="app-table-heading"><h2>Outbox Monitor results</h2></div>
+        <div class="app-table-heading"><h2 data-workspace-title id="admin-outbox-title"><spring:message code="admin.outbox.title" text="Outbox Monitor" /></h2></div>
         <div class="app-table-toolbar">
             <span class="admin-register-count"><spring:message code="common.showing" text="Showing" />
                 <c:choose><c:when test="${eventsPage.totalElements eq 0}">0</c:when><c:otherwise>${eventsPage.number * eventsPage.size + 1}-${eventsPage.number * eventsPage.size + fn:length(events)}</c:otherwise></c:choose>

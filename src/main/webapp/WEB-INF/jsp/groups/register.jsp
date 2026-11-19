@@ -2,8 +2,9 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %><%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %><%@ include file="../fragments/sidebar.jspf" %>
 <%@ include file="../fragments/alerts.jspf" %>
-<div class="erp-page-header"><h1 class="erp-page-title" id="group-title"><spring:message code="group.title" /></h1></div>
+
 <section class="erp-table-wrap" data-resource-table="lending-groups" data-table-title-id="group-title" data-group-register data-table-selection="single">
+<div class="app-table-titlebar"><h2 class="erp-panel-title" data-workspace-title id="group-title"><spring:message code="group.title" /></h2></div>
 <div class="accounting-actions" data-table-toolbar-for="lending-groups"><button class="app-btn btn-neutral" type="button" data-table-command data-group-command="view" disabled><spring:message code="group.open" /></button><span class="sr-only" data-group-selection-status aria-live="polite"></span><sec:authorize access="@access.has(principal,'GROUP_LENDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/groups/new' />"><spring:message code="group.create" /></a></sec:authorize></div>
 <c:url value="/finance/groups" var="listUrl" /><form method="get" action="${listUrl}" data-table-filter-for="lending-groups"><label><spring:message code="common.search" /><input class="aws-control" name="search" maxlength="100" value="<c:out value='${search}' />" /></label><input type="hidden" name="sort" value="<c:out value='${sort}' />" /><button class="app-btn btn-neutral" type="submit"><spring:message code="common.search" /></button></form>
 <div class="erp-table-scroll"><table class="erp-table"><thead><tr><th scope="col"><span class="sr-only"><spring:message code="voucher.select" /></span></th><c:forEach items="${['code','name','legalForm','members','status']}" var="column"><th scope="col" data-table-sort-asc="${column}" data-table-sort-desc="${column}_desc"><spring:message code="group.${column}" /></th></c:forEach></tr></thead><tbody>

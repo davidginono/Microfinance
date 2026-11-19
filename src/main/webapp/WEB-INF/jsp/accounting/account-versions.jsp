@@ -1,7 +1,6 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="account-version-shell.jspf" %>
 <div class="accounting-workspace accounting-resource-workspace">
- <p><spring:message code="coav.scopeHelp" /></p>
  <section class="erp-table-wrap" data-resource-table="account-versions" data-table-selection="single" data-table-page-size="${size}" id="account-version-register" data-base-url="<c:url value='/finance/accounts/versions/' />">
   <div class="app-table-titlebar coa-titlebar"><h2 data-workspace-title><spring:message code="coav.register" /></h2><div class="accounting-actions"><button type="button" class="app-btn btn-neutral" data-table-command id="account-version-view" disabled><spring:message code="coav.view" /></button></div></div>
   <form method="get" action="<c:url value='/finance/accounts/versions' />" class="erp-table-toolbar coa-filters">
