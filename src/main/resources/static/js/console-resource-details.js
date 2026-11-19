@@ -43,7 +43,7 @@
         const parent=node.parentElement;
         if(parent?.tagName==='SPAN' && parent.childElementCount===1)parent.classList.add('console-status-host');
     }
-    const messageSelector='[data-message-type],.console-message,[data-app-toast],[role="alert"],[role="status"],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.app-loading-error,.loan-error-summary,.accounting-error-summary,.loan-success,.coa-success,.portfolio-notice,.accounting-resource-workspace > .coa-error,:is(div,p,section):is(.bg-emerald-50,.bg-green-50,.bg-rose-50,.bg-red-50,.bg-amber-50,.bg-yellow-50)';
+    const messageSelector='[data-message-type],.console-message,[data-app-toast],[role="alert"],[role="status"],.aws-inline-notice,.admin-status-callout,.admin-delete-callout,.loan-empty-state,.app-loading-error,.loan-error-summary,.accounting-error-summary,.loan-success,.coa-success,.accounting-resource-workspace > .coa-error,:is(div,p,section):is(.bg-emerald-50,.bg-green-50,.bg-rose-50,.bg-red-50,.bg-amber-50,.bg-yellow-50)';
     const automaticMessageTypes=new WeakMap();
     function messages(scope) {
         const candidates=[...(scope.matches?.(messageSelector)?[scope]:[]),...scope.querySelectorAll(messageSelector)];

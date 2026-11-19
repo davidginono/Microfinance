@@ -94,14 +94,6 @@ class LoanReportExcelTest {
         var oversized=new Result(source.kind(),source.parameters(),source.institution(),source.branch(),source.columns(),Collections.nCopies(5001,source.rows().getFirst()),source.groups(),source.totals(),5001,0,false,"","");assertThatThrownBy(()->export.build(oversized,Locale.ENGLISH)).hasMessage("management.error.large");
         for(var kind:List.of(Kind.CASHBOOK,Kind.DAILY_COLLECTIONS))assertThatThrownBy(()->export.build(result(kind,1),Locale.ENGLISH)).hasMessage("management.error.parameters");
     }
-    @Test void portfolioWorkbookKeepsUnknownRatiosAndInstitutionTotalsWithoutLoanDetails()throws Exception{
-        var source=result(Kind.PORTFOLIO_RISK,1);var s=new LoanPortfolioReportRepository.Summary(1,1,new BigDecimal("100.01"),BigDecimal.ONE,BigDecimal.ZERO,BigDecimal.ONE,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.TEN,BigDecimal.ZERO,BigDecimal.ZERO);
-        var export=new LoanPortfolioReportExcel(messages(),new ReportExportLimiter(1));
-        for(boolean wide:List.of(false,true))for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
-            var r=new LoanPortfolioReportService.Report(new LoanPortfolioReportService.Scope("I1","B1",wide),new LoanPortfolioReportService.Parameters(source.parameters().from(),source.parameters().through(),source.parameters().cutoff(),0),s,new LoanPortfolioReportService.Ratios(null,null,null),new LoanPortfolioReportService.Coverage(1,0,1),wide?List.of():List.of(new LoanPortfolioReportRepository.SourceRow(UUID.randomUUID(),"000031",null,null,null,ManagementReportTest.DAY,false)),List.of(),List.of(),List.of(new LoanPortfolioReportRepository.BranchPerformance("B1",s)),false,"TEST","REFERENCE",Map.of());
-            byte[] bytes=export.build(r,locale);try(var book=new XSSFWorkbook(new ByteArrayInputStream(bytes))){assertThat(book.getNumberOfSheets()).isEqualTo(2);var report=book.getSheetAt(0);var data=book.getSheetAt(1);assertTitleOnlyMerges(report);assertTitleOnlyMerges(data);int header=data.getPaneInformation().getHorizontalSplitPosition()-1;assertGrid(data.getRow(header+1).getCell(0));assertThat(data.getRow(header+1).getCell(0).getStringCellValue()).isEqualTo(wide?"B1":"000031");var formatter=new DataFormatter();for(var row:report)if(formatter.formatCellValue(row.getCell(0)).equals(messages().getMessage("financial.portfolio.par30",null,locale)))assertThat(row.getCell(2).getCellType()).isEqualTo(CellType.BLANK);}
-        }
-    }
     static int column(Sheet s,int header,String label){for(var cell:s.getRow(header))if(cell.getStringCellValue().equals(label))return cell.getColumnIndex();throw new AssertionError(label);}
     private static void assertSubtitleLayout(Sheet report,int header,Kind kind,ResourceBundleMessageSource messages,Locale locale){
         var range=report.getRow(1);

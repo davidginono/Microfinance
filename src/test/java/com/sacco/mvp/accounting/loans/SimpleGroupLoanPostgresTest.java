@@ -161,13 +161,12 @@ class SimpleGroupLoanPostgresTest {
     @Test void anUnidentifiedPayerCannotReduceTheBalance(){UUID loan=fund();nextDay();assertThatThrownBy(()->pay(loan,"100000.00","")).isInstanceOf(IllegalArgumentException.class);assertThat(f.service.detail(f.actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("5000000.00");}
     @Test void reportsCountTheGroupOnceAndRecognizeItsPostedOrigin(){
         UUID loan=fund();nextDay();pay(loan,"400000.00","Asha");var named=new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(f.jdbc);
-        var portfolio=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(named);
-        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(f.institution,"B1",false);
-        var clock=f.context.getBean(ApplicationClock.class);var parameters=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(DAY,DAY.plusDays(2),clock.now(),0);
-        var summary=portfolio.summary(scope,parameters);assertThat(summary.covered()).isEqualTo(1);assertThat(summary.excluded()).isZero();assertThat(summary.principal()).isEqualByComparingTo("4600000.00");
+        var clock=f.context.getBean(ApplicationClock.class);
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(named);var reportParameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(DAY,DAY.plusDays(2),clock.now(),null,null,null,"",0);
         for(var kind:List.of(com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DISBURSED_LOANS_AUDIT,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_REPAYMENT_TRANSACTIONS)){
-            var data=reports.read(f.actor,kind,reportParameters,false);assertThat(data.rows()).hasSize(1);assertThat(data.rows().getFirst().get("loanId")).isEqualTo(f.service.detail(f.actor,loan).loan().number());
+            var data=reports.read(f.actor,kind,reportParameters,false);assertThat(data.excluded()).isZero();
+            if(kind==com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO)assertThat(data.totals().get("principalBalance")).isEqualByComparingTo("4600000.00");
+            assertThat(data.rows()).hasSize(1);assertThat(data.rows().getFirst().get("loanId")).isEqualTo(f.service.detail(f.actor,loan).loan().number());
         }
     }
     void declaredDebt(UUID client,String amount){var onboarding=f.context.getBean(OnboardingService.class);var profile=onboarding.profileForm(f.actor,client);profile.getProfile().setMonthlyDebtRepayments(new BigDecimal(amount));profile.setAction("RECORDED");onboarding.save(f.actor,client,profile);}

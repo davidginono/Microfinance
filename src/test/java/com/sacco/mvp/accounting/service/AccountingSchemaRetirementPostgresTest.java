@@ -3,8 +3,8 @@ package com.sacco.mvp.accounting.service;
 import com.sacco.mvp.accounting.loans.repository.LoanPostingAuthorizationRepository;
 import com.sacco.mvp.accounting.repository.RetainedFinancialHistoryRepository;
 import com.sacco.mvp.accounting.repository.VoucherRepository;
-import com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository;
-import com.sacco.mvp.accounting.reports.LoanPortfolioReportService;
+import com.sacco.mvp.accounting.reports.ManagementReportRepository;
+import com.sacco.mvp.accounting.management.dto.ManagementReports.*;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -72,11 +72,12 @@ class AccountingSchemaRetirementPostgresTest {
         assertThat(history.hasInstitutionHistory("NO-SUCH-INSTITUTION")).isFalse();
         assertThat(new LoanPostingAuthorizationRepository(jdbc).retainedSourceOwnsLoan(UUID.randomUUID())).isFalse();
         assertThat(new LoanPostingAuthorizationRepository(jdbc).retainedSourceOwnsLoan(legacyLoan)).isTrue();
-        var portfolio = new LoanPortfolioReportRepository(new NamedParameterJdbcTemplate(jdbc));
-        var scope = new LoanPortfolioReportService.Scope(institution,"B1",false);
-        var parameters = new LoanPortfolioReportService.Parameters(LocalDate.of(2026,1,1),LocalDate.of(2026,10,15),OffsetDateTime.now(),0);
-        assertThat(portfolio.rows(scope,parameters)).isEmpty();
-        assertThat(portfolio.coverage(scope,parameters)).isNotNull();
+        var actor = org.mockito.Mockito.mock(com.sacco.mvp.security.AppUserPrincipal.class);
+        org.mockito.Mockito.when(actor.getSaccoId()).thenReturn(institution);
+        org.mockito.Mockito.when(actor.getStationId()).thenReturn("B1");
+        var reports = new ManagementReportRepository(new NamedParameterJdbcTemplate(jdbc));
+        var parameters = new Parameters(LocalDate.of(2026,1,1),LocalDate.of(2026,10,15),OffsetDateTime.now(),null,null,null,"",0);
+        assertThat(reports.read(actor,Kind.LOAN_PORTFOLIO,parameters,false).rows()).isEmpty();
     }
 
     @Test void coreDateBucketsRemainAvailableAndExistingClosedDatesCannotChange() {

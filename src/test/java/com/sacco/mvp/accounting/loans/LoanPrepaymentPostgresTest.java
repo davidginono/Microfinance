@@ -56,10 +56,9 @@ class LoanPrepaymentPostgresTest {
         assertThat(f.ledger.waiveInterest(loan,f.actor,key,date,m("6.00"),"Approved borrower concession",null)).isEqualTo(id);
         assertThat(f.service.detail(f.actor,loan).loan().dueInterest()).isEqualByComparingTo("18.52");
         assertThat(f.jdbc.queryForObject("select sum(interest_paid) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
-        var reports=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(f.jdbc));
-        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(f.institution,"B1",false);
-        var parameters=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(LocalDate.of(2026,9,1),date,java.time.OffsetDateTime.now(),0);
-        assertThat(reports.rows(scope,parameters)).singleElement().satisfies(row->assertThat(row.overdueInterest()).isEqualByComparingTo("14.00"));
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(f.jdbc));
+        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(LocalDate.of(2026,9,1),date,java.time.OffsetDateTime.now(),null,null,null,"",0);
+        assertThat(reports.read(f.actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,parameters,false).rows()).singleElement().satisfies(row->assertThat((BigDecimal)row.get("interestArrears")).isEqualByComparingTo("14.00"));
         assertThatThrownBy(()->f.ledger.waiveInterest(loan,f.actor,UUID.randomUUID(),date,m("6.00"),"Self correction",id)).hasMessage("prepayment.error.checker");
         assertThatThrownBy(()->f.ledger.waiveInterest(loan,f.operator("B2"),UUID.randomUUID(),date,m("1.00"),"Wrong branch",null)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         f.ledger.waiveInterest(loan,f.operator("B1"),UUID.randomUUID(),date,m("6.00"),"Independent correction",id);

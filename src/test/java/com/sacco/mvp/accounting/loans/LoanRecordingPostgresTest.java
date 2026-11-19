@@ -367,11 +367,9 @@ class LoanRecordingPostgresTest {
         assertThat(status(loan)).isEqualTo("WRITTEN_OFF");assertThat(adjustments().context(actor,loan).bookPrincipal()).isZero();
         assertThat(adjustments().context(actor,loan).outstanding()).isEqualByComparingTo("1000.00");
         assertThat(adjustments().context(actor,loan).allowance()).isZero();
-        var reports=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
-        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(institution,"B1",false);
-        var range=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(LocalDate.of(2026,9,1),TODAY,OffsetDateTime.parse("2026-10-08T12:00:01+03:00"),0);
-        assertThat(reports.summary(scope,range).principal()).isZero();assertThat(reports.summary(scope,range).excluded()).isZero();
-        assertThat(reports.adjustments(scope,range).get("writeOff")).isEqualByComparingTo("1000.00");
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var range=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(LocalDate.of(2026,9,1),TODAY,OffsetDateTime.parse("2026-10-08T12:00:01+03:00"),null,null,null,"",0);
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,range,false).totals().get("principalBalance")).isZero();assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,range,false).excluded()).isZero();
         assertThat(jdbc.queryForObject("select principal_paid from loan_ledgers where loan_application_id=?",BigDecimal.class,loan)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,loan)).isZero();
         assertThatThrownBy(()->service.repay(actor,post(loan,"10.00","NO-ORDINARY-PAYMENT"))).hasMessage("repayment.error.state");
@@ -380,8 +378,7 @@ class LoanRecordingPostgresTest {
         assertThat(adjustments().view(actor,back).reversesJournalId()).isEqualTo(adjustments().view(actor,request).journalId());
         var receipt=post(loan,"120.00","ACTUAL-RECOVERY");receipt.setInterestAccountId(interest);service.repay(actor,receipt);
         assertThat(adjustments().context(actor,loan).outstanding()).isEqualByComparingTo("900.00");
-        assertThat(reports.summary(scope,range).principal()).isEqualByComparingTo("900.00");
-        assertThat(reports.adjustments(scope,range).get("writeOff")).isZero();
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,range,false).totals().get("principalBalance")).isEqualByComparingTo("900.00");
     }
     @Test void provisionTargetsUseDeltasAndCannotMoveAllowanceToAnotherAccount(){
         var loan=disbursed("D-ADJ-TARGET");var original=provide(loan,"100.00");var q=adjustments().view(actor,original);
@@ -870,16 +867,15 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("20.00");
         assertThat(jdbc.queryForObject("select future_interest_excluded from loan_repayment_transactions where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("20.00");
         assertThat(ledger.riskBalance(loan,TODAY.plusYears(1)).orElseThrow().currentOutstanding()).isZero();
-        var reports=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
-        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(institution,"B1",false);
-        var later=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(TODAY,TODAY.plusYears(1),OffsetDateTime.now(),0);
-        assertThat(reports.rows(scope,later)).singleElement().satisfies(row->{assertThat(row.complete()).isTrue();assertThat(row.overdueInterest()).isZero();});
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var later=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY,TODAY.plusYears(1),OffsetDateTime.now(),null,null,null,"",0);
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,later,false).rows()).singleElement().satisfies(row->{assertThat(row.get("complete")).isEqualTo(true);assertThat((BigDecimal)row.get("interestArrears")).isZero();});
         assertThatThrownBy(()->jdbc.update("update loan_ledger_installments set interest_excluded=0 where loan_application_id=?",loan)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Synthetic full early repayment correction");
         detail=service.detail(actor,loan).loan();assertThat(detail.status()).isEqualTo("DISBURSED");assertThat(detail.outstandingPrincipal()).isEqualByComparingTo("1000.00");
         assertThat(detail.futureInterest()).isEqualByComparingTo("20.00");assertThat(jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and future_interest_excluded=20",Integer.class,loan)).isEqualTo(2);
-        assertThat(reports.rows(scope,later)).singleElement().satisfies(row->assertThat(row.overdueInterest()).isEqualByComparingTo("20.00"));
+        assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,later,false).rows()).singleElement().satisfies(row->assertThat((BigDecimal)row.get("interestArrears")).isEqualByComparingTo("20.00"));
     }
     @Test void batchDoesNotPlanASecondCollectionOfInterestExcludedByAnEarlierFullRepayment(){
         seedHistoricalPolicy();var loan=disbursed("D-BATCH-FULL-EARLY");var batch=batches().create(actor,"Synthetic settlement cutoff");

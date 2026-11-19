@@ -13,6 +13,127 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class ManagementReportRepository {
     private final NamedParameterJdbcTemplate jdbc;
+    // Posted origins, allocations and frozen contracts shared by the remaining loan reports.
+    private static final String LOAN_SOURCE="""
+        WITH cohort AS (
+          SELECT l.loan_application_id,l.sacco_id,l.station_id,l.loan_id,l.applicant_member_id,l.disbursement_date,l.principal, a.station_id application_branch,a.sacco_id application_institution,
+            a.applicant_member_id application_client,a.top_up_source_loan_id,a.repayment_schedule_json contract
+          FROM loan_ledgers l JOIN loan_applications a ON a.id=l.loan_application_id
+          WHERE l.sacco_id=:institution AND (:wide OR l.station_id=:branch)
+            AND l.created_at<=:cutoff AND l.disbursement_date<=:through
+        ), origins AS (
+          SELECT c.loan_application_id,count(*) lines,count(DISTINCT j.voucher_id) vouchers,
+            sum(j.debit-j.credit) net,
+            sum(CASE WHEN j.account_code='LOAN_PRINCIPAL' THEN j.debit-j.credit ELSE 0 END) principal,
+            sum(CASE WHEN j.account_code='DISBURSEMENT_CLEARING' THEN j.credit-j.debit ELSE 0 END) cleared,
+            bool_and(j.effective_date=c.disbursement_date) dates
+          FROM cohort c JOIN loan_journal_entries j ON j.loan_application_id=c.loan_application_id
+          WHERE j.transaction_id IS NULL AND j.posted_at<=:cutoff AND j.effective_date<=:through
+          GROUP BY c.loan_application_id
+        ), transactions AS (
+          SELECT t.*,CASE WHEN t.kind='PAYMENT' THEN 1 ELSE -1 END sign
+          FROM loan_repayment_transactions t JOIN cohort c ON c.loan_application_id=t.loan_application_id
+          WHERE t.posted_at<=:cutoff AND t.payment_date<=:through
+        ), transaction_allocations AS (
+          SELECT t.id,sum(a.principal_amount) principal,sum(a.interest_amount) interest,sum(a.interest_excluded) excluded,
+            bool_and(i.loan_application_id=t.loan_application_id) owned
+          FROM transactions t LEFT JOIN loan_repayment_allocations a ON a.transaction_id=t.id
+          LEFT JOIN loan_ledger_installments i ON i.id=a.installment_id GROUP BY t.id
+        ), transaction_journals AS (
+          SELECT t.id,count(j.id) lines,sum(j.debit-j.credit) net,
+            sum(CASE WHEN j.account_code='LOAN_PRINCIPAL' THEN j.debit-j.credit ELSE 0 END) principal,
+            sum(CASE WHEN j.account_code='INTEREST_COLLECTIONS_CLEARING' THEN j.debit-j.credit ELSE 0 END) interest,
+            sum(CASE WHEN j.account_code=CASE t.channel WHEN 'CASH' THEN 'CASH_CLEARING' WHEN 'BANK' THEN 'BANK_CLEARING'
+              ELSE 'MOBILE_MONEY_CLEARING' END THEN j.debit-j.credit ELSE 0 END) receiving,
+            bool_and(j.loan_application_id=t.loan_application_id AND j.voucher_id=t.id
+              AND j.effective_date=t.payment_date AND j.posted_at<=:cutoff) owned
+          FROM transactions t LEFT JOIN loan_journal_entries j ON j.transaction_id=t.id AND j.posted_at<=:cutoff GROUP BY t.id
+        ), payments AS (
+          SELECT c.loan_application_id,coalesce(sum(t.sign*t.principal_amount),0) principal,
+            coalesce(sum(t.sign*t.interest_amount),0) interest,
+            coalesce(sum(CASE WHEN t.payment_date>=:from THEN t.sign*t.principal_amount ELSE 0 END),0) collected_principal,
+            coalesce(sum(CASE WHEN t.payment_date>=:from THEN t.sign*t.interest_amount ELSE 0 END),0) collected_interest,
+            coalesce(bool_and(t.sacco_id=c.sacco_id AND t.station_id=c.station_id AND t.payment_date>=c.disbursement_date
+              AND a.owned IS TRUE AND a.principal=t.principal_amount AND a.interest=t.interest_amount AND a.excluded=t.future_interest_excluded
+              AND j.owned IS TRUE AND j.lines=1+(CASE WHEN t.principal_amount>0 THEN 1 ELSE 0 END)+(CASE WHEN t.interest_amount>0 THEN 1 ELSE 0 END)
+              AND j.net=0 AND j.principal=-t.sign*t.principal_amount AND j.receiving=t.sign*t.amount
+              AND j.interest=-t.sign*t.interest_amount
+              AND (t.kind='PAYMENT' OR (r.kind='PAYMENT' AND r.loan_application_id=t.loan_application_id
+                AND r.sacco_id=t.sacco_id AND r.station_id=t.station_id AND r.posted_at<=t.posted_at
+                AND r.principal_amount=t.principal_amount AND r.interest_amount=t.interest_amount AND r.future_interest_excluded=t.future_interest_excluded AND r.amount=t.amount))) FILTER(WHERE t.id IS NOT NULL),true) valid
+          FROM cohort c LEFT JOIN transactions t ON t.loan_application_id=c.loan_application_id
+          LEFT JOIN transaction_allocations a ON a.id=t.id LEFT JOIN transaction_journals j ON j.id=t.id
+          LEFT JOIN loan_repayment_transactions r ON r.id=t.reverses_transaction_id GROUP BY c.loan_application_id
+        ), installment_allocations AS (
+          SELECT a.installment_id,sum(t.sign*a.principal_amount) principal,sum(t.sign*a.interest_amount) interest,sum(t.sign*a.interest_excluded) excluded
+          FROM loan_repayment_allocations a JOIN transactions t ON t.id=a.transaction_id GROUP BY a.installment_id
+        ), waiver_allocations AS (
+          SELECT a.installment_id,sum(CASE WHEN w.kind='WAIVER' THEN a.amount ELSE -a.amount END) waived
+          FROM loan_interest_waiver w JOIN cohort c ON c.loan_application_id=w.loan_id AND c.sacco_id=w.sacco_id AND c.station_id=w.station_id
+          JOIN loan_interest_waiver_part a ON a.waiver_id=w.id
+          WHERE w.created_at<=:cutoff AND w.effective_date<=:through GROUP BY a.installment_id
+        ), contract_terms AS (
+          SELECT c.loan_application_id,n.number,n.item->>'dueDate' due_date,
+            CASE WHEN n.item->>'principalComponent' ~ '^[0-9]{1,16}([.][0-9]{1,8})?$' THEN (n.item->>'principalComponent')::numeric END principal,
+            CASE WHEN n.item->>'interestComponent' ~ '^[0-9]{1,16}([.][0-9]{1,8})?$' THEN (n.item->>'interestComponent')::numeric END interest
+          FROM cohort c CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.contract->'schedule')='array'
+            THEN CASE WHEN jsonb_array_length(c.contract->'schedule')<=600 THEN c.contract->'schedule' ELSE '[]'::jsonb END
+            ELSE '[]'::jsonb END) WITH ORDINALITY n(item,number)
+        ), contract_counts AS (
+          SELECT loan_application_id,count(*) total FROM contract_terms GROUP BY loan_application_id
+        ), terms AS (
+          SELECT c.loan_application_id,count(i.id) installments,sum(i.principal) scheduled_principal,
+            sum(i.interest) scheduled_interest,coalesce(sum(a.excluded),0) excluded_interest,coalesce(sum(w.waived),0) waived_interest,max(i.principal+i.interest) periodic_payment,max(i.due_date) maturity,
+            coalesce(bool_and(coalesce(a.principal,0)>=0 AND coalesce(a.principal,0)<=i.principal
+              AND coalesce(a.interest,0)>=0 AND coalesce(a.excluded,0)>=0 AND coalesce(a.interest,0)+coalesce(a.excluded,0)+coalesce(w.waived,0)<=i.interest
+              AND ct.number IS NOT NULL AND ct.principal IS NOT NULL AND ct.interest IS NOT NULL
+              AND ct.due_date=i.due_date::text AND ct.principal=i.principal AND ct.interest=i.interest),false) valid,
+            coalesce(cc.total,0) contract_count,
+            coalesce(sum(CASE WHEN i.due_date<:through THEN i.principal-coalesce(a.principal,0) ELSE 0 END),0) overdue_principal,
+            coalesce(sum(CASE WHEN i.due_date<:through THEN i.interest-coalesce(a.interest,0)-coalesce(a.excluded,0)-coalesce(w.waived,0) ELSE 0 END),0) overdue_interest,
+            min(i.due_date) FILTER(WHERE i.due_date<:through AND (i.principal>coalesce(a.principal,0) OR i.interest>coalesce(a.interest,0)+coalesce(a.excluded,0)+coalesce(w.waived,0))) oldest
+          FROM cohort c LEFT JOIN loan_ledger_installments i ON i.loan_application_id=c.loan_application_id
+          LEFT JOIN installment_allocations a ON a.installment_id=i.id
+          LEFT JOIN waiver_allocations w ON w.installment_id=i.id
+          LEFT JOIN contract_terms ct ON ct.loan_application_id=c.loan_application_id AND ct.number=i.installment_number
+          LEFT JOIN contract_counts cc ON cc.loan_application_id=c.loan_application_id GROUP BY c.loan_application_id,cc.total
+        ), lifecycle AS (
+          SELECT c.loan_application_id,coalesce(sum(q.principal_change),0) principal_change,
+            coalesce(-sum(q.principal_change) FILTER(WHERE q.kind IN ('WRITE_OFF','WRITE_BACK')),0) written_off,
+            coalesce(sum(q.amount) FILTER(WHERE q.kind='DISBURSEMENT_REVERSAL'),0) cancelled
+          FROM cohort c LEFT JOIN loan_adjustment_request q ON q.loan_id=c.loan_application_id
+          JOIN loan_adjustment_decision d ON d.request_id=q.id JOIN gl_journal j ON j.id=d.journal_id
+          WHERE j.state='POSTED' AND q.effective_date<=:through AND j.posted_at<=:cutoff
+          GROUP BY c.loan_application_id
+        ), exposure AS MATERIALIZED (
+          SELECT c.loan_application_id,c.loan_id,c.station_id,c.disbursement_date,c.principal original_principal,
+            c.principal-p.principal+coalesce(x.principal_change,0) principal,
+            greatest(0,t.overdue_principal-coalesce(x.written_off,0)-coalesce(x.cancelled,0)) overdue_principal,
+            CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE t.overdue_interest END overdue_interest,
+            CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN null ELSE t.oldest END oldest,
+            CASE WHEN coalesce(x.written_off,0)+coalesce(x.cancelled,0)>0 THEN 0 ELSE coalesce(:through-t.oldest,0) END dpd,p.collected_principal,p.collected_interest,
+            p.principal paid_principal,p.interest paid_interest,t.scheduled_interest,t.excluded_interest,t.waived_interest,t.periodic_payment,t.maturity,t.installments,
+            coalesce(c.application_branch=c.station_id AND c.application_institution=c.sacco_id
+              AND c.application_client IS NOT DISTINCT FROM c.applicant_member_id AND c.top_up_source_loan_id IS NULL
+              AND (c.application_client IS NOT NULL OR EXISTS(SELECT 1 FROM (SELECT loan_id,sacco_id,station_id,signed_at FROM lending_group_org_funding UNION ALL SELECT loan_id,sacco_id,station_id,signed_at FROM lending_group_shared_funding UNION ALL SELECT g.loan_id,g.sacco_id,g.station_id,f.recorded_at FROM staff_group_funding f JOIN staff_group_loan g ON g.loan_id=f.loan_id) f
+                WHERE f.loan_id=c.loan_application_id AND f.sacco_id=c.sacco_id AND f.station_id=c.station_id AND f.signed_at<=:cutoff))
+              AND o.lines=2 AND o.vouchers=1 AND o.net=0 AND o.principal=c.principal AND o.cleared=c.principal AND o.dates
+              AND p.valid AND p.principal>=0 AND p.principal<=c.principal
+              AND t.installments>0 AND t.installments<=600 AND t.contract_count=t.installments AND t.scheduled_principal=c.principal AND t.valid
+              AND NOT EXISTS(SELECT 1 FROM accounting_archive.accounting_business_document b WHERE b.loan_id=c.loan_application_id
+                AND b.state='POSTED' AND b.posted_at<=:cutoff AND b.effective_date<=:through
+                AND (b.sacco_id<>c.sacco_id OR b.station_id<>c.station_id OR
+                  (b.kind NOT IN('LOAN_DISBURSEMENT','LOAN_REPAYMENT','LOAN_REPAYMENT_REVERSAL','INTEREST_ACCRUAL')
+                    AND NOT(b.kind IN('LOAN_ADVANCE','UNMATCHED_RECEIPT','REFUND') AND b.principal=0 AND b.interest=0 AND b.fees=0)))),false) complete
+          FROM cohort c LEFT JOIN origins o USING(loan_application_id) JOIN payments p USING(loan_application_id)
+            JOIN terms t USING(loan_application_id) LEFT JOIN lifecycle x USING(loan_application_id)
+        ), missing AS (
+          SELECT a.station_id,count(*) excluded FROM loan_applications a
+          WHERE a.sacco_id=:institution AND (:wide OR a.station_id=:branch) AND a.created_at<=:cutoff
+            AND a.disbursement_date<=:through AND NOT EXISTS(SELECT 1 FROM cohort c WHERE c.loan_application_id=a.id)
+          GROUP BY a.station_id
+        )
+        """;
     // The institution's Cash and Bank family defines the range, including older posting accounts with purpose OTHER.
     private static final String CASH_BANK_ACCOUNTS="""
         from gl_cash_bank_group g join gl_account a on a.parent_id=g.id and a.sacco_id=g.sacco_id
@@ -187,7 +308,7 @@ public class ManagementReportRepository {
         and (cast(:productId as uuid) is null or a.loan_product_setting_id=:productId)
         """;
     private static String disbursements(){
-        return LoanPortfolioReportRepository.SOURCE+"""
+        return LOAN_SOURCE+"""
             , report_rows as (
               select to_char(e.disbursement_date,'YYYY-MM')||' | '||coalesce(r.product_name,a.loan_type)||' | '||coalesce(p.money_account_name,'@unknown') as "groupName",
                 to_char(e.disbursement_date,'YYYY-MM') as month,coalesce(r.product_name,a.loan_type) as product,
@@ -216,7 +337,7 @@ public class ManagementReportRepository {
             """+CLIENT_FILTER+") ";
     }
     private static String expected(){
-        String known=LoanPortfolioReportRepository.SOURCE.replace(":through","least(:through,cast(:cutoff at time zone 'Africa/Dar_es_Salaam' as date))");
+        String known=LOAN_SOURCE.replace(":through","least(:through,cast(:cutoff at time zone 'Africa/Dar_es_Salaam' as date))");
         return known+"""
             , report_rows as (
               select coalesce(r.product_name,a.loan_type) as "groupName",i.due_date::text||e.loan_id||i.id::text as "rowOrder",
@@ -237,7 +358,7 @@ public class ManagementReportRepository {
             """+CLIENT_FILTER+") ";
     }
     private static String repayments(){
-        return LoanPortfolioReportRepository.SOURCE+"""
+        return LOAN_SOURCE+"""
             , principal_events as (
               select t.loan_application_id,t.id,t.id transaction_id,t.payment_date date,t.posted_at,t.sequence,-t.sign*t.principal_amount change
               from transactions t join exposure e on e.loan_application_id=t.loan_application_id where e.complete
@@ -277,6 +398,6 @@ public class ManagementReportRepository {
         values.put("overdue","e.overdue_principal+e.overdue_interest");
         values.put("referenceProvision","round(e.principal*(case when e.dpd<=30 then 0 when e.dpd<=90 then .10 when e.dpd<=180 then .30 when e.dpd<=365 then .50 else 1 end),2)");
         String money=values.entrySet().stream().map(v->"case when e.complete then "+v.getValue()+" else null end as \""+v.getKey()+"\"").reduce((x,y)->x+","+y).orElseThrow();
-        return LoanPortfolioReportRepository.SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where "+CLIENT_FILTER+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
+        return LOAN_SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where "+CLIENT_FILTER+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
     }
 }

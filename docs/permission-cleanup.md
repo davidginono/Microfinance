@@ -11,7 +11,7 @@ The eight report permissions below retain their enum identifiers for compatibili
 | `ACCESS_MATRIX_VIEW`, `ACCESS_MATRIX_UPDATE` | Additional ineffective claims found during the remaining-permission audit. The embedded matrix uses the user-access edit/update routes, guarded by `USER_ACCESS_UPDATE`. Removed unused default/recovery grants; existing user-access controls remain. |
 | `LOAN_DOCUMENTS_CREATE` | Additional ineffective claim: attachment uploads use loan draft creation/edit, guarded by `MEMBER_LOANS_CREATE`/`MEMBER_LOANS_UPDATE` and ownership. No separate document-creation operation consumes this claim. Existing uploads, document viewing and export remain. |
 
-Removed the two unused report-builder/execution stylesheets, retired English/Kiswahili labels and obsolete navigation gates. The shared `report-print.js` is retained because client loan statement printing still uses it. The live `reporting/loan-portfolio*.jsp` pages and current reporting services are retained. Tests for deleted runtime behavior were removed; history preservation now has dedicated database coverage.
+Removed the two unused report-builder/execution stylesheets, retired English/Kiswahili labels and obsolete navigation gates. The shared `report-print.js` is retained because client loan statement printing still uses it. At that increment, the `reporting/loan-portfolio*.jsp` pages and reporting services were retained; the separate portfolio workspace was subsequently removed on 2026-11-19. Tests for deleted runtime behavior were removed; history preservation now has dedicated database coverage.
 
 ## History and financial integrity
 

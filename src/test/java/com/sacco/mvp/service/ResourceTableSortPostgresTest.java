@@ -122,10 +122,7 @@ class ResourceTableSortPostgresTest {
         columns("payroll-history","event,actor,evidence,date",()->payroll.events(actor,id,0));
         var feedback=new com.sacco.mvp.accounting.payroll.repository.PayrollFeedbackRepository(jdbc);
         columns("payroll-results","employee,client,status,requested,deducted,date,employerReference,posting",()->feedback.rows(id,0,26));
-        var portfolio=new com.sacco.mvp.accounting.reports.LoanPortfolioReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
-        var scope=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Scope(actor.getSaccoId(),"B1",false);
-        var parameters=new com.sacco.mvp.accounting.reports.LoanPortfolioReportService.Parameters(LocalDate.of(2026,1,1),LocalDate.of(2026,10,20),OffsetDateTime.now(),0);
-        columns("reporting-loan-portfolio-6","loan,principal,overduePrincipal,overdueInterest,oldest,coverage",()->portfolio.rows(scope,parameters));
+
     }
 
     @Test void repositorySortsTheEntireScopedQueueBeforePagination() {

@@ -1,5 +1,7 @@
 # Loan report references
 
+2026-11-19: Removed the separate Loan portfolio reports workspace, its configuration/preview/Excel routes, pages, script, classification calculator and exclusive tests/labels. Shared posted-loan SQL now belongs to `ManagementReportRepository`; the six operational loan reports, their scoped exports and financial/audit history remain. Earlier workspace validation below is historical.
+
 The three reports extend the existing Financial Reports management workspace. They use the supplied Disbursed Loans Audit, Expected Repayments and Loan Repayment Transactions PDFs as visual references, not as instructions or evidence of institution policy. Existing JSP controls surround white paper previews with each reference's title font, serif or sans-serif column headings, monospaced rows, grouped underlined totals and repeated export headings. Audit and expected-repayment outputs use the reference landscape Legal paper; loan repayment transactions use portrait Letter paper. Product headings precede the tables, audit account details sit above the rows at the right, and repayment client/loan metadata repeats on continuation PDF pages. Preview column widths share the PDF column definitions. Wide paper tables scroll within the preview on phones. PDF and print remain the only outputs.
 
 ## Routes and meaning
@@ -16,7 +18,7 @@ Employer, department, cheque-only, age, gender and ambiguous default-balance fie
 
 ## Scope, evidence and bounds
 
-The existing ManagementReportController -> ManagementReportService -> ManagementReportRepository path owns each use case. Existing fresh FINANCIAL_REPORTS_VIEW and LOAN_REPORTS_VIEW claims and institution/branch checks apply. PDF and print additionally require FINANCIAL_REPORTS_EXPORT. No claims are granted. Client selectors remain scoped and outputs remain no-store. Bounded native SQL reuses LoanPortfolioReportRepository's posted-origin, immutable allocation/journal, contract-completeness and missing-history checks; no per-row database calls or external work is added.
+The existing ManagementReportController -> ManagementReportService -> ManagementReportRepository path owns each use case. Existing fresh FINANCIAL_REPORTS_VIEW and LOAN_REPORTS_VIEW claims and institution/branch checks apply. PDF and print additionally require FINANCIAL_REPORTS_EXPORT. No claims are granted. Client selectors remain scoped and outputs remain no-store. Bounded native SQL reuses ManagementReportRepository's posted-origin, immutable allocation/journal, contract-completeness and missing-history checks; no per-row database calls or external work is added.
 
 Expected repayment dates may extend up to 366 days ahead; every selected range remains at most 366 days. Its accounting knowledge stops at the earlier of the range end and the recorded cutoff's Tanzania date, even for a future due window. Other report dates cannot extend beyond today. Preview and export share the recorded cutoff, parameters, complete filtered totals and integrity rules. These remain live management reports rather than retained/finalized statements; client/product display names may change later.
 
@@ -63,3 +65,21 @@ Validation passed on Java 25 with 38 focused Maven tests and 18 PostgreSQL 17.9 
 The three PDF downloads use column anchors measured in points from the originals. Audit uses its numbered rows, staggered month and account headings, and spaced subtotal bands. Expected repayments keeps the narrow table and its large right margin. Repayment transactions uses the original portrait grouping, gray headings, and a peach final column for the supported interest exclusion field. The report face shows the actual print time, and the notes show the recorded cutoff with its offset. Page numbers use the original wording and placement. The existing source records and totals supply the contents.
 
 Rendered synthetic samples in English and Kiswahili and checked the first and continuation pages. All 35 focused Maven tests passed, including the management export and shared voucher, statement, and loan PDF checks.
+
+## Loan portfolio workspace removal (2026-11-19)
+
+- Scope: removed only the separate Loan portfolio reports destination and its setup, preview and Excel routes. The operational reports shown separately in the sidebar remain.
+- Architecture: deleted the controller, service, repository, workbook renderer and exclusive risk calculator. Moved the unchanged posted-loan SQL into the surviving `ManagementReportRepository`; no replacement route or hidden workflow remains.
+- Security: removed both navigation/report-list entry points. Existing session, CSRF, claims, institution/branch guards and financial commands are unchanged. Route discovery checks reject the retired path and all children.
+- Database and queries: no migration, schema, data, permission assignment or index change. Shared source SQL is identical; the remaining bounded query behavior is unchanged. Existing migration history and financial/audit records are preserved.
+- Threads and concurrency: no executor, asynchronous work, cache, lock or posting transaction change.
+- Files: removed the two JSPs, dedicated JavaScript and stylesheet, obsolete shared notice selector, bilingual labels and feature-only tests; updated shared-report consumers and current documentation.
+- Verification: isolated clean compilation, Maven verification, JavaScript component checks, signed-in mobile navigation and targeted PostgreSQL financial regressions. See the recorded result below.
+- Measurements: correctness and removal checks only. No workload benchmark was run; 1,000 requests/second capacity remains unproven.
+- Limits: historical implementation/verification notes earlier in this document describe the removed workspace at their original dates. They do not authorize restoring it.
+
+Verification result: Maven ran 1,762 tests with no failures or errors (1,320 executed; 442 skipped). Six additional PostgreSQL regressions passed against a disposable loopback PostgreSQL 17.9 database, including write-off/write-back, early settlement/reversal, receipt/report reconciliation, product filters, interest waiver and the single group balance. The 52 shared-table and 17 resource-detail JavaScript tests passed. Jasper compiled the surviving shared-shell views, and the retired-route discovery check passed. A source comparison confirmed the moved loan SQL is identical.
+
+Commands: `mvn -B -Dmicrofinance.build.directory=target/portfolio-removal-build verify` from clean compiled output; targeted `surefire:test` for the six financial regressions; `npm run test:tables`; `node --test src/test/js/console-resource-details.test.cjs`; `git diff --check`. The isolated database was stopped after use. The signed-in browser confirmed the report menu removal with mobile navigation open. The local app was restarted from the new classes on port 8081; login returns HTTP 200, retired CSS/JavaScript return 404 and shared CSS returns 200. Startup confirmed the database was up to date with no migration needed. Restarting may require signing in again.
+
+Packaging completed successfully. Inspected `target/portfolio-removal-build/ROOT.war`: no retired classes, JSPs, dedicated assets or portfolio message keys remain; the surviving management report repository is present.

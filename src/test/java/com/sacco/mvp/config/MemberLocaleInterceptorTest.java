@@ -139,7 +139,7 @@ class MemberLocaleInterceptorTest {
         when(settings.languageOrDefault(id)).thenReturn("sw");authenticateStaff(id,Position.ACCOUNTANT);
         var interceptor=new MemberLocaleInterceptor(settings,registry);
         org.springframework.mock.web.MockHttpSession session=new org.springframework.mock.web.MockHttpSession();
-        for(String path:java.util.List.of("/finance/accounts","/finance/vouchers/receipts","/reports/builder","/reports/financial/portfolio")) {
+        for(String path:java.util.List.of("/finance/accounts","/finance/vouchers/receipts","/reports/builder","/reports/financial/operations/loan-portfolio")) {
             var request=new MockHttpServletRequest("GET",path);request.setSession(session);
             var resolver=new org.springframework.web.servlet.i18n.SessionLocaleResolver();
             request.setAttribute(org.springframework.web.servlet.DispatcherServlet.LOCALE_RESOLVER_ATTRIBUTE,resolver);

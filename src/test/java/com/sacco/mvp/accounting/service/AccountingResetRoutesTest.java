@@ -24,12 +24,12 @@ class AccountingResetRoutesTest {
             }
         }
         for (var retired : List.of("/finance/policies", "/finance/business", "/finance/periods", "/finance/journals",
-            "/finance/reconciliation", "/finance/closing", "/finance/accounting-release", "/reports/statements")) {
+            "/finance/reconciliation", "/finance/closing", "/finance/accounting-release", "/reports/statements", "/reports/financial/portfolio")) {
             assertThat(routes).noneMatch(path -> path.equals(retired) || path.startsWith(retired + "/"));
         }
         assertThat(routes).contains("/finance/accounts", "/finance/vouchers/{kind}",
             "/finance/loan-records", "/finance/loan-disbursements", "/finance/loan-repayments",
-            "/reports/financial/portfolio");
+            "/reports/financial/operations/{reportName}");
     }
 
     private static List<String> paths(RequestMapping mapping) {

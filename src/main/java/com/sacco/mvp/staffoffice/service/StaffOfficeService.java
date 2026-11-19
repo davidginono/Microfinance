@@ -188,7 +188,6 @@ public class StaffOfficeService {
             if(has(a,"ACCOUNTING_JOURNALS_VIEW"))report(result,"CASHBOOK");
             if(has(a,"LOAN_REPORTS_VIEW")) {
                 for(var kind:List.of("LOAN_PORTFOLIO","PORTFOLIO_RISK","PORTFOLIO_ANALYSIS","DISBURSED_LOANS_AUDIT","EXPECTED_REPAYMENTS","LOAN_REPAYMENT_TRANSACTIONS"))report(result,kind);
-                result.add(new Report("financial.portfolio.menu","/reports/financial/portfolio/configure"));
                 if(has(a,"ACCOUNTING_RECONCILIATION_VIEW"))result.add(new Report("reconciliation.title","/reports/financial/sl-gl-reconciliation"));
             }
             result.add(new Report("fs.workspace","/reports/financial/statements"));

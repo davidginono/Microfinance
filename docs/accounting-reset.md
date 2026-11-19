@@ -13,7 +13,7 @@ The following application pages, routes, services, forms and feature tests have 
 
 These features are awaiting new instructions. The old accounting checklist is historical reference, not authorization to recreate them.
 
-Core receipt, payment and journal vouchers, chart of accounts, transaction configuration, loan recording, disbursements, repayments, client loan statements and loan portfolio reports remain.
+Core receipt, payment and journal vouchers, chart of accounts, transaction configuration, loan recording, disbursements, repayments, client loan statements and the individual operational loan reports remain. The separate Loan portfolio reports workspace was removed on 2026-11-19.
 
 No stored financial records, evidence, accounts, permissions or historical database migrations were deleted. Old permission identifiers remain compatible with stored records but unavailable permissions are excluded from assignment and effective access. The existing voucher date-bucket helper and closed-date checks remain necessary posting infrastructure; there is no period-management page or action.
 
