@@ -17,8 +17,9 @@
     const members = control => control.type === 'radio' && control.name
         ? Array.from(control.form?.elements || [control]).filter(el => el.type === 'radio' && el.name === control.name && !el.disabled) : [control];
     const canonical = control => members(control)[0] || control;
+    const selectedValues = control => JSON.stringify(Array.from(control.selectedOptions, option => option.value));
     const value = control => control.type === 'radio' ? members(control).find(member => member.checked)?.value || ''
-        : control.type === 'checkbox' ? control.checked : control.value;
+        : control.type === 'checkbox' ? control.checked : control.type === 'select-multiple' ? selectedValues(control) : control.value;
     function describe(control, id, add) {
         const ids = new Set((control.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean));
         if (add) ids.add(id); else ids.delete(id);

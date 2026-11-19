@@ -14,13 +14,6 @@
             commands.forEach(command=>command.addEventListener('click',()=>{const row=selected()?.closest('[data-layout-row]');const target=row?.dataset[command.dataset.layoutCommand+'Url'];if(target&&!command.disabled){if(window.WorkspaceNavigation)window.WorkspaceNavigation.navigate(target);else location.assign(target);}}));
             region.addEventListener('resource-table:reset',clear);region.addEventListener('resource-table:updated',clear);window.addEventListener('pageshow',clear);clear();
         });
-        document.querySelectorAll('[data-layout-picker]').forEach(picker=>{
-            if(picker.dataset.layoutReady)return;picker.dataset.layoutReady='true';
-            const search=picker.querySelector('[data-layout-account-search]');
-            const rows=[...picker.querySelectorAll('[data-layout-account]')];
-            const filter=()=>{const query=search.value.trim().toLocaleLowerCase();let visible=0;rows.forEach(row=>{row.hidden=query!==''&&!row.textContent.toLocaleLowerCase().includes(query);if(!row.hidden)visible++;});picker.querySelector('[data-layout-account-empty]').hidden=visible>0;};
-            if(window.AppSearch)window.AppSearch.bind(search,filter);else search.addEventListener('input',filter);
-        });
         const note=document.querySelector('[data-layout-note-form]');
         if(note&&!note.dataset.figuresReady){
             note.dataset.figuresReady='true';

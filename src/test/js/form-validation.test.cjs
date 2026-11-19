@@ -114,6 +114,18 @@ test('server errors retain their text and hint association until the value chang
         assert.equal(input.getAttribute('aria-describedby'), 'hint');
     } finally {await tick(); dom.window.close();}
 });
+test('an account selection error clears when a later option changes', async () => {
+    const {dom,d,form,fire} = fixture('<select multiple name="accounts" aria-describedby="hint"><option value="capital" selected>Capital</option><option value="reserve" selected>Reserve</option></select><small id="hint">Choose accounts.</small><span id="accounts.errors" class="coa-error">Choose an available account.</span>');
+    try {
+        const accounts = form.elements.accounts;
+        const error = d.getElementById('accounts.errors');
+        assert.equal(accounts.getAttribute('aria-invalid'), 'true');
+        accounts.options[1].selected = false;
+        fire(accounts, 'change');
+        assert.equal(error.hidden, true);
+        assert.equal(accounts.getAttribute('aria-describedby'), 'hint');
+    } finally {await tick(); dom.window.close();}
+});
 test('required radios share one message and clear together after a choice', async () => {
     const {dom,d,form,fire} = fixture('<fieldset><legend>Mode</legend><label>First<input type="radio" name="mode" value="a" required></label><label>Second<input type="radio" name="mode" value="b" required></label></fieldset>');
     try {

@@ -12,6 +12,19 @@ test('reordering set-valued claims stays clean while changing a permission remai
     claim.checked=false;claim.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(navigate(),false);
     dom.window.close();
 });
+test('changing only an additional account selection counts as an edit', () => {
+    const {dom,w,d,navigate,submit} = fixture('<form class="accounting-create-form" data-unchanged-url="/layout?unchanged=true"><select multiple name="accounts"><option value="capital" selected>Capital</option><option value="reserve">Reserve</option></select><button type="submit">Save</button></form>');
+    try {
+        const form = d.querySelector('form');
+        const accounts = form.elements.accounts;
+        assert.equal(navigate(), true);
+        accounts.options[1].selected = true;
+        accounts.dispatchEvent(new w.Event('change', {bubbles:true}));
+        assert.deepEqual(new w.FormData(form).getAll('accounts'), ['capital','reserve']);
+        assert.equal(navigate(), false);
+        assert.equal(submit(form).defaultPrevented, false);
+    } finally {dom.window.close();}
+});
 function fixture(forms = '<form method="post" class="accounting-create-form"><input name="name" value="Saved"><button type="submit">Save</button></form>') {
   const dom = new JSDOM(`${forms}<a href="#leave">Leave</a>
     <div id="accounting-discard-modal" hidden><div role="dialog"><button data-accounting-keep>Close</button>

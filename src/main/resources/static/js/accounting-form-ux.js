@@ -7,7 +7,12 @@
     let submitting = false, discarding = false, submitted, initialized = false, pending, previousFocus, previousOverflow, previousRootOverflow;
     const disabledOnSubmit = new Set();
     const values = form => {
-        const fields = Array.from(form.elements).filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action').map(el => [el.name, el.value, el.checked]);
+        const fields = Array.from(form.elements)
+            .filter(el => el.name && (el.type !== 'hidden' || form.hasAttribute('data-voucher-form')) && el.type !== 'submit' && el.name !== 'action')
+            .map(el => {
+                const value = el.type === 'select-multiple' ? JSON.stringify(Array.from(el.selectedOptions, option => option.value)) : el.value;
+                return [el.name, value, el.checked];
+            });
         const unordered = new Set((form.dataset.formUnorderedFields || '').split(/\s+/));
         return JSON.stringify([...fields.filter(([name]) => !unordered.has(name)), ...fields.filter(([name]) => unordered.has(name)).sort(([an,av],[bn,bv]) => an.localeCompare(bn) || av.localeCompare(bv))]);
     };

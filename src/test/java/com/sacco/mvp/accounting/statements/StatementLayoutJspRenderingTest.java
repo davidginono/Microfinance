@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class StatementLayoutJspRenderingTest {
     @TempDir Path temporary;
-    final UUID capital=UUID.randomUUID(),bank=UUID.randomUUID();
+    final UUID capital=UUID.randomUUID(),reserve=UUID.randomUUID(),bank=UUID.randomUUID();
     @Test void focusedFormsRenderSelectionsFiguresTranslationsAndRecoverableErrors()throws Exception {
         Path views=Path.of("src/main/webapp/WEB-INF/jsp/accounting/statements");
         String tags="""
@@ -48,9 +48,15 @@ class StatementLayoutJspRenderingTest {
                 response.setLocale("sw".equals(request.getParameter("lang"))?Locale.forLanguageTag("sw"):Locale.ENGLISH);
                 request.setAttribute("_csrf",Map.of("parameterName","_csrf","token","synthetic-token"));
                 boolean noAccounts="true".equals(request.getParameter("empty"));
-                request.setAttribute("accounts",noAccounts?List.of():List.of(new AccountChoice(capital,"311001","Capital <safe>","EQUITY"),new AccountChoice(bank,"111001","Bank","ASSET")));
                 boolean group="group".equals(request.getParameter("kind"));Change form;
-                if(group){var f=new GroupForm();f.setName("Owner capital");f.setNameSw("Mtaji");f.setAccounts(noAccounts?List.of():List.of(capital));form=f;request.setAttribute("positions",2);}
+                var choices=new ArrayList<AccountChoice>();
+                if(!noAccounts){
+                    choices.add(new AccountChoice(capital,"311001","Capital <safe>","EQUITY"));
+                    choices.add(new AccountChoice(reserve,"311002","Reserve","EQUITY"));
+                    if(!group)choices.add(new AccountChoice(bank,"111001","Bank","ASSET"));
+                }
+                request.setAttribute("accounts",choices);
+                if(group){var f=new GroupForm();f.setName("Owner capital");f.setNameSw("Mtaji");f.setAccounts(noAccounts?List.of():List.of(capital,reserve));form=f;request.setAttribute("positions",2);}
                 else{var f=new NoteForm();f.setNumber(2);f.setTitle("Policy");f.setTitleSw("Sera");f.setText("Recorded disclosure");f.setBasis(request.getParameter("basis"));if(!f.getBasis().equals("NARRATIVE"))f.setAccounts(List.of(bank));form=f;}
                 form.setIndex("true".equals(request.getParameter("edit"))?0:-1);form.setVersion(3);form.setRequestKey(UUID.randomUUID());form.setReason("Retain entered reason");
                 String name=group?"layoutGroup":"layoutNote";request.setAttribute(name,form);
@@ -61,15 +67,18 @@ class StatementLayoutJspRenderingTest {
         try{
             tomcat.getConnector();tomcat.start();var client=HttpClient.newHttpClient();String base="http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/fixture?";
             String group=page(client,base+"kind=group&edit=true&error=true");
-            assertThat(group).contains("name=\"accounts\"","value=\""+capital+"\"","checked=\"checked\"","Capital &lt;safe&gt;","Retain entered reason","data-field-error-for=\"reason\"","data-workspace-response-error");
+            assertThat(element(group,"select","accounts")).contains("multiple=\"multiple\"","aria-describedby=\"layout-accounts-hint\"");
+            assertThat(group).contains("value=\""+capital+"\" selected=\"selected\"","value=\""+reserve+"\" selected=\"selected\"",
+                "Capital &lt;safe&gt;","311001 · Equity","Retain entered reason","data-field-error-for=\"reason\"","data-workspace-response-error")
+                .doesNotContain("type=\"search\"","name=\"accounts\" type=\"checkbox\"");
             assertThat(element(group,"textarea","reason")).doesNotContain("required");
             assertThat(element(page(client,base+"kind=group"),"textarea","reason")).contains("required");
-            assertThat(page(client,base+"kind=group&empty=true")).contains("No accounts are available for this form").doesNotContain("class=\"fs-layout-account\"");
+            assertThat(page(client,base+"kind=group&empty=true")).contains("No accounts are available for this form").doesNotContain("name=\"accounts\"");
             for(String lang:List.of("en","sw"))for(String basis:List.of("NARRATIVE","BALANCE","MOVEMENT")){
                 String note=page(client,base+"kind=note&basis="+basis+"&lang="+lang);
                 var fieldset=Pattern.compile("<fieldset[^>]*data-layout-note-accounts[^>]*>").matcher(note);assertThat(fieldset.find()).isTrue();
                 if(basis.equals("NARRATIVE")){assertThat(fieldset.group()).contains("hidden","disabled");assertThat(element(note,"textarea","text")).contains("required");}
-                else{assertThat(fieldset.group()).doesNotContain("hidden","disabled");assertThat(element(note,"textarea","text")).doesNotContain("required");}
+                else{assertThat(fieldset.group()).doesNotContain("hidden","disabled");assertThat(element(note,"textarea","text")).doesNotContain("required");assertThat(note).contains("value=\""+bank+"\" selected=\"selected\"");}
                 assertThat(note).contains("name=\"requestKey\"","value=\"3\"","name=\"_csrf\"","Recorded disclosure");assertThat(note).doesNotContain("components[","notes[","categories[","/statements/setup");
                 assertThat(note).contains(lang.equals("en")?"No figures":"Bila takwimu");
             }

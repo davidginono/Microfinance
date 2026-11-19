@@ -6,7 +6,7 @@
 <div class="accounting-workspace fs-layout-form" data-resource-form-page>
 <h1 class="erp-page-title" data-aws-page-header><spring:message code="${titleKey}" /></h1>
 <c:url value="/reports/financial/statements/layout/groups" var="saveUrl" />
-<form:form modelAttribute="layoutGroup" method="post" action="${saveUrl}" cssClass="accounting-create-form" data-workspace-submit="recover" data-workspace-field-errors="true" data-unsaved-financial-form="${layoutHasErrors}" data-form-unordered-fields="accounts" data-unchanged-url="${pageContext.request.contextPath}/reports/financial/statements/layout?unchanged=true">
+<form:form modelAttribute="layoutGroup" method="post" action="${saveUrl}" cssClass="accounting-create-form" data-workspace-submit="recover" data-workspace-field-errors="true" data-unsaved-financial-form="${layoutHasErrors}" data-unchanged-url="${pageContext.request.contextPath}/reports/financial/statements/layout?unchanged=true">
 <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><form:hidden path="version" /><form:hidden path="index" /><form:hidden path="requestKey" />
 <section class="erp-panel"><div class="erp-panel-header"><h2><spring:message code="fs.layout.groupDetails" /></h2></div><div class="erp-panel-body fs-fields">
 <label><spring:message code="fs.layout.name" /><form:input path="name" cssClass="aws-control" maxlength="100" required="required" /><form:errors path="name" cssClass="coa-error" /></label>
