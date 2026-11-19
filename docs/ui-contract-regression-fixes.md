@@ -54,3 +54,24 @@ No throughput benchmark was run. The 1,000-RPS capacity target remains unproven.
 ## 9. Remaining validation boundary
 
 Browser inventory contained no authenticated Microfinance application tab. Authenticated desktop/mobile interaction and visual acceptance are unverified; source-contract and Jasper checks do not replace them. No unrelated browser project or operational database was used.
+
+
+## Resource details cleanup (19 November 2026)
+
+Reviewed 22 resource details pages and their shared fragments, covering institution/client/user records, loan and repayment records, vouchers, account versions, approvals, adjustments, budgets and payroll. Resource-wide filters belong in registers. Record-specific financial forms, subtable search/sort/paging, evidence, real status, required disclosures and retry/error controls remain.
+
+Removed the Institution details branch filter card and its Apply/Reset controls at source. Institution and branch IDs in the existing summary now link to their authorized details context. A scoped page shows its selected branch clearly; its institution ID returns to institution details. Branch access forms keep their branch, claims, CSRF, confirmation and edited values. Tabs continue to replace only their section, update native resource-link context, reject stale/authentication responses and offer local retry. Removed the filter-specific script updates, message keys and obsolete test exception. Existing institution/branch validation and data queries are unchanged.
+
+Removed the redundant fixed-schedule explanation from disbursement posting details. Shortened English/Kiswahili notices for account approval evidence, protected repayment definitions, posting corrections, group adjustment allocations, payroll delivery/results and stopping payroll instructions. Retained equal/opposite reversal amounts, independent authorized correction, latest-unreversed-payment restrictions, frozen loan order and per-loan caps, delivery-only and no-money effects, missing-data warnings, client consent/KYC and historical evidence. No journal, repayment, approval, schema, stored financial record, permission, transaction, lock, cache or executor change was made. No throughput benchmark was run; the 1,000-RPS target remains unproven.
+
+
+Verification for this cleanup:
+
+- `mvn -B -Dmicrofinance.build.directory=target/resource-details-cleanup-build -Dtest=ChartOfAccountsJspCompilationTest,PlatformAdminServiceTest -Dmicrofinance.jsp.pages=... test`: all application/test sources compiled; the ten affected detail JSPs and platform scope test passed (two test methods).
+- `mvn -B -Dmicrofinance.build.directory=target/resource-details-cleanup-build -Dtest=AdminConfigurationUiContractTest,AwsConsoleViewContractTest,ChartOfAccountsJspCompilationTest -Dmicrofinance.jsp.pages=../admin/sacco-detail.jsp surefire:test`: 27 tests passed, including the final Institution JSP.
+- `node --test src/test/js/institution-details.test.cjs src/test/js/console-resource-details.test.cjs src/test/js/resource-table.test.cjs`: 74 passed. Re-ran the five institution tests against the final navigation fixture: all passed. They preserve live branch-form values, record scope, tab-link context, cancellation, keyboard navigation and local retry.
+- English/Kiswahili orphan-label checks and `git diff --check` passed. The retained financial-warning keys remain present in both bundles.
+
+Browser automation was not repeated after the user's earlier stop. Component, source-contract and Jasper checks cover this change; authenticated visual acceptance remains unverified. The local app uses the verified classes and updated resources in `target/resource-details-cleanup-build` on port 8081.
+
+The updated local app started successfully. Login returned HTTP 200, and startup confirmed that no database migration was necessary.

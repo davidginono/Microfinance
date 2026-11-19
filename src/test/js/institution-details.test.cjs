@@ -9,8 +9,8 @@ const response = (section, extra = {}) => ({ok:true, redirected:false, headers:{
     text:async()=>`<div id="institution-section" data-institution-section="${section}" role="tabpanel" aria-labelledby="institution-tab-${section}"><section>${section}</section></div>`, ...extra});
 function setup(fetch) {
     const dom = new JSDOM(`<div data-institution-details data-loading="Loading" data-error="Section unavailable" data-retry="Try again">
-        <section data-detail-summary>Institution 1001</section><form data-institution-scope><input name="section" value="overview"><input name="reason" value="draft"></form>
-        <a data-institution-reset href="?section=overview">Reset</a><nav data-institution-tabs>${sections.map(section=>`<a id="institution-tab-${section}" role="tab" data-institution-tab="${section}" href="?section=${section}&stationId=BR-1">${section}</a>`).join('')}</nav>
+        <section data-detail-summary>Institution 1001 <a data-institution-resource-link href="?section=overview">1001</a></section><form method="post" action="/admin/saccos/1001/access/suspend"><input name="stationId" value="BR-1"><input name="reason" value="draft"></form>
+        <nav data-institution-tabs>${sections.map(section=>`<a id="institution-tab-${section}" role="tab" data-institution-tab="${section}" href="?section=${section}&stationId=BR-1">${section}</a>`).join('')}</nav>
         <div id="institution-section" data-institution-section="overview" role="tabpanel"><section>Original overview</section></div></div>`,
         {url:'http://localhost/admin/saccos/1001?section=overview&stationId=BR-1', runScripts:'outside-only'});
     const w=dom.window, d=w.document, initialized=[];
@@ -28,11 +28,13 @@ test('tabs replace only their section, retain live branch form values and update
         form.elements.reason.value='Unsaved reason';
         tab('loans').click(); await settle();
         assert.equal(d.querySelector('[data-detail-summary]'),summary); assert.equal(d.querySelector('form'),form);
-        assert.equal(form.elements.reason.value,'Unsaved reason'); assert.equal(form.elements.section.value,'loans');
+        assert.equal(form.elements.reason.value,'Unsaved reason'); assert.equal(form.elements.stationId.value,'BR-1');
         assert.equal(d.querySelector('[data-institution-section]').dataset.institutionSection,'loans');
         assert.equal(tab('loans').getAttribute('aria-selected'),'true'); assert.equal(tab('overview').tabIndex,-1);
         assert.equal(new URL(w.location.href).searchParams.get('stationId'),'BR-1');
-        assert.equal(new URL(d.querySelector('[data-institution-reset]').href).searchParams.get('section'),'loans');
+        const branchUrl = new URL(d.querySelector('[data-institution-resource-link]').href);
+        assert.equal(branchUrl.searchParams.get('stationId'),null);
+        assert.equal(branchUrl.searchParams.get('section'),'loans');
         assert.equal(calls.length,1); assert.equal(calls[0].options.credentials,'same-origin'); assert.equal(initialized.length,1);
     } finally {dom.window.close();}
 });

@@ -23,29 +23,22 @@
         <div class="erp-panel-body">
             <dl class="erp-detail-facts">
                 <div><dt><spring:message code="admin.saccoRegistry.saccoName" /></dt><dd><c:out value="${saccoDetail.summary.saccoName}" /></dd></div>
-                <div><dt><spring:message code="admin.institutionDetails.id" /></dt><dd><c:out value="${saccoDetail.saccoId}" /></dd></div>
-                <div><dt><spring:message code="admin.saccoRegistry.stations" /></dt><dd><c:out value="${saccoDetail.summary.stationListLabel}" /></dd></div>
+                <div><dt><spring:message code="admin.institutionDetails.id" /></dt><dd><c:url value="/admin/saccos/${saccoDetail.saccoId}" var="institutionUrl"><c:param name="section" value="${selectedSection}" /></c:url><a class="resource-table-id-link" data-institution-resource-link href="<c:out value='${institutionUrl}' />"><c:out value="${saccoDetail.saccoId}" /></a></dd></div>
+                <div><dt><spring:message code="${saccoDetail.stationScoped?'admin.saccoRegistry.station':'admin.saccoRegistry.stations'}" /></dt><dd>
+                    <c:choose><c:when test="${saccoDetail.stationScoped}"><c:out value="${saccoDetail.selectedStationId}" /></c:when><c:otherwise>
+                    <c:if test="${empty saccoDetail.stationOptions}">—</c:if>
+                    <c:forEach items="${saccoDetail.stationOptions}" var="station" varStatus="position">
+                        <c:url value="/admin/saccos/${saccoDetail.saccoId}" var="branchUrl"><c:param name="section" value="${selectedSection}" /><c:param name="stationId" value="${station}" /></c:url>
+                        <c:if test="${not position.first}">, </c:if><a class="resource-table-id-link" data-institution-resource-link href="<c:out value='${branchUrl}' />"><c:out value="${station}" /></a>
+                    </c:forEach>
+                    </c:otherwise></c:choose>
+                </dd></div>
                 <div><dt><spring:message code="admin.saccoRegistry.access" /></dt><dd><span data-resource-status="${saccoDetail.summary.accessStatus}"><spring:message code="admin.institutionDetails.access.${saccoDetail.summary.accessStatus}" /></span></dd></div>
                 <div><dt><spring:message code="admin.institutionDetails.paymentDue" /></dt><dd><c:choose><c:when test="${empty saccoDetail.summary.paymentDueDate}"><spring:message code="common.notSet" /></c:when><c:otherwise><c:out value="${saccoDetail.summary.paymentDueDateLabel}" /></c:otherwise></c:choose></dd></div>
                 <c:if test="${saccoDetail.summary.accessSuspended}"><div><dt><spring:message code="admin.institutionDetails.suspendedOn" /></dt><dd><c:out value="${saccoDetail.summary.accessSuspendedAtLabel}" /></dd></div></c:if>
                 <c:if test="${not empty saccoDetail.summary.accessRestrictionReason}"><div><dt><spring:message code="common.reason" /></dt><dd><c:out value="${saccoDetail.summary.accessRestrictionReason}" /></dd></div></c:if>
             </dl>
         </div>
-    </section>
-
-    <section class="erp-panel mb-4">
-        <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="admin.institutionDetails.branchScope" /></h2></div>
-        <form action="/admin/saccos/${saccoDetail.saccoId}" method="get" class="erp-panel-body institution-details-controls" data-institution-scope>
-            <input type="hidden" name="section" value="${selectedSection}" />
-            <label for="institution-branch"><spring:message code="admin.saccoRegistry.station" />
-                <select id="institution-branch" name="stationId" class="aws-control">
-                    <option value="" ${empty saccoDetail.selectedStationId ? 'selected' : ''}><spring:message code="admin.institutionDetails.allBranches" /></option>
-                    <c:forEach items="${saccoDetail.stationOptions}" var="station"><option value="<c:out value='${station}' />" ${saccoDetail.selectedStationId eq station ? 'selected' : ''}><c:out value="${station}" /></option></c:forEach>
-                </select>
-            </label>
-            <button type="submit" class="app-btn btn-neutral"><spring:message code="common.apply" /></button>
-            <a href="/admin/saccos/${saccoDetail.saccoId}?section=${selectedSection}" class="app-btn btn-neutral" data-institution-reset><spring:message code="common.reset" /></a>
-        </form>
     </section>
 
     <sec:authorize access="@access.has(principal, 'SACCO_REGISTRY_UPDATE')">

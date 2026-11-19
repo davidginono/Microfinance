@@ -56,10 +56,11 @@
                 window.refreshEnhancedSelects?.(next);
                 window.ConsoleResourceDetails?.init(next);
                 select(tab.dataset.institutionTab);
-                root.querySelector('[data-institution-scope] [name=section]').value = tab.dataset.institutionTab;
-                const reset = root.querySelector('[data-institution-reset]'), resetUrl = new URL(reset.href);
-                resetUrl.searchParams.set('section', tab.dataset.institutionTab);
-                reset.href = resetUrl.href;
+                root.querySelectorAll('[data-institution-resource-link]').forEach(link => {
+                    const url = new URL(link.href);
+                    url.searchParams.set('section', tab.dataset.institutionTab);
+                    link.href = url.href;
+                });
                 history.replaceState(history.state, '', tab.href);
                 document.dispatchEvent(new Event('resource-table:query'));
             } catch (error) {

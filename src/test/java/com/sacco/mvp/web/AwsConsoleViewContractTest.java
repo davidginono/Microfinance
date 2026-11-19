@@ -178,12 +178,6 @@ class AwsConsoleViewContractTest {
                 // Selection-dependent GET commands open version proposals; they are not filter toolbars.
                 if (getForms.group().contains("data-table-command")
                     || getForms.group().contains("accounting-create-form")) continue;
-                // Institution branch scope applies to every detail tab, not one resource table.
-                if (path.equals(JSP_ROOT.resolve("admin/sacco-detail.jsp"))
-                    && getForms.group().contains("data-institution-scope")) {
-                    assertThat(getForms.group()).contains("institution-details-controls");
-                    continue;
-                }
                 assertThat(getForms.group())
                     .as(path + " GET form")
                     .satisfiesAnyOf(
