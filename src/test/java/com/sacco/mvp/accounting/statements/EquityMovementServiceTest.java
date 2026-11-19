@@ -19,7 +19,7 @@ class EquityMovementServiceTest {
     final StatementSetupRepository repository=mock(StatementSetupRepository.class);
     final GeneralLedgerService access=mock(GeneralLedgerService.class);
     final AppUserPrincipal actor=mock(AppUserPrincipal.class);
-    final EquityMovementService service=new EquityMovementService(repository,access,mock(AuditService.class));
+    final EquityMovementService service=new EquityMovementService(repository,access,mock(AuditService.class),tools.jackson.databind.json.JsonMapper.builder().build());
     final UUID capital=UUID.randomUUID(),bank=UUID.randomUUID(),income=UUID.randomUUID(),journal=UUID.randomUUID();
     @BeforeEach void fixture(){when(actor.getSaccoId()).thenReturn("I");when(actor.getStationId()).thenReturn("B");when(actor.getMemberId()).thenReturn(UUID.randomUUID());when(repository.accounts("I")).thenReturn(List.of(new AccountChoice(capital,"311001","Capital","EQUITY"),new AccountChoice(bank,"111001","Bank","ASSET"),new AccountChoice(income,"411001","Income","INCOME")));}
     Movement line(UUID account,String debit,String credit){return new Movement(account,Category.UNCLASSIFIED,false,new BigDecimal(debit),new BigDecimal(credit));}

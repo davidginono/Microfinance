@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.statements.controller;
 
 import com.sacco.mvp.accounting.statements.dto.StatementLayoutModels.*;
+import com.sacco.mvp.accounting.dto.VoucherDtos;
 import com.sacco.mvp.accounting.statements.service.StatementLayoutService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -18,13 +19,35 @@ public class StatementLayoutController {
     @ModelAttribute void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
     @InitBinder("layoutGroup") void groupBinder(WebDataBinder binder){binder.setAllowedFields("version","index","requestKey","reason","name","nameSw","position","retained","accounts");binder.setAutoGrowCollectionLimit(2000);}
     @InitBinder("layoutNote") void noteBinder(WebDataBinder binder){binder.setAllowedFields("version","index","requestKey","reason","number","title","titleSw","basis","text","textSw","includeProfit","accounts");binder.setAutoGrowCollectionLimit(2000);}
+    @InitBinder("layoutMovementRow") void movementRowBinder(WebDataBinder binder){binder.setAllowedFields("version","index","requestKey","reason","name","nameSw","category");}
     @InitBinder("layoutRemoval") void removalBinder(WebDataBinder binder){binder.setAllowedFields("version","index","requestKey","reason");}
 
-    @GetMapping public String overview(@AuthenticationPrincipal AppUserPrincipal actor,Model model){model.addAttribute("layout",layouts.overview(actor));return ROOT+"layout";}
+    @GetMapping public String overview(@AuthenticationPrincipal AppUserPrincipal actor,Model model){model.addAttribute("layout",layouts.overview(actor));model.addAttribute("movementRowsLimit",StatementLayoutService.MAX_MOVEMENT_ROWS);return ROOT+"layout";}
     @GetMapping("/groups/new") public String newGroup(@AuthenticationPrincipal AppUserPrincipal actor,Model model){return group(actor,-1,null,model);}
     @GetMapping("/groups/{index}/edit") public String group(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable int index,@RequestParam(required=false) Integer version,Model model){var editor=layouts.group(actor,index,version);model.addAttribute("layoutGroup",editor.form());model.addAttribute("accounts",editor.accounts());model.addAttribute("positions",editor.positions());return ROOT+"layout-group";}
     @GetMapping("/notes/new") public String newNote(@AuthenticationPrincipal AppUserPrincipal actor,Model model){return note(actor,-1,null,model);}
     @GetMapping("/notes/{index}/edit") public String note(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable int index,@RequestParam(required=false) Integer version,Model model){var editor=layouts.note(actor,index,version);model.addAttribute("layoutNote",editor.form());model.addAttribute("accounts",editor.accounts());return ROOT+"layout-note";}
+    @GetMapping("/movement-rows/new") public String newMovementRow(@AuthenticationPrincipal AppUserPrincipal actor,Model model){return movementRow(actor,-1,null,model);}
+    @GetMapping("/movement-rows/{index}/edit") public String movementRow(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable int index,@RequestParam(required=false) Integer version,Model model){
+        model.addAttribute("layoutMovementRow",layouts.movementRow(actor,index,version));
+        return movementRowForm(model);
+    }
+
+    @PostMapping("/movement-rows") public String saveMovementRow(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("layoutMovementRow") MovementRowForm form,BindingResult binding,Model model){
+        if(!binding.hasErrors())try{return saved(layouts.saveMovementRow(actor,form));}catch(IllegalArgumentException error){
+            switch(key(error)){
+                case "fs.error.layoutMovementName"->binding.rejectValue("name",key(error));
+                case "fs.error.layoutMovementCategory"->binding.rejectValue("category",key(error));
+                case "fs.error.reason"->binding.rejectValue("reason",key(error));
+                default->binding.reject(key(error));
+            }
+        }
+        return movementRowForm(model);
+    }
+    private static String movementRowForm(Model model){
+        model.addAttribute("movementCategories",VoucherDtos.equityTypes(VoucherDtos.Type.JOURNAL));
+        return ROOT+"layout-movement-row";
+    }
 
     @PostMapping("/groups") public String saveGroup(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("layoutGroup") GroupForm form,BindingResult binding,Model model){
         if(!binding.hasErrors())try{return saved(layouts.saveGroup(actor,form));}catch(IllegalArgumentException error){reject(binding,error,true);}

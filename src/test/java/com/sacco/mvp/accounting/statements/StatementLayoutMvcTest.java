@@ -45,4 +45,17 @@ class StatementLayoutMvcTest {
     @Test void successfulAndUnchangedEditsReturnToTheOverview()throws Exception{mvc.perform(post("/reports/financial/statements/layout/groups").with(csrf())).andExpect(redirectedUrl("/reports/financial/statements/layout?saved=true"));when(layouts.saveGroup(eq(actor),any())).thenReturn(false);mvc.perform(post("/reports/financial/statements/layout/groups").with(csrf())).andExpect(redirectedUrl("/reports/financial/statements/layout?unchanged=true"));}
     @Test void removalCannotAcceptAnotherResourceKind()throws Exception{mvc.perform(post("/reports/financial/statements/layout/journals/remove").with(csrf())).andExpect(status().isBadRequest());verify(layouts,never()).remove(any(),anyBoolean(),any());}
     @Test void movementRoutesStillRejectUnknownTypes()throws Exception{mvc.perform(post("/reports/financial/statements/movements").with(csrf()).param("journal",UUID.randomUUID().toString()).param("version","0").param("category","ARBITRARY_FORMULA").param("reason","x").param("from","2026-01-01").param("through","2026-01-31")).andExpect(status().isBadRequest());verify(movements,never()).classify(any(),any(),anyInt(),any(),any());}
+    @Test void customMovementRowUsesTheFocusedLayoutFormAndScopedSave()throws Exception{
+        String path="/reports/financial/statements/layout/movement-rows";
+        when(layouts.movementRow(actor,-1,null)).thenReturn(new MovementRowForm());
+        when(layouts.saveMovementRow(eq(actor),any())).thenReturn(true);
+        mvc.perform(get(path+"/new")).andExpect(view().name("accounting/statements/layout-movement-row"));
+        mvc.perform(post(path)).andExpect(status().isForbidden());
+        mvc.perform(post(path).with(csrf()).param("name","Profit set aside").param("category","INVALID"))
+            .andExpect(model().attributeHasFieldErrors("layoutMovementRow","category"));
+        mvc.perform(post(path).with(csrf()).param("version","2").param("requestKey",UUID.randomUUID().toString())
+            .param("name","Profit set aside").param("reason","Reserve policy").param("category","TRANSFER").param("saccoId","FOREIGN"))
+            .andExpect(redirectedUrl("/reports/financial/statements/layout?saved=true"));
+        verify(layouts).saveMovementRow(eq(actor),argThat(form->form.getVersion()==2&&form.getName().equals("Profit set aside")&&form.getCategory().name().equals("TRANSFER")));
+    }
 }

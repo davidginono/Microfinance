@@ -36,17 +36,32 @@ public final class EquityStatementCalculator {
         for(var b:accounts){if(b.type().equals("EQUITY")){String c=components.get(b.id());opening.merge(c,(previous?b.previousOpening():b.opening()).negate(),BigDecimal::add);closing.merge(c,(previous?b.previousClosing():b.closing()).negate(),BigDecimal::add);}
             else if(Set.of("INCOME","EXPENSE").contains(b.type())){opening.merge(retained,(previous?b.previousOpening():b.opening()).negate(),BigDecimal::add);closing.merge(retained,(previous?b.previousClosing():b.closing()).negate(),BigDecimal::add);profit.merge(retained,(previous?b.previousMovement():b.movement()).negate(),BigDecimal::add);}}
         var changes=new EnumMap<Category,Map<String,BigDecimal>>(Category.class);for(var c:Category.values())changes.put(c,zero(columns));
+        var customChanges=new TreeMap<MovementRow,Map<String,BigDecimal>>(
+            Comparator.comparing(MovementRow::category).thenComparing(MovementRow::name,String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(MovementRow::name).thenComparing(MovementRow::nameSw).thenComparing(MovementRow::id));
         for(var m:movements)if(m.previous()==previous){var account=byId.get(m.accountId());if(account==null)throw new IllegalArgumentException("fs.error.snapshot");
-            if(account.type().equals("EQUITY"))changes.get(m.category()).merge(components.get(account.id()),m.signed().negate(),BigDecimal::add);
+            var amounts=m.row()==null?changes.get(m.category()):customChanges.computeIfAbsent(m.row(),unused->zero(columns));
+            if(account.type().equals("EQUITY"))amounts.merge(components.get(account.id()),m.signed().negate(),BigDecimal::add);
             else if(m.category()==Category.EARNINGS_TRANSFER&&Set.of("INCOME","EXPENSE").contains(account.type())){
                 // Closing transfers move already-earned profit between components; they are not new profit.
-                changes.get(Category.EARNINGS_TRANSFER).merge(retained,m.signed().negate(),BigDecimal::add);profit.merge(retained,m.signed(),BigDecimal::add);
+                amounts.merge(retained,m.signed().negate(),BigDecimal::add);profit.merge(retained,m.signed(),BigDecimal::add);
             }}
         var rows=new ArrayList<EquityRow>();rows.add(row("fs.opening",opening,true));rows.add(row("fs.surplus",profit,false));
-        for(var c:Category.values()){var values=changes.get(c);if(values.values().stream().anyMatch(v->v.signum()!=0)||c==Category.UNCLASSIFIED&&movements.stream().anyMatch(m->m.previous()==previous&&m.category()==c&&(m.debit().signum()!=0||m.credit().signum()!=0)))rows.add(row("fs.movement."+c,values,false));}
+        for(var c:Category.values()){
+            var values=changes.get(c);
+            if(values.values().stream().anyMatch(v->v.signum()!=0)||c==Category.UNCLASSIFIED&&movements.stream().anyMatch(m->m.previous()==previous&&m.category()==c&&(m.debit().signum()!=0||m.credit().signum()!=0)))rows.add(row("fs.movement."+c,values,false));
+            customChanges.forEach((custom,amounts)->{
+                if(custom.category()==c){
+                    rows.add(new EquityRow("fs.movement."+c,Map.copyOf(amounts),amounts.values().stream().reduce(ZERO,BigDecimal::add),false,custom));
+                }
+            });
+        }
         rows.add(row("fs.closing",closing,true));
         // Check every component, not merely a total that can hide offsetting errors.
-        for(String column:columns){BigDecimal difference=opening.get(column).add(profit.get(column));for(var c:Category.values())difference=difference.add(changes.get(c).get(column));difference=difference.subtract(closing.get(column));if(difference.signum()!=0)checks.add(new Check(previous?"previousEquity":"equity",difference));}
+        for(String column:columns){
+            BigDecimal displayed=rows.subList(0,rows.size()-1).stream().map(r->r.values().get(column)).reduce(ZERO,BigDecimal::add);
+            BigDecimal difference=displayed.subtract(closing.get(column));if(difference.signum()!=0)checks.add(new Check(previous?"previousEquity":"equity",difference));
+        }
         boolean unknown=movements.stream().anyMatch(m->m.previous()==previous&&m.category()==Category.UNCLASSIFIED&&(m.debit().signum()!=0||m.credit().signum()!=0));if(unknown)checks.add(new Check(previous?"previousEquityMovements":"equityMovements",null));
         return List.copyOf(rows);
     }

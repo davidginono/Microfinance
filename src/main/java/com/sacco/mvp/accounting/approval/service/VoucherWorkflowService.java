@@ -259,6 +259,9 @@ public class VoucherWorkflowService {
     @Transactional(readOnly=true)
     public Client selectedClient(AppUserPrincipal a,UUID id,Form f){var d=details(a,id);return vouchers.reviewClient(a,d.workflow().type(),f.getClientId()).orElse(null);}
     @Transactional(readOnly=true)
+    public List<com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementOption> equityOptions(AppUserPrincipal actor,Details workspace,Item item,Form submitted){
+        return vouchers.reviewEquityOptions(actor,workspace.workflow().type(),item.form(),submitted,workspace.actions().contains("EDIT"));
+    }
     public Map<String,Account> selectedAccounts(AppUserPrincipal a,UUID id,Form f) {
         var d=details(a,id);return vouchers.reviewAccounts(a,d.workflow().type(),f);
     }

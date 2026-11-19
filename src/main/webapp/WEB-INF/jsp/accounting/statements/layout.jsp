@@ -16,6 +16,20 @@
 <c:if test="${empty layout.groups}"><tr><td colspan="4"><span class="resource-table-empty-message"><spring:message code="fs.layout.noGroups" /></span></td></tr></c:if>
 </tbody></table></div><div data-table-pagination data-page="0" data-table-for="statement-layout-groups"></div><p class="sr-only" aria-live="polite" data-layout-selection></p>
 </section>
+<section class="erp-table-wrap" data-resource-table="statement-layout-movements" data-table-selection="single" data-layout-register>
+<div class="app-table-titlebar"><h2><spring:message code="fs.layout.movementRows" /></h2><div class="app-table-toolbar">
+<button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="edit" disabled><spring:message code="common.edit" /></button>
+<c:choose><c:when test="${layout.movementRows.size()>=movementRowsLimit and not empty movementRowsLimit}"><button type="button" class="app-btn btn-launch" disabled title="<spring:message code='fs.layout.movementRowsLimit' />"><spring:message code="fs.layout.addMovementRow" /></button></c:when><c:otherwise><a class="app-btn btn-launch" href="<c:url value='/reports/financial/statements/layout/movement-rows/new' />"><spring:message code="fs.layout.addMovementRow" /></a></c:otherwise></c:choose>
+</div></div>
+<div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="editor"><thead><tr><th><spring:message code="fs.setup.select" /></th><th><spring:message code="fs.layout.name" /></th><th><spring:message code="fs.setup.category" /></th></tr></thead><tbody>
+<c:forEach items="${layout.movementRows}" var="row" varStatus="rowStatus">
+<c:url value="/reports/financial/statements/layout/movement-rows/${rowStatus.index}/edit" var="editUrl"><c:param name="version" value="${layout.version}" /></c:url>
+<c:set var="movementName" value="${pageContext.response.locale.language=='sw' and not empty row.nameSw?row.nameSw:row.name}" />
+<tr data-layout-row data-edit-url="<c:out value='${editUrl}' />"><td class="resource-table-selection"><input type="checkbox" data-layout-select aria-label="<c:out value='${movementName}' />" /></td><td><c:out value="${movementName}" /></td><td><spring:message code="fs.movement.${row.category}" /></td></tr>
+</c:forEach>
+<c:if test="${empty layout.movementRows}"><tr><td colspan="3"><span class="resource-table-empty-message"><spring:message code="fs.layout.noMovementRows" /></span></td></tr></c:if>
+</tbody></table></div><div data-table-pagination data-page="0" data-table-for="statement-layout-movements"></div><p class="sr-only" aria-live="polite" data-layout-selection></p>
+</section>
 <section class="erp-table-wrap" data-resource-table="statement-layout-notes" data-table-selection="single" data-layout-register>
 <div class="app-table-titlebar"><h2><spring:message code="fs.notes" /></h2><div class="app-table-toolbar">
 <button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="edit" disabled><spring:message code="common.edit" /></button><button type="button" class="app-btn btn-neutral" data-table-command data-layout-command="remove" disabled><spring:message code="fs.layout.remove" /></button>

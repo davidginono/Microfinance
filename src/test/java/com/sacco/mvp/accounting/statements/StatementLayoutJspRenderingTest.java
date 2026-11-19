@@ -31,7 +31,7 @@ class StatementLayoutJspRenderingTest {
             <%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
             <spring:htmlEscape defaultHtmlEscape="true" />
             """;
-        for(String kind:List.of("group","note")){
+        for(String kind:List.of("group","note","movement-row")){
             String source=Files.readString(views.resolve("layout-"+kind+".jsp"));
             Files.writeString(temporary.resolve(kind+".jsp"),tags+source.substring(source.indexOf("<c:set var=\"layoutFormName\""),source.indexOf("</form:form>")+12));
         }
@@ -48,7 +48,8 @@ class StatementLayoutJspRenderingTest {
                 response.setLocale("sw".equals(request.getParameter("lang"))?Locale.forLanguageTag("sw"):Locale.ENGLISH);
                 request.setAttribute("_csrf",Map.of("parameterName","_csrf","token","synthetic-token"));
                 boolean noAccounts="true".equals(request.getParameter("empty"));
-                boolean group="group".equals(request.getParameter("kind"));Change form;
+                String kind=request.getParameter("kind");
+                boolean group="group".equals(kind);Change form;
                 var choices=new ArrayList<AccountChoice>();
                 if(!noAccounts){
                     choices.add(new AccountChoice(capital,"311001","Capital <safe>","EQUITY"));
@@ -57,11 +58,17 @@ class StatementLayoutJspRenderingTest {
                 }
                 request.setAttribute("accounts",choices);
                 if(group){var f=new GroupForm();f.setName("Owner capital");f.setNameSw("Mtaji");f.setAccounts(noAccounts?List.of():List.of(capital,reserve));form=f;request.setAttribute("positions",2);}
-                else{var f=new NoteForm();f.setNumber(2);f.setTitle("Policy");f.setTitleSw("Sera");f.setText("Recorded disclosure");f.setBasis(request.getParameter("basis"));if(!f.getBasis().equals("NARRATIVE"))f.setAccounts(List.of(bank));form=f;}
+                else if("movement-row".equals(kind)){
+                    var f=new MovementRowForm();
+                    f.setName("Profit <set aside>");
+                    f.setCategory(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.TRANSFER);
+                    request.setAttribute("movementCategories",com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(com.sacco.mvp.accounting.dto.VoucherDtos.Type.JOURNAL));
+                    form=f;
+                }else{var f=new NoteForm();f.setNumber(2);f.setTitle("Policy");f.setTitleSw("Sera");f.setText("Recorded disclosure");f.setBasis(request.getParameter("basis"));if(!f.getBasis().equals("NARRATIVE"))f.setAccounts(List.of(bank));form=f;}
                 form.setIndex("true".equals(request.getParameter("edit"))?0:-1);form.setVersion(3);form.setRequestKey(UUID.randomUUID());form.setReason("Retain entered reason");
-                String name=group?"layoutGroup":"layoutNote";request.setAttribute(name,form);
+                String name=group?"layoutGroup":form instanceof MovementRowForm?"layoutMovementRow":"layoutNote";request.setAttribute(name,form);
                 if("true".equals(request.getParameter("error"))){var errors=new BeanPropertyBindingResult(form,name);errors.rejectValue("reason","fs.error.reason");request.setAttribute(org.springframework.validation.BindingResult.MODEL_KEY_PREFIX+name,errors);}
-                request.getRequestDispatcher(group?"/group.jsp":"/note.jsp").forward(request,response);
+                request.getRequestDispatcher("/"+kind+".jsp").forward(request,response);
             }
         });context.addServletMappingDecoded("/fixture","fixture");
         try{
@@ -82,6 +89,9 @@ class StatementLayoutJspRenderingTest {
                 assertThat(note).contains("name=\"requestKey\"","value=\"3\"","name=\"_csrf\"","Recorded disclosure");assertThat(note).doesNotContain("components[","notes[","categories[","/statements/setup");
                 assertThat(note).contains(lang.equals("en")?"No figures":"Bila takwimu");
             }
+            assertThat(page(client,base+"kind=movement-row&lang=sw&edit=true&error=true"))
+                .contains("Hariri safu ya mabadiliko","value=\"TRANSFER\" selected=\"selected\"","Profit &lt;set aside&gt;",
+                    "data-workspace-response-error","name=\"_csrf\"").doesNotContain("value=\"UNCLASSIFIED\"");
         }finally{tomcat.stop();tomcat.destroy();spring.close();}
     }
     String page(HttpClient client,String url)throws Exception{var response=client.send(HttpRequest.newBuilder(URI.create(url)).header("Accept-Language",url.contains("lang=sw")?"sw":"en").timeout(Duration.ofSeconds(90)).GET().build(),HttpResponse.BodyHandlers.ofString());assertThat(response.statusCode()).as(response.body()).isEqualTo(200);return response.body();}

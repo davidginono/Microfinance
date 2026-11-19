@@ -43,7 +43,7 @@ public class StatementPresentation {
             return new Document(title(s,kind,locale),"equity",columns,rows,-1,false);
         }
         for(var c:List.of(new Column(label("fs.account",locale),false,.12f),new Column(label("fs.description",locale),false,.40f),new Column(label("fs.notes",locale),false,.08f),new Column(label("fs.current",locale),true,.20f),new Column(label("fs.previous",locale),true,.20f)))columns.add(c);
-        if(kind==Kind.NOTES&&s.version()>=3&&s.setup()!=null&&s.setup().version()>0){
+        if(kind==Kind.NOTES&&s.version()>=3&&s.setup()!=null&&s.setup().hasLayoutNotes()){
             columns.remove(2);columns.set(1,new Column(label("fs.description",locale),false,.48f));
             configuredNotes(s,rows,base,locale);
             return new Document(title(s,kind,locale),"statement",columns,rows,2,false);
@@ -86,7 +86,7 @@ public class StatementPresentation {
     private static String equityDate(java.time.LocalDate date,Locale locale){return date.format(java.time.format.DateTimeFormatter.ofPattern("d MMMM uuuu",locale));}
     private void equityRows(Snapshot snapshot,List<EquityRow> source,java.time.LocalDate from,java.time.LocalDate through,List<DisplayRow> rows,Locale locale){
         for(var r:source){
-            String name=switch(r.label()){
+            String name=r.customRow()!=null?local(r.customRow().name(),r.customRow().nameSw(),locale):switch(r.label()){
                 case "fs.opening" -> label("fs.equity.balanceAt",locale)+" "+equityDate(from,locale);
                 case "fs.closing" -> label("fs.equity.balanceAt",locale)+" "+equityDate(through,locale);
                 case "fs.surplus" -> label("fs.equity.profit",locale);

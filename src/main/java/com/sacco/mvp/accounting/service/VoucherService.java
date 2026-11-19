@@ -4,6 +4,8 @@ import com.sacco.mvp.accounting.dto.VoucherDtos.*;
 import com.sacco.mvp.accounting.repository.VoucherRepository;
 import com.sacco.mvp.accounting.statements.service.EquityMovementService;
 import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Movement;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementOption;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Classification;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
@@ -120,6 +122,16 @@ public class VoucherService {
     @Transactional
     public Preview preview(AppUserPrincipal actor,Type type,Form form){authorize(actor,type,"CREATE");authorizeEquitySelection(actor,form);validate(form,type,clock.today());return plan(actor,type,form);}
     public void authorizeEquitySelection(AppUserPrincipal actor,Form form){if(form!=null && form.isEquity())equityMovements.authorize(actor);}
+    public List<MovementOption> equityOptions(AppUserPrincipal actor,Type type,Form form){
+        if(type!=Type.JOURNAL||form.isPettyCash()||!hasEquityClaims(actor))return List.of();
+        return equityMovements.options(actor,form.getEquityRow(),true);
+    }
+    public List<MovementOption> reviewEquityOptions(AppUserPrincipal actor,Type type,Form recorded,Form submitted,boolean editable){
+        if(type!=Type.JOURNAL||!recorded.isEquity())return List.of();
+        if(editable&&hasEquityClaims(actor))return equityOptions(actor,type,submitted);
+        return recorded.getEquityRow()==null?List.of():equityMovements.options(actor,recorded.getEquityRow(),false);
+    }
+    private static boolean hasEquityClaims(AppUserPrincipal actor){return actor!=null&&actor.getClaims().containsAll(Set.of("FINANCIAL_REPORTS_VIEW","FINANCIAL_REPORTS_CONFIGURE"));}
     @Transactional(noRollbackFor=IllegalArgumentException.class)
     public Preview approvalPreview(AppUserPrincipal actor,Type type,Form form){
         approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");
@@ -173,7 +185,7 @@ public class VoucherService {
         var v=new Voucher(UUID.randomUUID(),number,type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),moneyId,plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
         vouchers.insert(v,actor.getSaccoId(),actor.getStationId(),f,hash,period,journal);
         if(reverses!=null)equityMovements.inheritReversal(actor,type,journal,v.journalId(),f.getDescription());
-        else if(f.isEquity())equityMovements.classify(actor,v.journalId(),0,f.getEquityMovement(),f.getEquityReason());
+        else if(plan.equityClassification()!=null)equityMovements.classifyPosted(actor,v.journalId(),plan.equityClassification(),f.getEquityReason());
         if(reverses==null)consumeNumber(actor,type,f.getRequestKey());
         audit.logEvent("ACCOUNTING",v.id(),reverses==null?"VOUCHER_POSTED":"VOUCHER_REVERSED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Voucher posted","VOUCHER",v.number(),actor.getSaccoId(),actor.getStationId(),Map.of("type",type.name(),"amount",v.total(),"transactions",v.transactionCount(),"journal",v.journalId()));
         return details(scoped(actor,type,v.id(),false));
@@ -222,26 +234,34 @@ public class VoucherService {
             result.add(new Transaction(UUID.randomUUID(),++n,row.getTransactionId(),template,name,row.getComponent(),row.getDescription().strip(),amount,debit,credit));
         }
         require(total.precision()<=18,"","amount");
+        Classification classification=null;
         if(f.isEquity()){
+            var selection=f.getEquityRow();
+            var custom=selection==null?null:equityMovements.resolve(actor,selection)
+                .orElseThrow(()->new Invalid("equityChoice","equityRow"));
+            var category=custom==null?f.getEquityMovement():custom.category();
             var types=new HashMap<UUID,String>();var movements=new ArrayList<Movement>();
             for(var transaction:result)for(var entry:transaction.postings()){
                 types.put(entry.account().id(),entry.account().type());boolean debit="DEBIT".equals(entry.side());
-                movements.add(new Movement(entry.account().id(),f.getEquityMovement(),false,debit?entry.amount():BigDecimal.ZERO,debit?BigDecimal.ZERO:entry.amount()));
+                movements.add(new Movement(entry.account().id(),category,false,debit?entry.amount():BigDecimal.ZERO,debit?BigDecimal.ZERO:entry.amount()));
             }
-            try{EquityMovementService.validateMovement(f.getEquityMovement(),movements,types);}
-            catch(IllegalArgumentException invalid){throw new Invalid("equityMovement","equityAccounts");}
+            try{EquityMovementService.validateMovement(category,movements,types);}
+            catch(IllegalArgumentException invalid){throw new Invalid("equityChoice","equityAccounts");}
+            classification=new Classification(category,custom,selection==null?null:selection.version());
         }
         var entries=new ArrayList<Map<String,Object>>();
         for(var transaction:result)for(var entry:transaction.postings())entries.add(Map.of("row",transaction.id(),"account",entry.account().id(),"side",entry.side(),"amount",entry.amount()));
         vouchers.validatePettyCash(actor.getSaccoId(),actor.getStationId(),f.getEffectiveDate(),type,json.writeValueAsString(entries));
-        return new Preview(List.copyOf(result),total);
+        return new Preview(List.copyOf(result),total,classification);
     }
     static void validate(Form f,Type type,LocalDate today){
         require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");
-        require(f.isEquity() || f.getEquityMovement()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()),"equityMovement","equityActivity");
+        require(f.isEquity() || f.getEquityRow()==null && f.getEquityMovement()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()),"equityChoice","equityActivity");
         if(f.isEquity()){
             require(f.getActivityId()==null && !f.isPettyCash(),"equity","equityActivity");
-            require(com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(type).contains(f.getEquityMovement()),"equityMovement","equityMovement");
+            require(f.getEquityRow()==null?com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(type).contains(f.getEquityMovement()):
+                    type==Type.JOURNAL&&f.getEquityMovement()==null&&f.getEquityRow().version()>0&&f.getEquityRow().id()!=null,
+                "equityChoice","equityMovement");
             text(f.getEquityReason(),500,true,"equityReason");
             require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getTransactionId()==null),"equity","equityActivity");
         }

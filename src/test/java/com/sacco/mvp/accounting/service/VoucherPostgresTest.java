@@ -6,6 +6,10 @@ import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleForm;
 import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.RuleRow;
 import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.StepRow;
 import com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Approval;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementSelection;
+import com.sacco.mvp.accounting.statements.repository.StatementSetupRepository;
+import com.sacco.mvp.accounting.statements.service.StatementLayoutService;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.*;
@@ -51,7 +55,7 @@ class VoucherPostgresTest {
   audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate());when(clock.now()).thenReturn(now);
   var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
-  var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build()),ledger),new com.sacco.mvp.accounting.statements.service.EquityMovementService(new com.sacco.mvp.accounting.statements.repository.StatementSetupRepository(jdbc),ledger,audit));
+  var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build()),ledger),new com.sacco.mvp.accounting.statements.service.EquityMovementService(new com.sacco.mvp.accounting.statements.repository.StatementSetupRepository(jdbc),ledger,audit,JsonMapper.builder().findAndAddModules().build()));
   var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(VoucherService)proxy.getProxy();
   workflowRepository=new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build());
   var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger);
@@ -169,7 +173,7 @@ class VoucherPostgresTest {
   pettySetup();pettyTopup("100");
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate().plusDays(4));when(clock.now()).thenReturn(now.plusDays(4));
   var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
-  var later=transactional(new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger),new com.sacco.mvp.accounting.statements.service.EquityMovementService(new com.sacco.mvp.accounting.statements.repository.StatementSetupRepository(jdbc),ledger,audit)),tx.getTransactionManager());
+  var later=transactional(new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger),new com.sacco.mvp.accounting.statements.service.EquityMovementService(new com.sacco.mvp.accounting.statements.repository.StatementSetupRepository(jdbc),ledger,audit,JsonMapper.builder().findAndAddModules().build())),tx.getTransactionManager());
   var payment=pettyForm(Type.PAYMENT,"90");payment.setEffectiveDate(now.toLocalDate().plusDays(2));later.post(actor,Type.PAYMENT,payment);
   var funding=pettyForm(Type.JOURNAL,"100");funding.setEffectiveDate(now.toLocalDate().plusDays(3));funding.getRows().getFirst().setDebitAccountId(cash);funding.getRows().getFirst().setCreditAccountId(account("LATER_BANK","ASSET","DEBIT","POSTING","BANK"));later.post(actor,Type.JOURNAL,funding);
   // Today's balance is 110, but this payment would leave -1 before the later top-up.
@@ -263,6 +267,40 @@ class VoucherPostgresTest {
   assertThatThrownBy(()->tx.execute(status->{var w=workflowRepository.find(actor,id,true).orElseThrow();workflowRepository.update(w,w.approval(),w.validation(),"POSTING",w.total(),w.assessmentAmount(),w.itemCount(),w.stage(),w.configVersion(),w.stages(),w.forceAllowed(),null,now);return service.post(actor,Type.JOURNAL,changed);})).hasMessage("approval.error.changed");
   workflowPosting.post(actor,id,version(id));var voucherId=workflows.details(actor,id).items().getFirst().voucherId();
   assertThat(service.view(actor,Type.JOURNAL,voucherId).equityMovement()).isEqualTo(form.getEquityMovement());
+ }
+ @Test void customReserveRowIsValidatedAndFrozenThroughApproval(){
+  var clock=mock(ApplicationClock.class);
+  var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
+  var layout=transactional(new StatementLayoutService(new StatementSetupRepository(jdbc),ledger,JsonMapper.builder().findAndAddModules().build(),audit),tx.getTransactionManager());
+  var row=layout.movementRow(actor,-1,null);
+  row.setName("Profit set aside for operations");row.setCategory(Category.TRANSFER);row.setReason("Approved reporting name");
+  layout.saveMovementRow(actor,row);
+  var selection=new MovementSelection(1,layout.overview(actor).movementRows().getFirst().id());
+
+  var form=equityForm(Type.JOURNAL);
+  form.setEquityMovement(null);
+  form.setEquityChoice(selection.value());
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,form)).hasMessage("voucher.error.equityAccounts");
+  UUID reserve=account("EXPANSION_RESERVE","EQUITY","CREDIT","POSTING","OTHER");
+  form.getRows().forEach(entry->{entry.setDebitAccountId(capital);entry.setCreditAccountId(reserve);});
+  form.setEquityRow(new MovementSelection(1,UUID.randomUUID()));
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,form)).hasMessage("voucher.error.equityRow");
+  form.setEquityRow(selection);
+
+  var reviewer=approver(Position.MANAGER);
+  configure(rule("SINGLE",false,Position.MANAGER,1));
+  UUID id=workflows.capture(actor,Type.JOURNAL,form);
+  assertThat(workflows.details(actor,id).items().getFirst().form().getEquityRow()).isEqualTo(selection);
+  assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where sacco_id=?",Integer.class,institution)).isZero();
+  var rename=layout.movementRow(actor,0,1);
+  rename.setName("Profit for operations");rename.setReason("Rename for new journals");layout.saveMovementRow(actor,rename);
+  command(reviewer,id,"APPROVE");
+  workflowPosting.post(actor,id,version(id));
+  UUID voucherId=workflows.details(actor,id).items().getFirst().voucherId();
+  var journal=service.view(actor,Type.JOURNAL,voucherId);
+  assertThat(journal.equityMovement()).isEqualTo(Category.TRANSFER);
+  assertThat(jdbc.queryForObject("select movement_name from statement_equity_classification where journal_id=?",String.class,journal.journalId()))
+      .isEqualTo("Profit set aside for operations");
  }
  @Test void linkedEquityReversalInheritsTypeWithoutGrantingAClassificationChoice(){
   var original=service.post(actor,Type.JOURNAL,equityForm(Type.JOURNAL));var other=operator("B1");

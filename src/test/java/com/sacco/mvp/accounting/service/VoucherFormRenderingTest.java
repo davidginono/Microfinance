@@ -43,9 +43,17 @@ class VoucherFormRenderingTest {
         Tomcat.addServlet(context,"jsp",new JspServlet());context.addServletMappingDecoded("*.jsp","jsp");
         Tomcat.addServlet(context,"form",new HttpServlet(){
             @Override protected void doGet(HttpServletRequest request,HttpServletResponse response)throws java.io.IOException,jakarta.servlet.ServletException {
+                response.setLocale(request.getLocale());
                 var form=new Form();form.setEffectiveDate(java.time.LocalDate.of(2026,11,18));
                 if(request.getParameter("split")!=null){var debit=new EntryForm();debit.setSide("DEBIT");debit.setAmount(java.math.BigDecimal.ONE);var credit=new EntryForm();credit.setSide("CREDIT");credit.setAmount(java.math.BigDecimal.ONE);form.getRows().getFirst().setEntries(List.of(debit,credit));}
                 if(request.getParameter("equity")!=null){form.setEquity(true);form.setEquityMovement(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.CONTRIBUTION);form.setEquityReason("Owner adds capital");}
+                if("JOURNAL".equals(request.getParameter("type"))&&request.getParameter("equity")!=null){
+                    var id=UUID.fromString("f82c2471-0267-4cc1-ba10-730c78ef5eb2");
+                    var row=new com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementRow(id,com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.TRANSFER,"Profit <set aside>","Faida iliyotengwa");
+                    var option=new com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementOption("1:"+id,row);
+                    form.setEquityMovement(null);form.setEquityChoice(option.value());
+                    request.setAttribute("equityOptions",List.of(option));
+                }
                 request.setAttribute("canEquityVoucher",true);request.setAttribute("equityTypes",com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(Type.valueOf(request.getParameter("type"))));request.setAttribute("voucherForm",form);request.setAttribute("voucherType",request.getParameter("type"));request.setAttribute("base","/finance/vouchers/test");
                 if(request.getParameter("split")!=null){
                     var amount=java.math.BigDecimal.ONE;
@@ -67,7 +75,12 @@ class VoucherFormRenderingTest {
                 if(split.equals("&split=true"))assertThat(response.body()).contains("name=\"rows[0].entries[1].amount\"","data-split-totals","data-resource-status=\"SUCCESS\"",messages.getMessage("voucher.balanced",null,locale));
                 else assertThat(response.body()).doesNotContain("voucher-preview-status");
                 assertThat(response.body()).contains("value=\"EQUITY\"", "name=\"equity\"");
-                if(split.equals("&equity=true")){assertThat(response.body()).contains("Owner adds capital","value=\"CONTRIBUTION\" selected=\"selected\"");if(type!=Type.JOURNAL)assertThat(response.body()).doesNotContain("value=\"EARNINGS_TRANSFER\"","value=\"TRANSFER\"");}
+                if(split.equals("&equity=true")){
+                    assertThat(response.body()).contains("Owner adds capital","name=\"equityChoice\"");
+                    if(type==Type.JOURNAL)assertThat(response.body()).contains("value=\"1:f82c2471-0267-4cc1-ba10-730c78ef5eb2\" selected=\"selected\"",
+                        language.equals("sw")?"Faida iliyotengwa":"Profit &lt;set aside&gt;");
+                    else assertThat(response.body()).contains("value=\"CONTRIBUTION\" selected=\"selected\"").doesNotContain("value=\"EARNINGS_TRANSFER\"","value=\"TRANSFER\"");
+                }
                 String output=System.getProperty("microfinance.voucher.render-output");
                 if(output!=null){Files.createDirectories(Path.of(output));Files.writeString(Path.of(output,language+"-"+type+(split.equals("&equity=true")?"-equity":split.isEmpty()?"-new":"-split")+".html"),response.body());}
             }

@@ -17,6 +17,7 @@ import java.util.function.UnaryOperator;
 /** Focused edits append the same immutable reporting metadata consumed by saved statements. */
 @Service @RequiredArgsConstructor
 public class StatementLayoutService {
+    public static final int MAX_MOVEMENT_ROWS=30;
     private final StatementSetupRepository repository;
     private final GeneralLedgerService access;
     private final ObjectMapper mapper;
@@ -28,7 +29,7 @@ public class StatementLayoutService {
         var groups=new ArrayList<GroupRow>();var notes=new ArrayList<NoteRow>();
         for(int i=0;i<setup.components().size();i++){var c=setup.components().get(i);groups.add(new GroupRow(i,c.name(),c.nameSw(),c.accounts().size(),c.retained()));}
         for(int i=0;i<setup.notes().size();i++){var n=setup.notes().get(i);notes.add(new NoteRow(i,n.number(),n.title(),n.titleSw(),n.basis(),n.accounts().size(),n.includeProfit()));}
-        return new Layout(setup.version(),List.copyOf(groups),List.copyOf(notes));
+        return new Layout(setup.version(),List.copyOf(groups),List.copyOf(notes),setup.movementRows());
     }
 
     @Transactional(readOnly=true)
@@ -55,6 +56,37 @@ public class StatementLayoutService {
     public List<AccountChoice> accounts(AppUserPrincipal actor,boolean equityOnly) {authorize(actor);return choices(actor,equityOnly);}
 
     @Transactional(readOnly=true)
+    public MovementRowForm movementRow(AppUserPrincipal actor,int index,Integer version) {
+        authorize(actor);
+        var setup=current(actor);
+        var form=new MovementRowForm();
+        initialize(form,setup,index);
+        index(form,setup.movementRows().size());
+        if(index<0)require(setup.movementRows().size()<MAX_MOVEMENT_ROWS,"limit");
+        else {
+            require(version!=null&&version==setup.version(),"setupStale");
+            var row=setup.movementRows().get(index);
+            form.setCategory(row.category());
+            form.setName(row.name());
+            form.setNameSw(row.nameSw());
+        }
+        return form;
+    }
+
+    @Transactional(timeout=15)
+    public boolean saveMovementRow(AppUserPrincipal actor,MovementRowForm form) {
+        return update(actor,form,"SAVE_MOVEMENT_ROW",setup->{
+            var rows=new ArrayList<>(setup.movementRows());
+            index(form,rows.size());
+            int index=form.getIndex();
+            UUID id=index<0?UUID.randomUUID():rows.get(index).id();
+            var row=new MovementRow(id,form.getCategory(),movementName(form.getName()),movementName(form.getNameSw()));
+            if(index<0)rows.add(row);else rows.set(index,row);
+            return new Setup(setup.version()+1,setup.components(),setup.notes(),setup.categories(),rows,!setup.hasLayoutNotes());
+        });
+    }
+
+    @Transactional(readOnly=true)
     public RemovalEditor removal(AppUserPrincipal actor,boolean group,int index,int version) {
         authorize(actor);var setup=current(actor);require(index>=0,"selection");target(setup,index,version,group);
         var form=new Change();initialize(form,setup,index);
@@ -70,7 +102,7 @@ public class StatementLayoutService {
             require(form.getPosition()>=1&&form.getPosition()<=groups.size()+1,"layoutPosition");
             var accounts=stableIds(form.getAccounts(),form.getIndex()<0?null:setup.components().get(form.getIndex()).accounts());
             groups.add(form.getPosition()-1,new Component(text(form.getName(),100),text(form.getNameSw(),100),accounts,form.isRetained()));
-            return new Setup(setup.version()+1,List.copyOf(groups),setup.notes(),setup.categories());
+            return new Setup(setup.version()+1,List.copyOf(groups),setup.notes(),setup.categories(),setup.movementRows());
         });
     }
 
@@ -81,7 +113,7 @@ public class StatementLayoutService {
             var accounts=stableIds(form.getAccounts(),form.getIndex()<0?null:setup.notes().get(form.getIndex()).accounts());
             var note=new Note(form.getNumber(),text(form.getTitle(),150),text(form.getTitleSw(),150),form.getBasis(),text(form.getText(),5000),text(form.getTextSw(),5000),accounts,form.isIncludeProfit());
             if(form.getIndex()<0)notes.add(note);else notes.set(form.getIndex(),note);
-            notes.sort(Comparator.comparingInt(Note::number));return new Setup(setup.version()+1,setup.components(),List.copyOf(notes),setup.categories());
+            notes.sort(Comparator.comparingInt(Note::number));return new Setup(setup.version()+1,setup.components(),List.copyOf(notes),setup.categories(),setup.movementRows());
         });
     }
 
@@ -90,7 +122,7 @@ public class StatementLayoutService {
         update(actor,form,group?"REMOVE_GROUP":"REMOVE_NOTE",setup->{
             require(form.getIndex()>=0,"selection");var groups=new ArrayList<>(setup.components());var notes=new ArrayList<>(setup.notes());
             index(form,group?groups.size():notes.size());if(group)groups.remove(form.getIndex());else notes.remove(form.getIndex());
-            return new Setup(setup.version()+1,List.copyOf(groups),List.copyOf(notes),setup.categories());
+            return new Setup(setup.version()+1,List.copyOf(groups),List.copyOf(notes),setup.categories(),setup.movementRows());
         });
     }
 
@@ -102,7 +134,7 @@ public class StatementLayoutService {
         if(duplicate.isPresent()){require(duplicate.get().equals(hash),"retry");return true;}
         var before=current(actor);require(before.version()==form.getVersion(),"setupStale");
         var after=edit.apply(before);
-        if(after.components().equals(before.components())&&after.notes().equals(before.notes())&&after.categories().equals(before.categories()))return false;
+        if(after.components().equals(before.components())&&after.notes().equals(before.notes())&&after.categories().equals(before.categories())&&after.movementRows().equals(before.movementRows()))return false;
         require(!reason.isBlank(),"reason");validate(after,choices(actor,false));
         String payload=mapper.writeValueAsString(after);require(payload.length()<=262144,"limit");
         repository.save(actor,after,payload,form.getRequestKey(),hash,reason);
@@ -111,7 +143,7 @@ public class StatementLayoutService {
     }
 
     private void validate(Setup setup,List<AccountChoice> accounts) {
-        require(setup.components().size()<=9&&setup.notes().size()<=30,"limit");
+        require(setup.components().size()<=9&&setup.notes().size()<=30&&setup.movementRows().size()<=MAX_MOVEMENT_ROWS,"limit");
         var choices=new HashMap<UUID,AccountChoice>();accounts.forEach(a->choices.put(a.id(),a));
         var names=new HashSet<String>();var groupAccounts=new HashSet<UUID>();int retained=0;
         for(var group:setup.components()){
@@ -120,6 +152,12 @@ public class StatementLayoutService {
             if(group.retained())retained++;
         }
         require(retained<=1,"layoutRetained");
+        var movementNames=new HashSet<String>();var movementNamesSw=new HashSet<String>();
+        for(var row:setup.movementRows()){
+            require(row.category()!=null&&row.category()!=Category.UNCLASSIFIED,"layoutMovementCategory");
+            require(!row.name().isBlank()&&movementNames.add(row.name().toLowerCase(Locale.ROOT))&&
+                movementNamesSw.add((row.nameSw().isBlank()?row.name():row.nameSw()).toLowerCase(Locale.ROOT)),"layoutMovementName");
+        }
         var numbers=new HashSet<Integer>();var noteAccounts=new HashSet<UUID>();boolean profit=false;
         for(var note:setup.notes()){
             require(note.number()>0&&note.number()<=999&&numbers.add(note.number()),"layoutNoteNumber");require(!note.title().isBlank(),"layoutNoteTitle");
@@ -140,6 +178,7 @@ public class StatementLayoutService {
     private static List<UUID> stableIds(List<UUID> submitted,List<UUID> existing){var chosen=ids(submitted);return existing!=null&&new HashSet<>(chosen).equals(new HashSet<>(existing))?existing:chosen;}
     private static void known(List<UUID> ids,List<AccountChoice> choices){var known=new HashSet<UUID>();choices.forEach(a->known.add(a.id()));require(known.containsAll(ids),"setupAccounts");}
     private static String text(String value,int max){require(value!=null&&value.length()<=max&&!value.chars().anyMatch(c->c<32&&c!='\n'&&c!='\r'&&c!='\t'),"setup");return value.strip();}
+    private static String movementName(String value){require(value!=null&&value.length()<=100&&value.chars().noneMatch(Character::isISOControl),"layoutMovementName");return value.strip();}
     private void authorize(AppUserPrincipal actor){access.requireActor(actor,"FINANCIAL_REPORTS_VIEW");access.requireActor(actor,"FINANCIAL_REPORTS_CONFIGURE");}
     private static void require(boolean valid,String key){if(!valid)throw new IllegalArgumentException("fs.error."+key);}
 }

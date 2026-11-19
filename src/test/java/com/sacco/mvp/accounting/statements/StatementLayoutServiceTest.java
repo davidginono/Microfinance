@@ -32,6 +32,30 @@ class StatementLayoutServiceTest {
     void stored(Setup setup){when(repository.latest("I")).thenReturn(Optional.of(new StoredSetup(setup.version(),mapper.writeValueAsString(setup))));}
     Component capitalGroup(){return new Component("Capital","Mtaji",List.of(capital),false);}
 
+    @Test void movementOnlySetupKeepsChartNotesAndOlderLayoutsReadWithTheirOriginalMeaning(){
+        var older=mapper.readValue("""
+            {"version":2,"components":[],"notes":[],"categories":[]}
+            """,Setup.class);
+        assertThat(older.movementRows()).isEmpty();
+        assertThat(older.hasLayoutNotes()).isTrue();
+        var form=service.movementRow(actor,-1,null);
+        form.setName("Profit set aside");
+        form.setCategory(Category.UNCLASSIFIED);
+        form.setReason("Approved reporting label");
+        assertThatThrownBy(()->service.saveMovementRow(actor,form)).hasMessage("fs.error.layoutMovementCategory");
+        form.setCategory(Category.TRANSFER);
+        assertThat(service.saveMovementRow(actor,form)).isTrue();
+        var recorded=org.mockito.ArgumentCaptor.forClass(Setup.class);
+        verify(repository).save(eq(actor),recorded.capture(),anyString(),eq(form.getRequestKey()),anyString(),eq(form.getReason()));
+        assertThat(recorded.getValue().hasLayoutNotes()).isFalse();
+        stored(recorded.getValue());
+        var duplicate=service.movementRow(actor,-1,null);
+        duplicate.setName("profit set aside");
+        duplicate.setCategory(Category.TRANSFER);
+        duplicate.setReason("Same label");
+        assertThatThrownBy(()->service.saveMovementRow(actor,duplicate)).hasMessage("fs.error.layoutMovementName");
+    }
+
     @Test void explicitClaimIsCheckedBeforePersistenceForReadsAndWrites(){
         doThrow(new AccessDeniedException("Denied")).when(access).requireActor(actor,"FINANCIAL_REPORTS_CONFIGURE");
         assertThatThrownBy(()->service.saveGroup(actor,group())).isInstanceOf(AccessDeniedException.class);

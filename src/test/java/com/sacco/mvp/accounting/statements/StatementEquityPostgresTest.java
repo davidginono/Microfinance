@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.statements;
 
 import com.sacco.mvp.accounting.statements.dto.StatementModels.*;
+import com.sacco.mvp.accounting.dto.VoucherDtos;
 import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.*;
 import com.sacco.mvp.accounting.statements.dto.StatementLayoutModels.*;
 import com.sacco.mvp.accounting.statements.repository.StatementSetupRepository;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.security.access.AccessDeniedException;
 import tools.jackson.databind.json.JsonMapper;
+import java.math.BigDecimal;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,7 +27,7 @@ class StatementEquityPostgresTest {
     @BeforeEach void prepare(){
         fixture.fixture();repository=new StatementSetupRepository(fixture.jdbc);
         layouts=fixture.proxy(new StatementLayoutService(repository,fixture.guard,JsonMapper.builder().findAndAddModules().build(),mock(AuditService.class)));
-        movements=fixture.proxy(new EquityMovementService(repository,fixture.guard,mock(AuditService.class)));
+        movements=fixture.proxy(new EquityMovementService(repository,fixture.guard,mock(AuditService.class),JsonMapper.builder().findAndAddModules().build()));
     }
     GroupForm configuration(){
         var group=new GroupForm();group.setRequestKey(UUID.randomUUID());group.setReason("Verified reporting layout");group.setName("Owner capital");group.setNameSw("Mtaji wa mmiliki");group.setAccounts(List.of(fixture.capital));layouts.saveGroup(fixture.actor,group);
@@ -50,6 +52,86 @@ class StatementEquityPostgresTest {
     @Test void closingJournalPreservesProfitAndDoesNotCreateMoney(){
         var voucher=fixture.post(fixture.income,fixture.capital,"416.67","Transfer earned profit");movements.classify(fixture.actor,voucher.journalId(),0,Category.EARNINGS_TRANSFER,"Approved closing transfer");
         var s=fixture.statements.get(fixture.actor,fixture.preview()).snapshot();assertThat(s.income().getLast().current()).isEqualByComparingTo("416.67");assertThat(s.equity().get(1).total()).isEqualByComparingTo("416.67");assertThat(s.equity().getLast().total()).isEqualByComparingTo("1416.67");assertThat(s.checks()).extracting(Check::key).doesNotContain("equity");
+    }
+    @Test void namedTransfersKeepTheirPostedLabelsAfterRenameAndReversal(){
+        var reserve=fixture.account("311002","Operations reserve","EQUITY","OTHER");
+        var capitalGroup=layouts.group(fixture.actor,-1,null).form();
+        capitalGroup.setName("Retained earnings");
+        capitalGroup.setAccounts(List.of(fixture.capital));
+        capitalGroup.setRetained(true);
+        capitalGroup.setReason("Set up retained profit");
+        assertThat(layouts.saveGroup(fixture.actor,capitalGroup)).isTrue();
+        var reserveGroup=layouts.group(fixture.actor,-1,null).form();
+        reserveGroup.setName("Operations reserve");
+        reserveGroup.setAccounts(List.of(reserve));
+        reserveGroup.setReason("Set up operations reserve");
+        assertThat(layouts.saveGroup(fixture.actor,reserveGroup)).isTrue();
+
+        var rowForm=layouts.movementRow(fixture.actor,-1,null);
+        rowForm.setName("Profit set aside for operations");
+        rowForm.setNameSw("Faida iliyotengwa kwa shughuli");
+        rowForm.setCategory(Category.TRANSFER);
+        rowForm.setReason("Approved reserve labels");
+        assertThat(layouts.saveMovementRow(fixture.actor,rowForm)).isTrue();
+        assertThat(layouts.saveMovementRow(fixture.actor,rowForm)).isTrue();
+        var other=layouts.movementRow(fixture.actor,-1,null);
+        other.setName("Profit set aside for training");
+        other.setCategory(Category.TRANSFER);
+        other.setReason("Distinguish training allocations");
+        assertThat(layouts.saveMovementRow(fixture.actor,other)).isTrue();
+        var options=movements.options(fixture.actor,null,true);
+        assertThat(options).extracting(option->option.row().name()).containsExactly(rowForm.getName(),other.getName());
+        var initial=options.getFirst();
+        var posting=transfer(reserve,initial.value(),"75.00");
+        assertThat(fixture.vouchers.preview(fixture.actor,VoucherDtos.Type.JOURNAL,posting).equityClassification().row()).isEqualTo(initial.row());
+        var voucher=fixture.vouchers.post(fixture.actor,VoucherDtos.Type.JOURNAL,posting);
+        assertThat(fixture.vouchers.post(fixture.actor,VoucherDtos.Type.JOURNAL,posting).id()).isEqualTo(voucher.id());
+        UUID oldRun=fixture.preview();
+        var captured=fixture.statements.get(fixture.actor,oldRun).snapshot();
+        assertThat(captured.equity()).filteredOn(r->r.customRow()!=null).singleElement().satisfies(r->{
+            assertThat(r.customRow()).isEqualTo(initial.row());
+            assertThat(r.values().get("component:0")).isEqualByComparingTo("-75.00");
+            assertThat(r.values().get("component:1")).isEqualByComparingTo("75.00");
+            assertThat(r.total()).isZero();
+        });
+        assertThat(captured.checks()).extracting(Check::key).doesNotContain("equity");
+
+        var edit=layouts.movementRow(fixture.actor,0,4);
+        edit.setName("Profit set aside for branch operations");
+        edit.setNameSw("");
+        edit.setReason("Clearer name for new journals");
+        assertThat(layouts.saveMovementRow(fixture.actor,edit)).isTrue();
+        var renamed=movements.options(fixture.actor,null,true).getFirst();
+        assertThat(renamed.row().id()).isEqualTo(initial.row().id());
+        assertThat(renamed.value()).isNotEqualTo(initial.value());
+        fixture.vouchers.post(fixture.actor,VoucherDtos.Type.JOURNAL,transfer(reserve,renamed.value(),"25.00"));
+        fixture.vouchers.reverse(fixture.actor,VoucherDtos.Type.JOURNAL,voucher.id(),UUID.randomUUID(),voucher.effectiveDate(),"Reverse the initial transfer");
+        var latest=fixture.statements.get(fixture.actor,fixture.preview()).snapshot();
+        var named=latest.equity().stream().filter(r->r.customRow()!=null).toList();
+        assertThat(named).extracting(r->r.customRow().name()).containsExactlyInAnyOrder(initial.row().name(),renamed.row().name());
+        assertThat(named.stream().filter(r->r.customRow().equals(initial.row())).findFirst().orElseThrow().values().get("component:1")).isZero();
+        assertThat(named.stream().filter(r->r.customRow().equals(renamed.row())).findFirst().orElseThrow().values().get("component:1")).isEqualByComparingTo("25.00");
+        assertThat(fixture.statements.get(fixture.actor,oldRun).snapshot()).isEqualTo(captured);
+        var messages=new org.springframework.context.support.ReloadableResourceBundleMessageSource();
+        messages.setBasename("classpath:messages");
+        messages.setDefaultEncoding("UTF-8");
+        var document=new StatementPresentation(messages).document(captured,Kind.EQUITY,captured.balances(),Locale.forLanguageTag("sw"));
+        assertThat(document.rows().toString()).contains(initial.row().nameSw());
+    }
+
+    VoucherDtos.Form transfer(UUID reserve,String choice,String amount){
+        var form=new VoucherDtos.Form();
+        form.setEffectiveDate(fixture.from.plusDays(9));
+        form.setReference(UUID.randomUUID().toString());
+        form.setEquity(true);
+        form.setEquityChoice(choice);
+        form.setEquityReason("Approved management allocation");
+        var row=form.getRows().getFirst();
+        row.setDescription("Move retained profit to the reserve");
+        row.setDebitAccountId(fixture.capital);
+        row.setCreditAccountId(reserve);
+        row.setAmount(new BigDecimal(amount));
+        return form;
     }
     @Test void conflictingRetryAndConcurrentFocusedEditsCannotLoseHistory()throws Exception{
         var first=configuration();first.setReason("Changed payload");assertThatThrownBy(()->layouts.saveGroup(fixture.actor,first)).hasMessage("fs.error.retry");

@@ -6,6 +6,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
 import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Classification;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementSelection;
 
 public final class VoucherDtos {
     private VoucherDtos() {}
@@ -23,6 +25,8 @@ public final class VoucherDtos {
         private boolean equity;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private Category equityMovement;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private MovementSelection equityRow;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
         private String equityReason="";
         private String receiptPurpose="OTHER";
@@ -30,6 +34,17 @@ public final class VoucherDtos {
         private String loanPayer;
         private UUID clientId,interestAccountId;
         private List<RowForm> rows=new ArrayList<>(List.of(new RowForm()));
+
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        public String getEquityChoice(){
+            return equityRow!=null?equityRow.value():equityMovement==null?"":equityMovement.name();
+        }
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        public void setEquityChoice(String choice){
+            if(choice==null||choice.isEmpty())return;
+            if(choice.indexOf(':')>=0)equityRow=MovementSelection.parse(choice);
+            else equityMovement=Category.valueOf(choice);
+        }
     }
     @Data public static class RowForm {
         private UUID transactionId,templateKey,debitAccountId,creditAccountId;
@@ -89,7 +104,9 @@ public final class VoucherDtos {
         public Filter(String search,LocalDate from,LocalDate through,String status,String sort,int page) {this(search,from,through,status,sort,page,25);}
     }
     public record Page(List<Voucher> rows,int page,boolean hasNext) {}
-    public record Preview(List<Transaction> rows,BigDecimal total) {}
+    public record Preview(List<Transaction> rows,BigDecimal total,Classification equityClassification) {
+        public Preview(List<Transaction> rows,BigDecimal total){this(rows,total,null);}
+    }
     public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group,String payer) {
         public boolean hasSharedBenefits(){return rows.stream().anyMatch(r->!r.sharedBenefits().isEmpty());}
         public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows){this(header,clientNumber,rows,null,"");}

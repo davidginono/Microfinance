@@ -27,7 +27,10 @@ public final class StatementModels {
         public BigDecimal signed(){return debit.subtract(credit);}
     }
     public record Row(String key,String code,String label,int note,String section,List<UUID> accounts,BigDecimal current,BigDecimal previous,boolean total) {}
-    public record EquityRow(String label,Map<String,BigDecimal> values,BigDecimal total,boolean summary) {}
+    public record EquityRow(String label,Map<String,BigDecimal> values,BigDecimal total,boolean summary,
+                            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) StatementSetupModels.MovementRow customRow) {
+        public EquityRow(String label,Map<String,BigDecimal> values,BigDecimal total,boolean summary){this(label,values,total,summary,null);}
+    }
     public record Check(String key,BigDecimal difference) {}
     public record Snapshot(int version,UUID id,Parameters parameters,OffsetDateTime generatedAt,String institution,String branch,
                            String institutionName,String branchName,List<Balance> balances,List<Row> position,List<Row> income,

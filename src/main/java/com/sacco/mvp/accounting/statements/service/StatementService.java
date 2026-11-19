@@ -66,7 +66,7 @@ public class StatementService {
         if(note==0)return rows;return rows.stream().map(r->r.key().equals("earnings")?new Row(r.key(),r.code(),r.label(),note,r.section(),r.accounts(),r.current(),r.previous(),r.total()):r).toList();
     }
     private static List<Balance> notes(List<Balance> balances,com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Setup setup){
-        if(setup.version()==0)return balances;var byAccount=new HashMap<UUID,Integer>();for(var n:setup.notes())for(UUID id:n.accounts())byAccount.put(id,n.number());
+        if(!setup.hasLayoutNotes())return balances;var byAccount=new HashMap<UUID,Integer>();for(var n:setup.notes())for(UUID id:n.accounts())byAccount.put(id,n.number());
         return balances.stream().map(b->{var m=b.mapping();if(m==null)return b;var mapping=new Mapping(m.accountId(),m.line(),m.section(),m.cashSection(),m.equityComponent(),byAccount.getOrDefault(b.id(),0),"",m.groupId(),m.groupCode());return new Balance(b.id(),b.code(),b.name(),b.type(),b.purpose(),mapping,b.opening(),b.debit(),b.credit(),b.closing(),b.previousOpening(),b.previousDebit(),b.previousCredit(),b.previousClosing());}).toList();
     }
     @Transactional(readOnly=true)
