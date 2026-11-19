@@ -34,8 +34,6 @@ class AccountingCodeLibraryMvcTest {
         lenient().when(library.transaction(any(),eq(transaction))).thenReturn(new TransactionCode(transaction,activity,"OPS","Operations","Shughuli","CASH-EXPENSE","Cash expense","","","MANUAL_JOURNAL",true,false));
         lenient().when(library.accounts(any(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
         lenient().when(library.activities(any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
-        lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
-        lenient().when(library.transactionRegister(any(),any(),anyString(),anyString(),anyString(),anyInt())).thenReturn(new Page<>(List.of(),0,false));
     }
     @Test void sortingPreservesActivityScopeAndPageSize() throws Exception {
         mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId",activity.toString())
@@ -100,7 +98,7 @@ class AccountingCodeLibraryMvcTest {
     @Test void activityTransactionsLinkRedirectsToTheFilteredRegisterWithItsSearchContext() throws Exception {
         mvc.perform(get("/finance/library/activities/"+activity).with(user(actor)).param("search","cash").param("state","ACTIVE").param("page","1"))
             .andExpect(redirectedUrl("/finance/library/transactions?activityId="+activity+"&search=cash&state=ACTIVE&page=1"));
-        verify(library).activity(actor,activity);verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt());
+        verify(library).activity(actor,activity);verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt(),anyInt(),anyString(),anyString());
     }
     @Test void allActivitiesFilterRemovesActivityScopeWithoutDroppingSearchOrStatus() throws Exception {
         mvc.perform(get("/finance/library/transactions").with(user(actor)).param("activityId","").param("search","cash").param("state","ACTIVE"))
@@ -110,37 +108,28 @@ class AccountingCodeLibraryMvcTest {
     @Test void activityRedirectRejectsForeignRecordsBeforeBuildingALocation() throws Exception {
         UUID foreign=UUID.randomUUID();when(library.activity(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
         mvc.perform(get("/finance/library/activities/"+foreign).with(user(actor))).andExpect(status().isForbidden());
-        verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt());
+        verify(library,never()).transactionRegister(any(),any(),anyString(),anyString(),anyInt(),anyInt(),anyString(),anyString());
     }
-    @Test void transactionDetailsPreselectContextAndIgnoreObsoleteHistoryParameters() throws Exception {
-        UUID version=UUID.randomUUID();
-        mvc.perform(get("/finance/library/transactions/"+transaction).with(user(actor)).param("version",version.toString()).param("page","2"))
+    @Test void transactionDetailsUseOnlyTheChosenRecordAndIgnoreOldFilterParameters() throws Exception {
+        var result=mvc.perform(get("/finance/library/transactions/"+transaction).with(user(actor))
+            .param("activityId",UUID.randomUUID().toString()).param("sourceEvent","EXPENSE")
+            .param("state","INACTIVE").param("version",UUID.randomUUID().toString()).param("page","2"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction"))
-            .andExpect(model().attribute("sourceEvent","MANUAL_JOURNAL")).andExpect(model().attribute("state","ACTIVE"))
-            .andExpect(model().attributeDoesNotExist("selectedVersion","versions")).andExpect(model().attribute("isTransactions",true));
-        verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);
-        verify(library).template(actor,transaction);
+            .andExpect(model().attribute("isTransactions",true))
+            .andExpect(model().attributeDoesNotExist("activityFilters","transactionChoices","sourceEvents","sourceEvent","state","selectedVersion","versions")).andReturn();
+        assertThat(((TransactionCode)result.getModelAndView().getModel().get("transaction")).id()).isEqualTo(transaction);
+        verify(library).transaction(actor,transaction);verify(library).template(actor,transaction);
+        verifyNoMoreInteractions(library);
     }
-    @Test void templateFiltersSelectTheRequestedTransactionWithinTheirScope() throws Exception {
-        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("activityId",activity.toString()).param("sourceEvent","MANUAL_JOURNAL").param("state","ACTIVE"))
-            .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction")).andExpect(model().attributeExists("transaction","activityFilters","transactionChoices"));
-        verify(library).transactionRegister(actor,activity,"","ACTIVE","MANUAL_JOURNAL",0);verify(library).template(actor,transaction);
+    @Test void retiredTemplateFiltersHaveNoRoute() throws Exception {
+        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()))
+            .andExpect(status().isNotFound());
+        verifyNoInteractions(library);
     }
-    @Test void changedTemplateFiltersSelectAMatchingTransaction() throws Exception {
-        UUID next=UUID.randomUUID();var expense=new TransactionCode(next,activity,"OPS","Operations","","EXPENSE","Expense","","","EXPENSE",true,false);
-        when(library.transactionRegister(actor,activity,"","ACTIVE","EXPENSE",0)).thenReturn(new Page<>(List.of(expense),0,false));
-        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",transaction.toString()).param("activityId",activity.toString()).param("sourceEvent","EXPENSE").param("state","ACTIVE").param("version",UUID.randomUUID().toString()).param("page","2"))
-            .andExpect(redirectedUrl("/finance/library/templates?transactionId="+next+"&activityId="+activity+"&sourceEvent=EXPENSE&state=ACTIVE"));
-        verify(library).template(actor,next);verify(library,never()).template(eq(actor),eq(transaction));
-    }
-    @Test void emptyTemplateFiltersDoNotLoadAnotherTransaction() throws Exception {
-        mvc.perform(get("/finance/library/templates").with(user(actor)).param("state","INACTIVE"))
-            .andExpect(status().isOk()).andExpect(view().name("accounting/library-transaction"));
-        verify(library).transactionRegister(actor,null,"","INACTIVE","",0);verify(library,never()).template(any(),any());
-    }
-    @Test void templateSelectionRejectsForeignTransactions() throws Exception {
+    @Test void transactionDetailsRejectForeignTransactionsBeforeLoadingTheTemplate() throws Exception {
         UUID foreign=UUID.randomUUID();when(library.transaction(actor,foreign)).thenThrow(new org.springframework.security.access.AccessDeniedException("Unavailable"));
-        mvc.perform(get("/finance/library/templates").with(user(actor)).param("transactionId",foreign.toString())).andExpect(status().isForbidden());
+        mvc.perform(get("/finance/library/transactions/"+foreign).with(user(actor))).andExpect(status().isForbidden());
+        verify(library,never()).template(any(),any());
     }
     @Test void modalCreatesTransactionWithInitialAccountTemplateAndIgnoresOwnershipFields() throws Exception {
         when(library.onboardTransaction(any(),any())).thenAnswer(invocation->{TransactionForm form=invocation.getArgument(1);assertThat(form.getCode()).isNull();form.setCode("TXN-000001");return transaction;});

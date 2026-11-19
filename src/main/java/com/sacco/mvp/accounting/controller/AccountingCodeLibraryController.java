@@ -1,7 +1,6 @@
 package com.sacco.mvp.accounting.controller;
 
 import com.sacco.mvp.accounting.dto.AccountingLibraryDtos.*;
-import com.sacco.mvp.accounting.dto.AccountingEvent;
 import com.sacco.mvp.accounting.service.AccountingCodeLibraryService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +13,6 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import java.util.Arrays;
 import java.util.UUID;
 
 @Controller @RequiredArgsConstructor @RequestMapping("/finance/library")
@@ -98,20 +96,10 @@ public class AccountingCodeLibraryController {
     }
     @GetMapping("/transactions/{id}")
     String transaction(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Model model) {
-        var code=library.transaction(actor,id);
-        return templates(actor,code,code.activityId(),code.sourceEvent(),code.active()?"ACTIVE":"INACTIVE",model);
-    }
-    @GetMapping("/templates")
-    String templates(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID transactionId,
-            @RequestParam(required=false) UUID activityId,@RequestParam(defaultValue="") String sourceEvent,@RequestParam(defaultValue="") String state,
-            Model model,RedirectAttributes redirect) {
-        String view=templates(actor,transactionId==null?null:library.transaction(actor,transactionId),activityId,sourceEvent,state,model);
-        var selected=(TransactionCode)model.getAttribute("transaction");
-        if(transactionId!=null && (selected==null || !transactionId.equals(selected.id()))) {
-            if(selected!=null)redirect.addAttribute("transactionId",selected.id());if(activityId!=null)redirect.addAttribute("activityId",activityId);
-            redirect.addAttribute("sourceEvent",sourceEvent);redirect.addAttribute("state",state);return "redirect:/finance/library/templates";
-        }
-        return view;
+        model.addAttribute("transaction",library.transaction(actor,id));
+        model.addAttribute("template",library.template(actor,id));
+        model.addAttribute("isTransactions",true);
+        return "accounting/library-transaction";
     }
     @GetMapping("/transactions/{id}/template") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
     String editTemplate(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
@@ -137,19 +125,6 @@ public class AccountingCodeLibraryController {
     @PostMapping("/transactions/{id}/{action:deactivate|reactivate}") @PreAuthorize("@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')")
     String transactionState(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@PathVariable String action,RedirectAttributes flash) {
         library.transactionState(actor,id,action.equals("reactivate"));success(flash);return "redirect:/finance/library/transactions/"+id;
-    }
-    private String templates(AppUserPrincipal actor,TransactionCode selected,UUID activityId,String sourceEvent,String state,Model model) {
-        var choices=library.transactionRegister(actor,activityId,"",state,sourceEvent,0);
-        if(selected!=null && ((activityId!=null && !activityId.equals(selected.activityId())) || (!sourceEvent.isEmpty() && !sourceEvent.equals(selected.sourceEvent())) || (!state.isEmpty() && selected.active()!=state.equals("ACTIVE")))) {
-            selected=null;
-        }
-        if(selected==null) {selected=choices.rows().isEmpty()?null:choices.rows().getFirst();}
-        model.addAttribute("transaction",selected);model.addAttribute("transactionChoices",choices);
-        model.addAttribute("isTransactions",true);
-        model.addAttribute("activity",activityId==null?null:library.activity(actor,activityId));model.addAttribute("activityFilters",library.activities(actor,"","",0));
-        model.addAttribute("sourceEvents",Arrays.stream(AccountingEvent.values()).map(Enum::name).toList());model.addAttribute("sourceEvent",sourceEvent);model.addAttribute("state",state);
-        if(selected!=null) {model.addAttribute("template",library.template(actor,selected.id()));}
-        return "accounting/library-transaction";
     }
     private String templateForm(AppUserPrincipal actor,UUID id,String search,int page,Model model) {
         if(model.getAttribute("templateForm") instanceof TemplateForm form && (form.getRules()==null || form.getRules().isEmpty()))

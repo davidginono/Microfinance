@@ -46,7 +46,7 @@ public class AccountingCodeLibraryService {
     public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,int page,int size,String sort,String direction) {
         authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);require(Set.of(10,25,30,50).contains(size),"validation");
         require(Set.of("code","name","activity","sourceEvent","template","status").contains(sort) && Set.of("asc","desc").contains(direction),"validation");
-        var rows=library.transactionRegister(actor.getSaccoId(),activity,term(search),state,"",page*size,size+1,sort,direction);
+        var rows=library.transactionRegister(actor.getSaccoId(),activity,term(search),state,page*size,size+1,sort,direction);
         return new Page<>(rows.stream().limit(size).toList(),page,rows.size()>size);
     }
     @Transactional(readOnly=true)
@@ -78,13 +78,7 @@ public class AccountingCodeLibraryService {
     }
     @Transactional(readOnly=true)
     public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,int page) {
-        return transactionRegister(actor,activity,search,state,"",page);
-    }
-    @Transactional(readOnly=true)
-    public Page<TransactionCode> transactionRegister(AppUserPrincipal actor,UUID activity,String search,String state,String sourceEvent,int page) {
-        authorize(actor,"VIEW");if(activity!=null)activity(actor,activity,false);validateQuery(search,state,page);
-        require(sourceEvent!=null && (sourceEvent.isEmpty() || Arrays.stream(AccountingEvent.values()).anyMatch(e->e.name().equals(sourceEvent))),"sourceEvent");
-        return slice(library.transactionRegister(actor.getSaccoId(),activity,term(search),state,sourceEvent,page*25),page);
+        return transactionRegister(actor,activity,search,state,page,25);
     }
     @Transactional
     public UUID onboardTransaction(AppUserPrincipal actor,TransactionForm form) {

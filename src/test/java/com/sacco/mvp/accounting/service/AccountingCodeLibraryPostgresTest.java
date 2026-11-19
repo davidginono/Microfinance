@@ -112,10 +112,6 @@ class AccountingCodeLibraryPostgresTest {
         var page=service.transactionRegister(actor,null,"PAY","",0);assertThat(page.rows()).hasSize(25);assertThat(page.hasNext()).isTrue();
         assertThat(java.util.stream.Stream.concat(page.rows().stream(),service.transactionRegister(actor,null,"PAY","",1).rows().stream()).filter(c->!c.systemManaged()).toList()).hasSize(30);
         assertThat(service.transactionRegister(actor,first,"","",0).rows()).hasSize(15).allMatch(c->c.activityId().equals(first));
-        assertThat(service.transactionRegister(actor,null,"","ACTIVE","EXPENSE",0).rows()).isEmpty();
-        assertThat(service.transactionRegister(actor,null,"","ACTIVE","MANUAL_JOURNAL",0).rows()).hasSize(25).allMatch(c->c.sourceEvent().equals("MANUAL_JOURNAL"));
-        assertThat(service.transactionRegister(actor,first,"","ACTIVE","EXPENSE",0).rows()).isEmpty();
-        assertThatThrownBy(()->service.transactionRegister(actor,null,"","","UNKNOWN",0)).hasMessage("library.error.sourceEvent");
         assertThatThrownBy(()->service.transactionRegister(actor,UUID.randomUUID(),"","",0)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
     @Test void editingReplacesTheCurrentAccountsWithoutKeepingCopies() {

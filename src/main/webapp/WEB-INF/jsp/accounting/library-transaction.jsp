@@ -10,32 +10,10 @@
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library' />"><spring:message code="library.navigation" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/library/transactions' />"><spring:message code="library.transactions" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="library.transactionTemplates" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="library.transactionTemplates" /></h1></div>
 <div class="accounting-workspace accounting-resource-workspace">
-    <section data-resource-table="accounting-library-transaction-1" class="erp-table-wrap accounting-filter-section">
-        <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="coa.filterBy" /></h2>
-            <c:if test="${not empty transaction and not transaction.systemManaged()}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><form method="post" action="<c:url value='/finance/library/transactions/${transaction.id}/${transaction.active?"deactivate":"reactivate"}' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><button class="app-btn btn-neutral"><spring:message code="${transaction.active?'accounting.deactivate':'coa.reactivate'}" /></button></form></sec:authorize></c:if>
-        </div>
-    <form method="get" action="<c:url value='/finance/library/templates' />" class="erp-table-toolbar coa-filters library-template-filters">
-        <label class="erp-table-toolbar__control"><spring:message code="library.activity" /><select class="aws-control" name="activityId"><option value=""><spring:message code="coa.all" /></option>
-            <c:if test="${not empty activity}"><option value="${activity.id}" selected><c:out value="${activity.name}" /></option></c:if>
-            <c:forEach items="${activityFilters.rows}" var="choice"><c:if test="${choice.id ne activity.id}"><option value="${choice.id}"><c:out value="${choice.name}" /></option></c:if></c:forEach>
-        </select></label>
-        <label class="erp-table-toolbar__control"><spring:message code="library.transaction" /><select class="aws-control" name="transactionId">
-            <c:if test="${empty transaction}"><option value=""><spring:message code="library.noMatchingTransactions" /></option></c:if>
-            <c:if test="${not empty transaction}"><option value="${transaction.id}" selected><c:out value="${transaction.name}" /></option></c:if>
-            <c:forEach items="${transactionChoices.rows}" var="choice"><c:if test="${choice.id ne transaction.id}"><option value="${choice.id}"><c:out value="${choice.name}" /></option></c:if></c:forEach>
-        </select></label>
-        <label class="erp-table-toolbar__control"><spring:message code="library.sourceEvent" /><select class="aws-control" name="sourceEvent"><option value=""><spring:message code="coa.all" /></option><c:forEach items="${sourceEvents}" var="event"><option value="${event}" ${sourceEvent==event?'selected':''}><spring:message code="library.event.${event}" /></option></c:forEach></select></label>
-        <label class="erp-table-toolbar__control"><spring:message code="coa.status" /><select class="aws-control" name="state"><option value=""><spring:message code="coa.all" /></option><option value="ACTIVE" ${state=='ACTIVE'?'selected':''}><spring:message code="accounting.active.true" /></option><option value="INACTIVE" ${state=='INACTIVE'?'selected':''}><spring:message code="accounting.active.false" /></option></select></label>
-        <div class="erp-table-toolbar__actions"><button class="app-btn btn-neutral"><spring:message code="coa.filter" /></button><a class="app-btn btn-neutral" href="<c:url value='/finance/library/templates' />"><spring:message code="coa.clear" /></a></div>
-    </form>
-    </section>
-    <c:if test="${empty transaction}"><p role="status"><spring:message code="library.noMatchingTransactions" /></p></c:if>
-    <c:if test="${not empty transaction}">
     <c:if test="${not empty transaction.description}"><p><c:out value="${transaction.description}" /></p></c:if>
     <c:if test="${not empty librarySuccess}"><p class="coa-success" role="status"><spring:message code="${librarySuccess}" /></p></c:if>
     <c:if test="${transaction.systemManaged()}"><p class="accounting-definition-note"><spring:message code="batch.systemHelp" /></p></c:if>
     <c:if test="${not transaction.systemManaged()}">
-    <p class="accounting-definition-note"><spring:message code="library.definitionOnly" /></p>
     <section data-resource-table="accounting-library-transaction-2" class="erp-table-wrap" data-aws-table-region>
         <div class="app-table-titlebar coa-titlebar"><h2><spring:message code="library.template" /></h2><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><c:if test="${transaction.active}"><a class="app-btn ${empty template?'btn-launch':'btn-neutral'}" href="<c:url value='/finance/library/transactions/${transaction.id}/template' />"><spring:message code="${empty template?'library.addTemplate':'library.editTemplate'}" /></a></c:if></sec:authorize></div>
         <div class="erp-table-scroll erp-table-scroll-sm" data-view-position-key="library-template"><table class="erp-table" data-table-sort-mode="local">
@@ -43,7 +21,6 @@
             <tbody><c:forEach items="${template.rules}" var="rule"><tr><td><spring:message code="library.component.${rule.component}" /></td><td><c:out value="${rule.debitCode}" /> · <c:out value="${rule.debitName}" /></td><td><c:out value="${rule.creditCode}" /> · <c:out value="${rule.creditName}" /></td></tr></c:forEach><c:if test="${empty template}"><tr><td colspan="3"><spring:message code="library.noTemplate" /></td></tr></c:if></tbody>
         </table></div>
     </section>
-    </c:if>
     </c:if>
 </div>
 <%@ include file="../fragments/footer.jspf" %>

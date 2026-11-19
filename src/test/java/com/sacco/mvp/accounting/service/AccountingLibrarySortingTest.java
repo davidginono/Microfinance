@@ -19,7 +19,7 @@ class AccountingLibrarySortingTest {
         for (var column : Map.of("code","t.code", "name","t.name", "activity","activity_code", "sourceEvent","t.source_event", "template","has_template", "status","t.active").entrySet()) {
             for (String direction : List.of("asc", "desc")) {
                 var jdbc=mock(JdbcTemplate.class);
-                new AccountingCodeLibraryRepository(jdbc).transactionRegister("institution",null,"","ACTIVE","",60,31,column.getKey(),direction);
+                new AccountingCodeLibraryRepository(jdbc).transactionRegister("institution",null,"","ACTIVE",60,31,column.getKey(),direction);
                 var call=mockingDetails(jdbc).getInvocations().iterator().next();
                 assertThat((String)call.getArgument(0)).contains("where t.sacco_id=?")
                     .endsWith("order by "+column.getValue()+" "+direction+",t.id limit ? offset ?");
@@ -52,11 +52,11 @@ class AccountingLibrarySortingTest {
 
     @Test void transactionOrderRunsBeforeLimitWithStableTieBreakerAndParentScope() {
         var jdbc=mock(JdbcTemplate.class);var repository=new AccountingCodeLibraryRepository(jdbc);var parent=UUID.randomUUID();
-        repository.transactionRegister("institution",parent,"office","ACTIVE","",100,51,"status","desc");
+        repository.transactionRegister("institution",parent,"office","ACTIVE",100,51,"status","desc");
         var sql=ArgumentCaptor.forClass(String.class);var args=ArgumentCaptor.forClass(Object[].class);
         verify(jdbc).query(sql.capture(),any(RowMapper.class),args.capture());
         assertThat(sql.getValue()).contains("where t.sacco_id=? and t.activity_id=?").endsWith("order by t.active desc,t.id limit ? offset ?");
-        assertThat(args.getValue()).containsExactly("institution",parent,"office","office","office","ACTIVE","ACTIVE","","",51,100);
+        assertThat(args.getValue()).containsExactly("institution",parent,"office","office","office","ACTIVE","ACTIVE",51,100);
         assertThatThrownBy(()->repository.activities("institution","","",0,31,"unknown","asc")).isInstanceOf(IllegalArgumentException.class);
     }
 }
