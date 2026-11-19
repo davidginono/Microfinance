@@ -21,9 +21,8 @@
 @media print{.fs-preview-footer,.fs-tab-status{display:none!important}}
 @media(max-width:767px){.fs-view-fields{flex-direction:row}.fs-workspace .fs-view-fields .fs-select-setting{flex:1 1 100%}}
 
-.aws-console .fs-movement-modal{inset:0!important}
 .fs-movement-modal[hidden]{display:none!important}
-.aws-console .fs-movement-modal>.app-modal-panel{display:flex;flex-direction:column;min-width:0;max-width:calc(100vw - 32px)!important;max-height:calc(100dvh - 32px)!important}
+.aws-console .fs-movement-modal>.app-modal-panel{display:flex;flex-direction:column;min-width:0}
 .fs-movement-modal [data-equity-classify]{display:flex;flex-direction:column;min-height:0;min-width:0}
 .fs-movement-modal .app-modal-body{min-height:0;overflow:auto;overscroll-behavior:contain}
 .fs-movement-modal :is(.app-modal-header,.app-modal-actions){flex-shrink:0}
