@@ -103,10 +103,8 @@
             const selectedOption = options[select.selectedIndex] || options.find(function (option) {
                 return option.selected;
             }) || options[0] || null;
-            const selectedLabel = select.multiple
-                ? selectedOptions.map(option => option.textContent.trim()).join(', ')
-                : selectedOption ? selectedOption.textContent.trim() : '';
-            const placeholderSelected = select.multiple ? !selectedOptions.length
+            const selectedLabel = !select.multiple && selectedOption ? selectedOption.textContent.trim() : '';
+            const placeholderSelected = select.multiple ? true
                 : selectedOption != null && selectedOption.value === '' && !select.value && selectedOption.dataset.emptyOption !== 'true';
             const query = (state.search?.value || '').trim().toLocaleLowerCase();
             const visibleOptions = options.filter(function (option) {
@@ -121,6 +119,29 @@
             if (select.disabled) closeEnhancedSelect(state);
             state.buttonText.textContent = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
             state.button.title = selectedLabel || document.body.dataset.shellSelect || 'Select an option';
+            if (state.selections) {
+                state.selections.replaceChildren();
+                selectedOptions.forEach(function (option, index) {
+                    const row = document.createElement('li'); row.className = 'neo-select-selection';
+                    const label = document.createElement('span'); label.textContent = option.textContent.trim();
+                    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'neo-select-remove';
+                    remove.textContent = '×';
+                    remove.setAttribute('aria-label', [select.dataset.removeLabel, label.textContent].filter(Boolean).join(' '));
+                    remove.title = remove.getAttribute('aria-label');
+                    remove.disabled = select.matches(':disabled') || option.disabled || !!option.parentElement.disabled || state.loading;
+                    remove.addEventListener('click', function (event) {
+                        event.stopPropagation();
+                        if (remove.disabled || select.matches(':disabled') || state.loading || !option.selected || !option.isConnected || option.closest('select') !== select) return;
+                        option.selected = false;
+                        state.wrapper.classList.remove('neo-select--invalid');
+                        renderEnhancedSelect(select);
+                        dispatchSelectionEvents(select);
+                        const remaining = state.selections.querySelectorAll('button:not(:disabled)');
+                        (remaining[Math.min(index, remaining.length - 1)] || state.button).focus({preventScroll:true});
+                    });
+                    row.append(label, remove); state.selections.append(row);
+                });
+            }
             state.list.replaceChildren();
             state.menu.querySelector('.neo-select-loading')?.remove();
             if(state.loading) {
@@ -319,6 +340,8 @@
             menu.append(list);
 
             wrapper.appendChild(button);
+            const selections = select.multiple ? document.createElement('ul') : null;
+            if (selections) {selections.className = 'neo-select-selections';wrapper.append(selections);}
             document.body.appendChild(menu);
 
             const state = {
@@ -326,7 +349,7 @@
                 wrapper: wrapper,
                 button: button,
                 buttonText: button.querySelector('.neo-select-button-text'),
-                menu: menu, list: list, loading: false
+                menu: menu, list: list, selections: selections, loading: false
             };
             enhancedStates.set(select, state);
             menu.addEventListener('keydown', event => {

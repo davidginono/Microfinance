@@ -3820,6 +3820,13 @@ html.session-timeout-active,
         isolation: isolate;
         z-index: 1;
     }
+.neo-select-selections {display:grid;gap:8px;min-width:0;margin:8px 0 0;padding:0;list-style:none;}
+.neo-select-selections:empty {display:none;}
+.neo-select-selection {display:flex;align-items:center;gap:8px;min-width:0;padding:4px 8px 4px 12px;border:1px solid #d5dbdb;border-radius:2px;background:#fafafa;}
+.neo-select-selection>span {flex:1 1 0;min-width:0;overflow-wrap:anywhere;}
+:is(.aws-console, .aws-auth-shell) .neo-select-remove {flex:0 0 28px;display:inline-flex;align-items:center;justify-content:center;width:28px;min-width:28px;height:28px;min-height:28px;margin:0;padding:0;border:0;background:transparent;color:#545b64;font-size:20px;line-height:1;box-shadow:none;}
+.neo-select-remove:focus-visible {outline:2px solid #0073bb;outline-offset:1px;}
+.neo-select-remove:disabled {opacity:.5;cursor:not-allowed;}
     .neo-select--open {
         z-index: 160;
     }

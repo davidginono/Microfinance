@@ -80,9 +80,9 @@ test('searchable multiple selects toggle accounts without losing other selection
         button.click();const search=d.querySelector('.neo-select-search input');
         for(const query of ['capital','reserve']){search.value=query;search.dispatchEvent(new w.Event('input'));d.querySelector('.neo-select-option').click();assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(d.activeElement.getAttribute('aria-selected'),'true');}
         assert.deepEqual(Array.from(new w.FormData(d.querySelector('form')).getAll('accounts')),['capital','reserve']);
-        assert.equal(button.textContent.trim(),'Capital, Reserve');assert.equal(changes,2);assert.equal(submits,0);
+        assert.deepEqual([...d.querySelectorAll('.neo-select-selection>span')].map(label=>label.textContent),['Capital','Reserve']);assert.equal(changes,2);assert.equal(submits,0);
         search.value='capital';search.dispatchEvent(new w.Event('input'));d.querySelector('.neo-select-option').click();
-        assert.deepEqual(Array.from(select.selectedOptions,option=>option.value),['reserve']);assert.equal(button.textContent.trim(),'Reserve');
+        assert.deepEqual(Array.from(select.selectedOptions,option=>option.value),['reserve']);assert.equal(d.querySelector('.neo-select-selection>span').textContent,'Reserve');
         search.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(d.querySelector('.neo-select-menu').hidden,true);assert.equal(d.activeElement,button);assert.equal(d.querySelector('[name=reason]').value,'Keep this reason');
     }finally{dom.window.close();}
 });
@@ -90,11 +90,36 @@ test('searchable multiple selects toggle accounts without losing other selection
 test('multiple selects retain saved values, disabled choices and reset state through the shared control',async()=>{
     const {dom,w,d}=await setup('<form><select name="accounts" multiple data-searchable="true"><option value="capital" selected>Capital</option><option value="reserve" selected>Reserve</option><optgroup disabled label="Unavailable"><option value="bank">Bank</option></optgroup></select></form>');
     try{
-        const select=d.querySelector('select'),button=d.querySelector('.neo-select-button');assert.equal(button.textContent.trim(),'Capital, Reserve');button.click();
+        const select=d.querySelector('select'),button=d.querySelector('.neo-select-button');assert.equal(d.querySelectorAll('.neo-select-selection').length,2);button.click();
         const bank=d.querySelector('[data-option-index="2"]');assert.equal(bank.disabled,true);bank.click();assert.equal(select.selectedOptions.length,2);
-        d.querySelector('[data-option-index="0"]').click();assert.equal(button.textContent.trim(),'Reserve');
-        d.querySelector('form').reset();w.refreshEnhancedSelects();assert.equal(button.textContent.trim(),'Capital, Reserve');
+        d.querySelector('[data-option-index="0"]').click();assert.equal(d.querySelector('.neo-select-selection>span').textContent,'Reserve');
+        d.querySelector('form').reset();w.refreshEnhancedSelects();assert.equal(d.querySelectorAll('.neo-select-selection').length,2);
         select.disabled=true;await tick();assert.equal(button.disabled,true);assert.equal(d.querySelector('.neo-select-menu').hidden,true);
+    }finally{dom.window.close();}
+});
+
+test('selected accounts have individual remove buttons that preserve search, native values and keyboard focus',async()=>{
+    const {dom,w,d}=await setup('<form><select name="accounts" multiple data-searchable="true" data-remove-label="Ondoa"><option value="capital" selected>Mtaji</option><option value="reserve" selected>Akiba</option><option value="bank" selected>Benki</option></select><input name="reason" value="Keep this reason"></form>');
+    try{
+        const select=d.querySelector('select'),button=d.querySelector('.neo-select-button');let changes=0;select.addEventListener('change',()=>changes++);
+        assert.equal(button.textContent.trim(),'Select an option');assert.equal(d.querySelectorAll('.neo-select-remove').length,3);
+        button.click();const search=d.querySelector('.neo-select-search input');search.value='benki';search.dispatchEvent(new w.Event('input'));
+        d.querySelectorAll('.neo-select-remove')[1].click();
+        assert.deepEqual(Array.from(new w.FormData(d.querySelector('form')).getAll('accounts')),['capital','bank']);
+        assert.equal(d.activeElement.getAttribute('aria-label'),'Ondoa Benki');assert.equal(search.value,'benki');assert.equal(button.getAttribute('aria-expanded'),'true');
+        d.activeElement.click();assert.deepEqual(Array.from(select.selectedOptions,option=>option.value),['capital']);
+        d.querySelector('.neo-select-remove').click();assert.equal(d.querySelectorAll('.neo-select-selection').length,0);assert.equal(d.activeElement,button);
+        assert.equal(new w.FormData(d.querySelector('form')).getAll('accounts').length,0);assert.equal(changes,3);assert.equal(d.querySelector('[name=reason]').value,'Keep this reason');
+    }finally{dom.window.close();}
+});
+
+test('disabled or loading selected accounts cannot be removed',async()=>{
+    const {dom,w,d}=await setup('<select name="accounts" multiple data-searchable="true"><option value="capital" selected>Capital</option><option value="reserve" selected disabled>Reserve</option></select>');
+    try{
+        const select=d.querySelector('select');assert.equal(d.querySelectorAll('.neo-select-remove')[1].disabled,true);
+        const picker=w.NeoSelect.search(select);picker.setLoading(true);assert.equal([...d.querySelectorAll('.neo-select-remove')].every(button=>button.disabled),true);
+        d.querySelector('.neo-select-remove').click();assert.equal(select.selectedOptions.length,2);picker.setLoading(false);
+        select.disabled=true;await tick();assert.equal([...d.querySelectorAll('.neo-select-remove')].every(button=>button.disabled),true);
     }finally{dom.window.close();}
 });
 

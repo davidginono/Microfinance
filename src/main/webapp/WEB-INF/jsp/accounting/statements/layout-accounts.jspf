@@ -4,7 +4,7 @@
 <c:otherwise>
 <label for="layout-accounts" class="sr-only"><spring:message code="fs.layout.accounts" /></label>
 <form:select path="accounts" id="layout-accounts" cssClass="aws-control" multiple="true" data-searchable="true"
-        size="${accounts.size() lt 4 ? accounts.size() : 4}">
+        size="${accounts.size() lt 4 ? accounts.size() : 4}" data-remove-label="<spring:message code='statement.remove' />">
     <c:forEach items="${accounts}" var="account">
         <form:option value="${account.id}"><c:out value="${account.name}" /> · <c:out value="${account.code}" /> · <spring:message code="accounting.option.${account.type}" /></form:option>
     </c:forEach>
