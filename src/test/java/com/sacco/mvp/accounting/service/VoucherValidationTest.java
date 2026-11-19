@@ -51,4 +51,34 @@ class VoucherValidationTest {
   var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(null,null);var copy=gate.canonical(f,f.getRequestKey());
   e.setAmount(BigDecimal.TEN);assertThat(copy.getRows().getFirst().getEntries().getFirst().getAmount()).isEqualByComparingTo("1.01");
  }
+ @Test void everyVoucherTypeRejectsEachUnbalancedTransactionEvenWhenDifferencesCancel(){
+  for(Type type:Type.values()){
+   var f=form();f.setRows(List.of(splitRow("1.01","1.01","1.00"),splitRow("1.01","1.00","1.01")));
+   assertThatThrownBy(()->VoucherService.validate(f,type,today)).isInstanceOfSatisfying(Invalid.class,e->{assertThat(e.field()).isEqualTo("rows[0].entries");assertThat(e).hasMessage("voucher.error.balance");});
+   f.setRows(List.of(splitRow("1.01","1.01","1.01"),splitRow("1.01","1.02","1.01")));
+   assertThatThrownBy(()->VoucherService.validate(f,type,today)).isInstanceOfSatisfying(Invalid.class,e->{assertThat(e.field()).isEqualTo("rows[1].entries");assertThat(e).hasMessage("voucher.error.balance");});
+  }
+ }
+ @Test void balancedSidesMustAlsoMatchTheDeclaredTransactionAmountForEveryVoucherType(){
+  for(Type type:Type.values())for(String amount:List.of("1.00","1.02")){
+   var f=form();f.setRows(List.of(splitRow(amount,"1.01","1.01")));
+   assertThatThrownBy(()->VoucherService.validate(f,type,today)).hasMessage("voucher.error.balance");
+  }
+ }
+ @Test void everyTransactionRequiresBothSidesAndUsesExactDecimalAmounts(){
+  for(Type type:Type.values()){
+   var f=form();var row=splitRow("1.01","1.01","1.01");f.setRows(List.of(row));
+   row.getEntries().getLast().setSide("DEBIT");assertThatThrownBy(()->VoucherService.validate(f,type,today)).hasMessage("voucher.error.balance");
+   row.getEntries().forEach(e->e.setSide("CREDIT"));assertThatThrownBy(()->VoucherService.validate(f,type,today)).hasMessage("voucher.error.balance");
+   row=splitRow("0.30","0.10","0.30");var extra=new EntryForm();extra.setSide("DEBIT");extra.setAmount(new BigDecimal("0.20"));row.getEntries().add(extra);f.setRows(List.of(row));
+   assertThatCode(()->VoucherService.validate(f,type,today)).doesNotThrowAnyException();
+   f.setRows(List.of(splitRow("9999999999999999.99","9999999999999999.99","9999999999999999.99")));
+   assertThatCode(()->VoucherService.validate(f,type,today)).doesNotThrowAnyException();
+  }
+ }
+ RowForm splitRow(String amount,String debit,String credit){
+  var r=new RowForm();r.setDescription("Split transaction");r.setAmount(new BigDecimal(amount));
+  var d=new EntryForm();d.setSide("DEBIT");d.setAmount(new BigDecimal(debit));
+  var c=new EntryForm();c.setSide("CREDIT");c.setAmount(new BigDecimal(credit));r.setEntries(new ArrayList<>(List.of(d,c)));return r;
+ }
 }

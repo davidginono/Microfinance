@@ -137,16 +137,53 @@ class VoucherPostgresTest {
   command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
   assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
  }
+ @Test void everyVoucherTypeRejectsUnbalancedPreviewPostingAndApprovalWithoutFinancialWrites(){
+  for(var type:Type.values()){
+   var f=split(type);f.getRows().getFirst().getEntries().getFirst().setAmount(new BigDecimal("99.99"));
+   assertThatThrownBy(()->service.preview(actor,type,f)).hasMessage("voucher.error.balance");
+   assertThatThrownBy(()->service.approvalPreview(actor,type,f)).hasMessage("voucher.error.balance");
+   assertThatThrownBy(()->service.post(actor,type,f)).hasMessage("voucher.error.balance");
+   assertThatThrownBy(()->workflows.capture(actor,type,f)).hasMessage("voucher.error.balance");
+  }
+  for(String table:List.of("accounting_voucher","gl_journal","accounting_outbox","voucher_workflow"))
+   assertThat(jdbc.queryForObject("select count(*) from "+table+" where sacco_id=?",Integer.class,institution)).isZero();
+ }
+ @Test void everyVoucherBatchKeepsOffsettingUnbalancedItemsOutOfApprovalUntilEachIsCorrected(){
+  var reviewer=approver(Position.MANAGER);
+  for(var type:Type.values()){
+   var rules=new RuleForm();rules.setType(type);rules.setRules(List.of(rule("BATCH",false,Position.MANAGER,1)));workflows.configure(actor,rules);
+   UUID id=workflows.batch(actor,type,UUID.randomUUID());var first=workflows.details(actor,id).items().getFirst();
+   var firstForm=split(type);firstForm.getRows().getFirst().getEntries().get(1).setAmount(new BigDecimal("59.99"));
+   workflows.save(actor,id,first.id(),version(id),first.version(),firstForm);
+   UUID second=workflows.add(actor,id,version(id));var secondForm=split(type);secondForm.getRows().getFirst().getEntries().getFirst().setAmount(new BigDecimal("99.99"));
+   workflows.save(actor,id,second,version(id),0,secondForm);command(actor,id,"SEND");
+   var invalid=workflows.details(actor,id);assertThat(invalid.workflow().validation()).isEqualTo("ERROR");assertThat(invalid.workflow().approval()).isEqualTo(Approval.REQUIRED);
+   assertThat(invalid.items()).allSatisfy(item->assertThat(item.issues()).anySatisfy(issue->{assertThat(issue.field()).isEqualTo("rows[0].entries");assertThat(issue.code()).isEqualTo("voucher.error.balance");}));
+   assertThatThrownBy(()->workflowPosting.post(actor,id,version(id))).hasMessage("approval.error.validate");
+   for(var item:invalid.items()){
+    var f=item.form();var entries=f.getRows().getFirst().getEntries();entries.getFirst().setAmount(new BigDecimal("100.00"));entries.get(1).setAmount(new BigDecimal("60.00"));
+    workflows.save(actor,id,item.id(),version(id),item.version(),f);
+   }
+   command(actor,id,"SEND");command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
+   assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
+   assertThat(workflows.details(actor,id).items()).allSatisfy(item->assertThat(service.view(actor,type,item.voucherId()).transactions()).allSatisfy(t->{
+    for(String side:List.of("DEBIT","CREDIT"))assertThat(t.postings().stream().filter(e->e.side().equals(side)).map(Entry::amount).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo(t.amount());
+   }));
+  }
+ }
  @Test void databaseRejectsPerTransactionImbalanceEvenWhenTheWholeJournalBalances(){
-  var f=form(Type.JOURNAL);var repository=new VoucherRepository(jdbc);
+  for(var type:Type.values()){
+  var f=form(type);var repository=new VoucherRepository(jdbc);
   assertThatThrownBy(()->tx.executeWithoutResult(status->{
    UUID period=repository.period(institution,day,actor.getMemberId(),now);
-   var debit=new Account(expense,"EXPENSE","Synthetic EXPENSE","OTHER");var credit=new Account(capital,"CAPITAL","Synthetic CAPITAL","CAPITAL");
+   var debit=type==Type.RECEIPT?new Account(cash,"CASH","Synthetic CASH","CASH"):new Account(expense,"EXPENSE","Synthetic EXPENSE","OTHER");
+   var credit=type==Type.PAYMENT?new Account(cash,"CASH","Synthetic CASH","CASH"):new Account(capital,"CAPITAL","Synthetic CAPITAL","CAPITAL");
    var first=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","First",new BigDecimal("100"),null,null,List.of(new Entry("DEBIT",debit,new BigDecimal("100")),new Entry("CREDIT",credit,new BigDecimal("90"))));
    var second=new Transaction(UUID.randomUUID(),2,null,null,"","TOTAL","Second",new BigDecimal("100"),null,null,List.of(new Entry("DEBIT",debit,new BigDecimal("90")),new Entry("CREDIT",credit,new BigDecimal("100"))));
-   var v=new Voucher(UUID.randomUUID(),"QA-"+UUID.randomUUID(),Type.JOURNAL,day,"","REF","","",null,new BigDecimal("200"),2,UUID.randomUUID(),actor.getMemberId(),"",now,null,null,"","",List.of(first,second));
+   var v=new Voucher(UUID.randomUUID(),"QA-"+UUID.randomUUID(),type,day,f.getParty(),"REF","","",type==Type.JOURNAL?null:cash,new BigDecimal("200"),2,UUID.randomUUID(),actor.getMemberId(),"",now,null,null,"","",List.of(first,second));
    repository.insert(v,institution,"B1",f,"0".repeat(64),period,null);
   })).hasStackTraceContaining("Each voucher transaction must balance");
+  }
  }
  @Test void concurrentSplitRetriesCreateOneVoucher()throws Exception{
   var f=split(Type.JOURNAL);var executor=Executors.newFixedThreadPool(2);

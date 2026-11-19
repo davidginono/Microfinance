@@ -233,9 +233,12 @@ public class VoucherService {
                 require(r.getTransactionId()==null && r.getTemplateKey()==null && "TOTAL".equals(r.getComponent()),field+".entries","template");
                 require(r.getEntries().size()>=2 && r.getEntries().size()<=50,field+".entries","entries");
                 require(r.getDebitAccountId()==null && r.getCreditAccountId()==null,field+".entries","request");
+                BigDecimal debits=BigDecimal.ZERO,credits=BigDecimal.ZERO;
                 for(int e=0;e<r.getEntries().size();e++){var entry=r.getEntries().get(e);String path=field+".entries["+e+"]";
                     require(entry!=null && entry.getSide()!=null && Set.of("DEBIT","CREDIT").contains(entry.getSide()),path,"entries");
-                    require(entry.getAmount()!=null && entry.getAmount().signum()>0 && entry.getAmount().scale()>=-16 && entry.getAmount().scale()<=2 && entry.getAmount().precision()-entry.getAmount().scale()<=16,path+".amount","amount");}
+                    require(entry.getAmount()!=null && entry.getAmount().signum()>0 && entry.getAmount().scale()>=-16 && entry.getAmount().scale()<=2 && entry.getAmount().precision()-entry.getAmount().scale()<=16,path+".amount","amount");
+                    if("DEBIT".equals(entry.getSide()))debits=debits.add(entry.getAmount());else credits=credits.add(entry.getAmount());}
+                require(debits.compareTo(r.getAmount())==0 && credits.compareTo(r.getAmount())==0,field+".entries","balance");
                 entryCount+=r.getEntries().size();
             }else entryCount+=2;
             require(entryCount<=500,"","entries");
