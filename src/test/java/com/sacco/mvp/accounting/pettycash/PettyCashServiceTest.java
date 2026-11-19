@@ -19,6 +19,23 @@ class PettyCashServiceTest {
     final ApplicationClock clock=mock(ApplicationClock.class);
     final AppUserPrincipal actor=mock(AppUserPrincipal.class);
     final PettyCashService service=new PettyCashService(repository,ledger,clock,mock(AuditService.class));
+    @Test void menuRequiresSavedBranchSetupAndLivePermission(){
+        when(actor.isStaffSession()).thenReturn(true);when(actor.getClaims()).thenReturn(Set.of("ACCOUNTING_BUSINESS_VIEW"));
+        when(repository.configured(actor)).thenReturn(false,true);
+        assertThat(service.available(actor)).isFalse();assertThat(service.available(actor)).isTrue();
+        doThrow(new AccessDeniedException("Revoked")).when(ledger).requireActor(actor,"ACCOUNTING_BUSINESS_VIEW");
+        assertThat(service.available(actor)).isFalse();verify(repository,times(2)).configured(actor);
+    }
+    @Test void menuSkipsPersistenceForAnonymousPlatformAndUnpermittedSessions(){
+        assertThat(service.available(null)).isFalse();assertThat(service.available(actor)).isFalse();
+        when(actor.isStaffSession()).thenReturn(true);when(actor.isPlatformIdentity()).thenReturn(true);
+        assertThat(service.available(actor)).isFalse();when(actor.isPlatformIdentity()).thenReturn(false);
+        when(actor.getClaims()).thenReturn(Set.of());assertThat(service.available(actor)).isFalse();verifyNoInteractions(ledger,repository);
+    }
+    @Test void uncheckedSetupCannotPersistADesignation(){
+        assertThatThrownBy(()->service.configure(actor,new Setup(UUID.randomUUID(),"Evidence",false))).hasMessage("petty.error.enable");
+        verify(ledger).requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");verifyNoInteractions(repository);
+    }
     @Test void revokedAccessStopsBeforeReadingFinancialRecords(){
         doThrow(new AccessDeniedException("Revoked")).when(ledger).requireActor(actor,"ACCOUNTING_BUSINESS_VIEW");
         assertThatThrownBy(()->service.workspace(actor,null)).isInstanceOf(AccessDeniedException.class);verifyNoInteractions(repository);

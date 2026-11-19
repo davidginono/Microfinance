@@ -23,6 +23,8 @@ Spending is checked against daily effective-date balances, including every subse
 
 ## Reading the cashbook
 
+Accounting Setup → Petty cash setup starts with an unticked **Use petty cash** checkbox. An authorized administrator must tick it and save a valid cash account and opening evidence before the branch's Petty cash voucher menu appears. The saved designation is the enablement record; no separate feature flag or schema change is required. The existing permanent account link remains protected, and saved setup shows a read-only tick. Menu visibility uses current institution/branch setup and live VIEW permission, skips JSON requests, and refreshes with shared workspace navigation. No permissions are granted by enabling the menu.
+
 Expenses lists posted payment transactions and signed linked corrections. All movements groups the designated account’s posted GL lines by journal and includes every movement, including historical non-expense activity. Original records are retained and their reversal status is determined at the response cutoff. Historical split rows with expense and non-expense debits cannot be reliably attributed and remain in All movements.
 
 Opening is the balance before the selected start date; closing includes its end date; current includes posted movements through today. Reporting uses one recorded cutoff and a repeatable-read transaction. Search and pagination do not change balances. Running balances are calculated across all movements before filtering or pagination, ordered by effective date, posting time, journal ID. Historical reports are current reconstructions at the displayed cutoff, not previously frozen statements.
@@ -44,3 +46,9 @@ No throughput claim is made. Reads use a fixed number of scoped aggregate/projec
 - A scoped balance aggregate over 33 synthetic posted movements used `ix_gl_line_account` and the journal scope key; one EXPLAIN ANALYZE sample took 3.984 ms execution time. This small correctness/query-plan sample is not a capacity benchmark. No new executors or asynchronous work were introduced. Throughput and the full application suite remain unverified.
 
 Reproduction uses Java 25 and the existing isolated voucher test gate, `MICROFINANCE_VOUCHER_TEST_URL=jdbc:postgresql://127.0.0.1:<disposable-port>/microfinance_vouchers_test`, with `mvn -Dtest=VoucherPostgresTest,PettyCashControllerTest,PettyCashServiceTest,PettyCashArchitectureTest,VoucherMvcTest,VoucherValidationTest,ChartOfAccountsJspCompilationTest,VoucherFormRenderingTest test`. Scope Jasper with `-Dmicrofinance.jsp.pages=pettycash/workspace.jsp,pettycash/setup.jsp,pettycash/pending.jsp,vouchers/form.jsp`. Never point the migration harness at operational data.
+
+## Optional menu increment — 19 November 2026
+
+Java 25 compiled all 454 production sources and the affected tests in `target/pettycash-menu-build`, separate from the running application's output. All **24 focused checks passed**: 15 controller/service/navigation/architecture/Jasper checks and nine PostgreSQL petty cash checks (`VoucherPostgresTest#petty*`). Rendered sidebar checks cover both languages, setup absent/present and missing VIEW permission. Service/MVC checks cover the unticked default, missing checkbox, retained values, CSRF and revoked live access. The disposable PostgreSQL check proves that setup enables only its own branch's menu and preserves financial protections.
+
+Navigation adds one institution/branch primary-key `exists` query after the existing live authorization check; anonymous, platform, unrelated-claim and JSON requests skip the lookup. No schema, permission defaults, financial postings, executors or background jobs changed. No throughput benchmark or full application suite was run for this increment.

@@ -11,6 +11,9 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class PettyCashRepository {
     private final JdbcTemplate jdbc;
+    public boolean configured(AppUserPrincipal a){
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from petty_cash_fund where sacco_id=? and station_id=?)",Boolean.class,a.getSaccoId(),a.getStationId()));
+    }
     public Optional<Choice> choice(AppUserPrincipal a,UUID id){
         return jdbc.query("select id,code,name from gl_account where id=? and sacco_id=?",(r,n)->new Choice(r.getObject(1,UUID.class),r.getString(2),r.getString(3)),id,a.getSaccoId()).stream().findFirst();
     }

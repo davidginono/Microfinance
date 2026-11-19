@@ -38,14 +38,14 @@ public class PettyCashController {
     }
     @GetMapping("/setup")
     public String setup(@AuthenticationPrincipal AppUserPrincipal actor,Model model){
-        model.addAttribute("fund",pettyCash.setup(actor).orElse(null));model.addAttribute("accountId","");model.addAttribute("evidence","");return "accounting/pettycash/setup";
+        model.addAttribute("fund",pettyCash.setup(actor).orElse(null));model.addAttribute("enabled",false);model.addAttribute("accountId","");model.addAttribute("evidence","");return "accounting/pettycash/setup";
     }
     @GetMapping("/accounts") @ResponseBody
     public List<Choice> accounts(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return pettyCash.choices(actor,search,page);}
     @PostMapping("/setup")
-    public String configure(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID accountId,@RequestParam(defaultValue="") String evidence,Model model,RedirectAttributes flash){
-        try{pettyCash.configure(actor,new Setup(accountId,evidence));flash.addFlashAttribute("successMessageCode","petty.saved");return "redirect:/finance/petty-cash/setup";}
-        catch(IllegalArgumentException e){model.addAttribute("setupError",e.getMessage());model.addAttribute("accountId",accountId);model.addAttribute("evidence",evidence);model.addAttribute("selectedAccountName",pettyCash.selectedAccount(actor,accountId));model.addAttribute("fund",pettyCash.setup(actor).orElse(null));return "accounting/pettycash/setup";}
+    public String configure(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID accountId,@RequestParam(defaultValue="") String evidence,@RequestParam(defaultValue="false") boolean enabled,Model model,RedirectAttributes flash){
+        try{pettyCash.configure(actor,new Setup(accountId,evidence,enabled));flash.addFlashAttribute("successMessageCode","petty.saved");return "redirect:/finance/petty-cash/setup";}
+        catch(IllegalArgumentException e){model.addAttribute("setupError",e.getMessage());model.addAttribute("enabled",enabled);model.addAttribute("accountId",accountId);model.addAttribute("evidence",evidence);model.addAttribute("selectedAccountName",pettyCash.selectedAccount(actor,accountId));model.addAttribute("fund",pettyCash.setup(actor).orElse(null));return "accounting/pettycash/setup";}
     }
     @GetMapping("/expense")
     public String expense(@AuthenticationPrincipal AppUserPrincipal actor){pettyCash.expenseFund(actor);return "redirect:/finance/vouchers/payments/new?pettyCash=true";}

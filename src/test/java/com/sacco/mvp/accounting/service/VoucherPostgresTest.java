@@ -65,7 +65,14 @@ class VoucherPostgresTest {
   var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
   return transactional(new com.sacco.mvp.accounting.pettycash.service.PettyCashService(new com.sacco.mvp.accounting.pettycash.repository.PettyCashRepository(jdbc),ledger,clock,audit),tx.getTransactionManager());
  }
- void pettySetup(){petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(cash,"New unused fund evidence"));}
+ void pettySetup(){petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(cash,"New unused fund evidence",true));}
+ @Test void pettyCashMenuRequiresCheckedSavedSetupInTheCurrentBranch(){
+  assertThat(petty().available(actor)).isFalse();
+  assertThatThrownBy(()->petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(cash,"Evidence",false))).hasMessage("petty.error.enable");
+  assertThat(petty().available(actor)).isFalse();
+  pettySetup();assertThat(petty().available(actor)).isTrue();
+  assertThat(petty().available(operator("B2"))).isFalse();
+ }
  Form pettyForm(Type type,String amount){var f=form(type);f.setEffectiveDate(now.toLocalDate());var row=f.getRows().getFirst();row.setAmount(new BigDecimal(amount));f.setRows(new ArrayList<>(List.of(row)));return f;}
  Voucher pettyTopup(String amount){var f=pettyForm(Type.JOURNAL,amount);f.getRows().getFirst().setDebitAccountId(cash);f.getRows().getFirst().setCreditAccountId(account("B-"+UUID.randomUUID(),"ASSET","DEBIT","POSTING","BANK"));return service.post(actor,Type.JOURNAL,f);}
  @Test void pettyCashPostsOnceAndReadsExactSplitAmountsAndLinkedReversals(){
@@ -104,7 +111,7 @@ class VoucherPostgresTest {
   assertThatThrownBy(this::pettySetup).hasMessage("petty.error.coverage");
   cash=account("NEW_CASH","ASSET","DEBIT","POSTING","CASH");pettySetup();pettySetup();
   UUID replacement=account("REPLACEMENT","ASSET","DEBIT","POSTING","CASH");
-  assertThatThrownBy(()->petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(replacement,"Evidence"))).hasMessage("petty.error.fixed");
+  assertThatThrownBy(()->petty().configure(actor,new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Setup(replacement,"Evidence",true))).hasMessage("petty.error.fixed");
   assertThatThrownBy(()->jdbc.update("delete from petty_cash_fund where account_id=?",cash)).isInstanceOf(org.springframework.dao.DataAccessException.class);
   assertThatThrownBy(()->jdbc.execute("truncate petty_cash_fund")).isInstanceOf(org.springframework.dao.DataAccessException.class);
   var early=pettyForm(Type.PAYMENT,"1");early.setEffectiveDate(now.toLocalDate().minusDays(1));

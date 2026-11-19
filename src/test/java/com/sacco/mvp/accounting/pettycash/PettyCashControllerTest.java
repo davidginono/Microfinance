@@ -46,18 +46,27 @@ class PettyCashControllerTest {
         UUID id=UUID.randomUUID();String evidence="Verified evidence";
         mvc.perform(post("/finance/petty-cash/setup").param("accountId",id.toString()).param("evidence",evidence)).andExpect(status().isForbidden());
         verify(service,never()).configure(any(),any());
-        doThrow(new IllegalArgumentException("petty.error.coverage")).when(service).configure(actor,new Setup(id,evidence));
+        doThrow(new IllegalArgumentException("petty.error.coverage")).when(service).configure(actor,new Setup(id,evidence,true));
         when(service.setup(actor)).thenReturn(Optional.empty());when(service.selectedAccount(actor,id)).thenReturn("Cash box");
-        mvc.perform(post("/finance/petty-cash/setup").with(request->{var token=tokens.generateToken(request);tokens.saveToken(token,request,new org.springframework.mock.web.MockHttpServletResponse());request.addHeader(token.getHeaderName(),token.getToken());return request;}).param("accountId",id.toString()).param("evidence",evidence))
+        mvc.perform(post("/finance/petty-cash/setup").with(request->{var token=tokens.generateToken(request);tokens.saveToken(token,request,new org.springframework.mock.web.MockHttpServletResponse());request.addHeader(token.getHeaderName(),token.getToken());return request;}).param("accountId",id.toString()).param("evidence",evidence).param("enabled","true"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/pettycash/setup"))
             .andExpect(model().attribute("accountId",id)).andExpect(model().attribute("evidence",evidence))
-            .andExpect(model().attribute("selectedAccountName","Cash box"));
+            .andExpect(model().attribute("selectedAccountName","Cash box")).andExpect(model().attribute("enabled",true));
     }
     @Test void missingAccountKeepsTheEnteredEvidence()throws Exception{
-        doThrow(new IllegalArgumentException("petty.error.evidence")).when(service).configure(actor,new Setup(null,"Evidence"));
+        doThrow(new IllegalArgumentException("petty.error.evidence")).when(service).configure(actor,new Setup(null,"Evidence",true));
         when(service.setup(actor)).thenReturn(Optional.empty());
-        mvc.perform(post("/finance/petty-cash/setup").with(request->{var token=tokens.generateToken(request);tokens.saveToken(token,request,new org.springframework.mock.web.MockHttpServletResponse());request.addHeader(token.getHeaderName(),token.getToken());return request;}).param("evidence","Evidence"))
+        mvc.perform(post("/finance/petty-cash/setup").with(request->{var token=tokens.generateToken(request);tokens.saveToken(token,request,new org.springframework.mock.web.MockHttpServletResponse());request.addHeader(token.getHeaderName(),token.getToken());return request;}).param("evidence","Evidence").param("enabled","true"))
             .andExpect(status().isOk()).andExpect(view().name("accounting/pettycash/setup"))
             .andExpect(model().attribute("evidence","Evidence")).andExpect(model().attribute("setupError","petty.error.evidence"));
+    }
+    @Test void setupStartsUncheckedAndMissingCheckboxDoesNotEnablePettyCash()throws Exception{
+        when(service.setup(actor)).thenReturn(Optional.empty());
+        mvc.perform(get("/finance/petty-cash/setup")).andExpect(model().attribute("enabled",false));
+        UUID id=UUID.randomUUID();
+        doThrow(new IllegalArgumentException("petty.error.enable")).when(service).configure(actor,new Setup(id,"Evidence",false));
+        mvc.perform(post("/finance/petty-cash/setup").with(request->{var token=tokens.generateToken(request);tokens.saveToken(token,request,new org.springframework.mock.web.MockHttpServletResponse());request.addHeader(token.getHeaderName(),token.getToken());return request;}).param("accountId",id.toString()).param("evidence","Evidence"))
+            .andExpect(model().attribute("enabled",false)).andExpect(model().attribute("setupError","petty.error.enable"));
+        verify(service).configure(actor,new Setup(id,"Evidence",false));
     }
 }

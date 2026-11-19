@@ -23,6 +23,6 @@ public final class PettyCashDtos {
     }
     public record Workspace(Fund fund,Query query,Balances balances,List<Row> rows,boolean hasNext,
                             OffsetDateTime cutoff,LocalDate today) {}
-    public record Setup(UUID accountId,String evidence) {}
+    public record Setup(UUID accountId,String evidence,boolean enabled) {}
     public record Choice(UUID id,String code,String name) {}
 }

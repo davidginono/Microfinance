@@ -54,6 +54,7 @@ class StaffNavigationRenderingTest {
                 try{
                     request.setAttribute("currentMember",actor);request.setAttribute("staffOffices",StaffOffice.assigned(actor.getStaffRoles()));
                     request.setAttribute("isPlatformAdminIdentity",actor.isPlatformIdentity());request.setAttribute("jakarta.servlet.forward.request_uri",ARCHIVE);
+                    request.setAttribute("pettyCashAvailable",Boolean.parseBoolean(request.getParameter("petty")));
                     request.getRequestDispatcher("/navigation.jsp").forward(request,response);
                 }finally{SecurityContextHolder.clearContext();}
             }
@@ -82,10 +83,19 @@ class StaffNavigationRenderingTest {
                 }
             }
             assertThat(render(client,base,Position.ADMIN,all,"en")).doesNotContain("Office activities","href=\""+CLIENT+"\"","href=\""+QUEUE+"\"","href=\""+ARCHIVE+"\"");
+            for(String language:List.of("en","sw")){
+                String claims="ACCOUNTING_BUSINESS_VIEW,ACCOUNTING_ACCOUNTS_VIEW";
+                assertThat(render(client,base,Position.ACCOUNTANT,claims,language)).contains("href=\"/finance/petty-cash/setup\"").doesNotContain("href=\"/finance/petty-cash\"");
+                assertThat(render(client,base,Position.ACCOUNTANT,claims,language,true)).containsOnlyOnce("href=\"/finance/petty-cash\"");
+                assertThat(render(client,base,Position.ACCOUNTANT,"ACCOUNTING_ACCOUNTS_VIEW",language,true)).doesNotContain("href=\"/finance/petty-cash\"");
+            }
         }finally{tomcat.stop();tomcat.destroy();spring.close();}
     }
     private String render(HttpClient client,String base,Position role,String claims,String language) throws Exception {
-        var response=client.send(HttpRequest.newBuilder(URI.create(base+"?role="+role+"&claims="+claims)).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
+        return render(client,base,role,claims,language,false);
+    }
+    private String render(HttpClient client,String base,Position role,String claims,String language,boolean configured) throws Exception {
+        var response=client.send(HttpRequest.newBuilder(URI.create(base+"?role="+role+"&claims="+claims+"&petty="+configured)).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);return response.body();
     }
     // JSP tags use FilterInvocation; Spring Security 7's engine uses RequestAuthorizationContext.

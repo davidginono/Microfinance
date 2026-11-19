@@ -19,6 +19,13 @@ public class PettyCashService {
     private final GeneralLedgerService ledger;
     private final ApplicationClock clock;
     private final AuditService audit;
+    @Transactional(readOnly=true)
+    public boolean available(AppUserPrincipal actor){
+        if(actor==null || !actor.isStaffSession() || actor.isPlatformIdentity() || !actor.getClaims().contains("ACCOUNTING_BUSINESS_VIEW"))return false;
+        try{ledger.requireActor(actor,"ACCOUNTING_BUSINESS_VIEW");}
+        catch(org.springframework.security.access.AccessDeniedException denied){return false;}
+        return funds.configured(actor);
+    }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public Workspace workspace(AppUserPrincipal actor,Query q){
         ledger.requireActor(actor,"ACCOUNTING_BUSINESS_VIEW");validate(q);
@@ -49,12 +56,13 @@ public class PettyCashService {
     @Transactional
     public void configure(AppUserPrincipal actor,Setup setup){
         ledger.requireActor(actor,"ACCOUNTING_ACCOUNTS_VIEW");ledger.requireActor(actor,"ACCOUNTING_ACCOUNTS_UPDATE");
+        if(!setup.enabled())throw invalid("enable");
         if(setup.accountId()==null || setup.evidence()==null || setup.evidence().isBlank() || setup.evidence().length()>500)throw invalid("evidence");
         var existing=funds.fund(actor);if(existing.isPresent()){
             if(existing.get().accountId().equals(setup.accountId()) && existing.get().evidence().equals(setup.evidence().strip()))return;
             throw invalid("fixed");
         }
-        try{funds.configure(actor,new Setup(setup.accountId(),setup.evidence().strip()),clock.today(),clock.now());}
+        try{funds.configure(actor,new Setup(setup.accountId(),setup.evidence().strip(),true),clock.today(),clock.now());}
         catch(DataAccessException e){String message=e.getMostSpecificCause().getMessage();
             if(message!=null && message.contains("petty.error.coverage"))throw invalid("coverage");
             if(message!=null && message.contains("petty.error.account"))throw invalid("account");
