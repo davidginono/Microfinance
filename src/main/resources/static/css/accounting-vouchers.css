@@ -11,6 +11,7 @@
 .aws-console .voucher-form .accounting-create-card>.accounting-grid {padding:20px;}
 .aws-console .voucher-form .accounting-create-card>.voucher-toolbar {background:#fafafa;border-bottom:1px solid #eaeded;padding:16px 20px;}
 [data-voucher-register] tr[data-voucher-id]{cursor:pointer}
+.aws-console [data-voucher-register] .app-table-titlebar :is(h2,.app-table-count){font-size:24px!important;line-height:32px}
 
 
 [data-voucher-register] .voucher-select:focus-visible{outline:2px solid #0073bb;outline-offset:3px}
