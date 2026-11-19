@@ -1,11 +1,10 @@
 <%@ page pageEncoding="UTF-8" %>
-<c:set var="multipleAccountChoices" value="${not empty accounts and accounts.size() gt 1}" />
 <c:choose>
 <c:when test="${empty accounts}"><p class="fs-layout-empty" role="status"><spring:message code="fs.layout.noAvailableAccounts" /></p></c:when>
 <c:otherwise>
 <label for="layout-accounts" class="sr-only"><spring:message code="fs.layout.accounts" /></label>
-<form:select path="accounts" id="layout-accounts" cssClass="aws-control fs-layout-account-select" multiple="true"
-        size="${accounts.size() lt 4 ? accounts.size() : 4}" aria-describedby="${multipleAccountChoices ? 'layout-accounts-hint' : ''}">
+<form:select path="accounts" id="layout-accounts" cssClass="aws-control" multiple="true" data-searchable="true"
+        size="${accounts.size() lt 4 ? accounts.size() : 4}">
     <c:forEach items="${accounts}" var="account">
         <form:option value="${account.id}"><c:out value="${account.name}" /> · <c:out value="${account.code}" /> · <spring:message code="accounting.option.${account.type}" /></form:option>
     </c:forEach>
@@ -13,4 +12,3 @@
 </c:otherwise>
 </c:choose>
 <form:errors path="accounts" cssClass="coa-error" />
-<c:if test="${multipleAccountChoices}"><p class="fs-layout-account-hint" id="layout-accounts-hint"><spring:message code="fs.layout.selectMultiple" /></p></c:if>

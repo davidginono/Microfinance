@@ -99,11 +99,15 @@
             }
 
             const options = Array.from(select.options);
+            const selectedOptions = options.filter(option => option.selected);
             const selectedOption = options[select.selectedIndex] || options.find(function (option) {
                 return option.selected;
             }) || options[0] || null;
-            const selectedLabel = selectedOption ? selectedOption.textContent.trim() : '';
-            const placeholderSelected = selectedOption != null && selectedOption.value === '' && !select.value && selectedOption.dataset.emptyOption !== 'true';
+            const selectedLabel = select.multiple
+                ? selectedOptions.map(option => option.textContent.trim()).join(', ')
+                : selectedOption ? selectedOption.textContent.trim() : '';
+            const placeholderSelected = select.multiple ? !selectedOptions.length
+                : selectedOption != null && selectedOption.value === '' && !select.value && selectedOption.dataset.emptyOption !== 'true';
             const query = (state.search?.value || '').trim().toLocaleLowerCase();
             const visibleOptions = options.filter(function (option) {
                 return !option.hidden && option.dataset.placeholder !== 'true'
@@ -165,16 +169,21 @@
                 } else {
                     item.setAttribute('aria-selected', 'false');
                 }
-                item.addEventListener('click', function () {
-                    if (item.disabled || state.loading || !option.isConnected || option.closest('select') !== select) {
+                item.addEventListener('click', function (event) {
+                    if (item.disabled || select.matches(':disabled') || state.loading || !option.isConnected || option.closest('select') !== select) {
                         return;
                     }
-                    select.value = option.value;
+                    if (select.multiple) {event.stopPropagation();option.selected = !option.selected;}
+                    else select.value = option.value;
                     state.wrapper.classList.remove('neo-select--invalid');
                     renderEnhancedSelect(select);
                     dispatchSelectionEvents(select);
-                    closeEnhancedSelect(state);
-                    state.button.focus({ preventScroll: true });
+                    if (select.multiple) {
+                        state.list.querySelector('[data-option-index="' + index + '"]')?.focus({ preventScroll: true });
+                    } else {
+                        closeEnhancedSelect(state);
+                        state.button.focus({ preventScroll: true });
+                    }
                 });
                 item.addEventListener('keydown', function (event) {
                     if (event.key === 'ArrowDown') {
@@ -274,7 +283,7 @@
         }
 
         function enhanceSelect(select) {
-            if (!select || select.dataset.neoEnhanced === 'true' || select.multiple || select.size > 1 || select.closest('.neo-select') || select.type === 'hidden' || select.dataset.nativeSelect === 'true') {
+            if (!select || select.dataset.neoEnhanced === 'true' || (select.multiple ? select.dataset.searchable !== 'true' : select.size > 1) || select.closest('.neo-select') || select.type === 'hidden' || select.dataset.nativeSelect === 'true') {
                 return;
             }
 
@@ -303,6 +312,7 @@
             menu.setAttribute('data-neo-select-menu', 'true');
             menu.hidden = true;
             const list = document.createElement('div'); list.className = 'neo-select-options'; list.setAttribute('role','listbox');
+            if (select.multiple) list.setAttribute('aria-multiselectable', 'true');
             list.id = 'neo-select-options-' + (++selectSerial); button.setAttribute('aria-controls',list.id);
             const label = select.getAttribute('aria-label') || Array.from(select.labels).map(label => Array.from(label.childNodes).filter(node=>node.nodeType===3).map(node=>node.textContent).join('').trim()).filter(Boolean).join(' ') || select.name;
             button.setAttribute('aria-label',label); list.setAttribute('aria-label',label);

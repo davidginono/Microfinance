@@ -11,10 +11,7 @@
 .fs-layout-translation summary{cursor:pointer;font-weight:600;padding:8px 0}
 .fs-layout-translation[open]>:not(summary){margin-top:12px}
 .fs-layout-translation label{display:flex;flex-direction:column;gap:4px;min-width:0}
-.fs-layout-form .fs-layout-account-select{height:auto!important;overscroll-behavior:contain}
-.fs-layout-account-hint{margin:4px 0 0;color:#545b64;font-size:13px}
 .fs-layout-form [hidden]{display:none!important}
-@media(pointer:coarse){.fs-layout-account-hint{display:none}}
 .fs-layout-figures{display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px}
 .fs-layout-figures label,.fs-layout-check{display:flex;align-items:flex-start;gap:8px;min-width:0}
 .fs-layout-figures input,.fs-layout-check input{flex:none;margin-top:3px;accent-color:#0073bb}

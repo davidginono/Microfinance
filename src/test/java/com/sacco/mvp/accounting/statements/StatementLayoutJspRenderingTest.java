@@ -67,7 +67,7 @@ class StatementLayoutJspRenderingTest {
         try{
             tomcat.getConnector();tomcat.start();var client=HttpClient.newHttpClient();String base="http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/fixture?";
             String group=page(client,base+"kind=group&edit=true&error=true");
-            assertThat(element(group,"select","accounts")).contains("multiple=\"multiple\"","aria-describedby=\"layout-accounts-hint\"");
+            assertThat(element(group,"select","accounts")).contains("multiple=\"multiple\"","data-searchable=\"true\"");
             assertThat(group).contains("value=\""+capital+"\" selected=\"selected\"","value=\""+reserve+"\" selected=\"selected\"",
                 "Capital &lt;safe&gt;","311001 · Equity","Retain entered reason","data-field-error-for=\"reason\"","data-workspace-response-error")
                 .doesNotContain("type=\"search\"","name=\"accounts\" type=\"checkbox\"");

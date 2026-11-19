@@ -71,6 +71,38 @@ test('large static lists acquire search automatically, while small enums and nat
     dom.window.close();
 });
 
+test('searchable multiple selects toggle accounts without losing other selections or native form values',async()=>{
+    const {dom,w,d}=await setup('<form><label for="accounts">Accounts</label><select id="accounts" name="accounts" multiple size="4" data-searchable="true"><option value="capital">Capital</option><option value="reserve">Reserve</option><option value="bank">Bank</option></select><input name="reason" value="Keep this reason"></form>');
+    try{
+        const select=d.querySelector('select'),button=d.querySelector('.neo-select-button');let changes=0,submits=0;
+        select.addEventListener('change',()=>changes++);d.querySelector('form').addEventListener('submit',event=>{event.preventDefault();submits++;});
+        assert.equal(button.textContent.trim(),'Select an option');assert.equal(d.querySelector('.neo-select-options').getAttribute('aria-multiselectable'),'true');
+        button.click();const search=d.querySelector('.neo-select-search input');
+        for(const query of ['capital','reserve']){search.value=query;search.dispatchEvent(new w.Event('input'));d.querySelector('.neo-select-option').click();assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(d.activeElement.getAttribute('aria-selected'),'true');}
+        assert.deepEqual(Array.from(new w.FormData(d.querySelector('form')).getAll('accounts')),['capital','reserve']);
+        assert.equal(button.textContent.trim(),'Capital, Reserve');assert.equal(changes,2);assert.equal(submits,0);
+        search.value='capital';search.dispatchEvent(new w.Event('input'));d.querySelector('.neo-select-option').click();
+        assert.deepEqual(Array.from(select.selectedOptions,option=>option.value),['reserve']);assert.equal(button.textContent.trim(),'Reserve');
+        search.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(d.querySelector('.neo-select-menu').hidden,true);assert.equal(d.activeElement,button);assert.equal(d.querySelector('[name=reason]').value,'Keep this reason');
+    }finally{dom.window.close();}
+});
+
+test('multiple selects retain saved values, disabled choices and reset state through the shared control',async()=>{
+    const {dom,w,d}=await setup('<form><select name="accounts" multiple data-searchable="true"><option value="capital" selected>Capital</option><option value="reserve" selected>Reserve</option><optgroup disabled label="Unavailable"><option value="bank">Bank</option></optgroup></select></form>');
+    try{
+        const select=d.querySelector('select'),button=d.querySelector('.neo-select-button');assert.equal(button.textContent.trim(),'Capital, Reserve');button.click();
+        const bank=d.querySelector('[data-option-index="2"]');assert.equal(bank.disabled,true);bank.click();assert.equal(select.selectedOptions.length,2);
+        d.querySelector('[data-option-index="0"]').click();assert.equal(button.textContent.trim(),'Reserve');
+        d.querySelector('form').reset();w.refreshEnhancedSelects();assert.equal(button.textContent.trim(),'Capital, Reserve');
+        select.disabled=true;await tick();assert.equal(button.disabled,true);assert.equal(d.querySelector('.neo-select-menu').hidden,true);
+    }finally{dom.window.close();}
+});
+
+test('multiple native lists remain unchanged unless searchable enhancement is requested',async()=>{
+    const {dom,d}=await setup('<select id="native-multiple" multiple><option>Capital</option><option>Reserve</option></select><select id="opt-out" multiple data-searchable="true" data-native-select="true"><option>Bank</option></select>');
+    try{assert.equal(d.querySelector('.neo-select'),null);assert.equal(d.querySelector('#native-multiple').dataset.neoEnhanced,undefined);assert.equal(d.querySelector('#opt-out').dataset.neoEnhanced,undefined);}finally{dom.window.close();}
+});
+
 test('an explicit All choice remains selectable after remote activity loading and restores an empty filter',async()=>{
     const markup=loan.replace('data-category="clients"','data-category="activities" data-choice-url="/reports/financial/sl-gl-reconciliation/activities"')
         .replace('<option value="">Select an option</option>','<option value="" data-empty-option="true">All activities</option>');
