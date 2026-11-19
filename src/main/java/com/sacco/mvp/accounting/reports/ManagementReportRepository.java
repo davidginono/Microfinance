@@ -44,6 +44,7 @@ public class ManagementReportRepository {
             sum(CASE WHEN j.account_code='LOAN_PRINCIPAL' THEN j.debit-j.credit ELSE 0 END) principal,
             sum(CASE WHEN j.account_code='INTEREST_COLLECTIONS_CLEARING' THEN j.debit-j.credit ELSE 0 END) interest,
             sum(CASE WHEN j.account_code=CASE t.channel WHEN 'CASH' THEN 'CASH_CLEARING' WHEN 'BANK' THEN 'BANK_CLEARING'
+              WHEN 'CASH_EQUIVALENTS' THEN 'CASH_EQUIVALENTS_CLEARING'
               ELSE 'MOBILE_MONEY_CLEARING' END THEN j.debit-j.credit ELSE 0 END) receiving,
             bool_and(j.loan_application_id=t.loan_application_id AND j.voucher_id=t.id
               AND j.effective_date=t.payment_date AND j.posted_at<=:cutoff) owned

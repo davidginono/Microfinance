@@ -804,6 +804,11 @@ class LoanRecordingPostgresTest {
             .hasMessage("batch.error.importLoan");
         assertThat(batches().get(actor, batch).receipts()).isZero();
         assertThat(batches().importDrafts(actor, batch, cash, List.of(entry))).isEqualTo(1);
+        var imported = batches().items(actor, batch, 0, "").rows().getFirst();
+        imported.form().setReference("DO-NOT-REPLACE");
+        var edited = batches().save(actor, batch, imported.id(),
+            new com.sacco.mvp.accounting.batch.dto.ReceiptBatchDtos.SaveItem(imported.version(), imported.form()));
+        assertThat(edited.form().getReference()).isEqualTo(entry.reference());
         assertThatThrownBy(() -> batches().importDrafts(actor, batch, cash, List.of(entry)))
             .hasMessage("batch.error.importReference");
         assertThat(batches().get(actor, batch).posted()).isZero();
@@ -829,6 +834,47 @@ class LoanRecordingPostgresTest {
     UUID futureLoan(String reference){
         var form=form();form.setApplicationDate(TODAY);form.setFirstPaymentDate(null);var id=service.save(actor,form);
         var funding=post(id,"1000.00",reference);funding.setEffectiveDate(TODAY);funding.setFirstPaymentDate(TODAY.plusMonths(1));service.disburse(actor,funding);return id;
+    }
+    @Test void batchReceiptsUseCashFamilyAccountsAndShowOutstandingPrincipalBeforeTheFirstDueDate(){
+        var root=account("100000","ASSET","DEBIT","HEADING","OTHER");
+        var current=statementGroup(root,"110000","Current assets");
+        jdbc.update("insert into gl_account_reporting_section values(?,?,'CURRENT_ASSETS')",current,institution);
+        var heading=statementGroup(current,"111000","Cash and cash equivalents");
+        var receiving=UUID.randomUUID();
+        jdbc.update("""
+            insert into gl_account(id,sacco_id,code,name,type,normal_balance,kind,purpose,parent_id,maker_id,created_at)
+            values(?,?,'111001','Synthetic cash equivalent','ASSET','DEBIT','POSTING','OTHER',?,?,now())
+            """,receiving,institution,heading,actor.getMemberId());
+        var outside=account("OTHER-ASSET","ASSET","DEBIT","POSTING","OTHER");
+        assertThat(service.choices(actor,"money","",0)).extracting(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice::id)
+            .containsExactlyInAnyOrder(cash,receiving);
+        assertThatThrownBy(()->service.receiptMoneyAccount(actor,outside)).hasMessage("recording.error.account");
+
+        var loan=futureLoan("D-BATCH-CASH-EQUIVALENTS");
+        var balances=batches().balances(actor,loan,TODAY).getFirst();
+        assertThat(balances.outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(balances.duePrincipal()).isZero();
+        assertThat(balances.dueInterest()).isZero();
+        assertThat(batches().balances(actor,loan,TODAY.minusDays(1)).getFirst().totalLoanOutstanding()).isNull();
+        assertThatThrownBy(()->batches().balances(operator("B2"),loan,TODAY)).isInstanceOf(AccessDeniedException.class);
+
+        var batch=batches().create(actor,"Cash-family collections");
+        var form=receiptForm(loan);
+        form.setReference(null);
+        form.setMoneyAccountId(receiving);
+        var item=batchItem(batch,form);
+        processBatch(batch,false);
+        assertThat(batches().get(actor,batch).ready()).isEqualTo(1);
+        processBatch(batch,true);
+        var saved=batches().items(actor,batch,0,"").rows().getFirst();
+        assertThat(saved.state()).isEqualTo("POSTED");
+        assertThat(saved.form().getReference()).isEqualTo("BATCH/"+item);
+        var receipt=receiptService().find(actor,saved.receiptId()).orElseThrow();
+        assertThat(receipt.header().moneyAccountId()).isEqualTo(receiving);
+        assertThat(receipt.header().reference()).isEqualTo(saved.form().getReference());
+        assertThat(jdbc.queryForObject("select channel from loan_repayment_transactions where loan_application_id=? and kind='PAYMENT'",String.class,loan)).isEqualTo("CASH_EQUIVALENTS");
+        receiptService().reverse(operator("B1"),saved.receiptId(),UUID.randomUUID(),TODAY,"Synthetic account correction");
+        assertThat(batches().balances(actor,loan,TODAY).getFirst().outstandingPrincipal()).isEqualByComparingTo("1000.00");
     }
     @Test void arbitraryEarlyReceiptAllocatesPrincipalAndReversalRestoresFutureInstalments(){
         var loan=futureLoan("D-FUTURE-RECEIPT");var form=receiptForm(loan);form.getRows().getFirst().setAmount(new BigDecimal("237.19"));
@@ -907,7 +953,10 @@ class LoanRecordingPostgresTest {
         processBatch(batch,false);processBatch(batch,true);assertThat(batches().get(actor,batch).posted()).isEqualTo(2);assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isEqualTo(2);
     }
     @Test void duplicateCollectionReferencesFailBatchValidationBeforeMoneyIsPosted(){
-        seedHistoricalPolicy();var loan=disbursed("D-BATCH-DUP");var batch=batches().create(actor,"Duplicate reference");var first=receiptForm(loan);var second=receiptForm(loan);second.setReference(first.getReference());batchItem(batch,first);batchItem(batch,second);processBatch(batch,false);
+        seedHistoricalPolicy();var loan=disbursed("D-BATCH-DUP");var batch=batches().create(actor,"Duplicate reference");
+        batchItem(batch,receiptForm(loan));batchItem(batch,receiptForm(loan));
+        jdbc.update("update receipt_batch_item set form_json=jsonb_set(form_json,'{reference}',to_jsonb('LEGACY-REFERENCE'::text)) where batch_id=?",batch);
+        processBatch(batch,false);
         assertThat(batches().get(actor,batch).failed()).isEqualTo(2);assertThat(batches().items(actor,batch,0,"").rows()).allMatch(i->i.failureKey().equals("batch.error.duplicate"));assertThat(batches().get(actor,batch).posted()).isZero();
     }
     @Test void systemActivityAndTransactionsCannotBeModifiedOrUsedAsOrdinaryTemplates(){

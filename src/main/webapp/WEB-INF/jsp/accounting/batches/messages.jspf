@@ -1,7 +1,7 @@
-<div hidden data-batch-messages><c:forEach items="${['client','date','loan','balances','amount','reference','status','choose','transactions','transaction','addTransaction','removeTransaction','removeReceipt','receivingAccount','evidence','details','totalLoanOutstanding','principalDue','interestDue','principal','interest','after','allocation','recordedPreview','batchPreview','saving','savedStatus','unsaved','saveFailed','lookupFailed','empty','loading','page','ready','posted','failed','remaining','total','policyVersion','order.INTEREST_FIRST','order.PRINCIPAL_FIRST','state.DRAFT','state.READY','state.VALIDATING','state.POSTING','state.COMPLETED','state.PARTIAL','state.CANCELLED','state.FAILED','state.POSTED','error.failed','postTitle','postMessage','postConfirm','cancel','unsavedLeave']}" var="key"><span data-message="${key}"><spring:message code="batch.${key}" /></span></c:forEach></div>
+<div hidden data-batch-messages><c:forEach items="${['client','date','loan','balances','amount','status','choose','transactions','transaction','addTransaction','removeTransaction','removeReceipt','receivingAccount','evidence','details','totalLoanOutstanding','principalOutstanding','interestDue','principal','interest','after','allocation','recordedPreview','batchPreview','saving','savedStatus','unsaved','saveFailed','lookupFailed','empty','loading','page','ready','posted','failed','remaining','total','policyVersion','order.INTEREST_FIRST','order.PRINCIPAL_FIRST','state.DRAFT','state.READY','state.VALIDATING','state.POSTING','state.COMPLETED','state.PARTIAL','state.CANCELLED','state.FAILED','state.POSTED','error.failed','postTitle','postMessage','postConfirm','cancel','unsavedLeave']}" var="key"><span data-message="${key}"><spring:message code="batch.${key}" /></span></c:forEach></div>
 <div hidden data-batch-messages><span data-message="receipts"><spring:message code="batch.receiptRows" /></span></div>
 <div hidden data-batch-messages><c:forEach items="${['reloadTitle','reloadMessage','reload']}" var="key"><span data-message="${key}"><spring:message code="batch.${key}" /></span></c:forEach></div>
-<div hidden data-batch-messages><c:forEach items="${['recordedBalances','projectedBalances','beforePosting']}" var="key"><span data-message="${key}"><spring:message code="batch.${key}" /></span></c:forEach></div>
+<div hidden data-batch-messages><c:forEach items="${['projectedTotal','totalBeforePayment']}" var="key"><span data-message="${key}"><spring:message code="batch.${key}" /></span></c:forEach></div>
 
 <div hidden data-batch-messages>
     <span data-message="field.client"><spring:message code="batch.field.client" text="Client unavailable in this branch." /></span>
@@ -26,7 +26,6 @@
     <span data-message="field.dateFormat"><spring:message code="batch.field.dateFormat" text="Enter a real DD/MM/YYYY date." /></span>
     <span data-message="field.dateFuture"><spring:message code="batch.field.dateFuture" text="Payment date is in the future." /></span>
     <span data-message="field.accountRequired"><spring:message code="batch.field.accountRequired" text="Select receiving account." /></span>
-    <span data-message="field.referenceRequired"><spring:message code="batch.field.referenceRequired" text="Enter collection reference." /></span>
     <span data-message="field.loanRequired"><spring:message code="batch.field.loanRequired" text="Select a loan." /></span>
     <span data-message="field.amountRequired"><spring:message code="batch.field.amountRequired" text="Enter payment amount." /></span>
     <span data-message="field.amountPositive"><spring:message code="batch.field.amountPositive" text="Amount must be above zero." /></span>
@@ -40,6 +39,5 @@
     <span data-message="field.opening"><spring:message code="batch.field.opening" text="Loan opening balance is unverified." /></span>
     <span data-message="field.schedule"><spring:message code="batch.field.schedule" text="Loan schedule cannot be verified." /></span>
     <span data-message="field.duplicateLoan"><spring:message code="batch.field.duplicateLoan" text="Loan already used in this receipt." /></span>
-    <span data-message="field.referenceLength"><spring:message code="batch.field.referenceLength" text="Reference exceeds 80 characters." /></span>
     <span data-message="linkAccounts"><spring:message code="batch.linkAccounts" /></span>
 </div>

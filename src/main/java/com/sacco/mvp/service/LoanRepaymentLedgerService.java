@@ -228,6 +228,7 @@ public class LoanRepaymentLedgerService {
     @Transactional
     public Receipt post(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
         requireStaff(actor, UserClaim.LOAN_REPAYMENTS_CREATE);
+        require(command.channel()!=LoanRepaymentTransaction.Channel.CASH_EQUIVALENTS,"channel");
         return postInternal(loanId, actor, command);
     }
 
@@ -534,6 +535,7 @@ public class LoanRepaymentLedgerService {
             case CASH -> "CASH_CLEARING";
             case BANK -> "BANK_CLEARING";
             case MOBILE_MONEY -> "MOBILE_MONEY_CLEARING";
+            case CASH_EQUIVALENTS -> "CASH_EQUIVALENTS_CLEARING";
             case INTERNAL -> "TOPUP_CLEARING";
         };
         List<LoanJournalEntry> lines = new ArrayList<>();

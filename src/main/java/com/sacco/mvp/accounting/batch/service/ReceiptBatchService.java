@@ -43,6 +43,17 @@ public class ReceiptBatchService {
     public Page<Item> items(AppUserPrincipal a,UUID id,int page,String state){authorize(a,false);query("",page);require(Set.of("","DRAFT","READY","FAILED","POSTED").contains(state),"input");find(a,id,false);var rows=repository.items(id,page,state);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
 
     @Transactional(readOnly = true)
+    public List<Balances> balances(AppUserPrincipal actor, UUID loanId, LocalDate date) {
+        authorize(actor, true);
+        return loans.receiptLoans(actor, List.of(loanId), date).stream().map(loan -> {
+            boolean available = loan.disbursed() != null && !date.isBefore(loan.disbursed())
+                && !date.isAfter(clock.today()) && (loan.lastPayment() == null || !date.isBefore(loan.lastPayment()));
+            return new Balances(loan.id(), loan.number(), available ? loan.outstandingPrincipal() : null,
+                available ? loan.duePrincipal() : null, available ? loan.dueInterest() : null);
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
     public Batch spreadsheetBatch(AppUserPrincipal actor, UUID id) {
         authorize(actor, true);
         return spreadsheetBatch(actor, id, false);
@@ -93,14 +104,13 @@ public class ReceiptBatchService {
             form.setClientId(loan.clientId());
             form.setMoneyAccountId(accountId);
             form.setEffectiveDate(input.date());
-            form.setReference(input.reference());
             String loanLabel = loan.number() + " - " + loan.product();
             var payment = new RowForm();
             payment.setLoanId(loan.id());
             payment.setAmount(input.amount());
             payment.setDescription(loanLabel);
             form.setRows(List.of(payment));
-            drafts.add(new ImportedDraft(canonical(UUID.randomUUID(), form), loan.clientNumber() + " - " + loan.client(),
+            drafts.add(new ImportedDraft(canonical(UUID.randomUUID(), form, input.reference()), loan.clientNumber() + " - " + loan.client(),
                 Map.of(loan.id(), loanLabel, accountId, account.label())));
         }
         repository.insertImportedDrafts(batch, drafts);
@@ -119,7 +129,8 @@ public class ReceiptBatchService {
     public Item save(AppUserPrincipal a,UUID batch,UUID id,SaveItem input){
         authorize(a,true);var b=editable(a,batch);require(!repository.payrollLinked(batch),"payroll");require(input!=null && input.form()!=null,"input");var prior=repository.item(batch,id);require(prior.isEmpty() || (!prior.get().state().equals("POSTED") && prior.get().version()==input.expectedVersion()),"stale");
         require(prior.isPresent() || input.expectedVersion()==0,"stale");require(prior.isPresent() || repository.summary(b).receipts()<1000,"limit");
-        Form f=canonical(id,input.form());int existing=prior.map(p->p.form().getRows().size()).orElse(0);require(repository.transactions(batch)-existing+f.getRows().size()<=2000,"limit");
+        String reference=prior.map(p->p.form().getReference()).filter(r->!r.isBlank()).orElse("BATCH/"+id);
+        Form f=canonical(id,input.form(),reference);int existing=prior.map(p->p.form().getRows().size()).orElse(0);require(repository.transactions(batch)-existing+f.getRows().size()<=2000,"limit");
         var labels=new HashMap<>(receipts.selected(a,f));if(f.getMoneyAccountId()!=null)labels.put(f.getMoneyAccountId(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label());String client=f.getClientId()==null?"":loans.receiptClient(a,f.getClientId()).label();
         for(var row:f.getRows())if(row.getLoanId()!=null && row.getDescription().isBlank())row.setDescription(labels.getOrDefault(row.getLoanId(),""));
         BigDecimal total=f.getRows().stream().map(RowForm::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);require(total.precision()-total.scale()<=16,"input");
@@ -170,9 +181,9 @@ public class ReceiptBatchService {
     private Batch editable(AppUserPrincipal a,UUID id){return editable(a,id,true);}
     private Batch editable(AppUserPrincipal a,UUID id,boolean lock){var b=find(a,id,lock);owner(a,b);require(!Set.of("VALIDATING","POSTING","COMPLETED").contains(b.state()),"busy");return b;}
     private static void owner(AppUserPrincipal a,Batch b){if(!a.getMemberId().equals(b.owner()))throw new AccessDeniedException("Batch owner required");}
-    private static Form canonical(UUID id,Form source){
+    private static Form canonical(UUID id,Form source,String reference){
         require(source.getRows()!=null && !source.getRows().isEmpty() && source.getRows().size()<=50,"limit");var f=new Form();f.setRequestKey(id);f.setReceiptPurpose("LOAN_REPAYMENT");f.setClientId(source.getClientId());f.setEffectiveDate(source.getEffectiveDate());f.setMoneyAccountId(source.getMoneyAccountId());
-        f.setReference(text(source.getReference(),80));f.setDescription(text(source.getDescription(),500));f.setEvidence(text(source.getEvidence(),500));var rows=new ArrayList<RowForm>();
+        f.setReference(text(reference,80));f.setDescription(text(source.getDescription(),500));f.setEvidence(text(source.getEvidence(),500));var rows=new ArrayList<RowForm>();
         for(var input:source.getRows()){require(input!=null && input.getTransactionId()==null && input.getDebitAccountId()==null && input.getCreditAccountId()==null && input.getTemplateKey()==null,"input");var r=new RowForm();r.setLoanId(input.getLoanId());r.setAmount(input.getAmount());require(r.getAmount()==null || (r.getAmount().scale()>=-16 && r.getAmount().scale()<=2 && (long)r.getAmount().precision()-r.getAmount().scale()<=16),"input");if(r.getAmount()!=null)r.setAmount(r.getAmount().setScale(2));r.setDescription(text(input.getDescription(),500));rows.add(r);}f.setRows(rows);return f;
     }
     private static String text(String value,int max){String s=value==null?"":value.strip();require(s.length()<=max && s.chars().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t'),"input");return s;}

@@ -501,7 +501,8 @@ public class LoanRecordingService {
         records.ticket(a,id,"PAYMENT",f,hash,journal,null,money,principal,interest,now);
         var feeLines=charges.collect(a,f.getLoanId(),"COLLECT",allocation.charges(),f.getEffectiveDate(),journal,id,f.getEvidence(),f.getNotes());
         var debtAmount=f.getAmount().subtract(allocation.charges());
-        var receipt=debtAmount.signum()==0?null:repayments.postRecorded(f.getLoanId(),a,new LoanRepaymentLedgerService.PaymentCommand(debtAmount,f.getEffectiveDate(),LoanRepaymentTransaction.Channel.valueOf(money.purpose()),f.getReference().strip(),f.getRequestKey(),policy.id(),false));
+        var channel="OTHER".equals(money.purpose())?LoanRepaymentTransaction.Channel.CASH_EQUIVALENTS:LoanRepaymentTransaction.Channel.valueOf(money.purpose());
+        var receipt=debtAmount.signum()==0?null:repayments.postRecorded(f.getLoanId(),a,new LoanRepaymentLedgerService.PaymentCommand(debtAmount,f.getEffectiveDate(),channel,f.getReference().strip(),f.getRequestKey(),policy.id(),false));
         loans.flush();
         check(allocation.interest().signum()==0 || interest!=null,"interestAccount");var lines=new ArrayList<Object[]>();lines.add(new Object[]{money.id(),f.getAmount(),ZERO});
         if(allocation.principal().signum()>0)lines.add(new Object[]{principal.id(),ZERO,allocation.principal()});if(allocation.interest().signum()>0)lines.add(new Object[]{interest.id(),ZERO,allocation.interest()});lines.addAll(feeLines);

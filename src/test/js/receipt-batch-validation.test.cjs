@@ -11,7 +11,7 @@ async function setup(estimate,patch={},realWidgets=false){
     <section class="erp-resource-section"><h2>Batch details</h2><dl class="erp-detail-facts" data-batch-summary></dl></section><div data-batch-error hidden></div>
     <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2>Receipts</h2><div class="accounting-actions"><button data-batch-refresh data-aws-table-refresh>Refresh</button><button data-batch-add></button><button data-batch-save></button></div></div><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
     <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label>Date<input data-default-date value="2026-10-19"></label><label>Account<select data-default-account data-batch-choice="money"></select></label><label>Show<select data-batch-filter></select></label></div>
-    <div class="erp-table-scroll batch-grid-scroll"><table class="erp-table" data-table-sort-mode="none"><thead><tr>${Array.from({length:9},(_,i)=>`<th data-table-identifier>Column ${i}</th>`).join('')}</tr></thead><tbody data-batch-rows></tbody></table></div></section><span data-batch-progress></span>
+    <div class="erp-table-scroll batch-grid-scroll"><table class="erp-table" data-table-sort-mode="none"><thead><tr>${Array.from({length:8},(_,i)=>`<th data-table-identifier>Column ${i}</th>`).join('')}</tr></thead><tbody data-batch-rows></tbody></table></div></section><span data-batch-progress></span>
     <div data-batch-confirm hidden><div role="dialog"><h2 id="batch-confirm-title"></h2><p data-confirm-message></p><div class="app-modal-actions"><button data-confirm-cancel></button><button data-confirm-post></button></div></div></div>
     <div data-batch-messages>${Object.entries(messages).map(([key,value])=>`<span data-message="${key}">${value}</span>`).join('')}</div>
   </main></body>`,{url:'http://localhost/finance/batches/receipts/batch',runScripts:'outside-only'});
@@ -79,13 +79,27 @@ test('failed table refresh preserves receipt values and recovers through the sha
     assert.equal(d.querySelector('input[type="number"]').value,'500.00');
   }finally{w.close();}
 });
-test('balances show total loan outstanding and retain the separate amounts due before and after preview',async()=>{
-  const line={loanNumber:'LN-001',outstandingPrincipal:'1000.00',duePrincipal:'100.00',dueInterest:'25.50',totalLoanOutstanding:'1025.50',principal:'24.50',interest:'25.50',principalBalance:'975.50'};
+test('balances show only the outstanding amounts and interest due, including a genuine zero',async()=>{
+  const line={loanId:'loan',loanNumber:'LN-001',outstandingPrincipal:'1000.00',duePrincipal:'0.00',dueInterest:'0.00',totalLoanOutstanding:'1000.00',principal:'50.00',interest:'0.00',principalBalance:'950.00'};
   const {dom,d,edit,save}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'Cash',lines:[line]})));
   try{
-    const balance=()=>d.querySelector('.batch-row td:nth-child(4)').textContent;
-    assert.match(balance(),/totalLoanOutstanding 1,025.50/);assert.match(balance(),/principalDue 100.00/);assert.match(balance(),/interestDue 25.50/);assert.doesNotMatch(balance(),/principalOutstanding/);
-    await edit('50.00');await save();assert.match(balance(),/totalLoanOutstanding 1,025.50/);assert.match(balance(),/principalDue 100.00/);assert.match(balance(),/interestDue 25.50/);
+    const balance=()=>[...d.querySelectorAll('.batch-row .batch-balance > *')].map(node=>node.textContent);
+    assert.deepEqual(balance(),['totalLoanOutstanding','1,025.50','principalOutstanding','1,000.00','interestDue','25.50']);
+    await edit('50.00');await save();
+    assert.deepEqual(balance(),['totalLoanOutstanding','1,000.00','principalOutstanding','1,000.00','interestDue','0.00']);
+    assert.equal(d.querySelector('.batch-row').cells.length,8);
+  }finally{dom.window.close();}
+});
+test('missing loan balances remain unavailable after the payment date changes',async()=>{
+  const {dom,w,d}=await setup(()=>{});
+  try{
+    const original=w.fetch;
+    w.fetch=async(url,options)=>url.includes('date=2026-10-18')
+      ? {ok:true,headers:{get:()=> 'application/json'},json:async()=>[{}]}
+      : original(url,options);
+    const date=d.querySelector('.batch-row input[type="date"]');
+    date.value='2026-10-18';date.dispatchEvent(new w.Event('change'));await settle();
+    assert.deepEqual([...d.querySelectorAll('.batch-balance dd')].map(node=>node.textContent),['—','—','—']);
   }finally{dom.window.close();}
 });
 test('retained errors are short, field-specific and accessible under the date control',async()=>{
@@ -121,7 +135,7 @@ test('editing while an older estimate is pending prevents its stale error return
 test('loan account errors sit below Loan ID rather than the status or amount',async()=>{
   const {dom,d}=await setup(()=>{},{failureKey:'recording.error.loanAccountsMissing'});try{
     const [issue]=visible(d);assert.equal(issue.textContent,'This existing loan needs its configured product accounts linked.');assert.equal(issue.closest('td').dataset.label,'loan');
-    assert.equal(d.querySelector('.batch-row td:last-child .batch-field-error'),null);
+    assert.equal(d.querySelector('.batch-row td:last-child .batch-field-error:not([hidden])'),null);
   }finally{dom.window.close();}
 });
 
@@ -137,7 +151,7 @@ test('configured account linking retries the saved receipt estimate without chan
 test('required fields have independent messages and reveal a missing receiving account',async()=>{
   const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:null,reference:'',rows:[{loanId:'loan',amount:null,description:''}]};
   const {dom,d}=await setup(()=>{},{failureKey:'voucher.error.text',form});try{
-    assert.deepEqual(visible(d).map(issue=>issue.textContent).sort(),['Select receiving account.','Enter payment amount.','Enter collection reference.'].sort());
+    assert.deepEqual(visible(d).map(issue=>issue.textContent).sort(),['Select receiving account.','Enter payment amount.'].sort());
     assert.equal(d.querySelector('.batch-detail-row').hidden,true);assert.equal(d.querySelector('.batch-expand').getAttribute('aria-expanded'),'false');
     assert.equal(d.querySelector('[aria-label="receivingAccount"]').closest('tr').className,'batch-row');
     assert.equal(new Set([...d.querySelectorAll('.batch-field-error')].map(issue=>issue.id)).size,d.querySelectorAll('.batch-field-error').length);
@@ -152,7 +166,7 @@ test('clearing a receipt account uses the batch default while explicit overrides
     assert.equal(calls.at(-1).moneyAccountId,'mobile');assert.equal(account.value,'mobile');
     account.value='';account.dispatchEvent(new w.Event('change'));await save();
     assert.equal(calls.at(-1).moneyAccountId,'bank');assert.equal(account.value,'bank');assert.equal(account.selectedOptions[0].textContent,'Bank');
-    assert.equal(calls.at(-1).reference,'RV-009');assert.equal(calls.at(-1).rows[0].amount,'500.00');
+    assert.equal(Object.hasOwn(calls.at(-1),'reference'),false);assert.equal(calls.at(-1).rows[0].amount,'500.00');
   }finally{dom.window.close();}
 });
 test('choosing a batch default fills an empty receipt account without replacing a saved account',async()=>{

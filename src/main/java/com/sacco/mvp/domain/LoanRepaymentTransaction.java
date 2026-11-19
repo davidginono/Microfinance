@@ -12,7 +12,7 @@ import java.util.UUID;
 @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class LoanRepaymentTransaction {
     public enum Kind { PAYMENT, REVERSAL, SETTLEMENT, SETTLEMENT_UNDO }
-    public enum Channel { CASH, BANK, MOBILE_MONEY, INTERNAL }
+    public enum Channel { CASH, BANK, MOBILE_MONEY, INTERNAL, CASH_EQUIVALENTS }
     @Id private UUID id;
     @Column(name = "loan_application_id", nullable = false) private UUID loanApplicationId;
     @Column(name = "sacco_id", nullable = false) private String saccoId;

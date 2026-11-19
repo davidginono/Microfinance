@@ -61,7 +61,9 @@ public class LoanRepaymentReceiptPdfService {
             new float[]{.06f,.44f,.30f,.20f},rows,label("voucher.print.amountWords",locale),VoucherPdfService.amountInWords(r.amount(),locale),
             List.of(field("voucher.print.totalAmount",money(r.amount(),locale),locale)),label("voucher.print.narration",locale),label("repayment.receipt",locale)+"\n"+Objects.toString(r.reason(),""),
             label("voucher.print.postingRecord",locale),posting,label("voucher.page",locale),label("voucher.continued",locale),logo,label("voucher.print.method",locale),
-            List.of(method("CASH",r.channel(),locale),method("BANK",r.channel(),locale),method("CHEQUE",r.channel(),locale),method("MOBILE_MONEY",r.channel(),locale))));
+            "CASH_EQUIVALENTS".equals(r.channel())
+                ? List.of(method("CASH_EQUIVALENTS",r.channel(),locale))
+                : List.of(method("CASH",r.channel(),locale),method("BANK",r.channel(),locale),method("CHEQUE",r.channel(),locale),method("MOBILE_MONEY",r.channel(),locale))));
     }
     private Field field(String key,String value,Locale locale){return new Field(label(key,locale),Objects.toString(value,""));}
     private Field method(String code,String channel,Locale locale){return field("voucher.print.method."+code,Boolean.toString(code.equals(channel)),locale);}
