@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category;
 
 public final class VoucherDtos {
     private VoucherDtos() {}
@@ -18,6 +19,12 @@ public final class VoucherDtos {
         private boolean pettyCash;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private UUID activityId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
+        private boolean equity;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private Category equityMovement;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+        private String equityReason="";
         private String receiptPurpose="OTHER";
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private String loanPayer;
@@ -42,7 +49,9 @@ public final class VoucherDtos {
     public record Entry(String side,Account account,BigDecimal amount) {
         public Entry reversed(){return new Entry("DEBIT".equals(side)?"CREDIT":"DEBIT",account,amount);}
     }
-    public record Account(UUID id,String code,String name,String purpose,boolean moneyEligible) {
+    public static List<Category> equityTypes(Type type){return Arrays.stream(Category.values()).filter(c->c!=Category.UNCLASSIFIED && (type==Type.JOURNAL || c!=Category.TRANSFER && c!=Category.EARNINGS_TRANSFER)).toList();}
+    public record Account(UUID id,String code,String name,String purpose,boolean moneyEligible,String type) {
+        public Account(UUID id,String code,String name,String purpose,boolean moneyEligible){this(id,code,name,purpose,moneyEligible,null);}
         public Account(UUID id,String code,String name,String purpose){this(id,code,name,purpose,Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose));}
     }
     public record Client(UUID id,String number,String name) {}
@@ -61,7 +70,13 @@ public final class VoucherDtos {
     public record Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
                           String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
                           String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
-                          String branchName,List<Transaction> transactions,UUID clientId,String clientNumber) {
+                          String branchName,List<Transaction> transactions,UUID clientId,String clientNumber,Category equityMovement) {
+        public Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
+                       String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
+                       String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
+                       String branchName,List<Transaction> transactions,UUID clientId,String clientNumber) {
+            this(id,number,type,effectiveDate,party,reference,description,evidence,moneyAccountId,total,transactionCount,journalId,postedBy,postedByName,postedAt,reversesId,reversedBy,institutionName,branchName,transactions,clientId,clientNumber,null);
+        }
         public Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
                        String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
                        String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,

@@ -65,6 +65,7 @@ public class VoucherPdfService {
         var posting=new ArrayList<Field>(List.of(field("voucher.postedBy",v.postedByName(),locale),
             field("voucher.postedAt",v.postedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),locale),
             field("voucher.status",label("voucher.status."+v.status(),locale),locale)));
+        if(v.equityMovement()!=null)posting.add(field("fs.setup.category",label("fs.movement."+v.equityMovement(),locale),locale));
         if(v.reversesId()!=null)posting.add(field("voucher.reversal",v.reference(),locale));
         if(v.reversedBy()!=null)posting.add(field("voucher.reversal",v.reversedBy().toString(),locale));
         var header=new ArrayList<Field>(List.of(field("voucher.print.number",v.number(),locale),field(receipt?"voucher.print.receiptDate":"voucher.print.paymentDate",v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),locale),field("voucher.print.branch",v.branchName(),locale)));
@@ -106,6 +107,7 @@ public class VoucherPdfService {
         void write()throws IOException{
             page();
             pair(label("voucher.date",locale),v.effectiveDate().format(DateTimeFormatter.ofPattern("dd/MM/uuuu")),label("voucher.reference",locale),v.reference());
+            if(v.equityMovement()!=null)paragraph(label("fs.setup.category",locale)+": "+label("fs.movement."+v.equityMovement(),locale),9,ink);
             if(!v.party().isBlank()){
                 section(label(v.type().name().equals("RECEIPT")?"voucher.print.payer":v.type().name().equals("PAYMENT")?"voucher.print.payee":"voucher.party",locale));
                 pair(label("voucher.print.name",locale),v.party(),label(v.moneyAccountId()==null?"voucher.type":"voucher.print.paymentDetails",locale),moneyAccount());

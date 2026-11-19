@@ -36,6 +36,14 @@ public class StatementSetupRepository {
         group by l.account_id,a.type order by l.account_id limit 2001
         """,(r,n)->new Movement(r.getObject("account_id",UUID.class),Category.UNCLASSIFIED,false,r.getBigDecimal("debit"),r.getBigDecimal("credit")),id,a.getSaccoId(),a.getStationId());}
     public int classificationVersion(AppUserPrincipal a,UUID id){return jdbc.queryForObject("select coalesce(max(version),0) from statement_equity_classification where sacco_id=? and station_id=? and journal_id=?",Integer.class,a.getSaccoId(),a.getStationId(),id);}
+    public Optional<Category> reversalClassification(AppUserPrincipal a,com.sacco.mvp.accounting.dto.VoucherDtos.Type type,UUID original,UUID reversal){return jdbc.query("""
+        select c.category from gl_journal r
+        join accounting_voucher v on v.journal_id=r.id and v.sacco_id=r.sacco_id and v.station_id=r.station_id
+        join statement_equity_classification c on c.journal_id=r.reverses_id and c.sacco_id=r.sacco_id and c.station_id=r.station_id
+        where r.id=? and r.reverses_id=? and r.sacco_id=? and r.station_id=? and r.state='POSTED'
+          and r.source_type='CORE_REVERSAL' and r.maker_id=? and v.type=?
+        order by c.version desc limit 1
+        """,(r,n)->Category.valueOf(r.getString(1)),reversal,original,a.getSaccoId(),a.getStationId(),a.getMemberId(),type.name()).stream().findFirst();}
     public boolean sameClassification(AppUserPrincipal a,UUID id,Category category,String reason){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from statement_equity_classification where sacco_id=? and station_id=? and journal_id=? and version=(select max(version) from statement_equity_classification where sacco_id=? and station_id=? and journal_id=?) and category=? and actor_id=? and reason=?)",Boolean.class,a.getSaccoId(),a.getStationId(),id,a.getSaccoId(),a.getStationId(),id,category.name(),a.getMemberId(),reason));}
     public void classify(AppUserPrincipal a,UUID id,int version,Category category,String reason){jdbc.update("insert into statement_equity_classification(sacco_id,station_id,journal_id,version,category,actor_id,reason) values(?,?,?,?,?,?,?)",a.getSaccoId(),a.getStationId(),id,version,category.name(),a.getMemberId(),reason);}
     public List<Movement> movements(UUID run,Parameters p){return jdbc.query("""

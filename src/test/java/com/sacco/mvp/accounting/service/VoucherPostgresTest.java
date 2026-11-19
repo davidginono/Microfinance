@@ -51,7 +51,7 @@ class VoucherPostgresTest {
   audit=mock(AuditService.class);claims=mock(UserClaimService.class);directory=mock(MemberDirectoryService.class);institutions=mock(SaccoRegistryService.class);
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate());when(clock.now()).thenReturn(now);
   var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
-  var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build()),ledger));
+  var raw=new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build()),ledger),new com.sacco.mvp.accounting.statements.service.EquityMovementService(new com.sacco.mvp.accounting.statements.repository.StatementSetupRepository(jdbc),ledger,audit));
   var proxy=new ProxyFactory(raw);proxy.setProxyTargetClass(true);proxy.addAdvice(new TransactionInterceptor(manager,new AnnotationTransactionAttributeSource()));service=(VoucherService)proxy.getProxy();
   workflowRepository=new com.sacco.mvp.accounting.approval.repository.VoucherWorkflowRepository(jdbc,JsonMapper.builder().findAndAddModules().build());
   var gate=new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger);
@@ -169,7 +169,7 @@ class VoucherPostgresTest {
   pettySetup();pettyTopup("100");
   var clock=mock(ApplicationClock.class);when(clock.today()).thenReturn(now.toLocalDate().plusDays(4));when(clock.now()).thenReturn(now.plusDays(4));
   var ledger=new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,clock,claims,directory,institutions);
-  var later=transactional(new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger)),tx.getTransactionManager());
+  var later=transactional(new VoucherService(new VoucherRepository(jdbc),ledger,clock,audit,JsonMapper.builder().findAndAddModules().build(),new com.sacco.mvp.accounting.approval.service.VoucherApprovalGate(workflowRepository,ledger),new com.sacco.mvp.accounting.statements.service.EquityMovementService(new com.sacco.mvp.accounting.statements.repository.StatementSetupRepository(jdbc),ledger,audit)),tx.getTransactionManager());
   var payment=pettyForm(Type.PAYMENT,"90");payment.setEffectiveDate(now.toLocalDate().plusDays(2));later.post(actor,Type.PAYMENT,payment);
   var funding=pettyForm(Type.JOURNAL,"100");funding.setEffectiveDate(now.toLocalDate().plusDays(3));funding.getRows().getFirst().setDebitAccountId(cash);funding.getRows().getFirst().setCreditAccountId(account("LATER_BANK","ASSET","DEBIT","POSTING","BANK"));later.post(actor,Type.JOURNAL,funding);
   // Today's balance is 110, but this payment would leave -1 before the later top-up.
@@ -218,6 +218,73 @@ class VoucherPostgresTest {
   var reversed=service.reverse(operator("B1"),Type.JOURNAL,v.id(),UUID.randomUUID(),day,"Wrong entry");
   assertThat(reversed.transactions().getFirst().postings()).containsExactlyElementsOf(v.transactions().getFirst().postings().stream().map(Entry::reversed).toList());
   assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,v.journalId(),reversed.journalId())).isEqualByComparingTo("0");
+ }
+ Form equityForm(Type type){
+  var f=form(type);f.setEquity(true);f.setEquityMovement(type==Type.PAYMENT?com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.DISTRIBUTION:com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.CONTRIBUTION);
+  f.setEquityReason("Recorded owner capital movement\nBank reference checked");for(var row:f.getRows()){row.setDebitAccountId(type==Type.PAYMENT?capital:cash);row.setCreditAccountId(type==Type.PAYMENT?cash:capital);}return f;
+ }
+ @Test void equitySystemActivityPostsAndClassifiesAllThreeVoucherTypesOnce(){
+  for(var type:Type.values()){
+   var form=equityForm(type);var posted=service.post(actor,type,form);
+   assertThat(posted.equityMovement()).isEqualTo(form.getEquityMovement());assertThat(service.post(actor,type,form).id()).isEqualTo(posted.id());
+   assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where journal_id=?",Integer.class,posted.journalId())).isEqualTo(1);
+   assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id=?",BigDecimal.class,posted.journalId())).isZero();
+   form.setEquityMovement(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.ADJUSTMENT);assertThatThrownBy(()->service.post(actor,type,form)).hasMessage("voucher.error.retry");
+  }
+ }
+ @Test void equityPreviewRejectsWrongAccountsAndNeverSavesAClassification(){
+  var form=equityForm(Type.JOURNAL);service.preview(actor,Type.JOURNAL,form);
+  assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where sacco_id=?",Integer.class,institution)).isZero();
+  form.getRows().forEach(r->r.setCreditAccountId(expense));
+  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,form)).hasMessage("voucher.error.equityAccounts");
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
+ }
+ @Test void reserveAndProfitTransferRulesAreValidatedBeforePosting(){
+  var form=equityForm(Type.JOURNAL);form.setEquityMovement(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.TRANSFER);
+  assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,form)).hasMessage("voucher.error.equityAccounts");
+  var reserve=account("RESERVE","EQUITY","CREDIT","POSTING","OTHER");form.getRows().forEach(r->{r.setDebitAccountId(capital);r.setCreditAccountId(reserve);});
+  assertThat(service.post(actor,Type.JOURNAL,form).equityMovement()).isEqualTo(form.getEquityMovement());
+  var profit=equityForm(Type.JOURNAL);profit.setEquityMovement(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.EARNINGS_TRANSFER);
+  profit.getRows().forEach(r->r.setDebitAccountId(expense));assertThat(service.post(actor,Type.JOURNAL,profit).equityMovement()).isEqualTo(profit.getEquityMovement());
+ }
+ @Test void equitySelectionRequiresCurrentExplicitReportClaims(){
+  var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.FINANCIAL_REPORTS_CONFIGURE);
+  when(claims.effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(permissions);
+  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,equityForm(Type.JOURNAL))).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  assertThatThrownBy(()->workflows.capture(actor,Type.JOURNAL,equityForm(Type.JOURNAL),false)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
+ }
+ @Test void pendingEquityKeepsItsTypeThroughApprovalWithoutPostingEarly(){
+  var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));var form=equityForm(Type.JOURNAL);
+  UUID id=workflows.capture(actor,Type.JOURNAL,form);var item=workflows.details(actor,id).items().getFirst();
+  assertThat(item.form().isEquity()).isTrue();assertThat(item.form().getEquityReason()).isEqualTo(form.getEquityReason());
+  assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where sacco_id=?",Integer.class,institution)).isZero();
+  command(reviewer,id,"APPROVE");var changed=workflows.details(actor,id).items().getFirst().form();changed.setEquityMovement(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.ADJUSTMENT);
+  assertThatThrownBy(()->tx.execute(status->{var w=workflowRepository.find(actor,id,true).orElseThrow();workflowRepository.update(w,w.approval(),w.validation(),"POSTING",w.total(),w.assessmentAmount(),w.itemCount(),w.stage(),w.configVersion(),w.stages(),w.forceAllowed(),null,now);return service.post(actor,Type.JOURNAL,changed);})).hasMessage("approval.error.changed");
+  workflowPosting.post(actor,id,version(id));var voucherId=workflows.details(actor,id).items().getFirst().voucherId();
+  assertThat(service.view(actor,Type.JOURNAL,voucherId).equityMovement()).isEqualTo(form.getEquityMovement());
+ }
+ @Test void linkedEquityReversalInheritsTypeWithoutGrantingAClassificationChoice(){
+  var original=service.post(actor,Type.JOURNAL,equityForm(Type.JOURNAL));var other=operator("B1");
+  var permissions=EnumSet.allOf(UserClaim.class);permissions.remove(UserClaim.FINANCIAL_REPORTS_CONFIGURE);permissions.remove(UserClaim.FINANCIAL_REPORTS_VIEW);
+  when(claims.effectiveClaims(eq(other.getMemberId()),anyCollection(),anyBoolean())).thenReturn(permissions);
+  assertThatThrownBy(()->service.reverse(operator("B2"),Type.JOURNAL,original.id(),UUID.randomUUID(),day,"Wrong branch")).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+  var key=UUID.randomUUID();var reversed=service.reverse(other,Type.JOURNAL,original.id(),key,day,"Correct owner amount");
+  assertThat(reversed.equityMovement()).isEqualTo(original.equityMovement());assertThat(service.reverse(other,Type.JOURNAL,original.id(),key,day,"Correct owner amount").id()).isEqualTo(reversed.id());
+  assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where journal_id=?",Integer.class,reversed.journalId())).isEqualTo(1);
+  assertThat(jdbc.queryForObject("select sum(l.credit-l.debit) from gl_journal_line l join gl_journal j on j.id=l.journal_id where j.sacco_id=? and l.account_id=?",BigDecimal.class,institution,capital)).isZero();
+ }
+ @Test void failedClassificationRollsBackTheWholeVoucher(){
+  doThrow(new IllegalStateException("Synthetic audit failure")).when(audit).log(eq("STATEMENT_SETUP"),any(),eq("CLASSIFY_EQUITY"),any(),any(),anyMap());
+  assertThatThrownBy(()->service.post(actor,Type.JOURNAL,equityForm(Type.JOURNAL))).hasMessage("Synthetic audit failure");
+  assertThat(jdbc.queryForObject("select count(*) from accounting_voucher where sacco_id=?",Integer.class,institution)).isZero();
+  assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isZero();
+  assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where sacco_id=?",Integer.class,institution)).isZero();
+ }
+ @Test void concurrentEquityRetriesCreateOneJournalAndOneClassification()throws Exception{
+  var form=equityForm(Type.JOURNAL);var pool=Executors.newFixedThreadPool(2);
+  try{var a=pool.submit(()->service.post(actor,Type.JOURNAL,form));var b=pool.submit(()->service.post(actor,Type.JOURNAL,form));assertThat(a.get(45,TimeUnit.SECONDS).id()).isEqualTo(b.get(45,TimeUnit.SECONDS).id());}finally{pool.shutdownNow();}
+  assertThat(jdbc.queryForObject("select count(*) from statement_equity_classification where sacco_id=?",Integer.class,institution)).isEqualTo(1);
  }
  @Test void receiptsAndPaymentsCanSplitBothSidesAndProtectEveryMoneyReference(){
   UUID bank=account("BANK","ASSET","DEBIT","POSTING","BANK"),other=account("OTHER_EXPENSE","EXPENSE","DEBIT","POSTING","OTHER");

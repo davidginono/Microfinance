@@ -99,7 +99,7 @@ class VoucherMvcTest {
   var ledger=new GeneralLedgerService(mock(com.sacco.mvp.accounting.repository.GeneralLedgerRepository.class),
    new com.sacco.mvp.service.AccessControlService(),mock(com.sacco.mvp.service.AuditService.class),context.getBean(ApplicationClock.class),
    mock(com.sacco.mvp.service.UserClaimService.class),directory,mock(com.sacco.mvp.service.SaccoRegistryService.class));
-  var realService=new VoucherService(repository,ledger,context.getBean(ApplicationClock.class),mock(com.sacco.mvp.service.AuditService.class),tools.jackson.databind.json.JsonMapper.builder().build(),gate);
+  var realService=new VoucherService(repository,ledger,context.getBean(ApplicationClock.class),mock(com.sacco.mvp.service.AuditService.class),tools.jackson.databind.json.JsonMapper.builder().build(),gate,mock(com.sacco.mvp.accounting.statements.service.EquityMovementService.class));
   var controller=context.getBean(VoucherController.class);
   org.springframework.test.util.ReflectionTestUtils.setField(controller,"vouchers",realService);
   try{
@@ -116,6 +116,18 @@ class VoucherMvcTest {
   var response=mvc.perform(post("/finance/vouchers/payments").with(user(actor)).with(csrf()).param("party","Supplier name").param("rows[0].amount","invalid"))
    .andExpect(model().attributeHasFieldErrors("voucherForm","rows[0].amount")).andReturn();
   assertThat(((Form)response.getModelAndView().getModel().get("voucherForm")).getParty()).isEqualTo("Supplier name");
+ }
+ @Test void equityActivityBindsOnlyItsTypeAndReasonForEveryVoucherRoute()throws Exception{
+  for(var kind:List.of("receipts","payments","journals")){
+   mvc.perform(post("/finance/vouchers/"+kind).with(user(actor)).with(csrf()).param("equity","true").param("equityMovement","CONTRIBUTION").param("equityReason","Owner adds capital").param("saccoId","FOREIGN").param("stationId","FOREIGN"))
+    .andExpect(redirectedUrl("/finance/vouchers/"+kind));
+   verify(service).post(eq(actor),eq(VoucherController.type(kind)),argThat(f->f.isEquity() && f.getActivityId()==null && f.getEquityMovement()==com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.CONTRIBUTION && f.getEquityReason().equals("Owner adds capital")));
+  }
+ }
+ @Test void unknownEquityTypeKeepsEnteredValuesAndCannotPost()throws Exception{
+  var result=mvc.perform(post("/finance/vouchers/journals").with(user(actor)).with(csrf()).param("equity","true").param("equityMovement","ARBITRARY").param("equityReason","Keep this reason").param("reference","EQUITY-REF"))
+   .andExpect(view().name("accounting/vouchers/form")).andExpect(model().attributeHasFieldErrors("voucherForm","equityMovement")).andReturn();
+  var form=(Form)result.getModelAndView().getModel().get("voucherForm");assertThat(form.isEquity()).isTrue();assertThat(form.getEquityReason()).isEqualTo("Keep this reason");assertThat(form.getReference()).isEqualTo("EQUITY-REF");verify(service,never()).post(any(),any(),any());
  }
  @Test void csrfClientsAndOversizedRowsCannotPost()throws Exception{
   mvc.perform(post("/finance/vouchers/receipts").with(user(actor))).andExpect(status().isForbidden());

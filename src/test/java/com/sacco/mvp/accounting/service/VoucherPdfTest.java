@@ -14,6 +14,16 @@ import static org.assertj.core.api.Assertions.*;
 import static com.sacco.mvp.accounting.reports.VoucherPdfRows.assertRow;
 
 class VoucherPdfTest {
+ @Test void equityTypeAppearsOnAllVoucherDocumentsInBothLanguages()throws Exception{
+  var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");var exporter=new VoucherPdfService(messages,new ReportExportLimiter(1));
+  var cash=new Account(UUID.randomUUID(),"111001","Bank","BANK");var capital=new Account(UUID.randomUUID(),"311001","Owner capital","CAPITAL");
+  for(var type:Type.values())for(var language:List.of("en","sw")){
+   var amount=new BigDecimal("1000000.00");var row=new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Owner capital",amount,type==Type.PAYMENT?capital:cash,type==Type.PAYMENT?cash:capital);
+   var movement=type==Type.PAYMENT?com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.DISTRIBUTION:com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.CONTRIBUTION;
+   var voucher=new Voucher(UUID.randomUUID(),"EQUITY-"+type,type,LocalDate.of(2026,11,19),"Owner","CAPITAL-REF","Owner funds","Evidence",type==Type.JOURNAL?null:cash.id(),amount,1,UUID.randomUUID(),UUID.randomUUID(),"Accountant",OffsetDateTime.parse("2026-11-19T12:00:00+03:00"),null,null,"Example Microfinance","Main branch",List.of(row),null,null,movement);
+   var locale=Locale.forLanguageTag(language);try(var pdf=Loader.loadPDF(exporter.render(voucher,locale).bytes())){assertThat(new PDFTextStripper().getText(pdf)).contains(messages.getMessage("fs.movement."+movement,null,locale),"EQUITY-"+type);}
+  }
+ }
  @Test void journalWithoutPartyExportsTransactionsWithoutAnEmptyPartySection()throws Exception {
   var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
   var debit=new Account(UUID.randomUUID(),"111001","Cash","CASH");var credit=new Account(UUID.randomUUID(),"411001","Income","OTHER");

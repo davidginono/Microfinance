@@ -93,6 +93,7 @@ public class VoucherWorkflowService {
     @Transactional
     public UUID capture(AppUserPrincipal a,Type type,Form source,boolean send) {
         authorize(a,"VOUCHER_WORKSPACE_CREATE");viewAccess(a,type);vouchers.authorize(a,type,"CREATE");
+        vouchers.authorizeEquitySelection(a,source);
         repository.policyLock(a,false);var form=gate.canonical(source,source.getRequestKey());repository.requestLock(a,source.getRequestKey());var existing=repository.request(a,source.getRequestKey());
         if(existing.isPresent()) {var w=existing.get();require(w.owner().equals(a.getMemberId()) && w.type()==type && w.scope().equals("SINGLE"),"retry");var items=repository.items(w.id());require(items.size()==1 && gate.formHash(type,items.getFirst().form()).equals(gate.formHash(type,form)),"retry");return w.id();}
         if(send)vouchers.preview(a,type,form);
@@ -105,6 +106,8 @@ public class VoucherWorkflowService {
         var prior=repository.item(id,item).orElseThrow(()->new Invalid("unavailable"));
         require(prior.version()==itemVersion,"stale");
         var form=gate.canonical(source,item);
+        require(form.isEquity()==prior.form().isEquity(),"changed");
+        vouchers.authorizeEquitySelection(a,form);
         form.setActivityId(prior.form().getActivityId());
         repository.save(w,a,item,prior.line(),form,false);repository.invalidate(id);changed(w,w.itemCount());event(a,w,"CORRECTED","");return item;
     }

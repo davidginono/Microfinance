@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.access.AccessDeniedException;
 import java.math.BigDecimal;
 import java.util.*;
+import com.sacco.mvp.accounting.dto.VoucherDtos.Type;
 
 @Service @RequiredArgsConstructor
 public class EquityMovementService {
@@ -23,13 +24,27 @@ public class EquityMovementService {
         authorize(a);require(id!=null&&category!=null&&version>=0,"setup");require(reason!=null&&reason.length()<=500&&!reason.chars().anyMatch(c->c<32&&c!='\n'&&c!='\r'&&c!='\t'),"setup");reason=reason.strip();require(!reason.isBlank(),"reason");repository.lock(a.getSaccoId()+"/"+a.getStationId()+"/"+id);
         var lines=repository.journal(a,id);if(lines.isEmpty())throw new AccessDeniedException("Journal unavailable");require(lines.size()<=2000,"limit");
         var choices=repository.accounts(a.getSaccoId());require(choices.size()<=2000,"limit");var types=new HashMap<UUID,String>();choices.forEach(c->types.put(c.id(),c.type()));
+        validateMovement(category,lines,types);
+        int current=repository.classificationVersion(a,id);if(current==version+1&&repository.sameClassification(a,id,category,reason))return;require(current==version,"setupStale");repository.classify(a,id,current+1,category,reason);
+        audit.log("STATEMENT_SETUP",id,"CLASSIFY_EQUITY",a.getMemberId(),null,Map.of("saccoId",a.getSaccoId(),"stationId",a.getStationId(),"reason",reason));
+    }
+    /** Pure accounting policy shared by voucher preview and posted-journal classification. */
+    public static void validateMovement(Category category,List<Movement> lines,Map<UUID,String> types){
+        require(category!=null&&!lines.isEmpty()&&lines.size()<=2000&&lines.stream().allMatch(l->types.get(l.accountId())!=null),"movement");
         var equity=lines.stream().filter(l->"EQUITY".equals(types.get(l.accountId()))).toList();require(!equity.isEmpty(),"movement");
         if(Set.of(Category.CONTRIBUTION,Category.DISTRIBUTION,Category.OCI).contains(category))require(lines.stream().noneMatch(l->Set.of("INCOME","EXPENSE").contains(types.getOrDefault(l.accountId(),""))),"movement");
         if(category==Category.TRANSFER)require(lines.size()==equity.size()&&equity.stream().map(Movement::signed).reduce(BigDecimal.ZERO,BigDecimal::add).signum()==0,"movement");
         if(category==Category.EARNINGS_TRANSFER)require(lines.size()>equity.size()&&lines.stream().allMatch(l->Set.of("EQUITY","INCOME","EXPENSE").contains(types.getOrDefault(l.accountId(),""))),"movement");
-        int current=repository.classificationVersion(a,id);if(current==version+1&&repository.sameClassification(a,id,category,reason))return;require(current==version,"setupStale");repository.classify(a,id,current+1,category,reason);
-        audit.log("STATEMENT_SETUP",id,"CLASSIFY_EQUITY",a.getMemberId(),null,Map.of("saccoId",a.getSaccoId(),"stationId",a.getStationId(),"reason",reason));
     }
-    private void authorize(AppUserPrincipal a){access.requireActor(a,"FINANCIAL_REPORTS_VIEW");access.requireActor(a,"FINANCIAL_REPORTS_CONFIGURE");}
+    /** A linked financial correction inherits its source type; it offers no new classification choice. */
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public void inheritReversal(AppUserPrincipal a,Type type,UUID original,UUID reversal,String reason){
+        access.requireActor(a,type==Type.JOURNAL?"ACCOUNTING_JOURNALS_REVERSE":"ACCOUNTING_BUSINESS_REVERSE");
+        repository.lock(a.getSaccoId()+"/"+a.getStationId()+"/"+original);
+        var category=repository.reversalClassification(a,type,original,reversal);if(category.isEmpty())return;
+        require(repository.classificationVersion(a,reversal)==0,"setupStale");repository.classify(a,reversal,1,category.get(),reason.strip());
+        audit.log("STATEMENT_SETUP",reversal,"CLASSIFY_EQUITY_REVERSAL",a.getMemberId(),null,Map.of("saccoId",a.getSaccoId(),"stationId",a.getStationId(),"originalJournal",original,"reason",reason.strip()));
+    }
+    public void authorize(AppUserPrincipal a){access.requireActor(a,"FINANCIAL_REPORTS_VIEW");access.requireActor(a,"FINANCIAL_REPORTS_CONFIGURE");}
     private static void require(boolean valid,String key){if(!valid)throw new IllegalArgumentException("fs.error."+key);}
 }

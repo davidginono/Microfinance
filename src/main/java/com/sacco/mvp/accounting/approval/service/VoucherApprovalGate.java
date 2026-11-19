@@ -60,6 +60,7 @@ public class VoucherApprovalGate {
         require(source.getRows()!=null && !source.getRows().isEmpty() && source.getRows().size()<=50,"limit");
         var f=new Form(); f.setRequestKey(key);f.setEffectiveDate(source.getEffectiveDate());f.setMoneyAccountId(source.getMoneyAccountId());
         f.setClientId(source.getClientId());f.setActivityId(source.getActivityId());
+        f.setEquity(source.isEquity());f.setEquityMovement(source.getEquityMovement());f.setEquityReason(text(source.getEquityReason(),500));
         f.setParty(text(source.getParty(),160));f.setReference(text(source.getReference(),160));
         f.setDescription(text(source.getDescription(),500));f.setEvidence(text(source.getEvidence(),500));
         var rows=new ArrayList<RowForm>();

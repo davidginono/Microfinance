@@ -2,6 +2,8 @@ package com.sacco.mvp.accounting.service;
 
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
 import com.sacco.mvp.accounting.repository.VoucherRepository;
+import com.sacco.mvp.accounting.statements.service.EquityMovementService;
+import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Movement;
 import com.sacco.mvp.domain.AuditEventStatus;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
@@ -25,6 +27,7 @@ public class VoucherService {
     private final AuditService audit;
     private final JsonMapper json;
     private final com.sacco.mvp.accounting.approval.service.VoucherApprovalGate approvals;
+    private final EquityMovementService equityMovements;
     private static final Set<String> COMPONENTS=Set.of("TOTAL","PRINCIPAL","INTEREST","FEES","TAX");
     public void authorize(AppUserPrincipal actor,Type type,String action){
         ledger.requireActor(actor,(type==Type.JOURNAL?"ACCOUNTING_JOURNALS_":"ACCOUNTING_BUSINESS_")+action);
@@ -115,7 +118,8 @@ public class VoucherService {
         return result;
     }
     @Transactional
-    public Preview preview(AppUserPrincipal actor,Type type,Form form){authorize(actor,type,"CREATE");validate(form,type,clock.today());return plan(actor,type,form);}
+    public Preview preview(AppUserPrincipal actor,Type type,Form form){authorize(actor,type,"CREATE");authorizeEquitySelection(actor,form);validate(form,type,clock.today());return plan(actor,type,form);}
+    public void authorizeEquitySelection(AppUserPrincipal actor,Form form){if(form!=null && form.isEquity())equityMovements.authorize(actor);}
     @Transactional(noRollbackFor=IllegalArgumentException.class)
     public Preview approvalPreview(AppUserPrincipal actor,Type type,Form form){
         approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");
@@ -126,7 +130,7 @@ public class VoucherService {
     }
     @Transactional
     public Voucher post(AppUserPrincipal actor,Type type,Form form){
-        authorize(actor,type,"CREATE");validate(form,type,clock.today());
+        authorize(actor,type,"CREATE");authorizeEquitySelection(actor,form);validate(form,type,clock.today());
         String hash=hash(type,form);
         var completed=vouchers.byRequest(actor.getSaccoId(),actor.getStationId(),form.getRequestKey());
         if(completed.isPresent()){require(completed.get().type()==type && vouchers.sameRequest(completed.get().id(),hash,actor.getMemberId()),"","retry");return details(completed.get());}
@@ -168,6 +172,8 @@ public class VoucherService {
         if(type!=Type.JOURNAL && reverses==null)moneyId=plan.rows().stream().flatMap(t->t.postings().stream()).filter(e->e.side().equals(type==Type.RECEIPT?"DEBIT":"CREDIT")).map(e->e.account().id()).findFirst().orElseThrow();
         var v=new Voucher(UUID.randomUUID(),number,type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),moneyId,plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
         vouchers.insert(v,actor.getSaccoId(),actor.getStationId(),f,hash,period,journal);
+        if(reverses!=null)equityMovements.inheritReversal(actor,type,journal,v.journalId(),f.getDescription());
+        else if(f.isEquity())equityMovements.classify(actor,v.journalId(),0,f.getEquityMovement(),f.getEquityReason());
         if(reverses==null)consumeNumber(actor,type,f.getRequestKey());
         audit.logEvent("ACCOUNTING",v.id(),reverses==null?"VOUCHER_POSTED":"VOUCHER_REVERSED",actor.getMemberId(),AuditEventStatus.SUCCESS,"Voucher posted","VOUCHER",v.number(),actor.getSaccoId(),actor.getStationId(),Map.of("type",type.name(),"amount",v.total(),"transactions",v.transactionCount(),"journal",v.journalId()));
         return details(scoped(actor,type,v.id(),false));
@@ -216,6 +222,15 @@ public class VoucherService {
             result.add(new Transaction(UUID.randomUUID(),++n,row.getTransactionId(),template,name,row.getComponent(),row.getDescription().strip(),amount,debit,credit));
         }
         require(total.precision()<=18,"","amount");
+        if(f.isEquity()){
+            var types=new HashMap<UUID,String>();var movements=new ArrayList<Movement>();
+            for(var transaction:result)for(var entry:transaction.postings()){
+                types.put(entry.account().id(),entry.account().type());boolean debit="DEBIT".equals(entry.side());
+                movements.add(new Movement(entry.account().id(),f.getEquityMovement(),false,debit?entry.amount():BigDecimal.ZERO,debit?BigDecimal.ZERO:entry.amount()));
+            }
+            try{EquityMovementService.validateMovement(f.getEquityMovement(),movements,types);}
+            catch(IllegalArgumentException invalid){throw new Invalid("equityMovement","equityAccounts");}
+        }
         var entries=new ArrayList<Map<String,Object>>();
         for(var transaction:result)for(var entry:transaction.postings())entries.add(Map.of("row",transaction.id(),"account",entry.account().id(),"side",entry.side(),"amount",entry.amount()));
         vouchers.validatePettyCash(actor.getSaccoId(),actor.getStationId(),f.getEffectiveDate(),type,json.writeValueAsString(entries));
@@ -223,6 +238,13 @@ public class VoucherService {
     }
     static void validate(Form f,Type type,LocalDate today){
         require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");
+        require(f.isEquity() || f.getEquityMovement()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()),"equityMovement","equityActivity");
+        if(f.isEquity()){
+            require(f.getActivityId()==null && !f.isPettyCash(),"equity","equityActivity");
+            require(com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(type).contains(f.getEquityMovement()),"equityMovement","equityMovement");
+            text(f.getEquityReason(),500,true,"equityReason");
+            require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getTransactionId()==null),"equity","equityActivity");
+        }
         require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getLoanId()==null),"","request");
         require(f!=null && f.getRequestKey()!=null,"","request");require(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(today),"effectiveDate","date");
         text(f.getParty(),160,type!=Type.JOURNAL,"party");text(f.getReference(),160,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
@@ -250,7 +272,7 @@ public class VoucherService {
     }
     private Voucher scoped(AppUserPrincipal actor,Type type,UUID id,boolean lock){return vouchers.find(actor.getSaccoId(),actor.getStationId(),type,id,lock).orElseThrow(()->new AccessDeniedException("Voucher outside your workspace"));}
     private Client client(AppUserPrincipal actor,Form f){return f.getClientId()==null?null:vouchers.client(actor.getSaccoId(),actor.getStationId(),f.getClientId(),true).orElseThrow(()->new Invalid("clientId","client"));}
-    private Voucher details(Voucher v){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),vouchers.transactions(v.id()),v.clientId(),v.clientNumber());}
+    private Voucher details(Voucher v){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),vouchers.transactions(v.id()),v.clientId(),v.clientNumber(),v.equityMovement());}
     private String hash(Type type,Form f){try{
         // Keep ordinary-voucher retry hashes compatible with the pre-unification form.
         var payload=(tools.jackson.databind.node.ObjectNode)json.valueToTree(f);
@@ -258,7 +280,7 @@ public class VoucherService {
         for(var row:payload.path("rows"))((tools.jackson.databind.node.ObjectNode)row).remove("loanId");
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((type.name()+json.writeValueAsString(payload)).getBytes(StandardCharsets.UTF_8)));
     }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
-    private static void text(String s,int max,boolean required,String field){boolean multiline=field.equals("description")||field.endsWith(".description");require(s!=null && (!required || !s.isBlank()) && s.length()<=max && s.chars().noneMatch(c->c<32 && !(multiline && (c=='\n'||c=='\r'||c=='\t'))),field,"text");}
+    private static void text(String s,int max,boolean required,String field){boolean multiline=field.equals("equityReason")||field.equals("description")||field.endsWith(".description");require(s!=null && (!required || !s.isBlank()) && s.length()<=max && s.chars().noneMatch(c->c<32 && !(multiline && (c=='\n'||c=='\r'||c=='\t'))),field,"text");}
     private static void query(String search,int page){require(search!=null && search.length()<=100 && page>=0 && page<=1000,"","filter");}
     static void validateFilter(Filter f){require(f!=null,"","filter");query(f.search(),f.page());require(Set.of(10,25,30,50).contains(f.size()),"","filter");require(Set.of("","POSTED","REVERSED","REVERSAL").contains(f.status()) && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),Set.of("number","date","party","reference","transactions","amount","status")) && (f.from()==null || f.through()==null || !f.through().isBefore(f.from())),"","filter");}
     private static void require(boolean ok,String field,String code){if(!ok)throw new Invalid(field,code);}

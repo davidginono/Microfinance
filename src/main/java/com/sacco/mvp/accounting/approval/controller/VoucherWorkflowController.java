@@ -22,7 +22,7 @@ public class VoucherWorkflowController {
     private final VoucherDocumentService documents;
     private final VoucherAutomaticPostingService automatic;
     @InitBinder("voucherForm") void formBinder(WebDataBinder b) {
-        b.setAutoGrowCollectionLimit(50);b.setAllowedFields("requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","clientId",
+        b.setAutoGrowCollectionLimit(50);b.setAllowedFields("equity","equityMovement","equityReason","requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","clientId",
             "rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @InitBinder("ruleForm") void ruleBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(20);b.setAllowedFields("type","version","rules[*].minimum","rules[*].maximum","rules[*].scope","rules[*].autoPost","rules[*].stages[*].role","rules[*].stages[*].approvals");}
@@ -79,6 +79,7 @@ public class VoucherWorkflowController {
     private void editor(AppUserPrincipal a,Details d,UUID item,int itemVersion,Model m) {
         support(a,d.workflow().id(),m);m.addAttribute("readOnly",!d.actions().contains("EDIT"));m.addAttribute("details",d);m.addAttribute("itemId",item);m.addAttribute("itemVersion",itemVersion);
         var f=(Form)m.getAttribute("voucherForm");m.addAttribute("accounts",workflows.selectedAccounts(a,d.workflow().id(),f));
+        m.addAttribute("equityTypes",com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(d.workflow().type()));
         m.addAttribute("voucherClient",workflows.selectedClient(a,d.workflow().id(),f));
         m.addAttribute("itemNumber",java.util.stream.IntStream.range(0,d.items().size()).filter(n->d.items().get(n).id().equals(item)).findFirst().orElse(d.items().size())+1);m.addAttribute("issues",d.items().stream().filter(i->i.id().equals(item)).findFirst().map(Item::issues).orElse(List.of()));
     }
