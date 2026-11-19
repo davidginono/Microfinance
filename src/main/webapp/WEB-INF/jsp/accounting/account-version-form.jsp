@@ -2,7 +2,6 @@
 <%@ include file="account-version-shell.jspf" %>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="coav.newVersion" /></h1></div>
 <div class="accounting-workspace accounting-create-workspace">
- <p><spring:message code="coav.saveHelp" /></p>
  <section class="accounting-form accounting-create-card">
   <h2><c:out value="${account.code}" /> · <c:out value="${account.name}" /></h2>
   <p><spring:message code="coav.operation.${operation}" /></p>
@@ -17,6 +16,7 @@
     <%@ include file="account-reporting.jspf" %>
    </c:when><c:otherwise><form:hidden path="name" /><form:hidden path="description" /></c:otherwise></c:choose>
    <label><spring:message code="coav.reason" /><form:textarea path="reason" cssClass="aws-control" maxlength="500" rows="2" required="required" /></label>
+   <p><spring:message code="coav.saveHelp" /></p>
    <div class="accounting-actions accounting-form-actions">
     <a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/versions' />"><spring:message code="common.cancel" /></a>
     <button class="app-btn btn-neutral" name="command" value="DRAFT" formnovalidate><spring:message code="coav.saveDraft" /></button>

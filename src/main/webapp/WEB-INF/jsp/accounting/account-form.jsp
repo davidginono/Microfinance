@@ -10,7 +10,6 @@
     <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/accounts' />"><spring:message code="finance.nav.accounts" /></a><span aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><spring:message code="${groupMode?'coa.newGroup':'coa.newAccount'}" /></span></nav>
     <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="${groupMode?'coa.newGroup':'coa.newAccount'}" /></h1></div>
 <div class="accounting-workspace accounting-create-workspace">
-    <p><spring:message code="${groupMode?'coa.groupHelp':'coa.accountHelp'}" /></p>
     <c:if test="${not empty parentError}"><p class="coa-error" role="alert"><spring:message code="${parentError}" /></p></c:if>
     <details class="coa-parent-picker" ${empty selectedParent?'open':''}>
         <summary><spring:message code="coa.chooseParent" /></summary>

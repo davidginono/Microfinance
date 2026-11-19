@@ -81,3 +81,16 @@ was not repeated for this presentation increment. Browser initialization timed o
 so desktop/mobile visual and interaction checks remain pending. No database migration,
 new query, executor or thread was added. No throughput benchmark was run; sustained
 1,000 RPS remains unproven.
+
+
+## Create and edit form copy cleanup (19 November 2026)
+
+Reviewed 55 form pages and fragments across accounting, administration, lending, client recording, groups, credit controls, payroll and settings. Removed routine account introductions, institution/branch edit subtitles and logo-paste explanations, including their unused labels and script updates. The retired account introduction incorrectly claimed that saving activates an account immediately; the live version/approval flow is unchanged. File selection, clipboard paste, preview, file metadata, format/size limits and the ready state remain.
+
+Account version and approval-policy guidance is now inside the form beside its save actions, once per form. Shortened English/Kiswahili guidance for contra balances, account versions, institution-wide approval rules, product account links, joint outside debt, payroll instructions/calculation/request-only behavior and voucher previews. Retained active posting-account requirements, future-disbursement-only account changes, independent authorized review, one entry per shared debt, recorded monthly debt matching, employee/mandate/employer references, contractual due-date/limit/cutoff basis, excluded charges and no-money/no-save preview effects.
+
+Required disclosures, declarations versus verification, unknown-value guidance, client privacy/consent, guarantor papers, upload limits, password/secret handling, validation, edited values, CSRF, explicit claims and native financial commands remain. No request fields, backend methods, schema, queries, posting/approval rules, transactions, locks or executors changed. No throughput benchmark was run.
+
+Verification: 37 Java/JSP checks passed, including twelve current form/detail JSPs, account-version MVC access, administration/AWS view contracts, file controls, session settings and client profile actions. Ran `mvn -B -Dmicrofinance.build.directory=target/resource-details-cleanup-build -Dtest=ChartOfAccountsJspCompilationTest,AdminConfigurationUiContractTest,AwsConsoleViewContractTest,FileUploadControlViewContractTest,SessionSettingsJspRenderingTest,ClientProfileActionsJspRenderingTest,AccountVersionMvcTest -Dmicrofinance.jsp.pages=... surefire:test` against unchanged compiled Java classes and the current JSP sources. All 69 JavaScript checks passed for accounting/platform form recovery, validation, action placement, profile wizard/documents and loan product editing. Bilingual orphan/reference checks and `git diff --check` passed. Authenticated browser automation was not repeated after the user's earlier stop; these results are component, contract and rendered-JSP verification.
+
+The local app restarted successfully with the updated resources. Login returned HTTP 200. No database migration was added or changed.

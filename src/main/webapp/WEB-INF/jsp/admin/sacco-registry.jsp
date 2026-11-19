@@ -7,13 +7,9 @@
 
 <spring:message code="admin.saccoRegistry.saccoRegistration" text="Institution Registry" var="SaccoRegistrationLabel" />
 <spring:message code="admin.saccoRegistry.stationRegistry" text="Branch Registry" var="StationRegistryLabel" />
-<spring:message code="admin.saccoRegistry.saccoRegistrationSubtitle" text="Register institution workspaces and manage the Branches under each institution." var="SaccoRegistrationSubtitle" />
-<spring:message code="admin.saccoRegistry.stationRegistrySubtitle" text="Manage Branch IDs for your institution workspace." var="StationRegistrySubtitle" />
 <spring:message code="admin.saccoRegistry.currentSaccoStations" text="Current Institution Branches" var="currentSaccoStationsLabel" />
 <spring:message code="admin.saccoRegistry.editSacco" text="Edit Institution" var="editSaccoLabel" />
 <spring:message code="admin.saccoRegistry.editStations" text="Edit Branches" var="editStationsLabel" />
-<spring:message code="admin.saccoRegistry.editSaccoHelp" text="Update the institution name and active Branch IDs." var="editSaccoHelp" />
-<spring:message code="admin.saccoRegistry.editStationsHelp" text="Review and update the active Branch IDs for this institution workspace." var="editStationsHelp" />
 <spring:message code="admin.saccoRegistry.saveChanges" text="Save Changes" var="saveChangesLabel" />
 <spring:message code="admin.saccoRegistry.saveStations" text="Save Branches" var="saveStationsLabel" />
 
@@ -184,7 +180,6 @@
                                     class="aws-file-paste-target">
                                 <span class="min-w-0">
                                     <span class="block text-sm font-semibold text-slate-700"><spring:message code="admin.create.pasteImage" /></span>
-                                    <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500"><spring:message code="admin.create.pasteHint" /></span>
                                 </span>
                                 <span class="aws-file-paste-shortcut">Ctrl+V</span>
                             </button>
@@ -243,7 +238,6 @@
                 <div class="app-modal-header">
                     <div>
                         <p class="erp-panel-title">${editSaccoLabel}</p>
-                        <p class="mt-2 text-sm text-slate-500">${editSaccoHelp}</p>
                 </div>
                     <button type="button" class="app-modal-close" data-sacco-modal-close="edit-${Sacco.saccoId}" aria-label="Close modal">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -314,7 +308,6 @@
                                         class="aws-file-paste-target">
                                     <span class="min-w-0">
                                         <span class="block text-sm font-semibold text-slate-700">Paste replacement image</span>
-                                        <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500">Click here and press Ctrl+V to paste a PNG or JPEG from your clipboard.</span>
                                     </span>
                                     <span class="aws-file-paste-shortcut">Ctrl+V</span>
                                 </button>
@@ -432,7 +425,6 @@
                                         class="aws-file-paste-target">
                                     <span class="min-w-0">
                                         <span class="block text-sm font-semibold text-slate-700">Paste replacement image</span>
-                                        <span data-logo-paste-hint class="mt-1 block text-xs font-medium text-slate-500">Click here and press Ctrl+V to paste a PNG or JPEG from your clipboard.</span>
                                     </span>
                                     <span class="aws-file-paste-shortcut">Ctrl+V</span>
                                 </button>
@@ -554,7 +546,6 @@
         function bindLogoUploadCard(card) {
             const fileInput = card.querySelector('[data-logo-file-input]');
             const pasteTarget = card.querySelector('[data-logo-paste-target]');
-            const pasteHint = card.querySelector('[data-logo-paste-hint]');
             const previewShell = card.querySelector('[data-logo-preview-shell]');
             const fileMeta = card.querySelector('[data-logo-file-meta]');
             if (!fileInput || !pasteTarget || !previewShell) {
@@ -564,9 +555,6 @@
             fileInput.addEventListener('change', function () {
                 if (fileInput.files && fileInput.files[0]) {
                     updateLogoPreview(previewShell, fileInput.files[0], fileMeta);
-                    if (pasteHint) {
-                        pasteHint.textContent = 'Selected image ready. You can still paste another one to replace it before saving.';
-                    }
                 } else {
                     setLogoFileMeta(fileMeta, '');
                 }
@@ -592,9 +580,6 @@
                 fileInput.files = transfer.files;
                 fileInput.dispatchEvent(new Event('change', { bubbles: true }));
                 pasteTarget.classList.add('is-ready');
-                if (pasteHint) {
-                    pasteHint.textContent = 'Pasted image ready. Save the form to apply this logo.';
-                }
             });
         }
 
