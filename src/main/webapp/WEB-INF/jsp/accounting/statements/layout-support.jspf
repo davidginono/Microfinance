@@ -1,0 +1,5 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
+<%@ include file="support.jspf" %>
+<link rel="stylesheet" href="<c:url value='/css/statement-layout.css' />" />
+<script src="<c:url value='/js/statement-layout.js' />" defer></script>

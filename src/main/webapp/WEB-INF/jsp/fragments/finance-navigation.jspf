@@ -130,7 +130,7 @@
                 <a href="<c:url value='/reports/financial/statements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/reports/financial/statements' ? 'shell-nav-active' : ''}"><spring:message code="fs.workspace" /></a>
                 <a href="<c:url value='/reports/financial/statements/history' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/history') ? 'shell-nav-active' : ''}"><spring:message code="fs.history" /></a>
                 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_CONFIGURE')">
-                    <a href="<c:url value='/reports/financial/statements/setup' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/setup')?'shell-nav-active':''}"><spring:message code="fs.setup" /></a>
+                    <a href="<c:url value='/reports/financial/statements/layout' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/layout')?'shell-nav-active':''}"><spring:message code="fs.layout.title" /></a>
                     <a href="<c:url value='/reports/financial/statements/movements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/movements')?'shell-nav-active':''}"><spring:message code="fs.movements" /></a>
                 </sec:authorize>
                 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_VIEW') and @access.has(principal, 'LOAN_REPORTS_VIEW')">

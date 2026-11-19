@@ -1,0 +1,9 @@
+<%@ page pageEncoding="UTF-8" %>
+<div class="fs-layout-picker" data-layout-picker>
+<label class="fs-layout-search"><span class="sr-only"><spring:message code="fs.layout.findAccount" /></span><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.8" cy="6.8" r="5" /><path d="m10.5 10.5 4 4" /></svg><input type="search" class="aws-control" data-layout-account-search placeholder="<spring:message code='fs.layout.findAccount' />" /></label>
+<div class="fs-layout-account-list" data-layout-account-list role="group" aria-label="<spring:message code='fs.layout.accounts' />">
+<c:forEach items="${accounts}" var="account"><label class="fs-layout-account" data-layout-account><form:checkbox path="accounts" value="${account.id}" /><span><c:out value="${account.name}" /><small><c:out value="${account.code}" /> · <spring:message code="accounting.option.${account.type}" /></small></span></label></c:forEach>
+</div>
+<p class="fs-layout-empty" data-layout-account-empty role="status" ${empty accounts?'':'hidden'}><spring:message code="${empty accounts?'fs.layout.noAvailableAccounts':'fs.layout.noAccounts'}" /></p>
+<form:errors path="accounts" cssClass="coa-error" />
+</div>

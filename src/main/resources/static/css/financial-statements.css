@@ -21,16 +21,6 @@
 @media print{.fs-preview-footer,.fs-tab-status{display:none!important}}
 @media(max-width:767px){.fs-view-fields{flex-direction:row}.fs-workspace .fs-view-fields .fs-select-setting{flex:1 1 100%}}
 
-.fs-configure [data-statement-setup]{display:grid;gap:20px;min-width:0}
-.fs-setup-row{min-width:0;border:1px solid #d5dbdb;padding:20px;margin:0 0 20px}
-.fs-setup-row legend{font-weight:600;padding:0 6px}
-.fs-setup-row:last-child{margin-bottom:0}
-[data-setup-list]{display:grid;gap:20px;margin-bottom:16px}
-[data-setup-list]>.fs-setup-row{margin:0}
-.fs-setup-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:16px}
-.fs-setup-actions .erp-icon-btn{flex:0 0 36px;width:36px;min-width:36px;height:36px;padding:0}
-.fs-setup-actions .erp-icon-btn svg{width:16px;height:16px}
-.fs-configure details.erp-panel>summary{padding:16px;cursor:pointer}.fs-configure details .erp-table-scroll{max-height:360px}.fs-setup-check{align-self:end}.fs-setup-check input{margin-right:8px}@media(max-width:767px){.fs-setup-row{padding:16px}}
 .aws-console .fs-movement-modal{inset:0!important}
 .fs-movement-modal[hidden]{display:none!important}
 .aws-console .fs-movement-modal>.app-modal-panel{display:flex;flex-direction:column;min-width:0;max-width:calc(100vw - 32px)!important;max-height:calc(100dvh - 32px)!important}

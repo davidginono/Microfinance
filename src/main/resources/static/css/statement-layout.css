@@ -1,0 +1,34 @@
+.statement-layout,.fs-layout-form{min-width:0;max-width:100%}
+.fs-layout-form{width:100%;max-width:960px}
+.fs-layout-form form{display:grid;gap:20px;min-width:0}
+.fs-layout-form .erp-panel{margin:0}
+.fs-layout-form .erp-panel-body{padding:20px!important;min-width:0}
+.fs-layout-form .erp-panel-header h2{margin:0;font-size:18px;line-height:24px}
+.fs-layout-form .aws-control{box-sizing:border-box;width:100%;max-width:100%;min-width:0}
+.fs-layout-scope{margin:0;color:#545b64;font-size:14px;line-height:20px}
+.fs-layout-added-profit{display:block;color:#545b64;font-size:13px;line-height:20px}
+.fs-layout-translation{min-width:0}
+.fs-layout-translation summary{cursor:pointer;font-weight:600;padding:8px 0}
+.fs-layout-translation[open]>:not(summary){margin-top:12px}
+.fs-layout-translation label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fs-layout-search{display:block;position:relative;margin-bottom:12px;max-width:520px}
+.fs-layout-search input{height:32px;padding-left:32px;font-style:italic}
+.fs-layout-search svg{position:absolute;left:10px;top:8px;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;pointer-events:none;color:#545b64}
+.fs-layout-account-list{max-height:280px;overflow:auto;border:1px solid #d5dbdb;overscroll-behavior:contain}
+.fs-layout-account{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-bottom:1px solid #eaeded;cursor:pointer;min-width:0}
+.fs-layout-account:last-child{border-bottom:0}
+.fs-layout-account input{flex:none;margin:3px 0 0;accent-color:#0073bb}
+.fs-layout-account>span{min-width:0;overflow-wrap:anywhere}
+.fs-layout-account small{display:block;color:#545b64;font-size:13px;line-height:20px;margin-top:2px}
+.fs-layout-account:has(input:checked){background:#e6f3fa}
+.fs-layout-account[hidden],.fs-layout-form [hidden]{display:none!important}
+.fs-layout-figures{display:flex;flex-wrap:wrap;align-items:center;gap:16px 24px}
+.fs-layout-figures label,.fs-layout-check{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.fs-layout-figures input,.fs-layout-check input{flex:none;margin-top:3px;accent-color:#0073bb}
+.fs-layout-figures-accounts{min-width:0;border:0;padding:0;margin:20px 0 0}
+.fs-layout-check{margin-top:16px}
+.fs-layout-empty{font-size:14px;color:#545b64;margin:12px 0 0}
+.fs-layout-fact-label{color:#545b64}
+.fs-layout-form .fs-fields p{margin:4px 0 0;overflow-wrap:anywhere}
+.fs-layout-form .accounting-form-actions{padding:0;margin:0;justify-content:flex-end}
+@media(max-width:767px){.fs-layout-form .erp-panel-body{padding:16px!important}.fs-layout-figures{flex-direction:column;align-items:flex-start;gap:12px}.fs-layout-form form{gap:16px}}

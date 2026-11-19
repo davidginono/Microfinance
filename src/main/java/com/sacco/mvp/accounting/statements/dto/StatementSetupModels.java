@@ -1,6 +1,5 @@
 package com.sacco.mvp.accounting.statements.dto;
 
-import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
@@ -22,25 +21,4 @@ public final class StatementSetupModels {
         public BigDecimal signed(){return debit.subtract(credit);}
     }
     public record Journal(UUID id,LocalDate date,String reference,String description,Category category,int version,BigDecimal debit,BigDecimal credit) {}
-    @Data public static class Form {
-        private int version;
-        private UUID requestKey;
-        private String reason="";
-        private List<ComponentForm> components=new ArrayList<>();
-        private List<NoteForm> notes=new ArrayList<>();
-        private List<CategoryForm> categories=new ArrayList<>();
-    }
-    @Data public static class ComponentForm {
-        private String name="",nameSw="",accounts="";
-        private boolean retained;
-    }
-    @Data public static class NoteForm {
-        private int number;
-        private boolean includeProfit;
-        private String title="",titleSw="",basis="BALANCE",text="",textSw="",accounts="";
-    }
-    @Data public static class CategoryForm {
-        private Category category;
-        private String name="",nameSw="";
-    }
 }

@@ -2,18 +2,6 @@
  'use strict';
  const ready=window.WorkspaceNavigation?.onReady || (fn=>document.readyState==='loading'?document.addEventListener('DOMContentLoaded',fn,{once:true}):fn());
  ready(()=>{
-  const form=document.querySelector('[data-statement-setup]');
-  if(form&&!form.dataset.statementSetupReady){
-   form.dataset.statementSetupReady='true';
-   const renumber=list=>{[...list.children].forEach((row,i)=>row.querySelectorAll('[name]').forEach(input=>{input.name=input.name.replace(/\[[^\]]*\]/,'['+i+']');}));const add=form.querySelector('[data-setup-add="'+list.dataset.setupList+'"]');if(add)add.disabled=list.children.length>=Number(list.dataset.max);};
-   form.addEventListener('click',event=>{
-    const add=event.target.closest('[data-setup-add]'),remove=event.target.closest('[data-setup-remove]'),move=event.target.closest('[data-setup-move]');
-    if(move){const row=move.closest('.fs-setup-row'),list=row.parentElement,other=Number(move.dataset.setupMove)<0?row.previousElementSibling:row.nextElementSibling;if(other){if(Number(move.dataset.setupMove)<0)list.insertBefore(row,other);else list.insertBefore(other,row);renumber(list);move.focus();}}
-    if(add){const key=add.dataset.setupAdd,list=form.querySelector('[data-setup-list="'+key+'"]');if(list.children.length>=Number(list.dataset.max))return;const template=document.querySelector('[data-setup-template="'+key+'"]');list.append(template.content.cloneNode(true));renumber(list);list.lastElementChild.querySelector('input')?.focus();}
-    if(remove){const row=remove.closest('.fs-setup-row'),list=row.parentElement;row.remove();renumber(list);form.querySelector('[data-setup-add="'+list.dataset.setupList+'"]')?.focus();}
-   });
-   form.addEventListener('submit',()=>form.querySelectorAll('[data-setup-list]').forEach(renumber));
-  }
   const region=document.querySelector('[data-equity-movements]');if(!region||region.dataset.equityMovementsReady)return;region.dataset.equityMovementsReady='true';
   // The shared shell mounts overlays on body before workspace initialization.
   const modal=document.getElementById('equity-movement-modal'),classify=modal.querySelector('[data-equity-classify]'),button=region.querySelector('[data-equity-edit]');

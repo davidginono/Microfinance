@@ -1,0 +1,7 @@
+<%@ page pageEncoding="UTF-8" %>
+<spring:hasBindErrors name="${layoutFormName}">
+<div data-workspace-response-error>
+<c:if test="${not empty errors.globalErrors}"><div class="console-message" data-message-type="error" role="alert" tabindex="-1" data-workspace-global-error><form:errors /></div></c:if>
+<div hidden><c:forEach items="${errors.fieldErrors}" var="fieldError"><span data-field-error-for="<c:out value='${fieldError.field}' />"><spring:message message="${fieldError}" /></span></c:forEach></div>
+</div>
+</spring:hasBindErrors>

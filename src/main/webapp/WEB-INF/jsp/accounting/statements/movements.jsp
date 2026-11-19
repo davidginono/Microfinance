@@ -1,7 +1,7 @@
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
-<script src="<c:url value='/js/statement-setup.js' />" defer></script>
+<script src="<c:url value='/js/equity-movements.js' />" defer></script>
 <div class="accounting-workspace">
 <%@ include file="feedback.jspf" %>
 <section class="erp-table-wrap" data-aws-table-region data-resource-table="equity-movements" data-table-selection="single" data-equity-movements>
