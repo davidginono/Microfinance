@@ -11,8 +11,14 @@
     <div hidden data-open-user-modal="${openUserModalKey}"></div>
 </c:if>
 
+<c:url value="/admin/users" var="usersUrl">
+    <c:if test="${not empty selectedStaffBranch}"><c:param name="branch" value="${selectedStaffBranch}" /></c:if>
+</c:url>
+<nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />">
+    <a class="erp-page-path__link" href="<c:out value='${usersUrl}' />"><spring:message code="admin.users.title" /></a>
+    <span aria-hidden="true">›</span><span aria-current="page"><c:out value="${user.userIdLabel}" /></span>
+</nav>
 <div class="erp-page-header" data-aws-page-header>
-    <p class="erp-breadcrumb"><spring:message code="admin.workspace.userBreadcrumb" /></p>
     <h1 class="erp-page-title" id="admin-user-edit-title"><c:out value="${user.fullName}" /></h1>
 </div>
 
@@ -59,20 +65,6 @@
         </div>
     </section>
 
-    <section class="erp-panel admin-user-edit-panel">
-        <h2><spring:message code="branches.branch" /></h2>
-        <div class="erp-panel-body">
-            <input type="hidden" name="sourceBranch" value="<c:out value='${selectedStaffBranch}' />" />
-            <label><span class="sr-only"><spring:message code="branches.branch" /></span>
-                <select name="branch" class="aws-control" required>
-                    <c:forEach var="choice" items="${staffBranches}">
-                        <option value="<c:out value='${choice}' />" ${selectedStaffBranch eq choice ? 'selected' : ''}><c:out value="${choice}" /></option>
-                    </c:forEach>
-                </select>
-            </label>
-        </div>
-    </section>
-
     <c:set var="matrixColumns" value="${['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE','CREATE','VALIDATE','POST','INITIATE','WITHDRAW','CANCEL','HOLD','FORCE_APPROVE','ESCALATED_APPROVE','WAIVE','REJECT','ASSIGN','EXPORT','IMPORT','DISBURSE','REVERSE']}" />
     <section id="user-access-claims" class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true" data-access-matrix>
         <div class="app-table-titlebar admin-user-section-header admin-user-section-header--actions">
@@ -99,25 +91,34 @@
 
     <section id="user-access-status" class="erp-panel admin-user-edit-panel">
         <div class="admin-user-section-header">
-            <h2><spring:message code="admin.workspace.accountStatus" /></h2>
+            <h2><spring:message code="admin.workspace.editAccess" /></h2>
         </div>
-        <div class="admin-user-section-body">
+        <div class="admin-user-section-body flex flex-wrap items-start gap-4">
+            <input type="hidden" name="sourceBranch" value="<c:out value='${selectedStaffBranch}' />" />
+            <label class="fcms-label admin-status-field flex-1">
+                <spring:message code="branches.branch" />
+                <select name="branch" class="fcms-control" required>
+                    <c:forEach var="choice" items="${staffBranches}">
+                        <option value="<c:out value='${choice}' />" ${selectedStaffBranch eq choice ? 'selected' : ''}><c:out value="${choice}" /></option>
+                    </c:forEach>
+                </select>
+            </label>
+
             <c:choose>
                 <c:when test="${user.status eq 'INVITED' or user.canDeleteStaffRecord}">
                     <input type="hidden" name="status" value="${user.status}" />
-                    <div class="admin-status-callout is-warning">
-                        <p class="admin-section-kicker"><spring:message code="common.status" /></p>
-                        <p class="admin-status-callout__value"><c:out value="${user.displayStatus}" /></p>
-                        <p class="admin-status-callout__text"><spring:message code="${user.status eq 'INVITED' ? 'admin.users.invite.pending' : 'admin.users.invite.cancelled'}" /></p>
+                    <div class="admin-status-field">
+                        <span class="fcms-label"><spring:message code="common.status" /></span>
+                        <span data-resource-status="${user.status}"><c:out value="${user.displayStatus}" /></span>
                     </div>
                 </c:when>
                 <c:otherwise>
-                    <label class="fcms-label admin-status-field">
+                    <label class="fcms-label admin-status-field flex-1">
                         <spring:message code="common.status" />
                         <select name="status" class="fcms-control">
                             <c:forEach items="${statuses}" var="status">
                                 <c:if test="${status ne 'INVITED'}">
-                                    <option value="${status}" ${user.status eq status ? 'selected' : ''}>${status}</option>
+                                    <option value="${status}" ${user.status eq status ? 'selected' : ''}><spring:message code="${status eq 'ACTIVE' ? 'status.active' : 'admin.dashboard.inactive'}" text="${status}" /></option>
                                 </c:if>
                             </c:forEach>
                         </select>
@@ -147,7 +148,7 @@
                 <spring:message code="admin.users.deleteUser" />
             </button>
         </c:if>
-        <a href="/admin/users" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
+        <a href="<c:out value='${usersUrl}' />" class="app-btn btn-neutral"><spring:message code="common.cancel" /></a>
         <button type="button" class="app-btn btn-neutral" data-access-discard disabled><spring:message code="access.matrix.discard" /></button>
         <button type="submit" class="app-btn btn-launch" data-access-save disabled><spring:message code="admin.saccoRegistry.saveChanges" /></button>
     </div>

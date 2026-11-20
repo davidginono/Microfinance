@@ -4,12 +4,13 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
+<c:set var="branchSection" value="${section}" />
 <%@ include file="branch-path.jspf" %>
 <c:url value="/staff/branches/${section}" var="registryUrl" />
 <c:set var="clientList" value="${section eq 'clients'}" />
 <section class="erp-table-wrap" data-resource-table="other-branch-records" data-aws-table-region>
     <div class="app-table-titlebar"><h1 class="erp-panel-title"><spring:message code="branches.section.${section}" /></h1></div>
-    <form method="get" action="${registryUrl}" data-table-filter-for="other-branch-records">
+    <form method="get" action="${registryUrl}" class="aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="other-branch-records">
         <input type="hidden" name="branch" value="<c:out value='${branch.id}' />" />
         <input type="hidden" name="sort" value="<c:out value='${sort}' />" />
         <label><span class="sr-only"><spring:message code="common.search" /></span><input name="search" type="search" class="aws-control" value="<c:out value='${search}' />" maxlength="100" placeholder="<spring:message code='common.search' />" /></label>
@@ -30,7 +31,7 @@
                 <tr>
                     <td><a class="resource-table-id-link" href="<c:out value='${recordUrl}' />"><c:out value="${row.number}" /></a></td>
                     <td><c:out value="${clientList ? row.name : row.client}" /></td>
-                    <td><spring:message code="${clientList ? 'kyc.state.'.concat(row.state) : 'recording.status.'.concat(row.status)}" text="${clientList ? row.state : row.status}" /></td>
+                    <td><span data-resource-status="${clientList ? row.state : row.status}"><spring:message code="${clientList ? 'kyc.state.'.concat(row.state) : 'recording.status.'.concat(row.status)}" text="${clientList ? row.state : row.status}" /></span></td>
                     <c:if test="${not clientList}"><td><fmt:formatNumber value="${row.principal}" minFractionDigits="2" maxFractionDigits="2" /></td></c:if>
                 </tr>
             </c:forEach>

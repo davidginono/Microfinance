@@ -1,16 +1,18 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
+<%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
 <c:url value="/staff/offices/loan-review-archive" var="archiveUrl" />
 <section class="erp-table-wrap" data-resource-table="staff-loan-review-archive" data-aws-table-region>
     <div class="app-table-titlebar">
-        <h1 class="erp-panel-title"><spring:message code="office.archive" /></h1>
-        <p class="erp-table-total"><spring:message code="office.archive.reviewed" /> <fmt:formatNumber value="${archive.count}" /></p>
+        <h2 class="erp-panel-title" data-workspace-title><spring:message code="office.archive" />
+            <span class="app-table-count" title="<spring:message code='office.archive.reviewed' />">(<fmt:formatNumber value="${archive.count}" />)</span>
+        </h2>
     </div>
-    <form method="get" action="${archiveUrl}" data-table-filter-for="staff-loan-review-archive">
+    <form method="get" action="${archiveUrl}" class="aws-filter-toolbar" data-aws-filter-toolbar data-table-filter-for="staff-loan-review-archive">
         <label><span class="sr-only"><spring:message code="common.search" /></span><input type="search" class="aws-control" name="search" maxlength="100" value="<c:out value='${search}' />" placeholder="<spring:message code='common.search' />" /></label>
         <input type="hidden" name="sort" value="<c:out value='${sort}' />" />
         <button class="app-btn btn-neutral"><spring:message code="voucher.filter" /></button>
@@ -29,8 +31,8 @@
                     <tr>
                         <td><a class="resource-table-id-link" href="<c:url value='/finance/loan-records/${loan.id}' />"><c:out value="${loan.number}" /></a></td>
                         <td><c:out value="${loan.client}" /></td>
-                        <td><c:out value="${loan.disbursed}" /></td>
-                        <td><spring:message code="recording.status.${loan.status}" /></td>
+                        <td><c:out value="${appTime:display(loan.disbursed)}" /></td>
+                        <td><span data-resource-status="${loan.status}"><spring:message code="recording.status.${loan.status}" /></span></td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty archive.rows}"><tr><td colspan="4"><spring:message code="${empty search ? 'office.archive.empty' : 'credit.noMatches'}" /></td></tr></c:if>

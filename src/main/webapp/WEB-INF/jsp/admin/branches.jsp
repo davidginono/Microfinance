@@ -7,7 +7,7 @@
 <c:if test="${branchSaved}"><div data-workspace-flashbar><div class="console-message" data-message-type="success" data-app-toast role="status"><spring:message code="branches.saved" /><button type="button" class="erp-icon-btn" data-feedback-dismiss aria-label="<spring:message code='common.close' />">&#215;</button></div></div></c:if>
 <section class="erp-table-wrap" data-resource-table="branch-register" data-aws-table-region>
     <div class="app-table-titlebar">
-        <h1 class="erp-panel-title"><spring:message code="branches.title" /></h1>
+        <h1 class="erp-panel-title" data-workspace-title><spring:message code="branches.title" /></h1>
         <c:if test="${register.canCreate}"><a class="app-btn btn-launch" href="<c:url value='/admin/branches/new' />"><spring:message code="branches.create" /></a></c:if>
     </div>
     <form method="get" action="<c:url value='/admin/branches' />" data-table-filter-for="branch-register"><input type="hidden" name="sort" value="<c:out value='${sort}' />" /></form>
@@ -23,7 +23,7 @@
                             <c:otherwise><c:out value="${branch.id}" /></c:otherwise></c:choose>
                         </td>
                         <td><c:out value="${branch.location}" /></td>
-                        <td><spring:message code="${branch.suspended ? 'branches.suspended' : branch.active ? 'branches.active' : 'branches.inactive'}" /></td>
+                        <td><span data-resource-status="${branch.suspended ? 'STOPPED' : branch.active ? 'ACTIVE' : 'INACTIVE'}"><spring:message code="${branch.suspended ? 'branches.suspended' : branch.active ? 'branches.active' : 'branches.inactive'}" /></span></td>
                     </tr>
                 </c:forEach>
                 <c:if test="${empty register.rows.content}"><tr><td colspan="3"><spring:message code="branches.empty" /></td></tr></c:if>

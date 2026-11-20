@@ -4,13 +4,14 @@
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <%@ include file="../fragments/sidebar.jspf" %>
+<c:set var="branchSection" value="statements" />
 <%@ include file="branch-path.jspf" %>
 <section class="erp-table-wrap" data-resource-table="branch-statements" data-aws-table-region>
     <div class="app-table-titlebar"><h1 class="erp-panel-title"><spring:message code="branches.section.statements" /></h1></div>
     <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="financial-statement"><thead><tr><th><spring:message code="fs.from" /></th><th><spring:message code="fs.through" /></th></tr></thead><tbody>
         <c:forEach var="run" items="${runs}">
             <c:url value="/staff/branches/statements/${run.id}" var="previewUrl"><c:param name="branch" value="${branch.id}" /></c:url>
-            <tr><td><c:out value="${run.from}" /></td><td><a class="resource-table-id-link" href="<c:out value='${previewUrl}' />"><c:out value="${run.through}" /></a></td></tr>
+            <tr><td><c:out value="${appTime:display(run.from)}" /></td><td><a class="resource-table-id-link" href="<c:out value='${previewUrl}' />"><c:out value="${appTime:display(run.through)}" /></a></td></tr>
         </c:forEach>
         <c:if test="${empty runs}"><tr><td colspan="2"><spring:message code="branches.empty" /></td></tr></c:if>
     </tbody></table></div>

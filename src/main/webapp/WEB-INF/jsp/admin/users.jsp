@@ -46,20 +46,24 @@
 
         <label class="admin-users-filter-field admin-users-filter-field--query">
             <span class="sr-only"><spring:message code="common.search" /></span>
-            <c:if test="${staffBranches.size() gt 1}">
-            <label><spring:message code="branches.branch" />
-                <select class="aws-control" name="branch">
-                    <c:forEach var="choice" items="${staffBranches}"><option value="<c:out value='${choice}' />" ${selectedStaffBranch eq choice ? 'selected' : ''}><c:out value="${choice}" /></option></c:forEach>
-                </select>
-            </label>
-        </c:if>
-        <input type="search"
+            <input type="search"
                    name="query"
                    value="${selectedUserQuery}"
                    class="fcms-control w-full"
                    placeholder="<spring:message code='admin.workspace.searchUsers' />"
                    title="<spring:message code='admin.workspace.searchUsers' />" />
         </label>
+
+        <c:if test="${staffBranches.size() gt 1}">
+            <label class="admin-users-filter-field admin-users-filter-field--branch">
+                <span class="sr-only"><spring:message code="branches.branch" /></span>
+                <select class="fcms-control w-full" name="branch">
+                    <c:forEach var="choice" items="${staffBranches}">
+                        <option value="<c:out value='${choice}' />" ${selectedStaffBranch eq choice ? 'selected' : ''}><c:out value="${choice}" /></option>
+                    </c:forEach>
+                </select>
+            </label>
+        </c:if>
 
         <label class="admin-users-filter-field admin-users-filter-field--rows" data-table-page-size-control>
             <span class="sr-only"><spring:message code="admin.workspace.pageSize" /></span>
@@ -230,9 +234,9 @@
                     <input name="phone" type="tel" value="<c:out value='${staffRegistrationValues.phone}' />" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" aria-describedby="staff-phone-status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                     <span id="staff-phone-status" role="status" aria-live="polite" aria-atomic="true" class="mt-1 block text-sm font-normal normal-case tracking-normal"></span>
                 </label>
-                <label class="block">
+                <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <spring:message code="branches.branch" />
-                    <select name="branch" class="aws-control" required>
+                    <select name="branch" class="fcms-control mt-1 w-full" required>
                         <c:forEach var="choice" items="${staffBranches}">
                             <option value="<c:out value='${choice}' />" ${(empty staffRegistrationValues.branch ? selectedStaffBranch : staffRegistrationValues.branch) eq choice ? 'selected' : ''}><c:out value="${choice}" /></option>
                         </c:forEach>
