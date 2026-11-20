@@ -117,9 +117,17 @@ class ReportTotalsTest {
         Tomcat.addServlet(context,"jsp",new JspServlet());context.addServletMappingDecoded("*.jsp","jsp");
         Tomcat.addServlet(context,"preview",new HttpServlet(){
             @Override protected void doGet(HttpServletRequest request,HttpServletResponse response) throws java.io.IOException,jakarta.servlet.ServletException {
-                var kind=Kind.valueOf(request.getParameter("kind"));var result=new LoanReportExcelTest().result(kind,1);
+                var kind=Kind.valueOf(request.getParameter("kind"));
+                var result=new LoanReportExcelTest().result(kind,1);
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS && request.getParameter("empty")!=null){
+                    result=new Result(kind,result.parameters(),"Institution","Branch",result.columns(),List.of(),List.of(),
+                        Map.of(),0,0,false,"","CL-SELECTED — Selected client",
+                        Map.of("clientNumber","CL-SELECTED","name","Selected client","product","Selected loan product"));
+                }
                 request.setAttribute("report",result);request.setAttribute("referenceLocale",request.getLocale());
-                request.setAttribute("referenceStamp","Printed");request.setAttribute("referencePeriod","Period");request.setAttribute("referenceDetails",List.of());
+                request.setAttribute("referenceStamp","Printed");request.setAttribute("referencePeriod","Period");
+                request.setAttribute("referenceDetails",LoanReportReferenceText.headerDetails(result,request.getLocale(),
+                    key->LoanReportExcelTest.messages().getMessage("management."+key,null,request.getLocale())));
                 var headings=new HashMap<String,String>();result.getDocumentColumns().forEach(c->headings.put(c.key(),c.key()));
                 request.setAttribute("referenceHeadings",headings);
                 request.setAttribute("referenceWidths",Collections.nCopies(result.getDocumentColumns().size()+(kind==Kind.DISBURSED_LOANS_AUDIT?1:0),50));
@@ -134,7 +142,14 @@ class ReportTotalsTest {
                 assertThat(response.statusCode()).as(kind+" "+response.body()).isEqualTo(200);
                 assertThat(response.body().split("<tr class=\"reference-total\"",-1)).as(kind+" HTML "+language).hasSize(2);
                 assertThat(response.body()).contains(LoanReportExcelTest.messages().getMessage("management.total",null,Locale.forLanguageTag(language)));
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS)assertThat(response.body()).doesNotContain(new LoanReportExcelTest().result(kind,1).clientSelection());
             }
+            var empty=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+tomcat.getConnector().getLocalPort()
+                +"/preview?kind=LOAN_REPAYMENT_TRANSACTIONS&empty=true")).header("Accept-Language","en").GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertThat(empty.statusCode()).isEqualTo(200);
+            assertThat(empty.body()).contains("<dd>CL-SELECTED</dd>","<dd>Selected client</dd>","<dd>Selected loan product</dd>",
+                "No records match these parameters.")
+                .doesNotContain("CL-SELECTED — Selected client","<p>Loan type / product:");
         }finally{tomcat.stop();tomcat.destroy();spring.close();}
     }
 }

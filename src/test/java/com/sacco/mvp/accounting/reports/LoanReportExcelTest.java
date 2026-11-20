@@ -114,8 +114,10 @@ class LoanReportExcelTest {
                 assertThat(range.getCell(1)).isNull();
                 assertThat(range.getCell(4).getStringCellValue()).isEqualTo(messages.getMessage("management.pdf.dueDateRange",null,locale));
                 var product=report.getRow(header-1);
-                assertThat(product.getCell(1).getStringCellValue()).isEqualTo("01");
-                assertThat(product.getCell(3).getStringCellValue()).isEqualTo("Business loans");
+                assertThat(product.getCell(0).getStringCellValue())
+                    .isEqualTo(messages.getMessage("management.pdf.loanTypeName",null,locale).toUpperCase(locale));
+                assertThat(product.getCell(2).getStringCellValue()).isEqualTo("Business loans");
+                assertThat(product.getPhysicalNumberOfCells()).isEqualTo(2);
             }
             case LOAN_REPAYMENT_TRANSACTIONS -> {
                 var borrower=report.getRow(header-4);

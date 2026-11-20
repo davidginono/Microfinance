@@ -72,8 +72,18 @@ public class ManagementReportService {
             var data=reports.read(a,kind,p,export);
             check(data.groups().size()<=1000 && (!export || data.rows().size()<=5000),"large");
             var identity=reports.identity(a);
-            return new Result(kind,product==null?p:p.withProductName(product.name()),identity[0],identity[1],com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),
-                export?data.rows():data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),!export && data.rows().size()>25,accountSelection,client==null?"":client.getLabel());
+            var resolved=product==null?p:p.withProductName(product.name());
+            var emptyFacts=new LinkedHashMap<String,Object>();
+            if(data.rows().isEmpty()){
+                if(!resolved.product().isBlank())emptyFacts.put("product",resolved.product());
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS && client!=null){
+                    emptyFacts.put("clientNumber",client.code());
+                    emptyFacts.put("name",client.name());
+                    if(data.count()==0)emptyFacts.putAll(reports.soleRepaymentLoan(a,p));
+                }
+            }
+            return new Result(kind,resolved,identity[0],identity[1],com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),
+                export?data.rows():data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),!export && data.rows().size()>25,accountSelection,client==null?"":client.getLabel(),Collections.unmodifiableMap(emptyFacts));
         });
     }
     public static com.sacco.mvp.domain.UserClaim viewClaim(Kind kind) {

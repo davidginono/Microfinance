@@ -57,7 +57,7 @@ public class StatementService {
         if(setup.notes().isEmpty())checks.add(new Check("notesSetup",null));
         else {var familyNotes=new HashMap<UUID,Set<Integer>>();for(var b:balances)if(b.mapping()!=null&&b.mapping().groupId()!=null)familyNotes.computeIfAbsent(b.mapping().groupId(),k->new HashSet<>()).add(b.mapping().note());if(familyNotes.values().stream().anyMatch(n->n.size()>1&&n.stream().anyMatch(i->i>0)))checks.add(new Check("notesLinks",null));}
 
-        var snapshot=new Snapshot(4,id,p,now,a.getSaccoId(),a.getStationId(),identity[0],identity[1],balances,profitNote(calculated.position(),setup),calculated.income(),calculated.cash(),equity.columns(),equity.current(),List.copyOf(checks),setup,equity.previous(),List.copyOf(movements));
+        var snapshot=new Snapshot(5,id,p,now,a.getSaccoId(),a.getStationId(),identity[0],identity[1],balances,profitNote(calculated.position(),setup),calculated.income(),calculated.cash(),equity.columns(),equity.current(),List.copyOf(checks),setup,equity.previous(),List.copyOf(movements));
         String payload=mapper.writeValueAsString(snapshot);require(payload.length()<=8*1024*1024,"limit");repository.payload(id,payload,sha(payload.getBytes(StandardCharsets.UTF_8)));
         log(a,id,"PREVIEW");return id;
     }
@@ -92,7 +92,7 @@ public class StatementService {
 
     private Run verifiedRun(UUID id,StatementRepository.Stored stored) {
         if(stored.payload()==null||!sha(stored.payload().getBytes(StandardCharsets.UTF_8)).equals(stored.checksum()))throw new IllegalStateException("Statement integrity check failed");
-        var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require((snapshot.version()>=1&&snapshot.version()<=4)&&snapshot.id().equals(id),"snapshot");
+        var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require((snapshot.version()>=1&&snapshot.version()<=5)&&snapshot.id().equals(id),"snapshot");
         return new Run(id,stored.from(),stored.through(),stored.generated(),stored.wide(),stored.saved(),snapshot);
     }
     @Transactional(readOnly=true)

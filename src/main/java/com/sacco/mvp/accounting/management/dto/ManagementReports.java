@@ -28,7 +28,13 @@ public final class ManagementReports {
     public record SubtotalLayout(Set<String> groups,Set<String> periods) {}
     public record Result(Kind kind, Parameters parameters, String institution, String branch,
             List<Column> columns, List<Map<String,Object>> rows, List<Group> groups,
-            Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountSelection, String clientSelection) {
+            Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountSelection,
+            String clientSelection, Map<String,Object> emptyGroupFacts) {
+        public Result(Kind kind, Parameters parameters, String institution, String branch,
+                List<Column> columns, List<Map<String,Object>> rows, List<Group> groups,
+                Map<String,BigDecimal> totals, long count, long excluded, boolean hasNext, String accountSelection, String clientSelection) {
+            this(kind,parameters,institution,branch,columns,rows,groups,totals,count,excluded,hasNext,accountSelection,clientSelection,Map.of());
+        }
         public List<String> getTotalFields(){return totalFields(kind);}
         public List<Column> getDocumentColumns(){return isReferenceLayout()?documentColumns(kind):columns;}
         public boolean hasSpreadsheet(){return spreadsheetSupported(kind);}

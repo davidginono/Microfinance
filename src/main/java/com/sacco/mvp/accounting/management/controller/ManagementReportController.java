@@ -18,7 +18,6 @@ import org.springframework.web.server.ResponseStatusException;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.time.*;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 
@@ -94,7 +93,7 @@ public class ManagementReportController {
         return "accounting/management/print";
     }
     @GetMapping("/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,kind(reportName),category,search,page);}
-    private void defaults(Filter f,Kind kind){if(f.getThrough()==null)f.setThrough((kind==Kind.EXPECTED_REPAYMENTS?clock.today().withDayOfMonth(clock.today().lengthOfMonth()):clock.today()).toString());if(f.getFrom()==null){java.time.LocalDate end;try{end=LocalDate.parse(f.getThrough());}catch(DateTimeException e){end=clock.today();}f.setFrom(end.withDayOfMonth(1).toString());}if(f.getCutoff()==null)f.setCutoff(clock.now().truncatedTo(ChronoUnit.SECONDS).toString());}
+    private void defaults(Filter f,Kind kind){if(f.getThrough()==null)f.setThrough((kind==Kind.EXPECTED_REPAYMENTS?clock.today().withDayOfMonth(clock.today().lengthOfMonth()):clock.today()).toString());if(f.getFrom()==null){java.time.LocalDate end;try{end=LocalDate.parse(f.getThrough());}catch(DateTimeException e){end=clock.today();}f.setFrom(end.withDayOfMonth(1).toString());}if(f.getCutoff()==null)f.setCutoff(clock.now().toString());}
     private Parameters parameters(Filter f){return new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),f.getStartAccount(),f.getEndAccount(),f.getClientId(),f.getProduct(),f.getPage(),f.getProductId());}
     private void context(AppUserPrincipal a,Kind kind,String name,Filter f,Model m){
         m.addAttribute("kind",kind);m.addAttribute("reportName",name);m.addAttribute("today",clock.today());

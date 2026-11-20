@@ -28,6 +28,8 @@ public class ReconciliationPdf {
             var font=PDType0Font.load(document,input);
             var context=new ArrayList<>(List.of(r.institution()+" | "+r.branch(),com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().from())+" — "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().through())+" | TZS",
                 msg("cutoff",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.display(r.parameters().cutoff()),msg("exceptionsOnly",locale)));
+            if(r.count()==0 && !"ALL".equals(r.parameters().component()))
+                context.add(msg("componentLabel",locale)+": "+msg("component."+r.parameters().component(),locale));
             if(r.selectedActivity()!=null){context.add(msg("activity",locale)+": "+r.selectedActivity().label(locale));context.add(msg("activityScope",locale));}
             if(r.parameters().unassigned()){context.add(msg("activity",locale)+": "+msg("unassigned",locale));context.add(msg("manualScope",locale));}
             try(var page=new AccountingPdfDocument(document,font,true,msg("title",locale),context,null,AccountingPdfDocument.Style.REFERENCE)) {

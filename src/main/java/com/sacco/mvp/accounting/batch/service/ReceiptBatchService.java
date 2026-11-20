@@ -94,6 +94,9 @@ public class ReceiptBatchService {
             var matches = eligible.getOrDefault(input.loanNumber(), List.of());
             if (matches.size() != 1) throw new ImportRowError("batch.error.importLoan", input.line());
             var loan = matches.getFirst();
+            if (input.clientId() != null && !input.clientId().equals(loan.clientId())) {
+                throw new ImportRowError("batch.error.importClient", input.line());
+            }
             if (input.date().isAfter(today) || input.date().isBefore(loan.disbursed())) {
                 throw new ImportRowError("batch.error.importDate", input.line());
             }

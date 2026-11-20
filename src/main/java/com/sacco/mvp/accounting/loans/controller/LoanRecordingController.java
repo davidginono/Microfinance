@@ -219,7 +219,7 @@ public class LoanRecordingController {
     }
     private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale){return statementDocument(source,locale,null);}
     private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale,Posting opening){
-        String unavailable=label("recording.unavailable",locale);String[] client=source.client().split(" - ",2);
+        String missing="—";String[] client=source.client().split(" - ",2);
         var identity=List.of(new StatementField(label("recording.statement.clientNumber",locale),client[0]),
             new StatementField(label("recording.statement.name",locale),client.length>1?client[1]:source.client()),
             new StatementField(label("recording.asOf",locale),statementDate(clock.today(),locale)));
@@ -233,18 +233,24 @@ public class LoanRecordingController {
             var disbursement=opening!=null?opening:movements.stream().filter(p->"DISBURSEMENT".equals(p.kind())).findFirst().orElse(null);
             var fields=new ArrayList<StatementField>();
             statementField(fields,"loan",loan.number(),locale);statementField(fields,"product",loan.product(),locale);
-            statementField(fields,"disbursementDate",disbursement==null?unavailable:statementDate(disbursement.date(),locale),locale);
+            statementField(fields,"disbursementDate",disbursement==null?missing:statementDate(disbursement.date(),locale),locale);
             statementField(fields,"principal",statementMoney(loan.principal(),locale),locale);
-            statementField(fields,"months",term==null?unavailable:term.tenureValue()+" "+label("recording.tenure."+term.tenureUnit(),locale),locale);
-            statementField(fields,"rateAnnual",term==null || term.rate()==null || "AMOUNT".equals(term.rateBasis())?unavailable:statementMoney(term.rate().multiply(new BigDecimal("100")),locale)+"% "+label("recording.basis."+term.rateBasis(),locale),locale);
-            statementField(fields,"paymentDates",term==null?unavailable:statementDate(term.firstPaymentDate(),locale)+" / "+statementDate(term.lastPaymentDate(),locale),locale);
-            statementField(fields,"installment",term==null || term.frequency()==null?unavailable:statementMoney(term.installment(),locale)+" / "+label("recording.frequency."+term.frequency(),locale),locale);
-            statementField(fields,"disbursed",disbursement==null?unavailable:statementMoney(disbursement.amount(),locale),locale);
-            statementField(fields,"outstanding",disbursement==null?unavailable:statementMoney(loan.outstandingPrincipal(),locale),locale);
-            statementField(fields,"dueInterest",disbursement==null?unavailable:statementMoney(loan.dueInterest(),locale),locale);
-            fields.add(new StatementField(label("charges.outstanding",locale),disbursement==null?unavailable:statementMoney(loan.charges(),locale)));
-            statementField(fields,"arrears",disbursement==null?unavailable:statementMoney(loan.arrears(),locale),locale);
-            statementField(fields,"branch",term==null?unavailable:term.institution()+" / "+term.branch(),locale);
+            statementField(fields,"months",term==null?missing:term.tenureValue()+" "+label("recording.tenure."+term.tenureUnit(),locale),locale);
+            if(term!=null && "AMOUNT".equals(term.rateBasis())){
+                statementField(fields,"fixedInterest",statementMoney(term.fixedInterest(),locale),locale);
+            }else{
+                String rate=term==null || term.rate()==null?missing
+                    :statementMoney(term.rate().movePointRight(2),locale)+"% "+label("recording.basis."+term.rateBasis(),locale);
+                statementField(fields,"rateAnnual",rate,locale);
+            }
+            statementField(fields,"paymentDates",term==null?missing:statementDate(term.firstPaymentDate(),locale)+" / "+statementDate(term.lastPaymentDate(),locale),locale);
+            statementField(fields,"installment",term==null || term.frequency()==null?missing:statementMoney(term.installment(),locale)+" / "+label("recording.frequency."+term.frequency(),locale),locale);
+            statementField(fields,"disbursed",disbursement==null?missing:statementMoney(disbursement.amount(),locale),locale);
+            statementField(fields,"outstanding",disbursement==null?missing:statementMoney(loan.outstandingPrincipal(),locale),locale);
+            statementField(fields,"dueInterest",disbursement==null?missing:statementMoney(loan.dueInterest(),locale),locale);
+            fields.add(new StatementField(label("charges.outstanding",locale),disbursement==null?missing:statementMoney(loan.charges(),locale)));
+            statementField(fields,"arrears",disbursement==null?missing:statementMoney(loan.arrears(),locale),locale);
+            statementField(fields,"branch",term==null?missing:term.institution()+" / "+term.branch(),locale);
             var rows=new ArrayList<List<String>>();
             for(var post:movements){
                 boolean credit=Set.of("PAYMENT","SETTLEMENT","FUNDING_UNDO").contains(post.kind());
@@ -266,8 +272,8 @@ public class LoanRecordingController {
             label("recording.statement.empty",locale),label("recording.statement.note",locale));
     }
     private void statementField(List<StatementField> fields,String key,String value,Locale locale){fields.add(new StatementField(label("recording.statement."+key,locale),value));}
-    private String statementDate(LocalDate value,Locale locale){return value==null?label("recording.unavailable",locale):value.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu",locale)).toUpperCase(locale);}
-    private String statementMoney(BigDecimal value,Locale locale){if(value==null)return label("recording.unavailable",locale);var format=java.text.NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(value);}
+    private String statementDate(LocalDate value,Locale locale){return value==null?"—":value.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu",locale)).toUpperCase(locale);}
+    private String statementMoney(BigDecimal value,Locale locale){if(value==null)return "—";var format=java.text.NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(value);}
     @GetMapping({"/loan-disbursements/report/pdf","/loan-disbursements/report/print","/loan-repayments/report/pdf","/loan-repayments/report/print"})
     public Object report(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="newest") String sort,@RequestParam(required=false) UUID productId,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
         String kind=kind(request);Choice selectedProduct=productId==null?null:service.filterProduct(a,productId);var rows=service.report(a,kind,new Filter(search,from,through,state,sort,0,null,productId));var lines=new ArrayList<String>();lines.add(label("recording.asOf",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(clock.today()));lines.add(label("voucher.from",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(from)+" | "+label("voucher.through",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(through));

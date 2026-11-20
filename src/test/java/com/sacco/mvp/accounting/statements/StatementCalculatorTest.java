@@ -39,10 +39,14 @@ class StatementCalculatorTest {
             .usingElementComparator(BigDecimal::compareTo).containsExactly(n("10"),n("10"),n("100"),n("110"));
         assertThat(result.checks()).extracting(Check::key).containsExactly("coverage");
     }
-    @Test void ambiguousCompoundCashJournalsAreFlaggedWithoutInventingAllocations(){
+    @Test void compoundJournalWithinOneActivityShowsItsNetCash(){
         var bank=balance("ASSET","BANK","CURRENT_ASSETS","OPERATING","0","100","0");var expense=balance("EXPENSE","EXPENSE","EXPENSE","OPERATING","0","50","0");var income=balance("INCOME","INCOME","INCOME","OPERATING","0","0","150");UUID journal=UUID.randomUUID();
         var result=StatementCalculator.calculate(List.of(bank,expense,income),List.of(cash(journal,bank,"100","0"),cash(journal,expense,"50","0"),cash(journal,income,"0","150")),PERIOD);
-        assertThat(result.checks()).extracting(Check::key).contains("cashAmbiguous","cash");
+        assertThat(result.cash()).filteredOn(r->r.label().equals("fs.cashCompound")).singleElement().satisfies(r->{
+            assertThat(r.section()).isEqualTo("OPERATING");
+            assertThat(r.current()).isEqualByComparingTo("100");
+        });
+        assertThat(result.checks()).extracting(Check::key).containsExactly("coverage");
     }
     @Test void exactReversalNetsToZeroAndMissingMappingsAreVisible(){
         var raw=balance("ASSET","BANK","CURRENT_ASSETS","OPERATING","0","0.01","0.01");var bank=new Balance(raw.id(),raw.code(),raw.name(),raw.type(),raw.purpose(),null,n("0"),n("0.01"),n("0.01"),n("0"),n("0"),n("0"),n("0"),n("0"));

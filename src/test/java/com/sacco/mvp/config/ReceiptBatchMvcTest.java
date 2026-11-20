@@ -80,10 +80,11 @@ class ReceiptBatchMvcTest {
         var path = "/finance/batches/receipts/" + batch + "/spreadsheet";
         var date = LocalDate.of(2026, 11, 9);
         var money = UUID.randomUUID();
+        var client = UUID.randomUUID();
         when(batches.spreadsheetBatch(actor, batch)).thenReturn(new Batch(batch, "I1", "B1",
             actor.getMemberId(), "Collections", 1, "DRAFT", false, null, OffsetDateTime.now()));
         when(batches.templateLoans(actor, batch, "")).thenReturn(List.of(new ReceiptEntryLoan(UUID.randomUUID(),
-            UUID.randomUUID(), "0001", "Client A", "001", "Business", date.minusMonths(1), date, BigDecimal.TEN)));
+            client, "0001", "Client A", "001", "Business", date.minusMonths(1), date, BigDecimal.TEN)));
         var downloaded = mvc.perform(get(path + "/template.xlsx").with(user(actor)))
             .andExpect(status().isOk()).andExpect(header().string("Cache-Control", "no-store"))
             .andExpect(header().string("Content-Disposition", "attachment; filename=\"repayment-entry.xlsx\""))
@@ -102,7 +103,7 @@ class ReceiptBatchMvcTest {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", completed);
         mvc.perform(multipart(path).file(upload).param("moneyAccountId", money.toString()).with(user(actor)))
             .andExpect(status().isForbidden());
-        var rows = List.of(new ImportRow(3, "0001", new BigDecimal("11.03"), date, "00009"));
+        var rows = List.of(new ImportRow(3, "0001", new BigDecimal("11.03"), date, "00009", client));
         verify(batches, never()).importDrafts(any(), any(), any(), any());
         when(context.getBean(LoanRecordingService.class).receiptMoneyAccount(actor, money))
             .thenReturn(new Choice(money, "Bank", "MONEY"));

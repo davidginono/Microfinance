@@ -80,6 +80,32 @@ class IndirectCashFlowExportTest {
             .satisfies(r->{assertThat(r.cells().get(3).amount()).isNull();assertThat(r.cells().get(3).text()).isEqualTo(presentation.label("fs.unavailable",Locale.ENGLISH));});
     }
 
+    @Test void mixedCashJournalKeepsTheMovementAndTheComparativeSubtotalNumeric() throws Exception {
+        var p=StatementCalculatorTest.PERIOD;
+        var bank=StatementCalculatorTest.balance("ASSET","BANK","CURRENT_ASSETS","OPERATING","0","100","0");
+        var expense=StatementCalculatorTest.balance("EXPENSE","EXPENSE","EXPENSE","OPERATING","0","50","0");
+        var capital=StatementCalculatorTest.balance("EQUITY","CAPITAL","EQUITY","FINANCING","0","0","150");
+        var id=UUID.randomUUID();
+        var accounts=List.of(bank,expense,capital);
+        var result=com.sacco.mvp.accounting.statements.service.StatementCalculator.calculate(accounts,List.of(
+            StatementCalculatorTest.cash(id,bank,"100","0"),StatementCalculatorTest.cash(id,expense,"50","0"),
+            StatementCalculatorTest.cash(id,capital,"0","150")),p,false);
+        assertThat(result.checks()).extracting(Check::key).contains("cashAllocation").doesNotContain("cash","previousCash");
+        var base=IndirectCashFlowTest.businessSnapshot();
+        var s=new Snapshot(5,base.id(),p,base.generatedAt(),base.institution(),base.branch(),base.institutionName(),
+            base.branchName(),accounts,result.position(),result.income(),result.cash(),List.of(),List.of(),result.checks());
+        var d=presentation.document(s,Kind.CASH_FLOW,accounts,Locale.ENGLISH);
+        var amounts=Map.of("Net cash from operating activities (classified)",0,
+            "Cash from entries to classify",100,"Net movement in cash and cash equivalents",100);
+        amounts.forEach((label,value)->assertThat(d.rows()).filteredOn(r->r.cells().get(1).text().equals(label)).singleElement()
+            .satisfies(r->{assertThat(r.cells().get(3).amount()).isEqualByComparingTo(value.toString());
+                assertThat(r.cells().get(4).amount()).isEqualByComparingTo("0");}));
+        try(var pdf=org.apache.pdfbox.Loader.loadPDF(exporter.export(s,d,"PDF",Locale.ENGLISH))){
+            assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(pdf))
+                .contains("Cash from entries to classify","100.00").doesNotContain("Unavailable");
+        }
+    }
+
     @Test void oldSnapshotsKeepTheirDirectMethodRowsAndAmounts(){
         var base=IndirectCashFlowTest.businessSnapshot();var oldRows=List.of(new Row("cash-1","","Interest received",0,"OPERATING",List.of(),new java.math.BigDecimal("80"),new java.math.BigDecimal("30"),false));
         var s=new Snapshot(3,base.id(),base.parameters(),base.generatedAt(),base.institution(),base.branch(),base.institutionName(),base.branchName(),base.balances(),base.position(),base.income(),oldRows,List.of(),List.of(),List.of());

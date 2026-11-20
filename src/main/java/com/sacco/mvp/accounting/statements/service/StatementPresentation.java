@@ -63,6 +63,8 @@ public class StatementPresentation {
         }else{
             List<Row> source=switch(kind){case POSITION->s.position();case INCOME->s.income();case CASH_FLOW->s.cashFlow();default->throw new IllegalArgumentException("fs.error.selection");};
             List<String> sections=switch(kind){case POSITION->s.version()<2?List.of("NON_CURRENT_ASSETS","CURRENT_ASSETS","EQUITY","NON_CURRENT_LIABILITIES","CURRENT_LIABILITIES","UNCLASSIFIED","TOTAL"):List.of("CURRENT_ASSETS","NON_CURRENT_ASSETS","CURRENT_LIABILITIES","NON_CURRENT_LIABILITIES","EQUITY","UNCLASSIFIED","TOTAL");case INCOME->List.of("INCOME","EXPENSE","UNCLASSIFIED","TOTAL");default->List.of("OPERATING","INVESTING","FINANCING","UNCLASSIFIED","TOTAL");};
+            boolean classifiedOnly=kind==Kind.CASH_FLOW&&s.version()>=5
+                &&s.checks().stream().anyMatch(c->Set.of("cashAllocation","cashMappings","cash","previousCash").contains(c.key()));
             for(String section:sections){
                 if(kind==Kind.POSITION&&section.equals(s.version()<2?"EQUITY":"CURRENT_LIABILITIES")){var assets=source.stream().filter(r->r.key().equals("assets")).findFirst().orElseThrow();rows.add(row(true,false,null,"",label(assets.label(),locale),"",assets.current(),assets.previous()));}
                 var members=source.stream().filter(r->section.equals(r.section())&&!(kind==Kind.POSITION&&r.key().equals("assets"))).toList();if(members.isEmpty() && !(s.version()>=2 && kind==Kind.INCOME && Set.of("INCOME","EXPENSE").contains(section)))continue;
@@ -70,9 +72,11 @@ public class StatementPresentation {
                 BigDecimal current=BigDecimal.ZERO,previous=BigDecimal.ZERO;
                 for(var r:members){rows.add(row(r.total(),false,r.accounts().isEmpty()?null:base+"/trial?kind="+kind+"&line="+r.key(),r.code(),cashLabel(r,locale),r.note()==0?"":Integer.toString(r.note()),r.current()==null?label("fs.unavailable",locale):r.current(),r.previous()==null?label("fs.unavailable",locale):r.previous()));if(r.current()!=null)current=current.add(r.current());if(r.previous()!=null)previous=previous.add(r.previous());}
                 if(!Set.of("TOTAL","UNCLASSIFIED").contains(section)){
-                    boolean uncertain=kind==Kind.CASH_FLOW&&s.version()>=4&&s.checks().stream().anyMatch(c->c.key().equals("cashAmbiguous"));
+                    boolean legacyUncertain=kind==Kind.CASH_FLOW&&s.version()==4&&s.checks().stream().anyMatch(c->c.key().equals("cashAmbiguous"));
                     String totalLabel=kind==Kind.CASH_FLOW&&s.version()>=4?"fs.cashTotal."+section:s.version()>=2&&kind==Kind.INCOME?(section.equals("INCOME")?"fs.incomeTotal":"fs.expensesTotal"):"fs.total";
-                    rows.add(row(true,false,null,"",label(totalLabel,locale),"",uncertain?label("fs.unavailable",locale):current,uncertain?label("fs.unavailable",locale):previous));
+                    String caption=label(totalLabel,locale);
+                    if(classifiedOnly)caption+=" ("+label("fs.cashClassified",locale)+")";
+                    rows.add(row(true,false,null,"",caption,"",legacyUncertain?label("fs.unavailable",locale):current,legacyUncertain?label("fs.unavailable",locale):previous));
                 }
             }
         }

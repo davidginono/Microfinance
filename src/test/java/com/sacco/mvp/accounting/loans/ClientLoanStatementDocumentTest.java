@@ -69,15 +69,19 @@ class ClientLoanStatementDocumentTest {
         try(var pdf=Loader.loadPDF(controller.loanStatementPdf(actor,client,loan,request,Locale.ENGLISH).getBody())){
             assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("James Mafumba","900.00","-10.00").doesNotContain("Document reference","Document number");
         }
-        var noPostings=new LoanRecordingService.StatementExport(source.client(),source.loans(),List.of(),source.terms());
+        var fixedTerms=new StatementTerms(loan,null,"WEEKLY",12,52,date.plusDays(7),money("25"),"Test institution","Branch 1",
+            "AMOUNT","MONTHS",12,null,"",money("60"));
+        var noPostings=new LoanRecordingService.StatementExport(source.client(),source.loans(),List.of(),List.of(fixedTerms));
         when(service.loanStatement(actor,client,loan,0,false)).thenReturn(new LoanRecordingService.LoanStatementView(noPostings,null,0,false));
         for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
             var emptyScreen=new ExtendedModelMap();controller.loanStatement(actor,client,loan,0,locale,emptyScreen);
             var emptySection=((StatementDocument)emptyScreen.get("document")).sections().getFirst();
             assertThat(emptySection.rows()).isEmpty();
+            assertThat(emptySection.fields()).filteredOn(f->f.label().equals(messages.getMessage("recording.statement.fixedInterest",null,locale)))
+                .extracting(StatementField::value).containsExactly("60.00");
             for(var key:List.of("recording.statement.disbursed","recording.statement.outstanding","recording.statement.dueInterest","charges.outstanding","recording.statement.arrears")){
                 assertThat(emptySection.fields()).filteredOn(f->f.label().equals(messages.getMessage(key,null,locale)))
-                    .extracting(StatementField::value).containsExactly(messages.getMessage("recording.unavailable",null,locale));
+                    .extracting(StatementField::value).containsExactly("—");
             }
         }
     }

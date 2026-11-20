@@ -2,6 +2,7 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %><%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
 <%@ include file="../../fragments/header.jspf" %><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
+<link rel="stylesheet" href="<c:url value='/css/receipt-batches.css' />" />
 <c:url var="batchUrl" value="/finance/batches/receipts/${batch.id}" />
 <c:url var="spreadsheetUrl" value="/finance/batches/receipts/${batch.id}/spreadsheet" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />">
@@ -19,11 +20,11 @@
     </c:if>
     <section class="erp-resource-section">
         <h2><spring:message code="batch.sheet.template" /></h2>
-        <form class="grid gap-3" method="get" action="${spreadsheetUrl}/template.xlsx">
+        <form class="batch-template-form" method="get" action="${spreadsheetUrl}/template.xlsx">
             <label class="grid gap-2"><spring:message code="batch.sheet.search" />
                 <input class="aws-control" name="search" maxlength="100" value="<c:out value='${search}' />" />
             </label>
-            <div class="accounting-actions"><button type="submit" class="app-btn btn-neutral" data-download-error-response><spring:message code="batch.sheet.download" /></button></div>
+            <button type="submit" class="app-btn btn-neutral" data-download-error-response><spring:message code="batch.sheet.download" /></button>
         </form>
     </section>
     <form method="post" enctype="multipart/form-data" class="accounting-create-form" action="${spreadsheetUrl}">

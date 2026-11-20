@@ -99,6 +99,10 @@ public class ManagementReportExcel {
         if (audit && month != null && subtotals.periods().contains(month))
             total(book, sheet, result, monthlyTotals.get(month), label("monthTotal", locale), amounts);
         if (result.groups().isEmpty()) {
+            if (result.isReferenceLayout()) {
+                book.space(sheet);
+                groupFacts(book, sheet, result, "", List.of(), locale);
+            }
             book.headers(sheet, headings, repayment ? columns - 1 : -1);
             book.line(sheet, label("empty", locale), columns, false);
         }
@@ -154,8 +158,6 @@ public class ManagementReportExcel {
             case LOAN_REPAYMENT_TRANSACTIONS -> book.caption(title, titleColumns, printed, false);
             default -> throw new IllegalArgumentException("Reference layout required");
         }
-        if (kind == Kind.DISBURSED_LOANS_AUDIT && result.groups().isEmpty())
-            book.line(sheet, scope(result), columns, false);
         for (String detail : LoanReportReferenceText.headerDetails(result, locale, key -> label(key, locale)))
             book.line(sheet, detail, columns, false);
         if (result.excluded() > 0)
@@ -166,14 +168,15 @@ public class ManagementReportExcel {
 
     private void groupFacts(AccountingReportWorkbook book, Sheet sheet, Result result, String group,
                             List<Map<String, Object>> rows, Locale locale) {
-        if (!result.isReferenceLayout() || rows.isEmpty()) {
+        if (!result.isReferenceLayout()) {
             book.line(sheet, group, reportColumns(result), true);
             return;
         }
-        var first = rows.getFirst();
+        var first = rows.isEmpty() ? result.emptyGroupFacts() : rows.getFirst();
         switch (result.kind()) {
             case DISBURSED_LOANS_AUDIT -> {
-                book.facts(sheet, Arrays.asList(null, label("month", locale),first.get("month")), Set.of(), Set.of(1));
+                book.facts(sheet, Arrays.asList(null, label("month", locale), first.get("month"), null,
+                    label("productSearch", locale), first.get("product")), Set.of(), Set.of(1, 4));
                 book.emphasizeFact(sheet, 2);
                 book.space(sheet);
                 book.facts(sheet, Arrays.asList(null, label("pdf.institutionName", locale), result.institution()),
@@ -185,9 +188,8 @@ public class ManagementReportExcel {
                     null, null, label("field.disbursementAccount", locale),
                     account.length == 2 ? account[0] : null, account[account.length - 1]), Set.of(), Set.of(1, 5));
             }
-            case EXPECTED_REPAYMENTS -> book.facts(sheet, Arrays.asList(label("pdf.productCode", locale).toUpperCase(locale),
-                commonProductCode(rows), label("pdf.loanTypeName", locale).toUpperCase(locale), group),
-                Set.of(), Set.of(0, 2));
+            case EXPECTED_REPAYMENTS -> book.facts(sheet, Arrays.asList(label("pdf.loanTypeName", locale).toUpperCase(locale),
+                null, first.getOrDefault("groupName", first.get("product"))), Set.of(), Set.of(0));
             case LOAN_REPAYMENT_TRANSACTIONS -> {
                 book.facts(sheet, Arrays.asList(field("clientNumber", locale).toUpperCase(locale), first.get("clientNumber"),
                     label("sheet.borrowerName", locale).toUpperCase(locale), first.get("name"), null,
@@ -202,11 +204,6 @@ public class ManagementReportExcel {
             }
             default -> throw new IllegalArgumentException("Reference layout required");
         }
-    }
-
-    private Object commonProductCode(List<Map<String, Object>> rows) {
-        Object code = rows.getFirst().get("productCode");
-        return code != null && rows.stream().allMatch(row -> code.equals(row.get("productCode"))) ? code : null;
     }
 
     private void reportNotes(AccountingReportWorkbook book, Sheet sheet, Result result, Locale locale) {

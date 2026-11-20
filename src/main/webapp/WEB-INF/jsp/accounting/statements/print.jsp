@@ -26,7 +26,7 @@
    <thead><tr><c:forEach items="${document.columns}" var="column"><th class="${column.numeric?'fs-print-number':''}"><c:out value="${column.label}" /></th></c:forEach></tr></thead>
    <tbody><c:forEach items="${document.rows}" var="row"><tr class="${row.heading?'fs-print-section':''} ${row.total?'fs-print-total':''}"><c:choose>
     <c:when test="${row.heading}"><td colspan="${fn:length(document.columns)}"><c:forEach items="${row.cells}" var="cell"><c:out value="${cell.text}" /></c:forEach></td></c:when>
-    <c:otherwise><c:forEach items="${row.cells}" var="cell"><td class="${not empty cell.amount?'fs-print-number':''}"><c:out value="${cell.text}" /></td></c:forEach></c:otherwise>
+    <c:otherwise><c:forEach items="${row.cells}" var="cell" varStatus="cs"><td class="${document.columns[cs.index].numeric?'fs-print-number':''} ${cell.amount!=null?'fs-print-amount':''}"><c:out value="${cell.text}" /></td></c:forEach></c:otherwise>
    </c:choose></tr></c:forEach></tbody>
   </table>
   <c:if test="${document.style=='equity'}"><p class="fs-equity-scope"><c:out value="${snapshot.institutionName}" /> | <c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose> | TZS</p></c:if>

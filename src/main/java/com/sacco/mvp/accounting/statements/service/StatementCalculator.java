@@ -80,41 +80,80 @@ public final class StatementCalculator {
         var moneyAccounts=new HashSet<UUID>();for(var account:accounts)if(account.money())moneyAccounts.add(account.id());
         var journals=new LinkedHashMap<UUID,List<Cash>>();lines.forEach(l->journals.computeIfAbsent(l.journalId(),k->new ArrayList<>()).add(l));
         var values=new LinkedHashMap<String,BigDecimal[]>();var sources=new LinkedHashMap<String,Set<UUID>>();var labels=new HashMap<String,String>();
-        var operatingCash=new HashMap<UUID,BigDecimal[]>();boolean ambiguous=false,unmapped=false;
+        var operatingCash=new HashMap<UUID,BigDecimal[]>();
+        boolean ambiguous=false,unmapped=false;
         for(var journal:journals.values()){
             BigDecimal money=journal.stream().filter(l->moneyAccounts.contains(l.accountId())).map(Cash::signed).reduce(ZERO,BigDecimal::add);
             var others=journal.stream().filter(l->!moneyAccounts.contains(l.accountId())&&l.signed().signum()!=0).toList();
-            if(others.isEmpty())continue; // Transfers within cash equivalents never inflate any activity.
-            if(money.signum()==0||others.stream().anyMatch(l->l.signed().signum()==money.signum())){ambiguous=true;continue;}
-            if(others.stream().map(Cash::signed).reduce(money,BigDecimal::add).signum()!=0){ambiguous=true;continue;}
-            for(var line:others){var account=byAccount.get(line.accountId());var m=account==null?null:account.mapping();
-                String section=m==null?"UNCLASSIFIED":m.cashSection();if("UNCLASSIFIED".equals(section))unmapped=true;
-                String label=m==null?(account==null?"fs.unclassified":account.name()):m.line();String key=section+"\u001f"+(m!=null && m.groupId()!=null?m.groupId():label);labels.put(key,label);
-                sources.computeIfAbsent(key,k->new LinkedHashSet<>()).add(line.accountId());
-                var amount=values.computeIfAbsent(key,k->new BigDecimal[]{ZERO,ZERO});
-                if(!line.date().isBefore(p.from())&&!line.date().isAfter(p.through()))amount[0]=amount[0].subtract(line.signed());
-                if(!line.date().isBefore(p.previousFrom())&&!line.date().isAfter(p.previousThrough()))amount[1]=amount[1].subtract(line.signed());
+            BigDecimal balance=others.stream().map(Cash::signed).reduce(money,BigDecimal::add);
+            if(others.isEmpty()&&balance.signum()==0)continue; // Transfer within cash and cash equivalents.
+            boolean mixed=money.signum()==0||others.stream().anyMatch(l->l.signed().signum()==money.signum());
+            if(balance.signum()!=0||mixed){
+                var sections=others.stream().map(l->cashSection(byAccount.get(l.accountId()))).distinct().toList();
+                boolean canClassify=balance.signum()==0&&sections.size()==1;
+                String section=canClassify?sections.getFirst():"UNCLASSIFIED";
+                ambiguous|=!canClassify;
+                unmapped|=sections.contains("UNCLASSIFIED");
+                String label=canClassify?"fs.cashCompound":"fs.cashPendingAllocation";
+                String key=section+"\u001f"+label;
+                labels.put(key,label);
+                var ids=sources.computeIfAbsent(key,k->new LinkedHashSet<>());
+                (others.isEmpty()?journal:others).forEach(line->ids.add(line.accountId()));
+                addCash(values.computeIfAbsent(key,k->new BigDecimal[]{ZERO,ZERO}),journal.getFirst().date(),money,p);
+                continue;
+            }
+            for(var line:others){
+                var account=byAccount.get(line.accountId());
+                var mapping=account==null?null:account.mapping();
+                String section=cashSection(account);
                 if("OPERATING".equals(section)){
-                    var operating=operatingCash.computeIfAbsent(line.accountId(),k->new BigDecimal[]{ZERO,ZERO});
-                    if(!line.date().isBefore(p.from())&&!line.date().isAfter(p.through()))operating[0]=operating[0].subtract(line.signed());
-                    if(!line.date().isBefore(p.previousFrom())&&!line.date().isAfter(p.previousThrough()))operating[1]=operating[1].subtract(line.signed());
+                    addCash(operatingCash.computeIfAbsent(line.accountId(),k->new BigDecimal[]{ZERO,ZERO}),line.date(),line.signed().negate(),p);
+                    continue;
                 }
+                unmapped|="UNCLASSIFIED".equals(section);
+                String label=mapping==null?(account==null?"fs.unclassified":account.name()):mapping.line();
+                String key=section+"\u001f"+(mapping!=null&&mapping.groupId()!=null?mapping.groupId():label);
+                labels.put(key,label);
+                sources.computeIfAbsent(key,k->new LinkedHashSet<>()).add(line.accountId());
+                addCash(values.computeIfAbsent(key,k->new BigDecimal[]{ZERO,ZERO}),line.date(),line.signed().negate(),p);
             }
         }
-        if(ambiguous)checks.add(new Check("cashAmbiguous",null));if(unmapped)checks.add(new Check("cashMappings",null));
-        var result=new ArrayList<Row>();int n=0;
-        for(var e:values.entrySet()){if(e.getValue()[0].signum()==0 && e.getValue()[1].signum()==0)continue;String[] key=e.getKey().split("\u001f",2);result.add(new Row("cash-"+(++n),"",labels.get(e.getKey()),0,key[0],List.copyOf(sources.get(e.getKey())),e.getValue()[0],e.getValue()[1],false));}
-        // Replace operating receipts/payments, never add surplus to their existing total.
-        result.removeIf(r->"OPERATING".equals(r.section()));
-        result.addAll(0,indirectOperating(accounts,operatingCash));
-        BigDecimal movement=result.stream().map(Row::current).reduce(ZERO,BigDecimal::add),previousMovement=result.stream().map(Row::previous).reduce(ZERO,BigDecimal::add);
+        if(ambiguous)checks.add(new Check("cashAllocation",null));
+        if(unmapped)checks.add(new Check("cashMappings",null));
+        var result=new ArrayList<>(indirectOperating(accounts,operatingCash));
+        int n=0;
+        for(var entry:values.entrySet()){
+            var amounts=entry.getValue();
+            String label=labels.get(entry.getKey());
+            if(amounts[0].signum()==0&&amounts[1].signum()==0&&!"fs.cashPendingAllocation".equals(label))continue;
+            String section=entry.getKey().split("\\u001f",2)[0];
+            result.add(new Row("cash-"+(++n),"",label,0,section,List.copyOf(sources.get(entry.getKey())),amounts[0],amounts[1],false));
+        }
+        BigDecimal displayed=result.stream().map(Row::current).reduce(ZERO,BigDecimal::add);
+        BigDecimal previousDisplayed=result.stream().map(Row::previous).reduce(ZERO,BigDecimal::add);
         BigDecimal opening=ZERO,closing=ZERO,previousOpening=ZERO,previousClosing=ZERO;
-        for(var a:accounts)if(moneyAccounts.contains(a.id())){opening=opening.add(a.opening());closing=closing.add(a.closing());previousOpening=previousOpening.add(a.previousOpening());previousClosing=previousClosing.add(a.previousClosing());}
-        result.add(new Row("cashMovement","","fs.cashMovement",0,"TOTAL",List.of(),ambiguous?null:movement,ambiguous?null:previousMovement,true));
+        for(var a:accounts)if(a.money()){
+            opening=opening.add(a.opening());closing=closing.add(a.closing());
+            previousOpening=previousOpening.add(a.previousOpening());previousClosing=previousClosing.add(a.previousClosing());
+        }
+        BigDecimal movement=closing.subtract(opening),previousMovement=previousClosing.subtract(previousOpening);
+        BigDecimal difference=movement.subtract(displayed),previousDifference=previousMovement.subtract(previousDisplayed);
+        if(difference.signum()!=0||previousDifference.signum()!=0)
+            result.add(new Row("cashDifference","","fs.cashDifference",0,"UNCLASSIFIED",List.of(),difference,previousDifference,false));
+        result.add(new Row("cashMovement","","fs.cashMovement",0,"TOTAL",List.of(),movement,previousMovement,true));
         result.add(new Row("cashOpening","","fs.cashOpening",0,"TOTAL",List.of(),opening,previousOpening,false));
         result.add(new Row("cashClosing","","fs.cashClosing",0,"TOTAL",List.of(),closing,previousClosing,true));
-        difference(checks,"cash",opening.add(movement).subtract(closing));difference(checks,"previousCash",previousOpening.add(previousMovement).subtract(previousClosing));
+        difference(checks,"cash",difference.negate());difference(checks,"previousCash",previousDifference.negate());
         return result;
+    }
+    private static String cashSection(Balance account){
+        var mapping=account==null?null:account.mapping();
+        return mapping!=null&&Set.of("OPERATING","INVESTING","FINANCING").contains(mapping.cashSection())
+            ?mapping.cashSection():"UNCLASSIFIED";
+    }
+    private static void addCash(BigDecimal[] amounts,java.time.LocalDate date,BigDecimal amount,Parameters p){
+        if(!date.isBefore(p.from())&&!date.isAfter(p.through()))amounts[0]=amounts[0].add(amount);
+        if(!date.isBefore(p.previousFrom())&&!date.isAfter(p.previousThrough()))amounts[1]=amounts[1].add(amount);
     }
     private static List<Row> indirectOperating(List<Balance> accounts,Map<UUID,BigDecimal[]> operatingCash){
         var result=new ArrayList<Row>();

@@ -13,7 +13,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
 import java.time.*;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Controller @RequiredArgsConstructor @RequestMapping("/reports/financial/sl-gl-reconciliation")
@@ -76,7 +75,7 @@ public class ReconciliationController {
     private void defaults(Filter f) {
         if(f.getFrom()==null)f.setFrom(clock.today().withDayOfMonth(1).toString());
         if(f.getThrough()==null)f.setThrough(clock.today().toString());
-        if(f.getCutoff()==null)f.setCutoff(clock.now().truncatedTo(ChronoUnit.SECONDS).toString());
+        if(f.getCutoff()==null)f.setCutoff(clock.now().toString());
     }
     private String safe(Exception e) { return "reconciliation.error.large".equals(e.getMessage())?e.getMessage():"reconciliation.error.parameters"; }
     @ExceptionHandler({IllegalArgumentException.class,DateTimeException.class}) String invalid(Exception e,Model model,HttpServletResponse response) {

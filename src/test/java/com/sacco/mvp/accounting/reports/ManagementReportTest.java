@@ -95,6 +95,11 @@ class ManagementReportTest {
                 if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(612);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(792);}
                 if(kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.EXPECTED_REPAYMENTS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(1008);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(612);}
                 String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.40");
+                if(kind==Kind.EXPECTED_REPAYMENTS){
+                    String productLabel=exporter.message("pdf.loanTypeName",Locale.forLanguageTag(language)).toUpperCase(Locale.ROOT);
+                    assertThat(text.replaceAll("\\s+","")).contains(productLabel.replace(" ",""))
+                        .doesNotContain("PRODUCTCODE","MSIMBOWABIDHAA");
+                }
                 if(result.isReferenceLayout()){
                     Locale locale=Locale.forLanguageTag(language);
                     String start=DAY.withDayOfMonth(1).format(java.time.format.DateTimeFormatter.ofPattern("dd-MMM-uuuu",locale)).toUpperCase(locale);
@@ -111,6 +116,33 @@ class ManagementReportTest {
             if(Boolean.getBoolean("microfinance.management.samples")){var folder=java.nio.file.Path.of("target/management-reference-previews");java.nio.file.Files.createDirectories(folder);java.nio.file.Files.write(folder.resolve(kind+"-"+language+".pdf"),bytes);}
         }
     }
+    @Test void emptyRepaymentExportsUseResolvedFactsWithoutAddingTransactions() throws Exception {
+        var messages=new ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        var clock=new com.sacco.mvp.service.ApplicationClock("Africa/Dar_es_Salaam");
+        var kind=Kind.LOAN_REPAYMENT_TRANSACTIONS;
+        var facts=Map.<String,Object>of("clientNumber","CL-TEST", "name","Selected client", "product","Education loan",
+            "loanId","LN-TEST", "startDate",DAY, "disbursed",new BigDecimal("1234.56"), "principalBalance",new BigDecimal("1000.00"));
+        var report=new Result(kind,parameters(0),"Institution","Branch",ManagementReports.columns(kind),
+            List.of(),List.of(),Map.of(),0,0,false,"","CL-TEST — Selected client",facts);
+        var pdf=new ManagementReportPdf(messages,new ReportExportLimiter(1),clock);
+        try(var doc=Loader.loadPDF(pdf.build(report,Locale.ENGLISH))){
+            assertThat(doc.getNumberOfPages()).isEqualTo(1);
+            assertThat(new PDFTextStripper().getText(doc))
+                .contains("CL-TEST","Selected client","Education loan","LN-TEST","1,234.56","No records")
+                .doesNotContain("Grand total");
+        }
+        var excel=new ManagementReportExcel(messages,new ReportExportLimiter(1),clock);
+        try(var workbook=new org.apache.poi.xssf.usermodel.XSSFWorkbook(
+                new java.io.ByteArrayInputStream(excel.build(report,Locale.ENGLISH)))){
+            String contents=java.util.stream.StreamSupport.stream(workbook.getSheetAt(0).spliterator(),false)
+                .flatMap(row->java.util.stream.StreamSupport.stream(row.spliterator(),false))
+                .map(Object::toString).collect(java.util.stream.Collectors.joining(" "));
+            assertThat(contents).contains("CL-TEST","Selected client","Education loan","LN-TEST","No records")
+                .doesNotContain("Grand total");
+        }
+    }
     @Test void emptyReportsFitOnOnePageWithoutAnExtraParametersSection()throws Exception{
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
         var exporter=new ManagementReportPdf(messages,new ReportExportLimiter(1),new com.sacco.mvp.service.ApplicationClock("Africa/Dar_es_Salaam"));
@@ -119,7 +151,7 @@ class ManagementReportTest {
             try(var doc=Loader.loadPDF(exporter.build(result,Locale.ENGLISH))){
                 assertThat(doc.getNumberOfPages()).as(kind.name()).isEqualTo(1);
                 String text=new PDFTextStripper().getText(doc);
-                assertThat(text).contains("No records","Recorded through").doesNotContain("Report parameters");
+                assertThat(text).contains(kind==Kind.DAILY_COLLECTIONS?"No posted receipts":"No records","Recorded through").doesNotContain("Report parameters");
                 if(result.isReferenceLayout())assertThat(text).contains("Page 1").doesNotContain("Grand total","0.00");
                 if(kind==Kind.DISBURSED_LOANS_AUDIT)
                     assertThat(text).contains("Institution name","Branch name").doesNotContain("Institution code","Branch code");

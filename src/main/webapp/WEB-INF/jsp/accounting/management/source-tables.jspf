@@ -4,7 +4,7 @@
 <c:set var="auditSource" value="${report.kind=='DISBURSED_LOANS_AUDIT'}" />
 <c:set var="recordNumber" value="${report.parameters.page*25}" />
 <c:forEach items="${emptySource ? [0] : displayedGroups}" var="group" varStatus="groupStatus">
-  <c:set var="facts" value="${emptySource ? null : groupFacts[group.name]}" />
+  <c:set var="facts" value="${emptySource ? report.emptyGroupFacts : groupFacts[group.name]}" />
   <section class="reference-source-group">
     <c:choose>
       <c:when test="${report.kind=='LOAN_REPAYMENT_TRANSACTIONS'}">
@@ -35,8 +35,7 @@
       </c:when>
       <c:otherwise>
         <dl class="reference-product-facts">
-          <dt><spring:message code="management.pdf.productCode" /></dt><dd><c:out value="${facts.productCode}" default="—" /></dd>
-          <dt><spring:message code="management.pdf.loanTypeName" /></dt><dd><c:out value="${emptySource ? null : group.name}" default="—" /></dd>
+          <dt><spring:message code="management.pdf.loanTypeName" /></dt><dd><c:out value="${emptySource ? facts.product : group.name}" default="—" /></dd>
         </dl>
       </c:otherwise>
     </c:choose>

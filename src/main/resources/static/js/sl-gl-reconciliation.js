@@ -7,7 +7,7 @@
         if (!form) return;
         event.preventDefault();event.stopImmediatePropagation();
         const url=new URL(form.action,location.href);
-        new FormData(form).forEach((value,name)=>{if(typeof value==='string' && name!=='cutoff')url.searchParams.set(name,value);});
+        new FormData(form).forEach((value,name)=>{if(typeof value==='string')url.searchParams.set(name,value);});
         window.WorkspaceNavigation.navigate(url.href);
     },true);
     document.addEventListener('resource-table:refresh',event=>{

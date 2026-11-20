@@ -70,10 +70,25 @@ public class StatementExportService {
                     style.setBorderTop(BorderStyle.THIN);style.setBorderBottom(BorderStyle.THIN);style.setBorderLeft(BorderStyle.THIN);style.setBorderRight(BorderStyle.THIN);
                     style.setTopBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());style.setBottomBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());style.setLeftBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());style.setRightBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());
                 }
-                int headerRow=rowNo;var header=sheet.createRow(rowNo++);int headerLines=1;for(int i=0;i<count;i++){var cell=header.createCell(i);cell.setCellValue(doc.columns().get(i).label());cell.setCellStyle(bold);sheet.setColumnWidth(i,Math.min(255*256,(int)(doc.columns().get(i).weight()*170*256)));float charactersPerLine=Math.max(10f,doc.columns().get(i).weight()*160);headerLines=Math.max(headerLines,doc.columns().get(i).label().lines().mapToInt(line->Math.max(1,(int)Math.ceil(line.length()/charactersPerLine))).sum());}header.setHeightInPoints(Math.min(300,headerLines*14+(equity?32:8)));
+                var numericHeading=book.createCellStyle();numericHeading.cloneStyleFrom(bold);numericHeading.setAlignment(HorizontalAlignment.RIGHT);
+                var numericText=book.createCellStyle();numericText.cloneStyleFrom(normal);numericText.setAlignment(HorizontalAlignment.RIGHT);
+                int headerRow=rowNo;var header=sheet.createRow(rowNo++);int headerLines=1;for(int i=0;i<count;i++){var cell=header.createCell(i);cell.setCellValue(doc.columns().get(i).label());cell.setCellStyle(doc.columns().get(i).numeric()?numericHeading:bold);sheet.setColumnWidth(i,Math.min(255*256,(int)(doc.columns().get(i).weight()*170*256)));float charactersPerLine=Math.max(10f,doc.columns().get(i).weight()*160);headerLines=Math.max(headerLines,doc.columns().get(i).label().lines().mapToInt(line->Math.max(1,(int)Math.ceil(line.length()/charactersPerLine))).sum());}header.setHeightInPoints(Math.min(300,headerLines*14+(equity?32:8)));
                 for(var r:doc.rows()){
                     var row=sheet.createRow(rowNo++);int longest=1;
-                    for(int i=0;i<r.cells().size();i++){var value=r.cells().get(i);var cell=row.createCell(i);if(value.amount()!=null&&value.amount().precision()<=15){cell.setCellValue(value.amount().doubleValue());cell.setCellStyle(r.total()?total:money);}else{cell.setCellValue(value.text());cell.setCellStyle(r.total()||r.heading()||equity&&i==0?bold:normal);}longest=Math.max(longest,(int)Math.ceil(value.text().length()/Math.max(10f,doc.columns().get(i).weight()*160)));}
+                    for(int i=0;i<r.cells().size();i++){
+                        var value=r.cells().get(i);
+                        var column=doc.columns().get(i);
+                        var cell=row.createCell(i);
+                        if(value.amount()!=null&&value.amount().precision()<=15){
+                            cell.setCellValue(value.amount().doubleValue());
+                            cell.setCellStyle(r.total()?total:money);
+                        }else{
+                            cell.setCellValue(value.text());
+                            boolean emphasized=r.total()||r.heading()||equity&&i==0;
+                            cell.setCellStyle(column.numeric()?(emphasized?numericHeading:numericText):(emphasized?bold:normal));
+                        }
+                        longest=Math.max(longest,(int)Math.ceil(value.text().length()/Math.max(10f,column.weight()*160)));
+                    }
                     row.setHeightInPoints(Math.min(300,Math.max(16,longest*13)));if(r.heading())row.setHeightInPoints(Math.max(27,row.getHeightInPoints()));
                 }
                 rowNo++;

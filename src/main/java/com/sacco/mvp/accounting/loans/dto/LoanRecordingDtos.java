@@ -189,8 +189,8 @@ public final class LoanRecordingDtos {
     }
     public record Totals(long count, BigDecimal amount, BigDecimal principal, BigDecimal interest) {}
     public record StatementTerms(UUID loanId, BigDecimal rate, String frequency, int months, int installments,
-        LocalDate firstPaymentDate, BigDecimal installment, String institution, String branch, String rateBasis, String tenureUnit, int tenureValue, LocalDate maturityDate,String chargeSnapshot) {
-        public StatementTerms(UUID loanId,BigDecimal rate,String frequency,int months,int installments,LocalDate firstPaymentDate,BigDecimal installment,String institution,String branch,String rateBasis,String tenureUnit,int tenureValue,LocalDate maturityDate){this(loanId,rate,frequency,months,installments,firstPaymentDate,installment,institution,branch,rateBasis,tenureUnit,tenureValue,maturityDate,"");}
+        LocalDate firstPaymentDate, BigDecimal installment, String institution, String branch, String rateBasis, String tenureUnit, int tenureValue, LocalDate maturityDate,String chargeSnapshot,BigDecimal fixedInterest) {
+        public StatementTerms(UUID loanId,BigDecimal rate,String frequency,int months,int installments,LocalDate firstPaymentDate,BigDecimal installment,String institution,String branch,String rateBasis,String tenureUnit,int tenureValue,LocalDate maturityDate){this(loanId,rate,frequency,months,installments,firstPaymentDate,installment,institution,branch,rateBasis,tenureUnit,tenureValue,maturityDate,"",null);}
         public StatementTerms(UUID loanId,BigDecimal rate,String frequency,int months,int installments,LocalDate firstPaymentDate,BigDecimal installment,String institution,String branch){this(loanId,rate,frequency,months,installments,firstPaymentDate,installment,institution,branch,"ANNUAL","MONTHS",months,null);}
         public LocalDate lastPaymentDate() {
             if(maturityDate!=null)return maturityDate;

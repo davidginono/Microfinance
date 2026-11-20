@@ -152,7 +152,8 @@ test('required fields have independent messages and reveal a missing receiving a
   const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:null,reference:'',rows:[{loanId:'loan',amount:null,description:''}]};
   const {dom,d}=await setup(()=>{},{failureKey:'voucher.error.text',form});try{
     assert.deepEqual(visible(d).map(issue=>issue.textContent).sort(),['Select receiving account.','Enter payment amount.'].sort());
-    assert.equal(d.querySelector('.batch-detail-row').hidden,true);assert.equal(d.querySelector('.batch-expand').getAttribute('aria-expanded'),'false');
+    assert.equal(d.querySelector('.batch-detail-row'),null);
+    assert.equal(d.querySelector('.batch-remove').textContent,'−');
     assert.equal(d.querySelector('[aria-label="receivingAccount"]').closest('tr').className,'batch-row');
     assert.equal(new Set([...d.querySelectorAll('.batch-field-error')].map(issue=>issue.id)).size,d.querySelectorAll('.batch-field-error').length);
   }finally{dom.window.close();}
@@ -179,13 +180,68 @@ test('choosing a batch default fills an empty receipt account without replacing 
     }finally{dom.window.close();}
   }
 });
-test('multi-loan errors identify only the incomplete transaction and open its details',async()=>{
-  const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:'cash',reference:'RV-009',rows:[{loanId:'loan',amount:'500.00',description:''},{loanId:'loan2',amount:null,description:''}]};
-  const {dom,d}=await setup(()=>{},{failureKey:'voucher.error.amount',form});try{
-    const [issue]=visible(d);assert.equal(issue.textContent,'Enter payment amount.');assert.equal(issue.id,'receipt-receipt-amount-1');
-    assert.equal(issue.closest('.batch-detail-row').hidden,false);assert.equal(d.querySelectorAll('input[type="number"][aria-invalid="true"]').length,1);
-    assert.equal(d.querySelector('input[type="number"]').value,'500.00');
+test('older multi-loan receipts show their stored total and status without an editable detail panel',async()=>{
+  const form={clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:'cash',reference:'RV-009',rows:[{loanId:'loan',amount:'500.00'},{loanId:'loan2',amount:null}]};
+  const {dom,d}=await setup(()=>{},{failureKey:'voucher.error.amount',failureMessage:'Enter the missing amount.',form,total:'500.00',labels:{loan:'LN-001',loan2:'LN-002'}});try{
+    assert.equal(d.querySelector('[data-batch-rows]').rows.length,1);
+    assert.equal(d.querySelector('.batch-loan-list').textContent,'LN-001, LN-002');
+    assert.equal(d.querySelector('.batch-row').cells[4].textContent,'500.00');
+    assert.equal(d.querySelector('input[type="number"]'),null);
+    assert.equal(d.querySelector('.batch-row select').disabled,true);
+    assert.equal(visible(d)[0].textContent,'Enter the missing amount.');
+    assert.equal(d.querySelector('.batch-remove').disabled,false);
   }finally{dom.window.close();}
+});
+test('minus removes the newly added receipt after its first save and leaves the other row',async()=>{
+  const {dom,w,d}=await setup(()=>{}, {}, true);
+  try{
+    const original=w.fetch, deletes=[];
+    let finishSave, newUrl;
+    w.fetch=async(url,options)=>{
+      if(options?.method==='PUT'){
+        newUrl=url;
+        assert.equal(JSON.parse(options.body).form.rows.length,1);
+        return new Promise(resolve=>{finishSave=()=>resolve({ok:true,headers:{get:()=> 'application/json'},json:async()=>({version:3,labels:{}})});});
+      }
+      if(options?.method==='DELETE'){
+        deletes.push(url);
+        return {ok:true,headers:{get:()=> 'application/json'},json:async()=>({deleted:true})};
+      }
+      return original(url,options);
+    };
+    d.querySelector('[data-batch-add]').click();
+    await settle();
+    const rows=d.querySelectorAll('.batch-row');
+    assert.equal(rows.length,2);
+    assert.equal(rows[1].querySelectorAll('input[type="number"]').length,1);
+    rows[1].querySelector('.batch-remove').click();
+    await settle();
+    assert.deepEqual(deletes,[]);
+    finishSave();
+    await settle();
+    assert.deepEqual(deletes,[newUrl + '?version=3']);
+    assert.deepEqual([...d.querySelectorAll('.batch-row')].map(row=>row.dataset.item),['receipt']);
+  }finally{dom.window.close();}
+});
+test('a rejected removal keeps the draft and re-enables its minus button',async()=>{
+  const {dom,w,d}=await setup(()=>{});
+  try{
+    const original=w.fetch;
+    w.fetch=async(url,options)=>options?.method==='DELETE'
+      ? {ok:false,headers:{get:()=> 'application/json'},json:async()=>({message:'Refresh before removing.'})}
+      : original(url,options);
+    const remove=d.querySelector('.batch-remove');
+    remove.click();
+    await settle();
+    assert.equal(d.querySelector('.batch-remove'),remove);
+    assert.equal(remove.disabled,false);
+    assert.equal(d.querySelector('input[type="number"]').value,'500.00');
+    assert.equal(d.querySelector('[data-batch-error]').textContent,'Refresh before removing.');
+  }finally{dom.window.close();}
+});
+test('posted receipts have a disabled minus button',async()=>{
+  const {dom,d}=await setup(()=>{},{state:'POSTED',failureKey:null});
+  try{assert.equal(d.querySelector('.batch-remove').disabled,true);}finally{dom.window.close();}
 });
 test('amount, date and client errors identify the actual constraint',async()=>{
   const cases=[

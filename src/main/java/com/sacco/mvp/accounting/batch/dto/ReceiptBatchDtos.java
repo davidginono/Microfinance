@@ -19,7 +19,7 @@ public final class ReceiptBatchDtos {
     }
     public record SaveItem(int expectedVersion,Form form) {}
     public record LinkAccounts(int expectedVersion) {}
-    public record ImportRow(int line, String loanNumber, BigDecimal amount, LocalDate date, String reference) {}
+    public record ImportRow(int line, String loanNumber, BigDecimal amount, LocalDate date, String reference, UUID clientId) {}
     public record ImportedDraft(Form form, String clientLabel, Map<UUID,String> labels) {}
     public static final class ImportRowError extends IllegalArgumentException {
         private final int line;

@@ -1,5 +1,9 @@
 # Financial statement workspace
 
+## Recorded cash and pending classification (2026-11-19)
+
+Version 5 reports net movement from the captured opening and closing cash balances. Compound journals within a single approved activity contribute their net cash to that activity. Mixed entries that need review contribute their recorded net cash under Awaiting classification. Any difference between the classified journal rows and recorded movement appears separately for reconciliation. Activity subtotals are identified as classified when further review is needed. Earlier saved runs retain their captured figures and artifacts.
+
 ## Indirect operating cash flow (2026-11-15)
 
 New version 4 captures start operating activities with the Income Statement's current/comparative surplus, after excluding classified earnings-closing transfers. They reconcile that accrual result to the existing frozen cash-journal evidence. The statement's fonts, columns, notes, comparison, totals, preview/print behavior and PDF/Excel rendering remain shared and unchanged. Version 1–3 captures retain their recorded direct-method rows and method label; generate a new preview to use the indirect method. No historical payload, journal, COA classification or retained artifact is rewritten.
@@ -20,7 +24,7 @@ COA creation and version editing share a Reporting setup section for cash-flow c
 
 The separate statement mapping pages, their mutation/read routes, and full-package PDF/Excel/print generation are removed. Individual statements, notes, trial balances and ledgers retain their authorized outputs. Snapshot version 2 captures the resulting membership, labels and effective settings. Version 1 snapshots and retained artifacts remain readable and are never recalculated from today's COA.
 
-Daily Collections and Cashbook use inclusive Start and End cash/bank account bounds. Both selectors search posting accounts under Cash and Bank (111000), a fixed family under Current assets. The subgroup determines membership even for accounts with the older Other purpose. A single bound selects a range within that family. With both bounds blank, the reports include historical cash activity across the institution's chart within the selected branch. Client selectors use exact IDs and display the client number and name within the selected branch. Preview, pagination, PDF and print carry the same filters and authorization.
+Daily Collections includes posted receipt vouchers and loan collections. Loan receipts show principal, interest and charges separately, including payments that settle charges alone. Corrections retain their debit amounts. Daily Collections and Cashbook use inclusive Start and End cash/bank account bounds. Both selectors search posting accounts under Cash and Bank (111000), a fixed family under Current assets. The subgroup determines membership even for accounts with the older Other purpose. A single bound selects a range within that family. With both bounds blank, the reports include historical cash activity across the institution's chart within the selected branch. Client selectors use exact IDs and display the client number and name within the selected branch. Preview, pagination, PDF and print carry the same filters and authorization.
 
 Focused verification covered V147 upgrades on disposable PostgreSQL 17 databases, account approval and report inheritance, exact drill-down membership, account and client filters, prior-version snapshots and individual exports. The affected MVC and JSP checks and 32 JavaScript checks passed. The signed-in browser connection timed out.
 
@@ -40,7 +44,7 @@ The report paper uses Arial/Helvetica for ordinary statements, Times for trial/l
 
 Statement tabs fetch the authorized server-rendered preview and replace only the statement workspace. They preserve the shell, update the URL, support Back/Forward and keep selected-report export/print context synchronized. Pending requests are cancelled when another tab is selected; failures retain the visible report with a localized retry message. No financial report data is cached in browser storage. Ordinary links remain available without JavaScript and for opening another tab.
 
-The shared shell owns one stable breadcrumb and page header outside the replaced workspace. Tab responses refresh its report actions without inserting another heading. Screen messages use plain-language draft status and a collapsed Items to review list; internal snapshot IDs and repeated source-coverage explanations are not displayed. Trial-balance and financial-position titles include the selected reporting date in every output language and format.
+The shared shell owns one stable breadcrumb and page header outside the replaced workspace. Tab responses refresh its report actions without inserting another heading. The preview shows the draft status and keeps calculation checks in the captured statement. Cash Flow shows pending classification and reconciliation amounts in the report itself. Trial-balance and financial-position titles include the selected reporting date in every output language and format.
 
 ## Source and calculation boundaries
 

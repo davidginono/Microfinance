@@ -60,10 +60,8 @@ public final class LoanReportReferenceText {
             details.add(documentPeriod(report.kind(), report.parameters(), locale, label));
         }
         details.add(label.apply("cutoff") + ": " + ApplicationTimestamps.display(report.parameters().cutoff()));
-        if (!report.clientSelection().isBlank())
+        if (report.kind() != Kind.LOAN_REPAYMENT_TRANSACTIONS && !report.clientSelection().isBlank())
             details.add(label.apply("client") + ": " + report.clientSelection());
-        if (report.count() == 0 && !report.parameters().product().isBlank())
-            details.add(label.apply("productSearch") + ": " + report.parameters().product());
         return details;
     }
 

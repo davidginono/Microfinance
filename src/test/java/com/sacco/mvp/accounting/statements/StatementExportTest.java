@@ -155,6 +155,12 @@ class StatementExportTest {
             try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,doc,"XLSX",locale)))){
                 var sheet=book.getSheetAt(0);assertThat(sheet.getNumMergedRegions()).isEqualTo(1);assertThat(sheet.getMergedRegion(0).getFirstRow()).isEqualTo(0);
                 assertThat(sheet.getRow(7).getCell(2).getNumericCellValue()).isEqualTo(-5);
+                int headerRow=sheet.getPaneInformation().getHorizontalSplitPosition()-1;
+                for(int column=1;column<doc.columns().size();column++){
+                    assertThat(sheet.getRow(headerRow).getCell(column).getCellStyle().getAlignment())
+                        .isEqualTo(sheet.getRow(7).getCell(column).getCellStyle().getAlignment())
+                        .isEqualTo(org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
+                }
                 assertThat(sheet.getRow(6).getCell(1).getCellStyle().getDataFormatString()).endsWith(";\"\"");
                 assertThat(sheet.getRow(7).getCell(2).getCellStyle().getBorderBottom()).isEqualTo(org.apache.poi.ss.usermodel.BorderStyle.THIN);
                 assertThat(book.getFontAt(sheet.getRow(0).getCell(0).getCellStyle().getFontIndex()).getColor()).isEqualTo(org.apache.poi.ss.usermodel.IndexedColors.RED.getIndex());

@@ -13,14 +13,22 @@ import java.util.*;
 @Repository @RequiredArgsConstructor
 public class ManagementReportRepository {
     private final NamedParameterJdbcTemplate jdbc;
-    // Posted origins, allocations and frozen contracts shared by the remaining loan reports.
+    private static final String LOAN_SELECTION = """
+        (cast(:clientId as uuid) is null or a.borrower_party_id=:clientId)
+        and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)
+        and (cast(:productId as uuid) is null or a.loan_product_setting_id=:productId)
+        """;
+    // Run the evidence checks on the selected loan cohort.
     private static final String LOAN_SOURCE="""
         WITH cohort AS (
           SELECT l.loan_application_id,l.sacco_id,l.station_id,l.loan_id,l.applicant_member_id,l.disbursement_date,l.principal, a.station_id application_branch,a.sacco_id application_institution,
             a.applicant_member_id application_client,a.top_up_source_loan_id,a.repayment_schedule_json contract
           FROM loan_ledgers l JOIN loan_applications a ON a.id=l.loan_application_id
-          WHERE l.sacco_id=:institution AND (:wide OR l.station_id=:branch)
+          LEFT JOIN accountant_loan_record r ON r.loan_id=a.id AND r.sacco_id=l.sacco_id AND r.station_id=l.station_id
+          WHERE l.sacco_id=:institution AND l.station_id=:branch
             AND l.created_at<=:cutoff AND l.disbursement_date<=:through
+            AND (not :disbursementPeriod or l.disbursement_date>=:from)
+            AND """+LOAN_SELECTION+"""
         ), origins AS (
           SELECT c.loan_application_id,count(*) lines,count(DISTINCT j.voucher_id) vouchers,
             sum(j.debit-j.credit) net,
@@ -130,8 +138,12 @@ public class ManagementReportRepository {
             JOIN terms t USING(loan_application_id) LEFT JOIN lifecycle x USING(loan_application_id)
         ), missing AS (
           SELECT a.station_id,count(*) excluded FROM loan_applications a
-          WHERE a.sacco_id=:institution AND (:wide OR a.station_id=:branch) AND a.created_at<=:cutoff
-            AND a.disbursement_date<=:through AND NOT EXISTS(SELECT 1 FROM cohort c WHERE c.loan_application_id=a.id)
+          LEFT JOIN accountant_loan_record r ON r.loan_id=a.id AND r.sacco_id=a.sacco_id AND r.station_id=a.station_id
+          WHERE a.sacco_id=:institution AND a.station_id=:branch AND a.created_at<=:cutoff
+            AND a.disbursement_date<=:through AND (not :disbursementPeriod or a.disbursement_date>=:from)
+            AND NOT EXISTS(SELECT 1 FROM cohort c WHERE c.loan_application_id=a.id
+              AND c.sacco_id=a.sacco_id AND c.station_id=a.station_id)
+            AND """+LOAN_SELECTION+"""
           GROUP BY a.station_id
         )
         """;
@@ -163,9 +175,15 @@ public class ManagementReportRepository {
     }
     public List<Choice> clients(AppUserPrincipal a,String search,int page,UUID selected) {
         return jdbc.query("""
-          select b.party_id,b.member_no,b.full_name from loan_borrower_directory b left join members m on m.id=b.client_id and m.sacco_id=b.sacco_id
-          where b.sacco_id=:institution and ((b.kind='CLIENT' and m.station_id=:branch and m.is_member) or (b.kind<>'CLIENT' and b.group_station_id=:branch))
-           and (cast(:id as uuid) is null or b.party_id=:id) and strpos(lower(b.member_no||' '||b.full_name),:search)>0 order by b.member_no,b.party_id limit 26 offset :offset
+          select b.id,b.member_no,b.full_name from (
+            select m.id,m.member_no,m.full_name from members m
+            where m.sacco_id=:institution and m.station_id=:branch and m.is_member
+            union all
+            select g.party_id,g.member_no,g.full_name from loan_borrower_directory g
+            where g.sacco_id=:institution and g.group_station_id=:branch and g.kind<>'CLIENT'
+          ) b
+          where (cast(:id as uuid) is null or b.id=:id) and strpos(lower(b.member_no||' '||b.full_name),:search)>0
+          order by b.member_no,b.id limit 26 offset :offset
           """,parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25).addValue("id",selected,java.sql.Types.OTHER),
           this::choice);
     }
@@ -177,11 +195,11 @@ public class ManagementReportRepository {
         var p=parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT))
             .addValue("selected",selected,Types.OTHER).addValue("offset",selected==null?page*25:0).addValue("customisedLabel",customisedLabel);
         return jdbc.query("""
-            select id,case when custom_recording_configuration then :customisedLabel else coalesce(product_name,loan_type) end label from loan_product_settings
+            select id,nullif(product_code,'') code,case when custom_recording_configuration then :customisedLabel else coalesce(product_name,loan_type) end label from loan_product_settings
             where sacco_id=:institution and (cast(:selected as uuid) is null or id=:selected)
               and (cast(:selected as uuid) is not null or strpos(lower(case when custom_recording_configuration then :customisedLabel else coalesce(product_name,loan_type) end),:search)>0)
             order by custom_recording_configuration desc,coalesce(display_order,2147483647),id limit 26 offset :offset
-            """,p,(r,n)->new Choice(r.getObject("id",UUID.class),"",r.getString("label")));
+            """,p,(r,n)->new Choice(r.getObject("id",UUID.class),Objects.toString(r.getString("code"),""),r.getString("label")));
     }
     public String[] identity(AppUserPrincipal a){return identity(a.getSaccoId(),a.getStationId());}
     public String[] identity(String institution,String branch){return jdbc.queryForObject("select i.sacco_name,coalesce(nullif(s.address_location,''),s.station_id) from registered_saccos i join sacco_stations s on s.sacco_id=i.sacco_id where s.sacco_id=:institution and s.station_id=:branch",parameters(institution,branch,null),(r,n)->new String[]{r.getString(1),r.getString(2)});}
@@ -189,7 +207,7 @@ public class ManagementReportRepository {
         return parameters(a.getSaccoId(),a.getStationId(),p);
     }
     private MapSqlParameterSource parameters(String institution,String branch,Parameters p){
-        var m=new MapSqlParameterSource("institution",institution).addValue("branch",branch).addValue("wide",false);
+        var m=new MapSqlParameterSource("institution",institution).addValue("branch",branch);
         if(p!=null)m.addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.cutoff())
             .addValue("clientId",p.clientId(),Types.OTHER).addValue("productId",p.productId(),Types.OTHER)
             .addValue("product",p.productId()==null?p.product().toLowerCase(Locale.ROOT):"");
@@ -200,10 +218,12 @@ public class ManagementReportRepository {
         return read(a.getSaccoId(),a.getStationId(),kind,p,export);
     }
     public Data read(String institution,String branch,Kind kind,Parameters p,boolean export){
-        var m=parameters(institution,branch,p).addValue("startAccount",p.startAccount(),Types.OTHER)
+        var m=parameters(institution,branch,p)
+            .addValue("disbursementPeriod",kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.LOAN_PORTFOLIO)
+            .addValue("startAccount",p.startAccount(),Types.OTHER)
             .addValue("endAccount",p.endAccount(),Types.OTHER).addValue("bounded",p.startAccount()!=null || p.endAccount()!=null)
             .addValue("offset",export?0:p.page()*25).addValue("limit",export?5001:26);
-        String source=switch(kind){case DAILY_COLLECTIONS->DAILY;case CASHBOOK->CASH;case DISBURSED_LOANS_AUDIT->disbursements();case EXPECTED_REPAYMENTS->expected();case LOAN_REPAYMENT_TRANSACTIONS->repayments();default->loans(kind);};
+        String source=switch(kind){case DAILY_COLLECTIONS->DAILY;case CASHBOOK->CASH;case DISBURSED_LOANS_AUDIT->disbursements();case EXPECTED_REPAYMENTS->expected();case LOAN_REPAYMENT_TRANSACTIONS->repayments();default->loans();};
         var money=com.sacco.mvp.accounting.management.dto.ManagementReports.totalFields(kind);
         boolean loan=kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS;
         String sums=money.stream().map(k->{
@@ -248,13 +268,13 @@ public class ManagementReportRepository {
           where v.sacco_id=:institution and v.station_id=:branch and v.type='RECEIPT' and v.posted_at<=:cutoff and v.effective_date between :from and :through
           union all
           select r.id,r.sacco_id,r.station_id,r.effective_date,r.posted_at,r.number,r.reference,r.party,r.money_account_id,r.posted_by,r.borrower_party_id,
-            x.line_no*2+part.n,x.description,null::text,null::text,'@loan',part.component,a.loan_id,r.client_number,m.phone,
+            x.line_no*3+part.n,x.description,null::text,null::text,'@loan',part.component,a.loan_id,r.client_number,m.phone,
             case when r.reverses_id is null then 0 else part.amount end,
             case when r.reverses_id is null then part.amount else 0 end
           from accountant_loan_receipt r join accountant_loan_receipt_row x on x.receipt_id=r.id and x.sacco_id=r.sacco_id and x.station_id=r.station_id
           join accountant_loan_post p on p.id=x.posting_id and p.sacco_id=r.sacco_id and p.station_id=r.station_id and p.state='POSTED' and p.recorded_at<=:cutoff
           join loan_applications a on a.id=p.loan_id and a.sacco_id=p.sacco_id and a.station_id=p.station_id
-          cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount)) part(n,component,amount)
+          cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount),(2,'CHARGES',p.charge_amount)) part(n,component,amount)
           join gl_journal j on j.id=p.journal_id and j.sacco_id=p.sacco_id and j.station_id=p.station_id and j.state='POSTED' and j.posted_at<=:cutoff
           join loan_borrower_contact m on m.loan_id=a.id and m.id=r.borrower_party_id and m.sacco_id=r.sacco_id and m.station_id=r.station_id
           where r.sacco_id=:institution and r.station_id=:branch and r.posted_at<=:cutoff and r.effective_date between :from and :through and part.amount>0
@@ -265,7 +285,7 @@ public class ManagementReportRepository {
           from accountant_loan_post p join loan_applications a on a.id=p.loan_id and a.sacco_id=p.sacco_id and a.station_id=p.station_id
           join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=p.sacco_id and m.station_id=p.station_id
           join gl_journal j on j.id=p.journal_id and j.sacco_id=p.sacco_id and j.station_id=p.station_id and j.state='POSTED' and j.posted_at<=:cutoff
-          cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount)) part(n,component,amount)
+          cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount),(2,'CHARGES',p.charge_amount)) part(n,component,amount)
           where p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
             and (p.kind='PAYMENT' or p.kind='REVERSAL' and exists(select 1 from accountant_loan_post original where original.id=p.reverses_id and original.kind='PAYMENT'))
             and p.recorded_at<=:cutoff and p.effective_date between :from and :through and part.amount>0
@@ -310,11 +330,6 @@ public class ManagementReportRepository {
         join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id
         left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id
         """;
-    private static final String CLIENT_FILTER="""
-        (cast(:clientId as uuid) is null or m.id=:clientId)
-        and (:product='' or strpos(lower(coalesce(r.product_name,a.loan_type)),:product)>0)
-        and (cast(:productId as uuid) is null or a.loan_product_setting_id=:productId)
-        """;
     private static String disbursements(){
         return LOAN_SOURCE+"""
             , report_rows as (
@@ -322,7 +337,7 @@ public class ManagementReportRepository {
                 to_char(e.disbursement_date,'YYYY-MM') as month,coalesce(r.product_name,a.loan_type) as product,
                 a.sacco_id as "institutionCode",a.station_id as "branchCode",
                 e.disbursement_date::text||e.loan_id||a.id::text as "rowOrder",m.member_no as "clientNumber",m.full_name as name,e.loan_id as "loanId",
-                case when e.complete then e.original_principal end as disbursed,
+                coalesce(case when e.complete then e.original_principal end,p.principal_amount) as disbursed,
                 (select sum(l.credit-l.debit) from gl_journal_line l
                   where l.journal_id=p.journal_id and l.sacco_id=p.sacco_id and l.station_id=p.station_id
                     and l.account_id=p.money_account_id) as "netDisbursed",
@@ -341,8 +356,7 @@ public class ManagementReportRepository {
                 and exists(select 1 from gl_journal j where j.id=p.journal_id and j.state='POSTED' and j.posted_at<=:cutoff)
               left join loan_ledger_installments first_installment on first_installment.loan_application_id=e.loan_application_id
                 and first_installment.installment_number=1
-              where e.disbursement_date>=:from and
-            """+CLIENT_FILTER+") ";
+            ) """;
     }
     private static String expected(){
         String known=LOAN_SOURCE.replace(":through","least(:through,cast(:cutoff at time zone 'Africa/Dar_es_Salaam' as date))");
@@ -350,20 +364,33 @@ public class ManagementReportRepository {
             , report_rows as (
               select coalesce(r.product_name,a.loan_type) as "groupName",i.due_date::text||e.loan_id||i.id::text as "rowOrder",
                 m.member_no as "clientNumber",m.full_name as name,m.phone,e.loan_id as "loanId",i.due_date as "dueDate",
-                nullif(lp.product_code,'') as "productCode",
                 e.principal as "principalBalance",i.principal-coalesce(pa.principal,0) as "principalDue",
                 i.interest-coalesce(pa.interest,0)-coalesce(pa.excluded,0)-coalesce(w.waived,0) as "interestDue",
                 i.principal-coalesce(pa.principal,0)+i.interest-coalesce(pa.interest,0)-coalesce(pa.excluded,0)-coalesce(w.waived,0) as "expectedTotal"
               from exposure e
             """+CLIENT_JOINS+"""
               join loan_ledger_installments i on i.loan_application_id=e.loan_application_id
-              left join loan_product_settings lp on lp.id=a.loan_product_setting_id and lp.sacco_id=a.sacco_id
               left join installment_allocations pa on pa.installment_id=i.id
               left join waiver_allocations w on w.installment_id=i.id
               where e.complete and not exists(select 1 from lifecycle x where x.loan_application_id=e.loan_application_id and (x.written_off<>0 or x.cancelled<>0))
                 and i.due_date between :from and :through
-                and (i.principal>coalesce(pa.principal,0) or i.interest>coalesce(pa.interest,0)+coalesce(pa.excluded,0)+coalesce(w.waived,0)) and
-            """+CLIENT_FILTER+") ";
+                and (i.principal>coalesce(pa.principal,0) or i.interest>coalesce(pa.interest,0)+coalesce(pa.excluded,0)+coalesce(w.waived,0))
+            ) """;
+    }
+    public Map<String,Object> soleRepaymentLoan(AppUserPrincipal actor,Parameters parameters) {
+        // Two candidates are enough to tell whether the filter identifies one loan.
+        var candidates=jdbc.query(LOAN_SOURCE+"""
+            select m.member_no as "clientNumber",m.full_name as name,e.loan_id as "loanId",
+              coalesce(r.product_name,a.loan_type) product,initial.due_date as "startDate",
+              case when e.complete then e.original_principal end disbursed,case when e.complete then e.principal end as "principalBalance"
+            from exposure e
+            """+CLIENT_JOINS+"""
+            left join loan_ledger_installments initial on initial.loan_application_id=e.loan_application_id
+              and initial.installment_number=1
+            where not exists(select 1 from missing)
+            order by e.loan_application_id limit 2
+            """,parameters(actor,parameters).addValue("disbursementPeriod",false),(r,n)->row(r));
+        return candidates.size()==1?candidates.getFirst():Map.of();
     }
     private static String repayments(){
         return LOAN_SOURCE+"""
@@ -393,10 +420,10 @@ public class ManagementReportRepository {
               left join loan_ledger_installments initial on initial.loan_application_id=e.loan_application_id and initial.installment_number=1
               left join loan_repayment_transactions original on original.id=t.reverses_transaction_id
                 and original.sacco_id=:institution and original.station_id=:branch
-              where e.complete and t.payment_date>=:from and
-            """+CLIENT_FILTER+") ";
+              where e.complete and t.payment_date>=:from
+            ) """;
     }
-    private static String loans(Kind kind){
+    private static String loans(){
         String band="case when e.dpd<=30 then 0 when e.dpd<=90 then 1 when e.dpd<=180 then 2 when e.dpd<=365 then 3 else 4 end";
         var values=new LinkedHashMap<String,String>();
         values.put("disbursed","e.original_principal");values.put("contractTotal","e.original_principal+e.scheduled_interest");values.put("instalment","e.periodic_payment");
@@ -406,6 +433,6 @@ public class ManagementReportRepository {
         values.put("overdue","e.overdue_principal+e.overdue_interest");
         values.put("referenceProvision","round(e.principal*(case when e.dpd<=30 then 0 when e.dpd<=90 then .10 when e.dpd<=180 then .30 when e.dpd<=365 then .50 else 1 end),2)");
         String money=values.entrySet().stream().map(v->"case when e.complete then "+v.getValue()+" else null end as \""+v.getKey()+"\"").reduce((x,y)->x+","+y).orElseThrow();
-        return LOAN_SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id where "+CLIENT_FILTER+(kind==Kind.LOAN_PORTFOLIO?" and e.disbursement_date>=:from":"")+") ";
+        return LOAN_SOURCE+", report_rows as (select e.complete,coalesce(r.product_name,a.loan_type) as \"groupName\",e.loan_id||e.loan_application_id::text as \"rowOrder\",m.member_no as \"clientNumber\",m.full_name as name,m.phone,e.loan_id as \"loanId\",null::text gender,null::text as \"defaultRate\",e.disbursement_date as \"disbursementDate\",case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,a.financial_snapshot->>'repaymentFrequency' frequency,"+money+" from exposure e join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id left join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id) ";
     }
 }

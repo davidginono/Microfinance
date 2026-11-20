@@ -7,6 +7,7 @@
   <c:if test="${not empty report.selectedActivity}"><p><spring:message code="reconciliation.activity" />: <c:out value="${pageContext.response.locale.language=='sw' and not empty report.selectedActivity.nameSw?report.selectedActivity.nameSw:report.selectedActivity.name}" /></p></c:if>
   <c:if test="${not empty report.selectedActivity}"><p><spring:message code="reconciliation.activityScope" /></p></c:if>
   <c:if test="${report.parameters.unassigned}"><p><spring:message code="reconciliation.activity" />: <spring:message code="reconciliation.unassigned" /></p><p><spring:message code="reconciliation.manualScope" /></p></c:if>
+  <c:if test="${report.count==0 and report.parameters.component!='ALL'}"><p><spring:message code="reconciliation.componentLabel" />: <spring:message code="reconciliation.component.${report.parameters.component}" /></p></c:if>
   <p><spring:message code="reconciliation.exceptionsOnly" /></p>
 </div>
 <c:if test="${report.count==0}"><p class="reconciliation-empty"><spring:message code="reconciliation.empty" /></p></c:if>

@@ -91,9 +91,9 @@ public class ManagementReportPdf {
                 if(r.kind()==Kind.DAILY_COLLECTIONS && day!=null && subtotals.periods().contains(day))page.row(totalRow(r,r.getDailyTotals().get(day),message("dayTotal",locale),locale),true);
                 if(audit && month!=null && subtotals.periods().contains(month))page.row(totalRow(r,monthlyTotals.get(month),message("monthTotal",locale),locale),true);
                 if(groups.isEmpty()){
-                    if(r.isReferenceLayout())sourceGroup(page,r,Map.of(),locale);
+                    if(r.isReferenceLayout())sourceGroup(page,r,r.emptyGroupFacts(),locale);
                     page.columns(labels,widths,numeric);
-                    page.text(message("empty",locale));
+                    page.text(message(r.kind()==Kind.DAILY_COLLECTIONS?"dailyEmpty":"empty",locale));
                 }
                 if(r.count()>0)page.row(totalRow(r,r.totals(),message("total",locale),locale),true);
                 page.endTable();
@@ -117,8 +117,8 @@ public class ManagementReportPdf {
                 List.of(value(facts.get("month"),locale),value(facts.get("product"),locale),
                     r.institution(),r.branch(),value(facts.get("disbursementAccount"),locale)));
             case EXPECTED_REPAYMENTS -> page.sourceGroup(
-                List.of(message("pdf.productCode",locale),message("pdf.loanTypeName",locale)),
-                List.of(value(facts.get("productCode"),locale),value(facts.getOrDefault("groupName",facts.get("product")),locale)));
+                List.of(message("pdf.loanTypeName",locale)),
+                List.of(value(facts.getOrDefault("groupName",facts.get("product")),locale)));
             default -> throw new IllegalArgumentException("Unsupported reference layout");
         }
     }
@@ -135,7 +135,7 @@ public class ManagementReportPdf {
             if(row.get("entryKind")!=null)text+="\n"+message("entry."+row.get("entryKind"),locale)+" "+value(row.get("reference"),locale);
             if(row.get("reversesReference")!=null)text+="\n"+message("field.reversesReference",locale)+": "+value(row.get("reversesReference"),locale);
         }else if(c.key().equals("frequency") && Set.of("MONTHLY","WEEKLY").contains(Objects.toString(row.get(c.key()),"")))return messages.getMessage("recording.frequency."+row.get(c.key()),null,locale);
-        else if(c.key().equals("transaction") && Set.of("PRINCIPAL","INTEREST").contains(Objects.toString(row.get("component"),"")))return message("component."+row.get("component"),locale)+" — "+text;
+        else if(c.key().equals("transaction") && Set.of("PRINCIPAL","INTEREST","CHARGES").contains(Objects.toString(row.get("component"),"")))return message("component."+row.get("component"),locale)+" — "+text;
         return text;
     }
     private List<String> totalRow(Result r,Map<String,BigDecimal> totals,String title,Locale locale){

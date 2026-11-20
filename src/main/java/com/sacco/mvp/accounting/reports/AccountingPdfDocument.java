@@ -147,7 +147,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
     }
     /** Reference metadata stays above its table and repeats on continuation pages. */
     public void sourceGroup(List<String> labels,List<String> values)throws IOException {
-        if(!sourceLayout||labels.size()!=values.size()||values.size()!=(style==Style.EXPECTED?2:style==Style.AUDIT?5:7))throw new IllegalArgumentException("Group metadata mismatch");
+        if(!sourceLayout||labels.size()!=values.size()||values.size()!=(style==Style.EXPECTED?1:style==Style.AUDIT?5:7))throw new IllegalArgumentException("Group metadata mismatch");
         groupLabels=style==Style.REPAYMENT||style==Style.EXPECTED?labels.stream().map(v->v.toUpperCase(Locale.ROOT)).toList():List.copyOf(labels);groupValues=List.copyOf(values);
         // Repayment rows can carry several lines of receipt and correction references.
         float reserve=style==Style.REPAYMENT?205:120;
@@ -167,7 +167,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
             return identityLines*12+20+labelLines*12+6+valueLines*12+10;
         }
         if(style==Style.AUDIT)return auditGroup(false);
-        return expectedGroupHeight();
+        return expectedGroup(false);
     }
     private List<String> repaymentIdentityValue(int column)throws IOException {
         float slotWidth=REPAYMENT_IDENTITY[column+1]-REPAYMENT_IDENTITY[column];
@@ -235,19 +235,17 @@ public final class AccountingPdfDocument implements AutoCloseable {
         }else if(style==Style.AUDIT){
             y-=auditGroup(true);
         }else {
-            float[] positions={9,94,153,265,790};
-            for(int n=0;n<4;n++){
-                String value=n%2==0?groupLabels.get(n/2):groupValues.get(n/2);
-                var parts=wrap(value,10,positions[n+1]-positions[n]-4,headingFont);
-                for(int p=0;p<parts.size();p++)draw(parts.get(p),positions[n],y-p*14,10,true,false);
-            }
-            y-=expectedGroupHeight();
+            y-=expectedGroup(true);
         }
     }
-    private float expectedGroupHeight()throws IOException {
-        int lines=Math.max(wrap(groupValues.get(0),10,55,headingFont).size(),wrap(groupValues.get(1),10,521,headingFont).size());
-        lines=Math.max(lines,wrap(groupLabels.get(1),10,108,headingFont).size());
-        return lines*14+13;
+    private float expectedGroup(boolean drawFields)throws IOException {
+        var label=wrap(groupLabels.getFirst(),10,108,headingFont);
+        var product=wrap(groupValues.getFirst(),10,665,headingFont);
+        if(drawFields){
+            for(int n=0;n<label.size();n++)draw(label.get(n),9,y-n*14,10,true,false);
+            for(int n=0;n<product.size();n++)draw(product.get(n),121,y-n*14,10,true,false);
+        }
+        return Math.max(label.size(),product.size())*14+13;
     }
     private void drawCentered(String value,float center,float baseline,float point,PDFont preferred,float minLeft)throws IOException {
         float halfWidth=face(value,preferred).getStringWidth(value)*point/2000;
@@ -283,8 +281,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
         for(int i=0;i<lines.size();i++){
             for(int n=0;n<lines.get(i).size();n++){
                 String label=lines.get(i).get(n);float edge=numeric[i]?rowRight(i,x):x;
-                if(style==Style.EQUITY)drawCentered(label,x+columnWidth(i)/2,y-n*12,point,headingFont,x);
-                else if(style==Style.EXPECTED && i==2)drawCentered(label,164,y-n*11,point,headingFont,x);
+                if(style==Style.EXPECTED && i==2)drawCentered(label,164,y-n*11,point,headingFont,x);
                 else if(sourceLayout && numeric[i] && (style!=Style.REPAYMENT || i>=5))drawCentered(label,(x+edge)/2,y-n*11,point,headingFont,x);
                 else draw(label,sourceLayout?x:edge,y-n*(sourceLayout?11:12),point,true,!sourceLayout && numeric[i]);
                 if(style==Style.TRIAL){float length=face(label,headingFont).getStringWidth(label)*8/1000;line(numeric[i]?edge-length:edge,numeric[i]?edge:edge+length,y-n*12-2);}

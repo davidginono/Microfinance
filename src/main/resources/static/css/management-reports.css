@@ -62,7 +62,7 @@
 .reference-EXPECTED_REPAYMENTS {--reference-table-start:9pt; --reference-table-width:781pt;}
 .reference-EXPECTED_REPAYMENTS .reference-table th:nth-child(3) {text-align:center;}
 .reference-EXPECTED_REPAYMENTS .reference-table :is(th,td):nth-child(8) {padding-inline-end:75pt;}
-.reference-product-facts {grid-template-columns:85pt 59pt 112pt 1fr; margin:0 10pt 15pt 9pt; text-transform:uppercase;}
+.reference-product-facts {grid-template-columns:112pt 1fr; margin:0 10pt 15pt 9pt; text-transform:uppercase;}
 .reference-LOAN_REPAYMENT_TRANSACTIONS {
   --reference-table-start:9pt; --reference-table-width:535pt;
   width:612pt; min-width:612pt; font:10pt/12pt Arial,sans-serif;

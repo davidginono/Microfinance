@@ -212,7 +212,25 @@ class LoanRecordingPostgresTest {
         var saved=receiptService().post(actor,f);assertThat(saved.rows().getFirst().charges()).isEqualByComparingTo("7.00");assertThat(saved.rows().getFirst().chargeAccount()).contains("CHARGES");
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,id)).isZero();
         assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("23.00");
+        var daily=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            f.getEffectiveDate(),TODAY,context.getBean(ApplicationClock.class).now(),null,null,client,"",0);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS;
+        var collected=daily.read(actor,kind,parameters,false);
+        assertThat(collected.rows()).singleElement().satisfies(row->{
+            assertThat(row).containsEntry("component","CHARGES").containsEntry("documentNumber",saved.header().number());
+            assertThat((BigDecimal)row.get("credit")).isEqualByComparingTo("7.00");
+        });
+        assertThat(daily.read(actor,kind,parameters,true).totals()).isEqualTo(collected.totals());
+        assertThat(daily.read(operator("B2"),kind,parameters,false).count()).isZero();
+        var emptyDate=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            TODAY,TODAY,parameters.cutoff(),null,null,client,"",0);
+        assertThat(daily.read(actor,kind,emptyDate,false).count()).isZero();
         var other=operator("B1");receiptService().reverse(other,saved.header().id(),UUID.randomUUID(),TODAY,"Synthetic returned collection");assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("30.00");
+        var corrected=daily.read(actor,kind,parameters,false);
+        assertThat(corrected.count()).isEqualTo(2);
+        assertThat(corrected.totals().get("credit")).isEqualByComparingTo("7.00");
+        assertThat(corrected.totals().get("debit")).isEqualByComparingTo("7.00");
     }
     @Test void chargedFundingCorrectionReversesDeductionsAndAssessmentsTogether(){
         chargePolicy("DEDUCT");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var request=adjustments().request(actor,adjustment(id,"DISBURSEMENT_REVERSAL"));var other=operator("B1");adjustments().decide(other,request,UUID.randomUUID(),true,"Synthetic verified cash return");
@@ -299,6 +317,14 @@ class LoanRecordingPostgresTest {
         var p=service.disburse(actor,f);assertThat(service.disburse(actor,f).id()).isEqualTo(p.id());
         var topup=service.topUp(actor,loan).orElseThrow();assertThat(topup.cash()).isEqualByComparingTo("475.48");assertThat(status(source)).isEqualTo("PAID");
         assertThat(service.detail(actor,loan).loan().topUpEligible()).isFalse();
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            TODAY,TODAY,context.getBean(ApplicationClock.class).now(),null,null,client,"",0);
+        var audit=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DISBURSED_LOANS_AUDIT,parameters,false);
+        assertThat(audit.rows()).filteredOn(row->f.getReference().equals(row.get("reference"))).singleElement().satisfies(row->{
+            assertThat((BigDecimal)row.get("disbursed")).isEqualByComparingTo("1500.00");
+            assertThat((BigDecimal)row.get("netDisbursed")).isEqualByComparingTo("475.48");
+        });
         assertThat(ledger.riskBalance(source,TODAY).orElseThrow().currentOutstanding()).isZero();assertThat(ledger.view(source,actor,0,0).futureInterest()).isZero();
         assertThat(service.detail(actor,source).loan().futureInterest()).isZero();assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1500.00");
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("475.48");
@@ -486,11 +512,38 @@ class LoanRecordingPostgresTest {
         assertThat(service.actualRepaymentSchedule(actor,id,2).orElseThrow().rows().getLast().endingBalance()).isZero();
         assertThatThrownBy(()->service.actualRepaymentSchedule(operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void repaymentFactsDescribeTheSelectedLoanBeforeAnyTransactions(){
+        disbursed("D-REPORT-PARAMETERS");
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY,TODAY,OffsetDateTime.now().plusSeconds(1),null,null,client,"",0,product);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_REPAYMENT_TRANSACTIONS;
+        assertThat(reports.read(actor,kind,p,false).count()).isZero();
+        var facts=reports.soleRepaymentLoan(actor,p);
+        assertThat(facts).containsKey("loanId");
+        assertThat((BigDecimal)facts.get("principalBalance")).isEqualByComparingTo("1000.00");
+        assertThat(reports.soleRepaymentLoan(operator("B2"),p)).isEmpty();
+        disbursed("D-REPORT-PARAMETERS-SECOND");
+        assertThat(reports.soleRepaymentLoan(actor,p)).isEmpty();
+    }
     @Test void referenceReportsReconcileGroupedReceiptsCorrectionsAndPortfolioBalances(){
         var first=disbursed("D-REFERENCE-1");var second=disbursed("D-REFERENCE-2");
         var receipt=receiptService().post(actor,receiptForm(first,second));
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
         var p=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(TODAY.minusMonths(1).withDayOfMonth(1),TODAY,OffsetDateTime.now().plusSeconds(1),null,null,null,"",0);
+        var filtered=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            p.from(),p.through(),p.cutoff(),null,null,client,"",0,product);
+        var otherProduct=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            p.from(),p.through(),p.cutoff(),null,null,client,"",0,UUID.randomUUID());
+        for(var kind:com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.values()){
+            if(kind==com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS ||
+                kind==com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK)continue;
+            var preview=reports.read(actor,kind,filtered,false);
+            var export=reports.read(actor,kind,filtered,true);
+            assertThat(preview.count()).as(kind.name()).isEqualTo(2);
+            assertThat(export.rows()).as(kind.name()).isEqualTo(preview.rows());
+            assertThat(export.totals()).isEqualTo(preview.totals());
+            assertThat(reports.read(actor,kind,otherProduct,false).count()).as(kind.name()).isZero();
+        }
         var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);
         assertThat(daily.count()).isEqualTo(4);assertThat(daily.totals().get("credit")).isEqualByComparingTo("240.00");assertThat(daily.excluded()).isZero();assertThat(daily.rows()).extracting(r->r.get("component")).containsOnly("PRINCIPAL","INTEREST");
         var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,false);
@@ -798,8 +851,12 @@ class LoanRecordingPostgresTest {
             assertThat(entry.instalmentAmount()).isEqualByComparingTo("1020.00");
         });
         assertThatThrownBy(() -> batches().templateLoans(operator("B2"), batch, "")).isInstanceOf(AccessDeniedException.class);
-        var entry = new ImportRow(3, eligible.getFirst().number(), new BigDecimal("119.99"), TODAY, "BANK-0001");
-        var unknown = new ImportRow(4, "FOREIGN", new BigDecimal("30.00"), TODAY, "BANK-0002");
+        var entry = new ImportRow(3, eligible.getFirst().number(), new BigDecimal("119.99"), TODAY, "BANK-0001", eligible.getFirst().clientId());
+        assertThat(batches().templateLoans(actor, batch, entry.loanNumber())).isEqualTo(eligible);
+        var wrongClient = new ImportRow(4, entry.loanNumber(), new BigDecimal("30.00"), TODAY, "BANK-0002", UUID.randomUUID());
+        assertThatThrownBy(() -> batches().importDrafts(actor, batch, cash, List.of(entry, wrongClient)))
+            .hasMessage("batch.error.importClient");
+        var unknown = new ImportRow(4, "FOREIGN", new BigDecimal("30.00"), TODAY, "BANK-0002", null);
         assertThatThrownBy(() -> batches().importDrafts(actor, batch, cash, List.of(entry, unknown)))
             .hasMessage("batch.error.importLoan");
         assertThat(batches().get(actor, batch).receipts()).isZero();
@@ -1173,6 +1230,8 @@ class LoanRecordingPostgresTest {
         assertThat(service.detail(actor,id).schedule().getLast().date()).isEqualTo(p.getEffectiveDate().plusDays(10));
         var annual=form();annual.setLoanMode("CUSTOM");annual.setCustomApplicationCharge(BigDecimal.ZERO);annual.setCustomProcessingCharge(BigDecimal.ZERO);annual.setInsurancePremium(BigDecimal.ZERO);annual.setInterestBasis("ANNUAL");annual.setInterestPercent(new BigDecimal("12"));annual.setMonths(6);annual.setFirstPaymentDate(null);var annualId=service.save(actor,annual);assertThat(service.detail(actor,annualId).contractualInterest()).isEqualByComparingTo("60.00");
         var amount=form();amount.setLoanMode("CUSTOM");amount.setCustomApplicationCharge(BigDecimal.ZERO);amount.setCustomProcessingCharge(BigDecimal.ZERO);amount.setInsurancePremium(BigDecimal.ZERO);amount.setInterestEntry("AMOUNT");amount.setInterestAmount(new BigDecimal("17.03"));var amountId=service.save(actor,amount);assertThat(service.detail(actor,amountId).contractualInterest()).isEqualByComparingTo("17.03");
+        assertThat(service.exportStatement(actor,client).terms()).filteredOn(t->t.loanId().equals(amountId)).singleElement()
+            .satisfies(t->assertThat(t.fixedInterest()).isEqualByComparingTo("17.03"));
     }
     @Test void uploadedEvidenceIsScopedFingerprintProtectedAndRollsBackWithTheLoan() throws Exception {
         var f=form();var file=new org.springframework.mock.web.MockMultipartFile("attachments","evidence.pdf","application/pdf","%PDF-1.4 synthetic evidence".getBytes(java.nio.charset.StandardCharsets.UTF_8));

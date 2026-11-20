@@ -283,26 +283,34 @@ public class LoanRecordingRepository {
         var parameters = new ArrayList<Object>();
         parameters.add(actor.getSaccoId());
         parameters.add(actor.getStationId());
-        String filter;
-        if (numbers.isEmpty()) {
-            filter = "strpos(lower(concat_ws(' ',l.loan_id,m.full_name,m.member_no)), ?) > 0";
-            parameters.add(search.toLowerCase(Locale.ROOT));
-        } else {
-            filter = "l.loan_id in (" + String.join(",", Collections.nCopies(numbers.size(), "?")) + ")";
+        String filter = "true";
+        if (!numbers.isEmpty()) {
+            filter = "loan_id in (" + String.join(",", Collections.nCopies(numbers.size(), "?")) + ")";
             parameters.addAll(numbers);
+        } else if (!search.isEmpty()) {
+            filter = """
+                party_id in (
+                    select party_id from scoped_loans
+                    where strpos(lower(concat_ws(' ',loan_id,full_name,member_no)), ?) > 0
+                )
+                """;
+            parameters.add(search.toLowerCase(Locale.ROOT));
         }
         return jdbc.query("""
-            select eligible.*, i.due_date, i.amount
-            from (
+            with scoped_loans as (
                 select l.id, m.party_id, l.loan_id, m.full_name, m.member_no, r.product_name, b.disbursement_date
                 from accountant_loan_record r
                 join loan_applications l on l.id=r.loan_id and l.sacco_id=r.sacco_id and l.station_id=r.station_id
                 join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id and m.kind='CLIENT'
                 join loan_ledgers b on b.loan_application_id=l.id and b.sacco_id=r.sacco_id and b.station_id=r.station_id
                 where r.sacco_id=? and r.station_id=? and l.status in ('DISBURSED','PAR','DEFAULTED')
-                  and b.disbursement_date is not null and l.loan_id is not null and
+                  and b.disbursement_date is not null and l.loan_id is not null
+            )
+            select eligible.*, i.due_date, i.amount
+            from (
+                select * from scoped_loans where
             """ + filter + """
-                order by l.loan_id,l.id limit 1001
+                order by loan_id,id limit 1001
             ) eligible
             left join lateral (
                 select due_date, principal-principal_paid+interest-interest_paid-interest_excluded-interest_waived amount
@@ -411,6 +419,8 @@ public class LoanRecordingRepository {
         coalesce((a.financial_snapshot->>'tenureValue')::integer,a.tenor_months) tenure_value,
         case when a.financial_snapshot->>'loanMode'='CUSTOM' then case when a.financial_snapshot->>'interestEntry'='AMOUNT' then 'AMOUNT' else coalesce(a.financial_snapshot->>'interestBasis','WHOLE_LOAN') end else 'ANNUAL' end rate_basis,
         (a.financial_snapshot::jsonb->>'interestRate')::numeric rate,
+        case when a.financial_snapshot->>'loanMode'='CUSTOM' and a.financial_snapshot->>'interestEntry'='AMOUNT'
+            then (a.financial_snapshot->>'interestAmount')::numeric end fixed_interest,
         a.financial_snapshot::jsonb->>'repaymentFrequency' frequency,
         (a.financial_snapshot::jsonb->>'numberOfPayments')::integer installments,
         (a.financial_snapshot::jsonb->>'periodicRepaymentAmount')::numeric installment,
@@ -422,7 +432,7 @@ public class LoanRecordingRepository {
         order by r.application_date,a.id limit 501
         """,(r,n)->new StatementTerms(r.getObject("id",UUID.class),r.getBigDecimal("rate"),r.getString("frequency"),
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
-            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name"),r.getString("rate_basis"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("final_due_date",LocalDate.class),r.getString("charge_snapshot")),client,a.getSaccoId(),a.getStationId(),loan,loan);}
+            r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name"),r.getString("rate_basis"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("final_due_date",LocalDate.class),r.getString("charge_snapshot"),r.getBigDecimal("fixed_interest")),client,a.getSaccoId(),a.getStationId(),loan,loan);}
     public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label,coalesce(tenure_unit,'MONTHS') tenure_unit,minimum_amount,maximum_amount,
         coalesce(min_tenure,case when min_repayment_months>0 then min_repayment_months else 1 end) minimum_tenure,

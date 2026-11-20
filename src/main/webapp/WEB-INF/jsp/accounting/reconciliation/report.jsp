@@ -23,7 +23,7 @@
   <div class="app-table-titlebar"><h2><spring:message code="reconciliation.discrepancies" /><c:if test="${not empty report}"> <span class="app-table-count">(<c:out value="${report.count}" />)</span></c:if></h2>
   </div>
   <form method="get" action="<c:url value='/reports/financial/sl-gl-reconciliation' />" id="reconciliation-report-parameters" class="resource-table-filters" data-reconciliation-query data-aws-filter-toolbar>
-    <input type="hidden" name="run" value="true" /><input type="hidden" name="cutoff" value="<c:out value='${filter.cutoff}' />" />
+    <input type="hidden" name="run" value="true" />
     <label><spring:message code="reconciliation.check" /><select class="aws-control" name="component"><c:forEach items="${['ALL','PRINCIPAL','ALLOWANCE','INTEREST_COLLECTIONS','INTEREST_RECEIVABLE']}" var="check"><option value="${check}" ${filter.component==check?'selected':''}><spring:message code="reconciliation.component.${check}" /></option></c:forEach><c:if test="${canViewGroupAttribution}"><option value="GROUP_ATTRIBUTION" ${filter.component=='GROUP_ATTRIBUTION'?'selected':''}><spring:message code="reconciliation.component.GROUP_ATTRIBUTION" /></option></c:if></select></label>
     <label><spring:message code="management.from" /><input class="aws-control" type="date" name="from" value="<c:out value='${filter.from}' />" max="${today}" required /></label>
     <label><spring:message code="management.through" /><input class="aws-control" type="date" name="through" value="<c:out value='${filter.through}' />" max="${today}" required /></label>

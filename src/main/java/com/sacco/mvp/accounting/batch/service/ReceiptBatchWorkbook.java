@@ -6,6 +6,7 @@ import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ReceiptEntryLoan;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbookType;
@@ -26,75 +27,127 @@ public class ReceiptBatchWorkbook {
     private static final int HEADER_ROW = 1;
     private static final String LOAN_LIST = "LoanList";
     private static final List<String> COLUMNS = List.of(
+        "client", "loan", "instalmentDate", "instalmentAmount", "received", "paymentDate", "reference");
+    private static final List<String> LEGACY_COLUMNS = List.of(
         "loan", "client", "instalmentDate", "instalmentAmount", "received", "paymentDate", "reference");
+    private static final int CLIENT_KEY_COLUMN = COLUMNS.size();
+    private static final String CLIENT_KEY_HEADER = "Client ID";
+    private static final String RANGE_PREFIX = "ClientLoans_";
     private final MessageSource messages;
 
     public byte[] write(UUID batch, List<ReceiptEntryLoan> loans, Locale locale) {
+        var clients = new LinkedHashMap<UUID, List<ReceiptEntryLoan>>();
+        for (var loan : loans) clients.computeIfAbsent(loan.clientId(), id -> new ArrayList<>()).add(loan);
+
         try (var book = new XSSFWorkbook(); var output = new ByteArrayOutputStream()) {
             var sheet = book.createSheet(label("sheet", locale));
-            var batchRow = sheet.createRow(0);
-            batchRow.createCell(0).setCellValue(label("batchId", locale));
-            batchRow.createCell(1).setCellValue(batch.toString());
-            var headerStyle = book.createCellStyle();
+            var loanList = book.createSheet(LOAN_LIST);
+            book.setSheetHidden(1, true);
+            sheet.setColumnHidden(CLIENT_KEY_COLUMN, true);
+
+            var bodyStyle = borderedStyle(book);
+            var headerStyle = borderedStyle(book);
             var font = book.createFont();
             font.setBold(true);
             headerStyle.setFont(font);
             headerStyle.setWrapText(true);
             headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            var entryStyle = book.createCellStyle();
+            var entryStyle = borderedStyle(book);
             entryStyle.setDataFormat(book.createDataFormat().getFormat("@"));
             entryStyle.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
             entryStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-            var loanList = book.createSheet(LOAN_LIST);
-            for (int index = 0; index < loans.size(); index++) {
-                var loan = loans.get(index);
-                var row = loanList.createRow(index);
-                row.createCell(0).setCellValue(loan.number());
-                row.createCell(1).setCellValue(loan.client());
-                row.createCell(2).setCellValue(loan.instalmentDate() == null ? "" : loan.instalmentDate().toString());
-                row.createCell(3).setCellValue(loan.instalmentAmount() == null ? "" : loan.instalmentAmount().toPlainString());
-            }
-            book.setSheetHidden(1, true);
-            var loanIds = book.createName();
-            loanIds.setNameName("RepaymentLoanIds");
-            loanIds.setRefersToFormula(LOAN_LIST + "!$A$1:$A$" + loans.size());
+            var dateStyle = borderedStyle(book);
+            dateStyle.setDataFormat(book.createDataFormat().getFormat("yyyy-mm-dd"));
+            var amountStyle = borderedStyle(book);
+            amountStyle.setDataFormat(book.createDataFormat().getFormat("#,##0.00"));
+
+            var batchRow = sheet.createRow(0);
+            batchRow.createCell(0).setCellValue(label("batchId", locale));
+            batchRow.createCell(1).setCellValue(batch.toString());
             var header = sheet.createRow(HEADER_ROW);
             header.setHeightInPoints(32);
-            int[] widths = {20, 42, 22, 31, 24, 28, 34};
+            int[] widths = {42, 20, 22, 31, 24, 28, 34};
             for (int column = 0; column < COLUMNS.size(); column++) {
                 var cell = header.createCell(column);
                 cell.setCellValue(label(COLUMNS.get(column), locale));
                 cell.setCellStyle(headerStyle);
                 sheet.setColumnWidth(column, widths[column] * 256);
             }
-            int rowCount = Math.min(MAX_ROWS, loans.size() + 25);
-            for (int index = 0; index < rowCount; index++) {
-                var row = sheet.createRow(HEADER_ROW + 1 + index);
-                var loanCell = row.createCell(0);
-                loanCell.setCellStyle(entryStyle);
-                if (index < loans.size()) loanCell.setCellValue(loans.get(index).number());
-                String loanAddress = "A" + (row.getRowNum() + 1);
-                for (int column = 1; column <= 3; column++) {
-                    row.createCell(column).setCellFormula("IF(" + loanAddress + "=\"\",\"\",IFERROR(VLOOKUP("
-                        + loanAddress + "," + LOAN_LIST + "!$A$1:$D$" + loans.size() + "," + (column + 1) + ",FALSE),\"\"))");
+            header.createCell(CLIENT_KEY_COLUMN).setCellValue(CLIENT_KEY_HEADER);
+
+            int loanRowIndex = 0;
+            int clientRowIndex = HEADER_ROW + 1;
+            for (var clientLoans : clients.values()) {
+                var firstLoan = clientLoans.getFirst();
+                int listStart = loanRowIndex + 1;
+                for (var loan : clientLoans) {
+                    var row = loanList.createRow(loanRowIndex++);
+                    row.createCell(0).setCellValue(loan.number());
+                    var instalmentDate = row.createCell(1);
+                    if (loan.instalmentDate() == null) instalmentDate.setCellValue("—");
+                    else instalmentDate.setCellValue(loan.instalmentDate());
+                    var instalmentAmount = row.createCell(2);
+                    var amount = loan.instalmentAmount();
+                    if (amount == null) instalmentAmount.setCellValue("—");
+                    else if (amount.stripTrailingZeros().precision() > 15) instalmentAmount.setCellValue(amount.toPlainString());
+                    else instalmentAmount.setCellValue(amount.doubleValue());
                 }
+                var loanIds = book.createName();
+                loanIds.setNameName(RANGE_PREFIX + firstLoan.clientId().toString().replace("-", ""));
+                loanIds.setRefersToFormula(LOAN_LIST + "!$A$" + listStart + ":$A$" + loanRowIndex);
+
+                var row = sheet.createRow(clientRowIndex++);
+                var client = row.createCell(0);
+                client.setCellStyle(bodyStyle);
+                client.setCellValue(firstLoan.clientNumber() + " - " + firstLoan.client());
+                var loan = row.createCell(1);
+                loan.setCellStyle(entryStyle);
+                if (clientLoans.size() == 1) loan.setCellValue(firstLoan.number());
+                row.createCell(CLIENT_KEY_COLUMN).setCellValue(firstLoan.clientId().toString());
+
+                String loanAddress = "$B" + (row.getRowNum() + 1);
+                String lookup = loanAddress + "," + LOAN_LIST + "!$A$" + listStart + ":$C$" + loanRowIndex;
+                var instalmentDate = row.createCell(2);
+                instalmentDate.setCellStyle(dateStyle);
+                instalmentDate.setCellFormula(referenceFormula(loanAddress, lookup, 2));
+                var instalmentAmount = row.createCell(3);
+                instalmentAmount.setCellStyle(amountStyle);
+                instalmentAmount.setCellFormula(referenceFormula(loanAddress, lookup, 3));
                 for (int column = 4; column < COLUMNS.size(); column++) row.createCell(column).setCellStyle(entryStyle);
             }
-            var helper = sheet.getDataValidationHelper();
-            var selector = helper.createValidation(helper.createFormulaListConstraint("RepaymentLoanIds"),
-                new org.apache.poi.ss.util.CellRangeAddressList(HEADER_ROW + 1, HEADER_ROW + rowCount, 0, 0));
-            selector.setShowErrorBox(true);
-            selector.setErrorStyle(DataValidation.ErrorStyle.STOP);
-            sheet.addValidationData(selector);
-            book.setForceFormulaRecalculation(true);
+
             sheet.createFreezePane(0, HEADER_ROW + 1);
-            sheet.setAutoFilter(new CellRangeAddress(HEADER_ROW, HEADER_ROW + rowCount, 0, COLUMNS.size() - 1));
+            if (!clients.isEmpty()) {
+                var helper = sheet.getDataValidationHelper();
+                var selector = helper.createValidation(
+                    helper.createFormulaListConstraint("INDIRECT(\"" + RANGE_PREFIX + "\"&SUBSTITUTE($H3,\"-\",\"\"))"),
+                    new CellRangeAddressList(HEADER_ROW + 1, clientRowIndex - 1, 1, 1));
+                selector.setShowErrorBox(true);
+                selector.setErrorStyle(DataValidation.ErrorStyle.STOP);
+                sheet.addValidationData(selector);
+                sheet.setAutoFilter(new CellRangeAddress(HEADER_ROW, clientRowIndex - 1, 0, CLIENT_KEY_COLUMN));
+                book.getCreationHelper().createFormulaEvaluator().evaluateAll();
+                book.setForceFormulaRecalculation(true);
+            }
             book.write(output);
             return output.toByteArray();
         } catch (IOException failure) {
             throw new IllegalStateException("Receipt template generation failed", failure);
         }
+    }
+
+    private static CellStyle borderedStyle(Workbook book) {
+        var style = book.createCellStyle();
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        return style;
+    }
+
+    private static String referenceFormula(String loanAddress, String lookup, int column) {
+        return "IF(" + loanAddress + "=\"\",\"\",IFERROR(VLOOKUP(" + lookup + "," + column + ",FALSE),\"—\"))";
     }
 
     public List<ImportRow> read(UUID batch, byte[] content) {
@@ -108,21 +161,27 @@ public class ReceiptBatchWorkbook {
                 var scope = sheet.getRow(0);
                 require(scope != null && batch.toString().equals(text(scope.getCell(1), 36)), "importBatch");
                 var header = sheet.getRow(HEADER_ROW);
-                require(header != null && header.getLastCellNum() == COLUMNS.size()
-                    && (matches(header, Locale.ENGLISH) || matches(header, Locale.forLanguageTag("sw"))), "importHeaders");
+                boolean clientFirst = header != null && header.getLastCellNum() == COLUMNS.size() + 1
+                    && CLIENT_KEY_HEADER.equals(text(header.getCell(CLIENT_KEY_COLUMN), CLIENT_KEY_HEADER.length()))
+                    && matches(header, COLUMNS);
+                require(clientFirst || header != null && header.getLastCellNum() == LEGACY_COLUMNS.size()
+                    && matches(header, LEGACY_COLUMNS), "importHeaders");
+                int columnCount = clientFirst ? COLUMNS.size() + 1 : LEGACY_COLUMNS.size();
+                int loanColumn = clientFirst ? 1 : 0;
                 require(sheet.getLastRowNum() <= MAX_ROWS + HEADER_ROW, "limit");
                 var rows = new ArrayList<ImportRow>();
                 for (int index = HEADER_ROW + 1; index <= sheet.getLastRowNum(); index++) {
                     var row = sheet.getRow(index);
                     if (row == null) continue;
                     try {
-                        require(row.getLastCellNum() <= COLUMNS.size(), "importRow");
-                        // The workbook's lookup formulas are display-only. Import only the loan and actual payment cells.
+                        require(row.getLastCellNum() <= columnCount, "importRow");
+                        // Reference formulas are display-only. The service verifies the client and loan against live data.
                         if (blank(row.getCell(4)) && blank(row.getCell(5)) && blank(row.getCell(6))) continue;
-                        String loan = text(row.getCell(0), 80);
+                        String loan = text(row.getCell(loanColumn), 80);
                         String reference = text(row.getCell(6), 80);
                         require(!loan.isEmpty() && !reference.isEmpty(), "importRow");
-                        rows.add(new ImportRow(index + 1, loan, amount(row.getCell(4)), date(row.getCell(5)), reference));
+                        UUID clientId = clientFirst ? UUID.fromString(text(row.getCell(CLIENT_KEY_COLUMN), 36)) : null;
+                        rows.add(new ImportRow(index + 1, loan, amount(row.getCell(4)), date(row.getCell(5)), reference, clientId));
                     } catch (IllegalArgumentException | java.time.DateTimeException failure) {
                         throw new ImportRowError("batch.error.importRow", index + 1);
                     }
@@ -137,11 +196,15 @@ public class ReceiptBatchWorkbook {
         }
     }
 
-    private boolean matches(Row header, Locale locale) {
-        for (int column = 0; column < COLUMNS.size(); column++) {
+    private boolean matches(Row header, List<String> columns) {
+        return matches(header, columns, Locale.ENGLISH) || matches(header, columns, Locale.forLanguageTag("sw"));
+    }
+
+    private boolean matches(Row header, List<String> columns, Locale locale) {
+        for (int column = 0; column < columns.size(); column++) {
             var cell = header.getCell(column);
             if (cell == null || cell.getCellType() != CellType.STRING
-                || !label(COLUMNS.get(column), locale).equals(cell.getStringCellValue())) return false;
+                || !label(columns.get(column), locale).equals(cell.getStringCellValue())) return false;
         }
         return true;
     }
