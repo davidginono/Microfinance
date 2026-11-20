@@ -95,6 +95,19 @@ public class StatementRepository {
     public void payload(UUID id,String value,String checksum){jdbc.update("update statement_run set payload=?,checksum=? where id=? and payload is null",value,checksum,id);}
     public Optional<Stored> find(UUID id,AppUserPrincipal a){return jdbc.query("select * from statement_run where id=? and sacco_id=? and station_id=?",this::stored,id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Stored> history(AppUserPrincipal a,int page,String sort,boolean wideAllowed){String order=switch(sort){case "oldest"->"generated_at asc,id";case "from"->"date_from asc,id";case "from_desc"->"date_from desc,id";case "through"->"date_through asc,id";case "through_desc"->"date_through desc,id";case "status"->"saved_at nulls first,id";case "status_desc"->"saved_at desc nulls last,id";default->"generated_at desc,id";};return jdbc.query("select id,date_from,date_through,generated_at,institution_wide,saved_at,null::text payload,null::text checksum from statement_run where sacco_id=? and station_id=? and (not institution_wide or ?) and payload is not null order by "+order+" limit 31 offset ?",this::stored,a.getSaccoId(),a.getStationId(),wideAllowed,page*30);}
+    public List<Stored> branchSaved(String institution,String branch,int page) {
+        return jdbc.query("""
+            select id,date_from,date_through,generated_at,institution_wide,saved_at,null::text payload,null::text checksum
+            from statement_run where sacco_id=? and station_id=? and not institution_wide and saved_at is not null and payload is not null
+            order by generated_at desc,id desc limit 31 offset ?
+            """,this::stored,institution,branch,page*30);
+    }
+    public Optional<Stored> branchSaved(String institution,String branch,UUID id) {
+        return jdbc.query("""
+            select id,date_from,date_through,generated_at,institution_wide,saved_at,payload,checksum
+            from statement_run where id=? and sacco_id=? and station_id=? and not institution_wide and saved_at is not null
+            """,this::stored,id,institution,branch).stream().findFirst();
+    }
     public void save(UUID id,AppUserPrincipal a,OffsetDateTime now){jdbc.update("update statement_run set saved_at=? where id=? and sacco_id=? and station_id=? and saved_at is null",now,id,a.getSaccoId(),a.getStationId());}
     public List<Activity> activity(UUID run,UUID account,Parameters p,int page,int limit){return jdbc.query("""
         with activity as (

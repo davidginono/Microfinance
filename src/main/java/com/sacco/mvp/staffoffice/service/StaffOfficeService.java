@@ -1,7 +1,6 @@
 package com.sacco.mvp.staffoffice.service;
 
 import com.sacco.mvp.accounting.approval.service.VoucherWorkflowService;
-import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Filter;
 import com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService;
 import com.sacco.mvp.accounting.loans.service.LoanRecordingService;
 import com.sacco.mvp.accounting.service.AccountOfficeWorkService;
@@ -125,10 +124,8 @@ public class StaffOfficeService {
     }
 
     private Set<Position> reviewGroups(AppUserPrincipal a) {
-        if(!has(a,"LOAN_RECORDING_VIEW"))return Set.of();
-        if(hasAny(a,"LOAN_RECORDING_APPROVE","LOAN_RECORDING_REJECT"))
-            return StaffOffice.assigned(a.getStaffRoles()).stream().map(StaffOffice::getGroup).collect(java.util.stream.Collectors.toSet());
-        return reviews.assignedReviewGroups(a);
+        if(!has(a,"LOAN_RECORDING_VIEW") || !hasAny(a,"LOAN_RECORDING_APPROVE","LOAN_RECORDING_REJECT"))return Set.of();
+        return StaffOffice.assigned(a.getStaffRoles()).stream().map(StaffOffice::getGroup).collect(java.util.stream.Collectors.toSet());
     }
     private List<Source> sources(AppUserPrincipal a,StaffOffice office,Set<Position> reviewGroups) {
         var result=new ArrayList<Source>();
@@ -141,7 +138,6 @@ public class StaffOfficeService {
             add(result,"accounts",true);
         }
         if(has(a,"CLIENT_ONBOARDING_VIEW"))add(result,"clients",false);
-        if(has(a,"LOAN_RECORDING_VIEW"))add(result,"loans",true);
         if(hasAny(a,"DISBURSEMENT_QUEUE_VIEW","DISBURSEMENT_QUEUE_DISBURSE"))add(result,"funding",true);
         if(has(a,"COLLECTIONS_VIEW"))add(result,"collections",false);
         if(has(a,"COLLATERAL_VIEW"))add(result,"collateral",false);
@@ -151,7 +147,7 @@ public class StaffOfficeService {
             case ICT_MANAGER->List.of("staff","support");
             case CUSTOMER_CARE->List.of("clients","support");
             case CHIEF_ACCOUNTANT,FINANCE_MANAGER,ACCOUNTS_CLERK,ACCOUNTS_CLERK_2->List.of("voucher-reviews","account-reviews","vouchers","accounts","funding");
-            default->List.of("loan-reviews","loans","collections");
+            default->List.of("loan-reviews","collections");
         };
         result.sort(Comparator.comparingInt(s->{if(s.key().equals("loan-reviews"))return -1;int n=priority.indexOf(s.key());return n<0?priority.size():n;}));
         return List.copyOf(result);
@@ -167,12 +163,6 @@ public class StaffOfficeService {
             case "account-reviews","accounts"->accounts.read(a,source.equals("account-reviews"),search,sort,page);
             case "staff","support"->administration.read(a,source.equals("staff"),search,sort,page);
             case "clients"->{var p=clients.clients(a,search,"",page,sort.equals("number_desc")?"number_desc":"number_asc");yield new Page(p.rows().stream().map(r->new Task(r.number(),r.name(),"kyc.state."+r.state(),null,"/finance/clients/onboarding/"+r.id())).toList(),page,p.hasNext());}
-            case "loans"->{
-                var p=loans.list(a,new Filter(search,null,null,"",sort.equals("number")?"number_asc":sort,page,null));
-                var intake=loans.intakeIds(a,p.rows().stream().map(r->r.id()).toList());
-                yield new Page(p.rows().stream().map(r->new Task(r.number(),r.client(),"recording.status."+r.status(),r.principal(),
-                    "/finance/loan-records/"+(intake.contains(r.id())?"applications/":"")+r.id())).toList(),page,p.hasNext());
-            }
             case "funding"->loans.officeFunding(a,search,sort,page);
             case "collections"->{var p=credit.cases(a,search,page,sort.equals("number_desc")?"loan_desc":"loan_asc");yield new Page(p.rows().stream().map(r->new Task(r.loanNumber(),r.borrower(),"credit.state."+r.state(),r.arrears(),"/finance/credit/collections/"+r.id())).toList(),page,p.hasNext());}
             case "collateral"->{var p=credit.assets(a,search,page,sort.equals("number_desc")?"code_desc":"code_asc");yield new Page(p.rows().stream().map(r->new Task(r.code(),r.description(),"office.recorded",r.value(),"/finance/credit/collateral/"+r.id())).toList(),page,p.hasNext());}

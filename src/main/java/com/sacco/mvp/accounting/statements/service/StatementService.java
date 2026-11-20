@@ -72,6 +72,25 @@ public class StatementService {
     @Transactional(readOnly=true)
     public Run get(AppUserPrincipal a,UUID id){
         authorize(a,false);var stored=repository.find(id,a).orElseThrow(()->new AccessDeniedException("Statement unavailable"));authorize(a,stored.wide());
+        return verifiedRun(id,stored);
+    }
+
+    @Transactional(readOnly=true)
+    public List<StatementRepository.Stored> branchSaved(com.sacco.mvp.branches.service.BranchService.ReadScope scope,int page) {
+        scope.require(com.sacco.mvp.domain.UserClaim.FINANCIAL_REPORTS_VIEW);
+        page(page);
+        return repository.branchSaved(scope.institution(),scope.branch().id(),page);
+    }
+
+    @Transactional(readOnly=true)
+    public Run branchSaved(com.sacco.mvp.branches.service.BranchService.ReadScope scope,UUID id) {
+        scope.require(com.sacco.mvp.domain.UserClaim.FINANCIAL_REPORTS_VIEW);
+        var stored=repository.branchSaved(scope.institution(),scope.branch().id(),id)
+            .orElseThrow(()->new AccessDeniedException("Statement unavailable"));
+        return verifiedRun(id,stored);
+    }
+
+    private Run verifiedRun(UUID id,StatementRepository.Stored stored) {
         if(stored.payload()==null||!sha(stored.payload().getBytes(StandardCharsets.UTF_8)).equals(stored.checksum()))throw new IllegalStateException("Statement integrity check failed");
         var snapshot=mapper.readValue(stored.payload(),Snapshot.class);require((snapshot.version()>=1&&snapshot.version()<=4)&&snapshot.id().equals(id),"snapshot");
         return new Run(id,stored.from(),stored.through(),stored.generated(),stored.wide(),stored.saved(),snapshot);

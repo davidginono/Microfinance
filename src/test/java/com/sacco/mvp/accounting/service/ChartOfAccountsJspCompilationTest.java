@@ -26,6 +26,8 @@ class ChartOfAccountsJspCompilationTest {
         else {
             var expanded=new java.util.LinkedHashSet<>(java.util.List.of(pages));
             expanded.add("vouchers/loan-details.jsp");
+            expanded.addAll(java.util.List.of("loans/cancel.jsp","../admin/branch-form.jsp","../admin/branch-delegation.jsp",
+                "../admin/user-edit.jsp","../staff/branches.jsp","../staff/branch-record.jsp","../staff/branch-reports.jsp","../staff/branch-statement.jsp"));
             expanded.add("loans/group-history.jsp");expanded.add("loans/group-withdraw.jsp");expanded.add("../disbursement/detail.jsp");expanded.add("../groups/details.jsp");
             // Compile every accountant resource view changed by the shared table rollout.
             String[] folders = {"accounting", "reporting", "reports", "admin", "disbursement", "staff", "repayments", "account", "credit", "onboarding", "groups"};

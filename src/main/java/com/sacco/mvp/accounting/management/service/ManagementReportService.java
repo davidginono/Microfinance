@@ -21,7 +21,7 @@ public class ManagementReportService {
     private final MessageSource messages;
     public void authorize(AppUserPrincipal a,Kind kind,boolean export){
         guard.requireActor(a,"FINANCIAL_REPORTS_VIEW");
-        guard.requireActor(a,switch(kind){case DAILY_COLLECTIONS->"ACCOUNTING_BUSINESS_VIEW";case CASHBOOK->"ACCOUNTING_JOURNALS_VIEW";default->"LOAN_REPORTS_VIEW";});
+        guard.requireActor(a,viewClaim(kind).name());
         if(export)guard.requireActor(a,"FINANCIAL_REPORTS_EXPORT");
     }
     @Transactional(readOnly=true) public List<Choice> choices(AppUserPrincipal a,Kind kind,String category,String search,int page) {
@@ -76,6 +76,29 @@ public class ManagementReportService {
                 export?data.rows():data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),!export && data.rows().size()>25,accountSelection,client==null?"":client.getLabel());
         });
     }
+    public static com.sacco.mvp.domain.UserClaim viewClaim(Kind kind) {
+        return switch(kind) {
+            case DAILY_COLLECTIONS -> com.sacco.mvp.domain.UserClaim.ACCOUNTING_BUSINESS_VIEW;
+            case CASHBOOK -> com.sacco.mvp.domain.UserClaim.ACCOUNTING_JOURNALS_VIEW;
+            default -> com.sacco.mvp.domain.UserClaim.LOAN_REPORTS_VIEW;
+        };
+    }
+
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
+    public Result branchReport(com.sacco.mvp.branches.service.BranchService.ReadScope scope,Kind kind,Parameters p) {
+        scope.require(com.sacco.mvp.domain.UserClaim.FINANCIAL_REPORTS_VIEW);
+        scope.require(viewClaim(kind));
+        validate(p,clock.today(),clock.now(),kind);
+        check(p.startAccount()==null && p.endAccount()==null && p.clientId()==null && p.productId()==null,"parameters");
+        return limiter.run(() -> {
+            var data=reports.read(scope.institution(),scope.branch().id(),kind,p,false);
+            check(data.groups().size()<=1000,"large");
+            var identity=reports.identity(scope.institution(),scope.branch().id());
+            return new Result(kind,p,identity[0],identity[1],com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),
+                data.rows().stream().limit(25).toList(),data.groups(),data.totals(),data.count(),data.excluded(),data.rows().size()>25,"","");
+        });
+    }
+
     public static void validate(Parameters p,java.time.LocalDate today,java.time.OffsetDateTime now){
         validate(p,today,now,null);
     }

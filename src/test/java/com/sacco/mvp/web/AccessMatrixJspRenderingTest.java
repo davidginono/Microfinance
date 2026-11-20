@@ -42,7 +42,7 @@ class AccessMatrixJspRenderingTest {
             """+matrix;
         Set<UserClaim> assigned=EnumSet.of(UserClaim.MANAGER_QUEUE_VIEW,UserClaim.VOUCHER_RULE_CONFIGURE);
         var user=AdminService.UserAccessView.builder().claims(assigned).build();
-        var response=render(page,Map.of("user",user,"accessMatrixRows",UserClaim.matrixRows()));
+        var response=render(page,Map.of("user",user,"accessMatrixRows",UserClaim.matrixRows(),"canGrantBranchView",true));
         for(var claim:UserClaim.matrixRows().stream().flatMap(row->row.claimsByAction().values().stream()).toList()){
             var input=Pattern.compile("<input[^>]*data-access-claim=\""+claim.name()+"\"[^>]*>").matcher(response.body());
             assertThat(input.find()).as(claim.name()).isTrue();

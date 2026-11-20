@@ -13,8 +13,13 @@
         </c:forEach>
     </div>
 </c:forEach>
+<sec:authorize access="@access.has(principal,'LOAN_RECORDING_VIEW')">
+<a href="<c:url value='/staff/offices/loan-review-archive' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq '/staff/offices/loan-review-archive' ? 'shell-nav-active' : ''}"><spring:message code="office.archive" /></a>
+</sec:authorize>
+<sec:authorize access="@access.has(principal,'OTHER_BRANCHES_VIEW')"><a href="<c:url value='/staff/branches' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/staff/branches') ? 'shell-nav-active' : ''}"><spring:message code="branches.oversight" /></a></sec:authorize>
 <%@ include file="office-activities.jspf" %>
-<sec:authorize access="@access.hasAny(principal,'USER_ACCESS_VIEW','SUPPORT_VIEW','OUTBOX_VIEW','SMS_USAGE_VIEW')"><div class="shell-sidebar-nav-heading"><span><spring:message code="admin.tools" /></span></div></sec:authorize>
+<sec:authorize access="@access.hasAny(principal,'USER_ACCESS_VIEW','SUPPORT_VIEW','OUTBOX_VIEW','SMS_USAGE_VIEW','BRANCHES_VIEW')"><div class="shell-sidebar-nav-heading"><span><spring:message code="admin.tools" /></span></div></sec:authorize>
+<sec:authorize access="@access.has(principal,'BRANCHES_VIEW')"><a href="<c:url value='/admin/branches' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/branches') ? 'shell-nav-active' : ''}"><spring:message code="branches.title" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'USER_ACCESS_VIEW')"><a href="<c:url value='/admin/users' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/users') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.usersRoles" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'SUPPORT_VIEW')"><a href="<c:url value='/admin/incidents' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/incidents') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.incidents" /></a></sec:authorize>
 <sec:authorize access="@access.has(principal,'OUTBOX_VIEW')"><a href="<c:url value='/admin/outbox' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/admin/outbox') ? 'shell-nav-active' : ''}"><spring:message code="menu.admin.outboxMonitor" /></a></sec:authorize>

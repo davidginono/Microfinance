@@ -27,5 +27,9 @@ public final class LoanCancellationDtos {
         }
         public boolean isActionable() {return actionable();}
     }
+    public record Action(String submitLabel, String blockedReason) {
+        public boolean available() { return submitLabel != null; }
+        public boolean isAvailable() { return available(); }
+    }
     public record Result(UUID loanId,UUID adjustmentId) {}
 }

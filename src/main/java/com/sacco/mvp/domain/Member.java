@@ -120,6 +120,7 @@ public class Member {
 
     @Transient
     public boolean isStaffAccessActive() {
+        if (isMemberAccess()) return false;
         StaffAccessStatus status = staffAccessStatus == null ? StaffAccessStatus.NONE : staffAccessStatus;
         if (status == StaffAccessStatus.ACTIVE) {
             return !getStaffRolesResolved().isEmpty();

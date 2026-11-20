@@ -13,6 +13,24 @@ import jakarta.servlet.http.HttpServletResponse;
 @RequestMapping("/staff/offices")
 public class StaffOfficeController {
     private final StaffOfficeService offices;
+    private final com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService reviews;
+
+    @GetMapping("/loan-review-archive")
+    public String archive(@AuthenticationPrincipal AppUserPrincipal actor,
+                          @RequestParam(defaultValue="") String search,
+                          @RequestParam(defaultValue="newest") String sort,
+                          @RequestParam(defaultValue="0") int page, Model model, HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store");
+        try {
+            model.addAttribute("archive",reviews.archive(actor,search,sort,page));
+        } catch(IllegalArgumentException invalid) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,null,invalid);
+        }
+        model.addAttribute("search",search);
+        model.addAttribute("sort",sort);
+        return "staff/loan-review-archive";
+    }
+
     @GetMapping("/{office}/dashboard")
     public String formerDashboard(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable String office,HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store");

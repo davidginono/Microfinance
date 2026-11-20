@@ -100,7 +100,7 @@ class SessionKeepaliveControllerTest {
             .id(UUID.randomUUID())
             .memberNo("MEM001")
             .fullName("Test User")
-            .memberAccount(true)
+            .memberAccount(false)
             .status(MemberStatus.ACTIVE)
             .passwordHash("encoded-password")
             .build();

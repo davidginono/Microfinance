@@ -40,7 +40,7 @@ class AccountSecurityControllerTest {
         reset(preferences);
         mvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
         principal = new AppUserPrincipal(Member.builder().id(UUID.randomUUID())
-            .position(com.sacco.mvp.domain.Position.ACCOUNTANT).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).memberNo("OTP-TEST").memberAccount(true).status(MemberStatus.ACTIVE).build(),Set.of());
+            .position(com.sacco.mvp.domain.Position.ACCOUNTANT).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).memberNo("OTP-TEST").memberAccount(false).status(MemberStatus.ACTIVE).build(),Set.of());
     }
 
     @Test

@@ -12,11 +12,9 @@
 </dl>
 <c:if test="${not empty cancellation.cancelledAt}"><dl class="erp-detail-facts"><div><dt><spring:message code="cancellation.by" /></dt><dd><c:out value="${cancellation.cancelledBy}" /></dd></div><div><dt><spring:message code="voucher.date" /></dt><dd><c:out value="${appTime:display(cancellation.cancelledAt)}" /></dd></div><div><dt><spring:message code="repayment.reason" /></dt><dd><c:out value="${cancellation.reason}" /></dd></div></dl></c:if>
 <c:if test="${not empty cancellation.adjustmentId}"><p role="status"><spring:message code="cancellation.request.${cancellation.adjustmentState}" /> <sec:authorize access="@access.has(principal,'LOAN_ADJUSTMENTS_VIEW')"><a class="resource-table-id-link" href="<c:url value='/finance/loan-adjustments/${cancellation.adjustmentId}' />"><spring:message code="common.view" /></a></sec:authorize></p></c:if>
-<c:if test="${not empty cancellation.blockedReason and cancellation.adjustmentState!='PENDING' and cancellation.adjustmentState!='APPROVED' and empty cancellation.cancelledAt}"><p role="status"><spring:message code="${cancellation.blockedReason}" /></p></c:if>
+<c:if test="${not empty cancellationAction.blockedReason and cancellation.adjustmentState!='PENDING' and cancellation.adjustmentState!='APPROVED' and empty cancellation.cancelledAt}"><p role="status"><spring:message code="${cancellationAction.blockedReason}" /></p></c:if>
 </div></section>
-<sec:authorize access="@access.has(principal,'LOAN_RECORDING_CANCEL')" var="canCancel" />
-<sec:authorize access="@access.has(principal,'LOAN_ADJUSTMENTS_VIEW') and @access.has(principal,'LOAN_ADJUSTMENTS_CREATE')" var="canRequestReversal" />
-<c:if test="${cancellation.actionable and canCancel and (not cancellation.funded or canRequestReversal)}">
+<c:if test="${cancellationAction.available}">
 <c:url value="/finance/loan-records/${cancellation.id}/cancel" var="cancelUrl" />
 <form:form action="${cancelUrl}" method="post" modelAttribute="cancellationForm" class="accounting-create-form" data-resource-form-page="true" data-workspace-submit="recover">
 <form:hidden path="requestKey" /><form:hidden path="state" /><form:hidden path="terms" />
@@ -32,10 +30,10 @@
 <label><form:checkbox path="confirmed" required="required" /> <spring:message code="cancellation.confirm" /></label><form:errors path="confirmed" cssClass="coa-error" />
 </div></section>
 <c:if test="${not empty cancellationError}"><p class="coa-error" role="alert" tabindex="-1"><spring:message code="${cancellationError}" /></p></c:if>
-<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records/${cancellation.id}' />"><spring:message code="common.cancel" /></a><button type="submit" class="app-btn btn-launch"><spring:message code="${cancellation.funded?'cancellation.request':'cancellation.title'}" /></button></div>
+<div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records/${cancellation.id}' />"><spring:message code="common.cancel" /></a><button type="submit" class="app-btn btn-launch"><spring:message code="${cancellationAction.submitLabel}" /></button></div>
 </form:form>
 </c:if>
-<c:if test="${not cancellation.actionable or not canCancel or (cancellation.funded and not canRequestReversal)}">
+<c:if test="${not cancellationAction.available}">
 <c:if test="${not empty cancellationError}"><p class="coa-error" role="alert"><spring:message code="${cancellationError}" /></p></c:if>
 <div class="accounting-actions accounting-form-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/loan-records/${cancellation.id}' />"><spring:message code="common.close" /></a></div>
 </c:if>

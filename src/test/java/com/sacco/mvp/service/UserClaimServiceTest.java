@@ -170,26 +170,17 @@ class UserClaimServiceTest {
     }
 
     @Test
-    void defaultClaimsCombineMultipleRolesAndMemberAccess() {
-        Set<UserClaim> claims = userClaimService.defaultClaims(
-            List.of(Position.MANAGER, Position.DISBURSEMENT_OFFICER),
-            true
-        );
-
-        assertThat(claims).doesNotContain(UserClaim.LOAN_RECORDING_APPROVE,UserClaim.MEMBER_LOANS_VIEW,UserClaim.GUARANTOR_REQUESTS_APPROVE).contains(
-            UserClaim.DISBURSEMENT_QUEUE_DISBURSE,
-            UserClaim.LOAN_DOCUMENTS_VIEW,
-            UserClaim.NOTIFICATIONS_UPDATE
-        );
+    void clientIdentityHasNoStaffDefaults() {
+        assertThat(userClaimService.defaultClaims(List.of(Position.MANAGER,Position.DISBURSEMENT_OFFICER),true)).isEmpty();
     }
 
-    @Test void explicitAdministratorRevocationsStillOverrideTheNewDefaultsInSingleAndBatchReads() {
+    @Test void ictKeepsOnlyLockedDefaultsWhenOtherPermissionsHaveBeenRevoked() {
         UUID member=UUID.randomUUID();var roles=List.of(Position.ICT_MANAGER);
         when(memberAccessClaimRepository.findByIdMemberId(member)).thenReturn(List.of(accessClaim(member,"USER_ACCESS_VIEW")));
         when(memberAccessClaimRepository.findByIdMemberIdIn(Set.of(member))).thenReturn(List.of(accessClaim(member,"USER_ACCESS_VIEW")));
-        assertThat(userClaimService.effectiveClaims(member,roles,false)).containsExactly(UserClaim.USER_ACCESS_VIEW);
+        assertThat(userClaimService.effectiveClaims(member,roles,false)).containsExactlyInAnyOrderElementsOf(UserClaim.lockedClaims(roles));
         assertThat(userClaimService.effectiveClaims(java.util.Map.of(member,new UserClaimService.ClaimSubject(roles,false))).get(member))
-            .containsExactly(UserClaim.USER_ACCESS_VIEW);
+            .containsExactlyInAnyOrderElementsOf(UserClaim.lockedClaims(roles));
         verifyNoInteractions(userSettingsRepository);
     }
 

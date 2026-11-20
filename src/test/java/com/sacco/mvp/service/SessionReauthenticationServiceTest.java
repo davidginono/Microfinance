@@ -71,7 +71,7 @@ class SessionReauthenticationServiceTest {
             .id(UUID.randomUUID())
             .memberNo("MEM001")
             .fullName("Test User")
-            .memberAccount(true)
+            .memberAccount(false)
             .status(status)
             .passwordHash(passwordHash)
             .build();

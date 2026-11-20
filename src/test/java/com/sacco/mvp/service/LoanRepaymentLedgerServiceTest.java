@@ -323,7 +323,7 @@ class LoanRepaymentLedgerServiceTest {
     private AppUserPrincipal poster() { return actor(posterId, "B1", Set.of(UserClaim.LOAN_REPAYMENTS_CREATE), true); }
     static AppUserPrincipal actor(UUID id, String branch, Set<UserClaim> claims, boolean staff) {
         return (staff ? new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(id).saccoId("I1").stationId(branch).fullName("Test Operator")
-            .memberNo("C001").memberAccount(true).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),claims) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(id).saccoId("I1").stationId(branch).fullName("Test Operator")
+            .memberNo("C001").memberAccount(false).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),claims) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(id).saccoId("I1").stationId(branch).fullName("Test Operator")
             .memberNo("C001").memberAccount(true).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),claims));
     }
     private LoanRepaymentLedgerService.PaymentCommand command(String amount, LocalDate date) {

@@ -33,6 +33,23 @@ class LoanGroupApprovalPostgresTest {
         f.context.registerBean(LoanGroupApprovalService.class,()->new LoanGroupApprovalService(new LoanRecordingRepository(f.jdbc),f.context.getBean(GeneralLedgerService.class),f.context.getBean(MemberDirectoryService.class),f.context.getBean(AuditService.class),f.context.getBean(ApplicationClock.class),f.context.getBean(tools.jackson.databind.ObjectMapper.class),f.service,mock(SaccoConfigurationService.class)));
         service=f.context.getBean(LoanGroupApprovalService.class);
     }
+    @Test void archiveCountsOnlyDisbursedLoansWithTheSignedInReviewersDecision() {
+        decide(first,submit(),"REJECT");
+        UUID request=submit();
+        decide(first,request,"APPROVE");decide(second,request,"APPROVE");decide(manager,request,"APPROVE");
+        assertThat(service.archive(first,"","newest",0).count()).isZero();
+        var post=f.post(loan,"5000000.00","REVIEW-ARCHIVE-"+UUID.randomUUID());
+        post.setEffectiveDate(SimpleGroupLoanPostgresTest.DAY);
+        post.setFirstPaymentDate(SimpleGroupLoanPostgresTest.DAY.plusDays(1));
+        f.service.disburse(f.actor,post);
+        var archive=service.archive(first,"","newest",0);
+        assertThat(archive.count()).isEqualTo(1);
+        assertThat(archive.rows()).extracting(ReviewedLoan::id).containsExactly(loan);
+        assertThat(service.archive(first,"no-match","newest",0).rows()).isEmpty();
+        assertThat(service.archive(f.actor,"","newest",0).count()).isZero();
+        assertThat(queue(first,Position.ACCOUNTANT)).doesNotContain("/finance/loan-records/"+loan);
+    }
+
     @Test void recorderAndReviewerCommandsStaySeparateInTheDatabase(){
         assertThat(service.review(f.actor,loan).canSubmit()).isTrue();
         assertThat(service.review(first,loan).canSubmit()).isFalse();
@@ -78,25 +95,24 @@ class LoanGroupApprovalPostgresTest {
     List<String> queue(AppUserPrincipal actor,Position group) {
         return service.officeReviews(actor,group,"","number",0).rows().stream().map(com.sacco.mvp.staffoffice.dto.OfficeWork.Task::href).toList();
     }
-    @Test void assignedReviewersCanReadTheirQueueButCannotDecideWithoutExplicitClaims() {
+    @Test void assignedReviewersCannotReadTheirQueueOrDecideWithoutExplicitClaims() {
         UUID request=submit();
         var viewer=new AppUserPrincipal(f.context.getBean(MemberDirectoryService.class).find(first.getMemberId()).orElseThrow(),Set.of(UserClaim.LOAN_RECORDING_VIEW));
         when(f.context.getBean(UserClaimService.class).effectiveClaims(eq(viewer.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.LOAN_RECORDING_VIEW));
-        assertThat(service.assignedReviewGroups(viewer)).containsExactly(Position.ACCOUNTANT);
-        assertThat(queue(viewer,Position.ACCOUNTANT)).hasSize(1);
+        assertThatThrownBy(()->queue(viewer,Position.ACCOUNTANT)).isInstanceOf(AccessDeniedException.class);
         assertThat(service.review(viewer,loan).canApprove()).isFalse();assertThat(service.review(viewer,loan).canReject()).isFalse();
         for(var decision:List.of("APPROVE","REJECT"))
             assertThatThrownBy(()->service.decide(viewer,loan,request,UUID.randomUUID(),decision,"Checked")).isInstanceOf(AccessDeniedException.class);
         assertThat(f.jdbc.queryForObject("select count(*) from loan_group_decision where request_id=?",Integer.class,request)).isZero();
-        assertThat(service.assignedReviewGroups(f.operator("B2"))).isEmpty();
+        assertThat(queue(f.operator("B2"),Position.ACCOUNTANT)).isEmpty();
     }
     @Test void reviewerCardsKeepPendingFrozenAssignmentsAfterConfigurationChanges() {
         UUID request=submit();
         var form=new GroupRuleForm();form.setProductId(f.product);form.setExpectedRevision(1);form.setGroups(List.of(Position.LOAN_OFFICER));form.setApprovals(List.of(1));
         service.saveRule(f.actor,form);
-        assertThat(service.assignedReviewGroups(first)).contains(Position.ACCOUNTANT);
+        assertThat(queue(first,Position.ACCOUNTANT)).contains("/finance/loan-records/"+loan);
         decide(second,request,"REJECT");
-        assertThat(service.assignedReviewGroups(first)).isEmpty();
+        assertThat(queue(first,Position.ACCOUNTANT)).doesNotContain("/finance/loan-records/"+loan);
     }
     @Test void personalDashboardCountsKeepAllAssignedReviewGroupsAndFrozenEligibility() {
         var directory=f.context.getBean(MemberDirectoryService.class);
@@ -247,17 +263,14 @@ class LoanGroupApprovalPostgresTest {
         assertThat(f.jdbc.queryForObject("select count(*) from loan_group_request where loan_id=?",Integer.class,loan)).isEqualTo(2);
         assertThat(f.jdbc.queryForObject("select decision from loan_group_decision where request_id=?",String.class,request)).isEqualTo("REJECT");
     }
-    @Test void aNamedGroupBorrowerWithStaffPermissionsCannotApproveTheirOwnLoan(){
+    @Test void aNamedGroupBorrowerCannotAcquireStaffAccessOrApproveTheirOwnLoan(){
         UUID request=submit();
-        var m=Member.builder().id(s.clients.getFirst()).saccoId(f.institution).stationId("B1").fullName("Synthetic group borrower")
-            .status(MemberStatus.ACTIVE).position(Position.ACCOUNTANT).staffRoles(Set.of(Position.ACCOUNTANT))
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).memberAccount(true).build();
-        f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE' where id=?",s.clients.getFirst());
-        for(var claim:List.of("LOAN_RECORDING_VIEW","LOAN_RECORDING_APPROVE"))f.jdbc.update("insert into member_access_claims(member_id,claim_name) values(?,?)",s.clients.getFirst(),claim);
-        when(f.context.getBean(MemberDirectoryService.class).find(s.clients.getFirst())).thenReturn(Optional.of(m));
-        var actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class));
-        assertThat(service.review(actor,loan).canApprove()).isFalse();
-        assertThatThrownBy(()->decide(actor,request,"APPROVE")).hasMessage("loanGroups.error.independent");
-        assertThatThrownBy(()->f.jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,0,?,'APPROVE','Own group','Paper',now())",UUID.randomUUID(),request,s.clients.getFirst())).isInstanceOf(DataAccessException.class);
+        UUID borrower=s.clients.getFirst();
+        assertThatThrownBy(()->f.jdbc.update("update members set position='ACCOUNTANT',staff_access_status='ACTIVE' where id=?",borrower))
+            .isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(()->f.jdbc.update("insert into member_staff_roles(member_id,role_name) values(?,'ACCOUNTANT')",borrower))
+            .isInstanceOf(DataAccessException.class);
+        assertThatThrownBy(()->f.jdbc.update("insert into loan_group_decision(id,request_id,step,actor_id,decision,reason,evidence,recorded_at) values(?,?,0,?,'APPROVE','Own group','Paper',now())",UUID.randomUUID(),request,borrower))
+            .isInstanceOf(DataAccessException.class);
     }
 }

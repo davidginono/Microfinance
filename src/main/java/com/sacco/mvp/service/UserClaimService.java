@@ -37,14 +37,15 @@ public class UserClaimService {
         }
         List<MemberAccessClaim> storedClaims = memberAccessClaimRepository.findByIdMemberId(memberId);
         if (!storedClaims.isEmpty()) {
-            return parseStoredClaims(storedClaims, staffRoles);
+            return withLockedClaims(parseStoredClaims(storedClaims, staffRoles), staffRoles, memberAccess);
         }
-        return userSettingsRepository.findById(memberId)
+        var assigned = userSettingsRepository.findById(memberId)
             .map(UserSettings::getNotificationPrefs)
             .map(this::parsePrefs)
             .filter(prefs -> prefs.containsKey("claims"))
             .map(prefs -> parseClaims(prefs, staffRoles))
             .orElse(defaults);
+        return withLockedClaims(assigned, staffRoles, memberAccess);
     }
 
     /** Keep existing client defaults while admitting only explicitly assigned own-coverage powers. */
@@ -85,7 +86,21 @@ public class UserClaimService {
                     : defaultClaims(subject.staffRoles(), subject.memberAccess()));
             }
         }
+        resolved.replaceAll((id, assigned) -> {
+            var subject = subjects.get(id);
+            return withLockedClaims(assigned,subject.staffRoles(),subject.memberAccess());
+        });
         return resolved;
+    }
+
+    private Set<UserClaim> withLockedClaims(Set<UserClaim> assigned, Collection<Position> roles, boolean client) {
+        if(client) return Set.of();
+        var effective = EnumSet.noneOf(UserClaim.class);
+        effective.addAll(assigned);
+        var locked = UserClaim.lockedClaims(roles);
+        effective.addAll(locked);
+        if(locked.isEmpty()) effective.remove(UserClaim.INSTITUTION_BRANCH_ADMIN);
+        return effective;
     }
 
     public record ClaimSubject(Collection<Position> staffRoles, boolean memberAccess) {}

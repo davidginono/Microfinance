@@ -29,6 +29,10 @@ public class MemberDirectoryService {
         return memberId == null ? Optional.empty() : memberRepository.findById(memberId);
     }
 
+    public boolean hasCurrentStaffAssignment(UUID id,String institution,String branch) {
+        return id!=null && memberRepository.hasCurrentStaffAssignment(id,institution,branch);
+    }
+
     public List<Member> findAll(Collection<UUID> memberIds) {
         return memberIds == null || memberIds.isEmpty()
             ? List.of()

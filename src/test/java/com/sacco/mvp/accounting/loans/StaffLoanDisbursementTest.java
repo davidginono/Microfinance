@@ -36,7 +36,7 @@ class StaffLoanDisbursementTest {
     @Test void borrowerCannotPostTheirOwnRecordedLoanEvenWithDisbursementClaim() {
         UUID person = UUID.randomUUID();
         var actor = new AppUserPrincipal(Member.builder().id(person).saccoId("I1").stationId("B1")
-            .position(Position.DISBURSEMENT_OFFICER).staffAccessStatus(StaffAccessStatus.ACTIVE).memberAccount(true).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).build(),Set.of(UserClaim.DISBURSEMENT_QUEUE_DISBURSE));
+            .position(Position.DISBURSEMENT_OFFICER).staffAccessStatus(StaffAccessStatus.ACTIVE).memberAccount(false).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).build(),Set.of(UserClaim.DISBURSEMENT_QUEUE_DISBURSE));
         var loan = LoanApplication.builder().id(UUID.randomUUID()).applicantMemberId(person).status(LoanStatus.READY_FOR_DISBURSEMENT).build();
         var form = new PostForm(); form.setLoanId(loan.getId()); form.setAmount(BigDecimal.TEN);
         form.setEffectiveDate(LocalDate.of(2026,10,30)); form.setReference("Synthetic reference");

@@ -95,8 +95,8 @@ class PasswordLoginIsolationTest {
             assertThatThrownBy(() -> login(manager, "", "dual.user")).isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "", "dual@example.com")).isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "", "MEM001")).isInstanceOf(AuthenticationException.class);
-            assertThat(login(manager, "staff-password", "dual.user").isStaffSession()).isTrue();
-            assertThat(login(manager, "staff-password", "dual@example.com").isStaffSession()).isTrue();
+            assertThatThrownBy(() -> login(manager, "staff-password", "dual.user")).isInstanceOf(AuthenticationException.class);
+            assertThatThrownBy(() -> login(manager, "staff-password", "dual@example.com")).isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "staff-password", "MEM001"))
                 .isInstanceOf(AuthenticationException.class);
             assertThatThrownBy(() -> login(manager, "staff-password", "12345"))

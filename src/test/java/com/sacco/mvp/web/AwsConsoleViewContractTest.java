@@ -115,7 +115,7 @@ class AwsConsoleViewContractTest {
 
     @Test
     void conciseWorkspaceHeadersDoNotExposePageSubtitles() throws Exception {
-        for (String workspace : List.of("app", "manager", "board", "loan-officer", "disbursement")) {
+        for (String workspace : List.of("staff", "disbursement")) {
             try (Stream<Path> paths = Files.walk(JSP_ROOT.resolve(workspace))) {
                 paths.filter(path -> path.toString().endsWith(".jsp"))
                     .forEach(path -> assertThat(read(path))

@@ -148,6 +148,21 @@ public class LoanRecordingService {
         authorize(a,"POST");records.record(a,loan,false);return repayments.previewPayment(loan,a,date,amount,prior);
     }
     @Transactional(readOnly=true)
+    public Page<BranchLoan> branchLoans(com.sacco.mvp.branches.service.BranchService.ReadScope scope,String search,String sort,int page) {
+        scope.require(com.sacco.mvp.domain.UserClaim.LOAN_RECORDING_VIEW);
+        if(search==null || search.length()>100 || page<0 || page>10000) throw new IllegalArgumentException("branches.error.filter");
+        var rows=records.branchLoans(scope.institution(),scope.branch().id(),search.strip().toLowerCase(java.util.Locale.ROOT),sort,page);
+        return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
+
+    @Transactional(readOnly=true)
+    public BranchLoan branchLoan(com.sacco.mvp.branches.service.BranchService.ReadScope scope,UUID id) {
+        scope.require(com.sacco.mvp.domain.UserClaim.LOAN_RECORDING_VIEW);
+        return records.branchLoan(scope.institution(),scope.branch().id(),id)
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Loan unavailable"));
+    }
+
+    @Transactional(readOnly=true)
     public Page<LoanRow> list(AppUserPrincipal a,Filter f){authorize(a,"VIEW");filter(f,false);var rows=records.registerLoans(a,f,clock.today(),26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
     @Transactional(readOnly=true)
     public Page<Posting> register(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);var rows=records.posts(a,kind,f,26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}

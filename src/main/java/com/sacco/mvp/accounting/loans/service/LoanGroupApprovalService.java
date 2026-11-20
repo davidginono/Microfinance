@@ -25,21 +25,30 @@ public class LoanGroupApprovalService {
     private final SaccoConfigurationService products;
 
     @Transactional(readOnly=true)
-    public Set<Position> assignedReviewGroups(AppUserPrincipal a) {
-        access.requireActor(a,"LOAN_RECORDING_VIEW");
-        var groups=com.sacco.mvp.staffoffice.model.StaffOffice.assigned(currentGroups(a)).stream()
-            .map(com.sacco.mvp.staffoffice.model.StaffOffice::getGroup).toList();
-        return records.reviewGroups(a,groups);
-    }
-    @Transactional(readOnly=true)
     public com.sacco.mvp.staffoffice.dto.OfficeWork.Page officeReviews(AppUserPrincipal a,Position group,String search,String sort,int page) {
         access.requireActor(a,"LOAN_RECORDING_VIEW");
+        try {
+            access.requireActor(a,"LOAN_RECORDING_APPROVE");
+        } catch(AccessDeniedException noApproval) {
+            access.requireActor(a,"LOAN_RECORDING_REJECT");
+        }
         require(search!=null&&search.length()<=100&&page>=0&&page<=10000&&Set.of("newest","oldest","number","number_desc").contains(sort),"filter");
         if(!com.sacco.mvp.staffoffice.model.StaffOffice.assigned(currentGroups(a)).stream().anyMatch(o->o.getGroup()==group))
             throw new AccessDeniedException("Current approval group required");
         var rows=records.officeReviews(a,group,search,sort,page);
         return new com.sacco.mvp.staffoffice.dto.OfficeWork.Page(rows.stream().limit(25).toList(),page,rows.size()>25);
     }
+    @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ReviewArchive archive(AppUserPrincipal actor, String search, String sort, int page) {
+        access.requireActor(actor,"LOAN_RECORDING_VIEW");
+        require(search!=null && search.length()<=100 && page>=0 && page<=10000 &&
+            Set.of("newest","oldest","number","number_desc","client","client_desc","status","status_desc").contains(sort),"filter");
+        String query=search.strip().toLowerCase(java.util.Locale.ROOT);
+        var rows=records.reviewedLoans(actor,query,sort,page);
+        return new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ReviewArchive(
+            rows.stream().limit(25).toList(),records.reviewedLoanCount(actor,query),page,rows.size()>25);
+    }
+
     @Transactional(readOnly=true)
     public GroupRuleForm customRule(AppUserPrincipal a) {
         access.requireActor(a,"APPROVAL_FLOW_VIEW");

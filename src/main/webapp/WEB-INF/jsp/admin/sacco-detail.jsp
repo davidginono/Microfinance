@@ -114,7 +114,12 @@
                     <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="property-layout"><thead><tr>
                         <th><spring:message code="admin.institutionDetails.userId" /></th><th><spring:message code="admin.institutionDetails.clientNumber" /></th><th><spring:message code="admin.institutionDetails.name" /></th><th><spring:message code="admin.institutionDetails.accountType" /></th><th><spring:message code="admin.institutionDetails.roles" /></th><th><spring:message code="common.status" /></th>
                     </tr></thead><tbody>
-                        <c:forEach items="${saccoMembers}" var="member"><tr><td><c:out value="${member.userIdLabel}" /></td><td><c:out value="${member.loginId}" /></td><td><c:out value="${member.fullName}" /></td><td><c:out value="${member.membershipLabel}" /></td><td><c:out value="${empty member.roleSummary ? '-' : member.roleSummary}" /></td><td><span data-resource-status="${member.status}"><c:out value="${member.displayStatus}" /></span></td></tr></c:forEach>
+                        <c:forEach items="${saccoMembers}" var="member"><tr><td><sec:authorize access="@authz.platformAdminIdentity(principal) and @access.has(principal,'SACCO_REGISTRY_UPDATE') and @access.has(principal,'USER_ACCESS_UPDATE')" var="canDelegateBranch" />
+                            <c:choose><c:when test="${canDelegateBranch and not empty member.lockedClaims and not member.memberAccess}">
+                                <c:url value="/admin/branches/delegation" var="delegationUrl"><c:param name="institution" value="${saccoDetail.saccoId}" /><c:param name="user" value="${member.accountId}" /></c:url>
+                                <a class="resource-table-id-link" href="<c:out value='${delegationUrl}' />"><c:out value="${member.userIdLabel}" /></a>
+                            </c:when><c:otherwise><c:out value="${member.userIdLabel}" /></c:otherwise></c:choose>
+                        </td><td><c:out value="${member.loginId}" /></td><td><c:out value="${member.fullName}" /></td><td><c:out value="${member.membershipLabel}" /></td><td><c:out value="${empty member.roleSummary ? '-' : member.roleSummary}" /></td><td><span data-resource-status="${member.status}"><c:out value="${member.displayStatus}" /></span></td></tr></c:forEach>
                         <c:if test="${empty saccoMembers}"><tr><td colspan="6"><spring:message code="admin.institutionDetails.noClients" /></td></tr></c:if>
                     </tbody></table></div>
                     <div data-table-pagination data-table-for="admin-sacco-detail-2" data-page="${saccoMembersPage.number}">

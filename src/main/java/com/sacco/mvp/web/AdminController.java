@@ -971,14 +971,19 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_VIEW')")
     public String users(@AuthenticationPrincipal AppUserPrincipal principal,
                         @RequestParam(required = false) String query,
+                        @RequestParam(required = false) String branch,
                         @RequestParam(required = false, defaultValue = "userId") String searchBy,
                         @RequestParam(defaultValue = "0") int page,
                         @RequestParam(defaultValue = "25") int size,
                         Model model) {
         String selectedSearchBy = normalizeUsersSearchBy(searchBy);
+        var live=adminService.workspaceClaims(principal);
+        String selectedBranch=adminService.staffBranch(principal,live,branch);
+        model.addAttribute("staffBranches",adminService.staffBranches(principal,live));
+        model.addAttribute("selectedStaffBranch",selectedBranch);
         Page<AdminService.UserAccessView> usersPage = adminService.usersPage(
             adminScopeService.currentSaccoId(principal),
-            adminScopeService.currentStationId(principal),
+            selectedBranch,
             selectedSearchBy,
             query,
             page,
@@ -989,7 +994,8 @@ public class AdminController {
         model.addAttribute("selectedUserQuery", query == null ? "" : query.trim());
         model.addAttribute("selectedUserSearchBy", selectedSearchBy);
         model.addAttribute("selectedPageSize", usersPage.getSize());
-        model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, selectedSearchBy, usersPage.getSize()));
+        model.addAttribute("usersPaginationQuery", buildUsersPaginationQuery(query, selectedSearchBy, usersPage.getSize())
+            + "&branch=" + UriUtils.encode(java.util.Objects.toString(selectedBranch,""),StandardCharsets.UTF_8));
         model.addAttribute("staffPositions", staffPositionsFor(principal));
         model.addAttribute("canEditUsers", principal != null && principal.getClaims().contains(UserClaim.USER_ACCESS_UPDATE.name()));
         return "admin/users";
@@ -999,12 +1005,19 @@ public class AdminController {
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_UPDATE')")
     public String editUser(@PathVariable UUID id,
                            @AuthenticationPrincipal AppUserPrincipal principal,
+                           @RequestParam(required=false) String branch,
                            Model model,
                            RedirectAttributes ra) {
         try {
+            var live=adminService.workspaceClaims(principal);
+            String selectedBranch=adminService.staffBranch(principal,live,branch);
+            model.addAttribute("staffBranches",adminService.staffBranches(principal,live));
+            model.addAttribute("selectedStaffBranch",selectedBranch);
+            model.addAttribute("canGrantBranchView",adminService.hasBranchDelegation(live));
+            model.addAttribute("lockedIctClaims",UserClaim.lockedClaims(java.util.Set.of(Position.ICT_MANAGER)));
             AdminService.UserAccessView user = adminService.userAccess(
                 adminScopeService.currentSaccoId(principal),
-                adminScopeService.currentStationId(principal),
+                selectedBranch,
                 id
             );
             List<Position> staffPositions = staffPositionsFor(principal);
@@ -1026,34 +1039,27 @@ public class AdminController {
     @PostMapping("/users")
     @PreAuthorize("@authz.workspaceAdminOnly(principal) and @access.has(principal, 'USER_ACCESS_CREATE')")
     public String createUser(@AuthenticationPrincipal AppUserPrincipal principal,
+                             @RequestParam(required=false) String branch,
                              @RequestParam String fullName,
                              @RequestParam String email,
                              @RequestParam(required = false) String phone,
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              RedirectAttributes ra) {
         try {
-            var createdUser = adminService.createUser(
-                adminScopeService.currentSaccoId(principal),
-                adminScopeService.currentStationId(principal),
-                principal.getMemberId(),
-                principal.getGrantedPositions(),
-                fullName,
-                email,
-                phone,
-                positions
-            );
+            var createdUser = adminService.createBranchUser(principal,branch,fullName,email,phone,positions);
             String createdUserId = adminService.userIdLabel(createdUser.getId());
             ra.addFlashAttribute("createdStaffUserId", createdUserId);
             ra.addFlashAttribute("createdStaffMemberNumber", createdUser.getStaffNo());
-            ra.addFlashAttribute("message", messages.getMessage(createdUser.isMemberAccess()
-                ? "staffOnboarding.assigned" : "staffOnboarding.invited",new Object[]{createdUser.getStaffNo()},
+            ra.addFlashAttribute("message", messages.getMessage("staffOnboarding.invited",new Object[]{createdUser.getStaffNo()},
                 org.springframework.context.i18n.LocaleContextHolder.getLocale()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(),
                 org.springframework.context.i18n.LocaleContextHolder.getLocale()));
             ra.addFlashAttribute("staffRegistrationValues", Map.of("fullName", fullName, "email", email,
-                "phone", phone == null ? "" : phone, "positions", positions == null ? List.of() : positions));
+                "phone", phone == null ? "" : phone, "positions", positions == null ? List.of() : positions,
+                "branch",java.util.Objects.toString(branch,"")));
         }
+        if(branch!=null && !branch.isBlank()) ra.addAttribute("branch",branch);
         return "redirect:/admin/users";
     }
 
@@ -1064,20 +1070,15 @@ public class AdminController {
                              @RequestParam(name = "positions", required = false) java.util.List<Position> positions,
                              @RequestParam(name = "claims", required = false) java.util.List<UserClaim> claims,
                              @RequestParam MemberStatus status,
+                             @RequestParam(required=false) String sourceBranch,
+                             @RequestParam(required=false) String branch,
                              RedirectAttributes ra) {
         try {
-            adminService.updateUser(
-                adminScopeService.currentSaccoId(principal),
-                adminScopeService.currentStationId(principal),
-                principal.getMemberId(),
-                principal.getGrantedPositions(),
-                id,
-                positions,
-                status,
-                claims
-            );
+            String target=adminService.updateBranchUser(principal,id,sourceBranch,branch,positions,status,claims);
+            if(target!=null && !target.equals(principal.getStationId())) ra.addAttribute("branch",target);
             ra.addFlashAttribute("message", "User updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
+            if(sourceBranch!=null) ra.addAttribute("branch",sourceBranch);
             ra.addFlashAttribute("error", messages.getMessage(ex.getMessage(), null, ex.getMessage(),
                 org.springframework.context.i18n.LocaleContextHolder.getLocale()));
         }

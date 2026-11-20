@@ -1,5 +1,7 @@
 # Staff offices
 
+**Loan reviews and archive.** Loan reviews show only items where the current staff member can approve or reject at the frozen workflow step. Disbursed Loans Archive counts distinct loans with a recorded decision by the signed-in staff member and confirmed unreversed funding in the current branch.
+
 Institution staff have one personal `/staff/dashboard`. Each assigned group retains `/staff/offices/{office}/queue` and `/reports`. The fixed office slugs are `loan-officer`, `general-manager`, `finance-manager`, `chief-accountant`, `ict-manager`, `credit-officer`, `accounts-clerk`, `customer-care` and `accounts-clerk-2`. Super Administrator retains the separate platform workspace.
 
 `StaffOffice` defines assignment and display order using `Position.staffAssignableRoles()`. Historical aliases normalize for presentation only. One Dashboard link appears above all assigned offices' Review queue and Reports links. Password, OTP and MFA use the same personal landing. Valid saved work destinations survive authentication; retired, unassigned and former role-dashboard destinations fall back to the personal dashboard. Former assigned-office dashboard URLs redirect after live assignment validation. Institution staff visiting `/admin/dashboard` also redirect to their personal dashboard; platform identities retain that route's platform view. Canonical endpoints still authorize every request.

@@ -46,7 +46,14 @@
 
         <label class="admin-users-filter-field admin-users-filter-field--query">
             <span class="sr-only"><spring:message code="common.search" /></span>
-            <input type="search"
+            <c:if test="${staffBranches.size() gt 1}">
+            <label><spring:message code="branches.branch" />
+                <select class="aws-control" name="branch">
+                    <c:forEach var="choice" items="${staffBranches}"><option value="<c:out value='${choice}' />" ${selectedStaffBranch eq choice ? 'selected' : ''}><c:out value="${choice}" /></option></c:forEach>
+                </select>
+            </label>
+        </c:if>
+        <input type="search"
                    name="query"
                    value="${selectedUserQuery}"
                    class="fcms-control w-full"
@@ -103,7 +110,8 @@
             <c:otherwise>
                 <c:forEach items="${users}" var="user">
                     <tr>
-                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700"><c:choose><c:when test="${canEditUsers}"><a class="resource-table-id-link" href="<c:url value='/admin/users/${user.accountId}/edit' />"><c:out value="${user.userIdLabel}" /></a></c:when><c:otherwise><c:out value="${user.userIdLabel}" /></c:otherwise></c:choose></td>
+                        <c:url value="/admin/users/${user.accountId}/edit" var="staffEditUrl"><c:if test="${not empty selectedStaffBranch}"><c:param name="branch" value="${selectedStaffBranch}" /></c:if></c:url>
+                        <td class="px-3 py-2 align-top whitespace-nowrap font-medium text-slate-700"><c:choose><c:when test="${canEditUsers}"><a class="resource-table-id-link" href="<c:out value='${staffEditUrl}' />"><c:out value="${user.userIdLabel}" /></a></c:when><c:otherwise><c:out value="${user.userIdLabel}" /></c:otherwise></c:choose></td>
                         <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.memberNumber}" /></td>
                         <td class="px-3 py-2 align-top whitespace-nowrap"><c:out value="${user.staffMemberNumber}" /></td>
                         <td class="px-3 py-2 align-top">
@@ -124,7 +132,7 @@
                         <td class="px-3 py-2 align-top whitespace-nowrap">
                             <c:choose>
                                 <c:when test="${canEditUsers}">
-                                    <a href="/admin/users/${user.accountId}/edit" class="app-btn btn-neutral"><spring:message code="common.edit" /></a>
+                                    <a href="<c:out value='${staffEditUrl}' />" class="app-btn btn-neutral"><spring:message code="common.edit" /></a>
                                     <c:if test="${user.canResendStaffInvitation}">
                                         <form action="<c:url value='/admin/users/${user.accountId}/resend-invite' />" method="post">
                                             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -222,6 +230,15 @@
                     <input name="phone" type="tel" value="<c:out value='${staffRegistrationValues.phone}' />" inputmode="numeric" pattern="255[0-9]{9}" minlength="12" maxlength="12" required placeholder="255712345678" aria-describedby="staff-phone-status" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" />
                     <span id="staff-phone-status" role="status" aria-live="polite" aria-atomic="true" class="mt-1 block text-sm font-normal normal-case tracking-normal"></span>
                 </label>
+                <label class="block">
+                    <spring:message code="branches.branch" />
+                    <select name="branch" class="aws-control" required>
+                        <c:forEach var="choice" items="${staffBranches}">
+                            <option value="<c:out value='${choice}' />" ${(empty staffRegistrationValues.branch ? selectedStaffBranch : staffRegistrationValues.branch) eq choice ? 'selected' : ''}><c:out value="${choice}" /></option>
+                        </c:forEach>
+                    </select>
+                </label>
+
 
                 <fieldset class="md:col-span-2 m-0 min-w-0 border-0 p-0">
                     <legend class="text-sm font-semibold text-slate-700"><spring:message code="admin.workspace.staffRoles" /></legend>

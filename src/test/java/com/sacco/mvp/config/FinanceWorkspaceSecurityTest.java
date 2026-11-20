@@ -63,7 +63,7 @@ class FinanceWorkspaceSecurityTest {
 
     @Test void directAccountingDefaultsKeepTheExplicitAdministratorConfigurationException() {
         for (Position role : Position.values()) {
-            var financial=UserClaim.defaultClaims(Set.of(role), true).stream().filter(claim ->
+            var financial=UserClaim.defaultClaims(Set.of(role), false).stream().filter(claim ->
                 claim.name().startsWith("ACCOUNTING_") || claim.name().startsWith("REPORT_TEMPLATE_")
                     || claim.name().startsWith("LOAN_RECORDING_")).toList();
             if(role==Position.ACCOUNTANT) assertThat(financial).containsExactlyInAnyOrder(
@@ -80,7 +80,7 @@ class FinanceWorkspaceSecurityTest {
     private AppUserPrincipal principal(boolean staff, String institution, String branch) {
         Member member = Member.builder().id(UUID.randomUUID()).memberNo("SECURITY-TEST")
             .saccoId(institution).stationId(branch).fullName("Synthetic Security Test")
-            .memberAccount(true).status(MemberStatus.ACTIVE)
+            .memberAccount(!staff).status(MemberStatus.ACTIVE)
             .staffRoles(staff ? Set.of(Position.ACCOUNTANT) : Set.of())
             .staffAccessStatus(staff ? StaffAccessStatus.ACTIVE : StaffAccessStatus.NONE).build();
         return (staff ? new com.sacco.mvp.security.AppUserPrincipal(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW)) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(member,Set.of(UserClaim.ACCOUNTING_JOURNALS_VIEW)));

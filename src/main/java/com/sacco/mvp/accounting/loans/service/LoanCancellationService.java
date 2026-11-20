@@ -28,6 +28,25 @@ public class LoanCancellationService {
         return cancellations.view(actor,id);
     }
 
+    @Transactional(readOnly=true)
+    public Action action(AppUserPrincipal actor,View loan) {
+        if(!loan.actionable()) return new Action(null,loan.blockedReason());
+        try {
+            access.requireActor(actor,"LOAN_RECORDING_CANCEL");
+        } catch(org.springframework.security.access.AccessDeniedException denied) {
+            return new Action(null,"cancellation.error.permission");
+        }
+        if(loan.funded()) {
+            try {
+                adjustments.authorize(actor,"VIEW");
+                adjustments.authorize(actor,"CREATE");
+            } catch(org.springframework.security.access.AccessDeniedException denied) {
+                return new Action(null,"cancellation.error.reversalPermission");
+            }
+        }
+        return new Action(loan.funded()?"cancellation.request":"cancellation.title",null);
+    }
+
     @Transactional
     public Result cancel(AppUserPrincipal actor,UUID id,Form form) {
         access.requireActor(actor,"LOAN_RECORDING_VIEW");access.requireActor(actor,"LOAN_RECORDING_CANCEL");

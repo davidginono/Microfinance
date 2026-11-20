@@ -36,8 +36,10 @@ class LoanCancellationMvcTest {
         when(service.view(actor,id)).thenReturn(new View(id,"LN-TEST","Synthetic client","RECORDED","a".repeat(32),new BigDecimal("1000.00"),false,null,null,null,null,null,null));
     }
     @Test void confirmationIsReadOnlyAndProtectedFromCaching() throws Exception {
+        when(service.action(eq(actor),any(View.class))).thenReturn(new Action("cancellation.title",null));
         mvc.perform(get("/finance/loan-records/"+id+"/cancel").with(user(actor))).andExpect(status().isOk())
-            .andExpect(view().name("accounting/loans/cancel")).andExpect(header().string("Cache-Control","no-store"));
+            .andExpect(view().name("accounting/loans/cancel")).andExpect(header().string("Cache-Control","no-store"))
+            .andExpect(model().attribute("cancellationAction",new Action("cancellation.title",null)));
         verify(service,never()).cancel(any(),any(),any());
     }
     @Test void jspCanReadCancellationRecordComponentsAndAvailability() {

@@ -183,9 +183,13 @@ public class ManagementReportRepository {
             order by custom_recording_configuration desc,coalesce(display_order,2147483647),id limit 26 offset :offset
             """,p,(r,n)->new Choice(r.getObject("id",UUID.class),"",r.getString("label")));
     }
-    public String[] identity(AppUserPrincipal a){return jdbc.queryForObject("select i.sacco_name,coalesce(nullif(s.address_location,''),s.station_id) from registered_saccos i join sacco_stations s on s.sacco_id=i.sacco_id where s.sacco_id=:institution and s.station_id=:branch",parameters(a,null),(r,n)->new String[]{r.getString(1),r.getString(2)});}
+    public String[] identity(AppUserPrincipal a){return identity(a.getSaccoId(),a.getStationId());}
+    public String[] identity(String institution,String branch){return jdbc.queryForObject("select i.sacco_name,coalesce(nullif(s.address_location,''),s.station_id) from registered_saccos i join sacco_stations s on s.sacco_id=i.sacco_id where s.sacco_id=:institution and s.station_id=:branch",parameters(institution,branch,null),(r,n)->new String[]{r.getString(1),r.getString(2)});}
     private MapSqlParameterSource parameters(AppUserPrincipal a,Parameters p){
-        var m=new MapSqlParameterSource("institution",a.getSaccoId()).addValue("branch",a.getStationId()).addValue("wide",false);
+        return parameters(a.getSaccoId(),a.getStationId(),p);
+    }
+    private MapSqlParameterSource parameters(String institution,String branch,Parameters p){
+        var m=new MapSqlParameterSource("institution",institution).addValue("branch",branch).addValue("wide",false);
         if(p!=null)m.addValue("from",p.from()).addValue("through",p.through()).addValue("cutoff",p.cutoff())
             .addValue("clientId",p.clientId(),Types.OTHER).addValue("productId",p.productId(),Types.OTHER)
             .addValue("product",p.productId()==null?p.product().toLowerCase(Locale.ROOT):"");
@@ -193,7 +197,10 @@ public class ManagementReportRepository {
     }
     public record Data(List<Map<String,Object>> rows,List<Group> groups,Map<String,BigDecimal> totals,long count,long excluded) {}
     public Data read(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
-        var m=parameters(a,p).addValue("startAccount",p.startAccount(),Types.OTHER)
+        return read(a.getSaccoId(),a.getStationId(),kind,p,export);
+    }
+    public Data read(String institution,String branch,Kind kind,Parameters p,boolean export){
+        var m=parameters(institution,branch,p).addValue("startAccount",p.startAccount(),Types.OTHER)
             .addValue("endAccount",p.endAccount(),Types.OTHER).addValue("bounded",p.startAccount()!=null || p.endAccount()!=null)
             .addValue("offset",export?0:p.page()*25).addValue("limit",export?5001:26);
         String source=switch(kind){case DAILY_COLLECTIONS->DAILY;case CASHBOOK->CASH;case DISBURSED_LOANS_AUDIT->disbursements();case EXPECTED_REPAYMENTS->expected();case LOAN_REPAYMENT_TRANSACTIONS->repayments();default->loans(kind);};

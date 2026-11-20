@@ -4,7 +4,7 @@ The application is a staff accounting package. Clients are business records, not
 
 ## Access and staff
 
-The assignable groups are Super Administrator, Loan Officer, General Manager, Finance Manager, Chief Accountant, ICT Manager, Credit Officer, Accounts Clerk, Customer Care and Accounts Clerk 2. Super Administrator uses the separate platform login. Institution staff use the staff login and invitation flow, including staff who also have a client record.
+The assignable groups are Super Administrator, Loan Officer, General Manager, Finance Manager, Chief Accountant, ICT Manager, Credit Officer, Accounts Clerk, Customer Care and Accounts Clerk 2. Super Administrator uses the separate platform login. Institution staff use the staff login and invitation flow. Staff and client identities are mutually exclusive.
 
 Groups describe assignments; explicit access claims authorize each operation. Group membership does not automatically grant loan approval, repayment, correction, configuration or financial posting permissions. Institution and branch scope remain mandatory. Old borrower sessions cannot access staff routes.
 
@@ -12,17 +12,25 @@ Staff enter their assigned workspace directly. The retired institution selector 
 
 Named group offices, direct authentication landings, bounded work queues and existing report links are described in [Staff offices](staff-offices.md). Personal profile completion is optional for staff workspace access.
 
-Staff registration requires three names, an email address and a phone number. Contact availability is checked after a typing pause and again on save. Staff activate their invitation and enter their assigned workspace without a further profile-completion step. Availability responses contain no matching account details; an existing scoped client can still receive staff access through the existing identity checks.
+Staff registration requires three names, an email address and a phone number. Contact availability is checked after a typing pause and again on save. Staff activate their invitation and enter their assigned workspace without a further profile-completion step. Availability responses contain no matching account details; an existing client record cannot receive staff access.
 
 Legacy role identifiers remain on existing assignments where frozen voucher rules and historical evidence reference them. The cutover adds their current group equivalent without granting permissions: Minor Administrator → ICT Manager; Chairperson → Finance Manager; Board/Credit Committee → Credit Officer; Disbursement Officer → Accounts Clerk. The user editor presents the current groups and retains a legacy alias only while its corresponding assignment remains selected.
 
 Historical manager, board, guarantor and reversal entities remain where reports, evidence joins or archival queries still use them. Their retired workspaces and write services are removed.
 
+## Branch administration
+
+Each branch can have its own ICT Manager. The Users access matrix uses the locked User Access view/update permissions, alongside the locked dashboard, branch view/update, and staff branch assignment permissions. Use the User Access create permission for staff invitation. These permissions apply to the staff member's branch.
+
+A platform administrator can delegate institution-wide branch administration from the institution's Members tab by opening the User ID of an active ICT Manager. That administrator can create branches, edit locations, select a branch when inviting staff, and transfer staff between open branches. Users must sign in again after their assignment changes. Financial history retains the original branch IDs.
+
+A delegated institution administrator can assign **Other branches – View** in the Users access matrix. The Other branches workspace provides branch status and read-only client, loan, management report, and saved statement views. Each service also checks its existing view permission. Branch selection applies to the overview request. Staff continue working in their assigned branch.
+
 ## Loan recording and approval
 
 1. Staff record a draft or a complete application in Loan records. Drafts are unassessed records and cannot be funded.
 2. The approval selector and review column are labelled Staff. Configure ordered staff groups and the required number of different people for each product and branch inside Create Loan Product and Edit Loan Product → Approval Workflow. Custom loans also require this setup.
-3. The recorder sends a complete recorded application for review. Required client checks and financial assessment must be present. A signed individual application is optional; guarantor evidence and signed group agreements retain their existing requirements. The application uses the latest approval workflow for its own loan product and branch; a missing workflow blocks submission. The system verifies that enough independent, authorized staff are available. Applications appear in the current configured group's loan review queue, then move to the next group after the required approvals. General Manager and Loan Officer receive applications only when selected by that product's workflow.
+3. The recorder sends a complete recorded application for review. Required client checks and financial assessment must be present. A signed individual application is optional; guarantor evidence and signed group agreements retain their existing requirements. The application uses the latest approval workflow for its own loan product and branch; a missing workflow blocks submission. The system verifies that enough independent, authorized staff are available. Applications appear only for staff who can decide at the current configured group's step, then move to the next group after the required approvals. General Manager and Loan Officer receive applications only when selected by that product's workflow.
 4. Each reviewer records a real decision and reason. No separate supporting document reference is requested. Older references remain immutable history. The recorder, submitter and borrower cannot approve the application. This includes named shared borrowers and company representatives. One person can decide only once in a review round, including when they belong to multiple groups.
 5. All required approvals make the unchanged application ready for disbursement. A rejection stops that round. A later round keeps the earlier decisions and freezes its own rule revision and terms.
 6. Authorized staff record disbursement separately, using the existing accounting, proof, closed-period, idempotency and reconciliation safeguards. Approval itself moves no money.
@@ -48,6 +56,12 @@ Recording a client profile does not verify it. Independent checks and the produc
 Deploy from a clean build (`mvn clean verify`) with a verified database backup, and run Flyway through the application deployment process. A clean build removes compiled copies of the deleted controllers; do not clean the output of an application currently running from that directory. These migrations do not delete financial records or automatically assign new financial claims. Review group assignments and explicitly grant the required claims before routing new requests. A database backup is required for a full cutover rollback; restoring borrower credentials from application code is intentionally unsupported.
 
 The accounting/report-builder backlog remains in `accounting-report-builder-checklist.md`. This change does not establish completion of that backlog or measured 1,000 requests/second capacity.
+
+### Staff and client access cutover
+
+Before applying the V175 migration, back up the database and review accounts with a client flag and a staff position, staff access state or staff role. Provision replacement staff access before migration if an active branch or the platform would otherwise lose its only admin. The migration rolls back when this condition is unmet.
+
+The migration keeps the client and their record IDs, retires staff login access and pending invitations, and records the prior roles and claims in the audit log. It keeps loan contracts, repayments, journals, attachments, and prior staff decisions. It enforces exclusive identities at both the member and role boundaries. The archive index supports lookup of a staff member's decisions.
 
 ## Verification (2026-11-11)
 

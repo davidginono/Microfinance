@@ -127,7 +127,7 @@ class AdminControllerUserAccessSecurityTest {
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(actor)).thenReturn("SACCO-01");
         when(adminScopeService.currentStationId(actor)).thenReturn("ST-1");
-        when(adminService.createUser(eq("SACCO-01"), eq("ST-1"), eq(actor.getMemberId()), any(),
+        when(adminService.createBranchUser(eq(actor), isNull(),
             eq("Asha Mushi"), eq("asha@example.invalid"), eq("255712345678"), eq(List.of(Position.CREDIT_OFFICER))))
             .thenThrow(new IllegalStateException("staffRegistration.nameInvalid"));
         mockMvc.perform(post("/admin/users").with(authentication(authenticationFor(actor))).with(csrf())
@@ -135,7 +135,7 @@ class AdminControllerUserAccessSecurityTest {
                 .param("positions", "CREDIT_OFFICER"))
             .andExpect(redirectedUrl("/admin/users"))
             .andExpect(flash().attribute("staffRegistrationValues", Map.of("fullName", "Asha Mushi", "email", "asha@example.invalid",
-                "phone", "255712345678", "positions", List.of(Position.CREDIT_OFFICER))))
+                "phone", "255712345678", "positions", List.of(Position.CREDIT_OFFICER), "branch", "")))
             .andExpect(flash().attribute("error", "Enter three names using letters, up to 120 characters."));
     }
 
@@ -316,6 +316,7 @@ class AdminControllerUserAccessSecurityTest {
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
         when(adminScopeService.currentStationId(any(AppUserPrincipal.class))).thenReturn("ST-1");
+        when(adminService.staffBranch(eq(principal),any(),isNull())).thenReturn("ST-1");
         when(adminService.userAccess("SACCO-01", "ST-1", accountId)).thenReturn(userView(accountId));
 
         mockMvc.perform(get("/admin/users/{id}/edit", accountId)
@@ -345,6 +346,7 @@ class AdminControllerUserAccessSecurityTest {
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "ST-1")).thenReturn(Optional.of(station()));
         when(adminScopeService.currentSaccoId(any(AppUserPrincipal.class))).thenReturn("SACCO-01");
         when(adminScopeService.currentStationId(any(AppUserPrincipal.class))).thenReturn("ST-1");
+        when(adminService.staffBranch(eq(principal),any(),isNull())).thenReturn("ST-1");
         when(adminService.usersPage("SACCO-01", "ST-1", "userId", null, 0, 25))
             .thenReturn(new PageImpl<>(List.of()));
 
@@ -1117,7 +1119,7 @@ class AdminControllerUserAccessSecurityTest {
 
         @Bean
         SaccoAccessFilter saccoAccessFilter(SaccoStationRepository saccoStationRepository) {
-            return new SaccoAccessFilter(new com.sacco.mvp.service.StationAccessService(saccoStationRepository));
+            return new SaccoAccessFilter(new com.sacco.mvp.service.StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         }
 
         @Bean("authz")

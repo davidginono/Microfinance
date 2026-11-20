@@ -200,7 +200,7 @@ class LoanAnalyticsServiceTest {
             .memberNo("STAFF1")
             .staffNo("STAFF1")
             .fullName("Staff One")
-            .memberAccount(true)
+            .memberAccount(false)
             .staffAccessStatus(StaffAccessStatus.ACTIVE)
             .status(MemberStatus.ACTIVE)
             .position(position)

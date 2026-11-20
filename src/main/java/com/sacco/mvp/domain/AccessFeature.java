@@ -17,6 +17,8 @@ public enum AccessFeature {
     VOUCHER_DOCUMENTS("Voucher supporting documents"),
     ACCESS_MATRIX("Access Matrix"),
     USER_ACCESS("User Access"),
+    BRANCHES("Branches"),
+    BRANCH_OVERSIGHT("View other branches"),
     ADMIN_DASHBOARD("Admin Dashboard"),
     SACCO_REGISTRY("SACCO Registry"),
     PLATFORM_SETTINGS("Platform Settings"),

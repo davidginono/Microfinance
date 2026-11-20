@@ -29,7 +29,7 @@ public class LoanCancellationController {
     public String form(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Model model) {
         var loan=service.view(actor,id);var form=new Form();form.setRequestKey(UUID.randomUUID());
         form.setState(loan.status());form.setTerms(loan.terms());if(loan.funded())form.setEffectiveDate(clock.today());
-        model.addAttribute("cancellation",loan);model.addAttribute("cancellationForm",form);return "accounting/loans/cancel";
+        pageState(actor,loan,model);model.addAttribute("cancellationForm",form);return "accounting/loans/cancel";
     }
     @PostMapping("/{id}/cancel")
     public String cancel(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
@@ -53,6 +53,11 @@ public class LoanCancellationController {
             else if(!errors.hasErrors())model.addAttribute("cancellationError",key!=null && (key.startsWith("cancellation.error.") || key.startsWith("adjustment.error.")
                 || key.startsWith("charges.error.") || key.equals("voucher.error.period"))?key:"cancellation.error.changed");
         } catch(DataAccessException e) {model.addAttribute("cancellationError","cancellation.error.changed");}
-        response.setStatus(400);model.addAttribute("cancellation",service.view(actor,id));return "accounting/loans/cancel";
+        response.setStatus(400);pageState(actor,service.view(actor,id),model);return "accounting/loans/cancel";
+    }
+
+    private void pageState(AppUserPrincipal actor,View loan,Model model) {
+        model.addAttribute("cancellation",loan);
+        model.addAttribute("cancellationAction",service.action(actor,loan));
     }
 }

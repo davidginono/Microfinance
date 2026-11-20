@@ -13,7 +13,8 @@ class UserClaimTest {
                     UserClaim.LOAN_CHARGES_CUSTOM,UserClaim.LOAN_RECORDING_POST);
         }
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.ICT_MANAGER),false))
-            .containsExactlyInAnyOrder(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
+            .containsAll(UserClaim.lockedClaims(java.util.List.of(Position.ICT_MANAGER)))
+            .doesNotContain(UserClaim.INSTITUTION_BRANCH_ADMIN,UserClaim.OTHER_BRANCHES_VIEW);
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.LOAN_OFFICER),false))
             .doesNotContain(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
     }
@@ -79,7 +80,8 @@ class UserClaimTest {
             java.util.Map.entry(AccessAction.CONFIGURE, UserClaim.VOUCHER_RULE_CONFIGURE));
         java.util.List<UserClaim> displayed = new java.util.ArrayList<>();
         for (var row : rows) displayed.addAll(row.claimsByAction().values());
-        java.util.List<UserClaim> available = java.util.Arrays.stream(UserClaim.values()).filter(UserClaim::isAvailable).toList();
+        java.util.List<UserClaim> available = java.util.Arrays.stream(UserClaim.values()).filter(UserClaim::isAvailable)
+            .filter(claim -> claim != UserClaim.INSTITUTION_BRANCH_ADMIN).toList();
         assertThat(displayed).doesNotHaveDuplicates();
         assertThat(displayed).containsExactlyInAnyOrderElementsOf(available);
     }

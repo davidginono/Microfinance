@@ -123,7 +123,7 @@ class StaffOfficeServiceTest {
             .thenReturn(Set.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         var a=new AppUserPrincipal(member,Set.of(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,UserClaim.ACCOUNTING_ACCOUNTS_VIEW));
         var dashboard=service.dashboard(a);
-        assertThat(dashboard.activities().stream().map(s->s.key())).containsExactly("loan-reviews","loans","accounts");
+        assertThat(dashboard.activities().stream().map(s->s.key())).containsExactly("loan-reviews","accounts");
         assertThat(dashboard.activities().getFirst().destinations()).extracting(d->d.office()).containsExactly("loan-officer","chief-accountant");
         assertThat(dashboard.activities().getLast().destinations()).hasSize(1);
         verifyNoInteractions(reviews,loans,accounts,admin);
@@ -153,17 +153,13 @@ class StaffOfficeServiceTest {
         assertThatThrownBy(()->service.activity(a,"unknown")).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(administration);
     }
-    @Test void configuredReviewersSeeTheCardAndQueueWithoutReceivingDecisionClaims() {
+    @Test void loanViewWithoutDecisionClaimsDoesNotOpenAReviewQueue() {
         var a=actor(StaffOffice.LOAN_OFFICER,UserClaim.LOAN_RECORDING_VIEW);
-        when(reviews.assignedReviewGroups(any())).thenReturn(Set.of(Position.LOAN_OFFICER));
-        when(reviews.officeReviews(any(),eq(Position.LOAN_OFFICER),anyString(),anyString(),anyInt())).thenReturn(OfficeWork.Page.empty(0));
-        assertThat(service.dashboard(a).activities()).extracting(s->s.key()).contains("loan-reviews");
-        assertThat(service.activity(a,"loan-reviews").entries()).hasSize(1);
-        assertThat(service.read(a,"loan-officer","queue","loan-reviews","","",0).source().key()).isEqualTo("loan-reviews");
-        assertThat(a.getClaims()).containsExactly("LOAN_RECORDING_VIEW");
-        when(reviews.assignedReviewGroups(any())).thenReturn(Set.of());
-        assertThat(service.dashboard(a).activities()).extracting(s->s.key()).doesNotContain("loan-reviews");
+        assertThat(service.dashboard(a).activities()).extracting(s->s.key()).doesNotContain("loan-reviews","loans");
         assertThatThrownBy(()->service.activity(a,"loan-reviews")).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.read(a,"loan-officer","queue","loan-reviews","","",0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.read(a,"loan-officer","queue","loans","","",0)).isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(reviews);
     }
     @Test void loanReviewCardIsIncludedBeforeOtherFinanceWorkAndOpensTheReviewerQueue() {
         var a=actor(StaffOffice.FINANCE_MANAGER,UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_APPROVE,
@@ -175,7 +171,7 @@ class StaffOfficeServiceTest {
         when(accounts.read(any(),anyBoolean(),anyString(),anyString(),anyInt())).thenReturn(OfficeWork.Page.empty(0));
         var dashboard=service.dashboard(a);
         assertThat(dashboard.activities().getFirst().key()).isEqualTo("loan-reviews");
-        assertThat(dashboard.activities()).hasSize(6);
+        assertThat(dashboard.activities()).hasSize(5);
         var summary=service.activity(a,"loan-reviews");
         assertThat(summary.entries().getFirst().shown()).isEqualTo(1);
         var queue=service.read(a,"finance-manager","queue","","","",0);

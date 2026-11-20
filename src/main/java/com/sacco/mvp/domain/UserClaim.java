@@ -88,6 +88,11 @@ public enum UserClaim {
     USER_ACCESS_UPDATE(AccessFeature.USER_ACCESS, AccessAction.UPDATE),
     USER_ACCESS_DELETE(AccessFeature.USER_ACCESS, AccessAction.DELETE),
 
+    BRANCHES_VIEW(AccessFeature.BRANCHES, AccessAction.VIEW),
+    BRANCHES_UPDATE(AccessFeature.BRANCHES, AccessAction.UPDATE),
+    STAFF_BRANCH_ASSIGN(AccessFeature.BRANCHES, AccessAction.ASSIGN),
+    INSTITUTION_BRANCH_ADMIN(AccessFeature.BRANCHES, AccessAction.CONFIGURE),
+    OTHER_BRANCHES_VIEW(AccessFeature.BRANCH_OVERSIGHT, AccessAction.VIEW),
     ADMIN_DASHBOARD_VIEW(AccessFeature.ADMIN_DASHBOARD, AccessAction.VIEW),
 
     SACCO_REGISTRY_VIEW(AccessFeature.SACCO_REGISTRY, AccessAction.VIEW),
@@ -314,7 +319,7 @@ public enum UserClaim {
                 ? List.of(feature, AccessFeature.VOUCHER_APPROVAL) : List.of(feature);
             for (AccessFeature source : sources) {
                 BY_FEATURE_ACTION.getOrDefault(source, Map.of()).forEach((action, claim) -> {
-                    if (claim.isAvailable()) available.put(action, claim);
+                    if (claim.isAvailable() && claim != INSTITUTION_BRANCH_ADMIN) available.put(action, claim);
                 });
             }
             if (!available.isEmpty()) rows.add(new AccessMatrixRow(feature, feature.getDisplayName(), Map.copyOf(available)));
@@ -388,6 +393,7 @@ public enum UserClaim {
 
     public static Set<UserClaim> defaultClaims(Collection<Position> staffRoles, boolean memberAccess) {
         EnumSet<UserClaim> claims = EnumSet.noneOf(UserClaim.class);
+        if(memberAccess) return claims;
         for (Position position : Position.normalizeStaffRoles(staffRoles)) {
             switch (position) {
                 case MEMBER -> {
@@ -410,12 +416,13 @@ public enum UserClaim {
                 case BOARD -> claims.addAll(legacyClaims("REVIEW_BOARD_QUEUE"));
                 case CREDIT_COMMITTEE -> claims.addAll(legacyClaims("REVIEW_CREDIT_COMMITTEE_QUEUE"));
                 case MINOR_ADMIN -> claims.addAll(workspaceAdminDefaults());
-                case ICT_MANAGER -> addAll(claims, LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
+                case ICT_MANAGER -> addAll(claims, USER_ACCESS_CREATE, LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
                 case ADMIN -> claims.addAll(platformAdminDefaults());
                 default -> { }
             }
         }
         claims.removeIf(claim -> !claim.isAvailable());
+        claims.addAll(lockedClaims(staffRoles));
         return claims;
     }
 
@@ -444,6 +451,12 @@ public enum UserClaim {
         }
         return position == Position.DISBURSEMENT_OFFICER
             ? Optional.of(DISBURSEMENT_QUEUE_VIEW) : Optional.empty();
+    }
+
+    public static Set<UserClaim> lockedClaims(Collection<Position> roles) {
+        boolean ict = Position.normalizeStaffRoles(roles).stream().anyMatch(role -> role.userGroup() == Position.ICT_MANAGER);
+        return ict ? Set.of(ADMIN_DASHBOARD_VIEW, USER_ACCESS_VIEW, USER_ACCESS_UPDATE,
+            BRANCHES_VIEW, BRANCHES_UPDATE, STAFF_BRANCH_ASSIGN) : Set.of();
     }
 
     public static Set<UserClaim> administratorRecoveryClaims() {

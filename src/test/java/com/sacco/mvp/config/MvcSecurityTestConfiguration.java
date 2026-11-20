@@ -29,7 +29,7 @@ public class MvcSecurityTestConfiguration {
     /** Models a retired session so route isolation remains tested after borrower principals are removed. */
     public static com.sacco.mvp.security.AppUserPrincipal formerClient(com.sacco.mvp.domain.Member member,java.util.Set<com.sacco.mvp.domain.UserClaim> claims) {
         var identity=com.sacco.mvp.domain.Member.builder().id(member.getId()).saccoId(member.getSaccoId()).stationId(member.getStationId())
-            .fullName(member.getFullName()).email(member.getEmail()).memberNo(member.getMemberNo()).memberAccount(true)
+            .fullName(member.getFullName()).email(member.getEmail()).memberNo(member.getMemberNo()).memberAccount(false)
             .status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE)
             .position(com.sacco.mvp.domain.Position.LOAN_OFFICER).build();
         return new com.sacco.mvp.security.AppUserPrincipal(identity,claims) {
@@ -39,9 +39,14 @@ public class MvcSecurityTestConfiguration {
         };
     }
 
+    public static MemberDirectoryService activeAssignmentDirectory() {
+        return Mockito.mock(MemberDirectoryService.class, call ->
+            call.getMethod().getName().equals("hasCurrentStaffAssignment") ? true : Mockito.RETURNS_DEFAULTS.answer(call));
+    }
+
     @Bean
     SaccoAccessFilter saccoAccessFilter(StationAccessService stationAccessService) {
-        return new SaccoAccessFilter(stationAccessService);
+        return new SaccoAccessFilter(stationAccessService,activeAssignmentDirectory());
     }
 
     @Bean

@@ -211,6 +211,43 @@ public class SaccoRegistryService {
             .orElse(saccoId);
     }
 
+    @Transactional(readOnly=true)
+    public List<String> openBranchIds(String institution) {
+        return saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(institution).stream()
+            .filter(branch -> !branch.isAccessSuspended()).map(SaccoStation::getStationId).toList();
+    }
+
+    @Transactional(readOnly=true)
+    public org.springframework.data.domain.Slice<BranchSummary> branches(String institution,String onlyBranch,int page,String column,org.springframework.data.domain.Sort.Direction direction) {
+        var sort=org.springframework.data.domain.Sort.by(direction,column);
+        if(!column.equals("stationId")) sort=sort.and(org.springframework.data.domain.Sort.by("stationId"));
+        return saccoStationRepository.branchPage(institution,onlyBranch,org.springframework.data.domain.PageRequest.of(page,25,sort))
+            .map(branch -> new BranchSummary(branch.getStationId(),branch.getAddressLocation(),branch.isActive(),branch.isAccessSuspended()));
+    }
+
+    public record BranchSummary(String id,String location,boolean active,boolean suspended) {}
+
+    @Transactional
+    public void editBranchLocation(String institution,String branch,String location,UUID actor) {
+        String address=normalizeAddressLocation(location);
+        if(address==null) throw new IllegalArgumentException("branches.error.location");
+        lockAccountingSetup(institution);
+        var station=saccoStationRepository.findBySaccoIdAndStationId(institution,branch)
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Branch unavailable"));
+        if(java.util.Objects.equals(station.getAddressLocation(),address)) return;
+        var before=java.util.Map.of("location",java.util.Objects.toString(station.getAddressLocation(),""));
+        station.setAddressLocation(address);
+        station.setUpdatedAt(OffsetDateTime.now());
+        auditService.log("BRANCH",station.getId(),"BRANCH_LOCATION_UPDATED",actor,before,
+            java.util.Map.of("saccoId",institution,"stationId",branch,"location",address));
+        invalidateRegisteredSaccoCache();
+    }
+
+    public List<String> institutionBranchIds(String institution) {
+        return saccoStationRepository.findBySaccoIdOrderByStationIdAsc(institution).stream()
+            .map(SaccoStation::getStationId).toList();
+    }
+
     public List<String> activeStations(String saccoId) {
         return saccoStationRepository.findBySaccoIdAndActiveTrueOrderByStationIdAsc(normalizeSaccoId(saccoId)).stream()
             .map(SaccoStation::getStationId)

@@ -16,6 +16,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface MemberRepository extends JpaRepository<Member, UUID> {
+    @Query(value = """
+        select exists(select 1 from members m where m.id=:id and m.status='ACTIVE'
+          and m.sacco_id is not distinct from :institution and m.station_id is not distinct from :branch
+          and not (m.is_member is true or (m.is_member is null and m.position='MEMBER'))
+          and (m.staff_access_status='ACTIVE' or (m.staff_access_status='NONE'
+            and coalesce(m.staff_no,'')='' and m.staff_access_assigned_at is null and m.staff_access_activated_at is null))
+          and ((m.position is not null and m.position<>'MEMBER')
+            or exists(select 1 from member_staff_roles r where r.member_id=m.id and r.role_name<>'MEMBER')))
+        """, nativeQuery = true)
+    boolean hasCurrentStaffAssignment(@Param("id") UUID id,@Param("institution") String institution,@Param("branch") String branch);
+
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Member m where m.id = :id and m.saccoId = :institution and (:branch is null or lower(m.stationId) = lower(:branch))")
     Optional<Member> findForStaffInvitation(@Param("id") UUID id, @Param("institution") String institution,

@@ -59,6 +59,20 @@
         </div>
     </section>
 
+    <section class="erp-panel admin-user-edit-panel">
+        <h2><spring:message code="branches.branch" /></h2>
+        <div class="erp-panel-body">
+            <input type="hidden" name="sourceBranch" value="<c:out value='${selectedStaffBranch}' />" />
+            <label><span class="sr-only"><spring:message code="branches.branch" /></span>
+                <select name="branch" class="aws-control" required>
+                    <c:forEach var="choice" items="${staffBranches}">
+                        <option value="<c:out value='${choice}' />" ${selectedStaffBranch eq choice ? 'selected' : ''}><c:out value="${choice}" /></option>
+                    </c:forEach>
+                </select>
+            </label>
+        </div>
+    </section>
+
     <c:set var="matrixColumns" value="${['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE','CREATE','VALIDATE','POST','INITIATE','WITHDRAW','CANCEL','HOLD','FORCE_APPROVE','ESCALATED_APPROVE','WAIVE','REJECT','ASSIGN','EXPORT','IMPORT','DISBURSE','REVERSE']}" />
     <section id="user-access-claims" class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true" data-access-matrix>
         <div class="app-table-titlebar admin-user-section-header admin-user-section-header--actions">
@@ -70,14 +84,15 @@
         <div class="aws-filter-toolbar resource-table-search"><label><span class="sr-only"><spring:message code="access.matrix.search" /></span><span class="access-matrix-search"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.5" cy="6.5" r="4.5" /><path d="m10 10 4 4" /></svg><input type="search" class="aws-control" data-access-search placeholder="<spring:message code='access.matrix.search' />" autocomplete="off" /></span></label></div>
         <div class="erp-table-scroll admin-claims-scroll"><table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="editor">
             <thead><tr><th scope="col" data-table-identifier data-access-sort="claim"><spring:message code="access.matrix.permissionClaim" /></th><c:forEach items="${matrixColumns}" var="column"><th scope="col" data-table-column-locked data-access-sort="${column}"><spring:message code="${column=='UPDATE'?'access.matrix.edit':'access.action.'.concat(column)}" /></th></c:forEach></tr></thead>
-            <tbody><c:forEach items="${accessMatrixRows}" var="row"><spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" />
+            <tbody><c:forEach items="${accessMatrixRows}" var="row"><c:if test="${canGrantBranchView or row.feature.name() ne 'BRANCH_OVERSIGHT'}"><spring:message code="access.feature.${row.feature}" text="${row.label}" var="matrixFeatureLabel" />
                 <tr data-claim-row data-claim-key="${row.feature}">
                     <th scope="row"><span class="access-matrix-name"><c:out value="${matrixFeatureLabel}" /></span></th>
                     <c:forEach items="${matrixColumns}" var="column"><c:set var="matrixClaim" value="${null}" /><c:forEach items="${row.claimsByAction}" var="entry"><c:if test="${entry.key.name()==column}"><c:set var="matrixClaim" value="${entry.value}" /></c:if></c:forEach>
-                        <td data-claim-action="${column}"><c:choose><c:when test="${not empty matrixClaim}"><spring:message code="access.action.${column}" var="matrixActionLabel" /><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${column}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) ? 'checked' : ''} class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td>
+                        <td data-claim-action="${column}"><c:choose><c:when test="${not empty matrixClaim}"><spring:message code="access.action.${column}" var="matrixActionLabel" /><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${column}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) or user.lockedClaims.contains(matrixClaim) ? 'checked' : ''}
+                            ${user.lockedClaims.contains(matrixClaim) ? 'disabled' : ''} data-ict-claim="${lockedIctClaims.contains(matrixClaim)}" class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td>
                     </c:forEach>
                 </tr>
-            </c:forEach></tbody>
+            </c:if></c:forEach></tbody>
         </table></div>
         <p data-access-empty hidden role="status"><spring:message code="access.matrix.empty" /></p>
     </section>
@@ -240,6 +255,11 @@
             return Array.from(root.querySelectorAll(selector + ':not(:disabled)'));
         }
         function syncMatrixState(editForm) {
+            const ictAssigned = Boolean(editForm.querySelector('[data-staff-role-checkbox="edit-user"][value="ICT_MANAGER"]:checked'));
+            editForm.querySelectorAll('[data-ict-claim="true"]').forEach((input) => {
+                input.disabled = ictAssigned;
+                if (ictAssigned) input.checked = true;
+            });
             editForm.querySelector('[data-access-matrix]')?.dispatchEvent(new Event('access-matrix:changed'));
         }
         function allRoleDefaultClaims() {

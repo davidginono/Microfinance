@@ -36,11 +36,17 @@ public class OnboardingRepository {
         """;
     private final RowMapper<Client> clientMapper=(r,n)->new Client(r.getObject("id",UUID.class),r.getString("member_no"),r.getString("full_name"),r.getString("phone"),r.getString("email"),r.getString("state"),r.getObject("revision_id",UUID.class),r.getInt("sequence"),r.getObject("review_due",LocalDate.class),r.getBoolean("staff_user"));
     public List<Client> clients(AppUserPrincipal a,String search,String state,int page,String order,LocalDate day) {
+        return clients(a.getSaccoId(),a.getStationId(),search,state,page,order,day);
+    }
+    public List<Client> clients(String institution,String branch,String search,String state,int page,String order,LocalDate day) {
         return jdbc.query("select * from ("+CLIENT_SELECT+" and (m.member_no ilike ? escape '!' or m.full_name ilike ? escape '!')) q where (?='' or state=?) order by "+order+",id limit 26 offset ?",
-            clientMapper,day,day,day,a.getSaccoId(),a.getStationId(),pattern(search),pattern(search),state,state,page*25);
+            clientMapper,day,day,day,institution,branch,pattern(search),pattern(search),state,state,page*25);
     }
     public Client client(AppUserPrincipal a,UUID id,LocalDate day) {
-        return jdbc.query(CLIENT_SELECT+" and m.id=?",clientMapper,day,day,day,a.getSaccoId(),a.getStationId(),id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Client unavailable"));
+        return client(a.getSaccoId(),a.getStationId(),id,day);
+    }
+    public Client client(String institution,String branch,UUID id,LocalDate day) {
+        return jdbc.query(CLIENT_SELECT+" and m.id=?",clientMapper,day,day,day,institution,branch,id).stream().findFirst().orElseThrow(()->new AccessDeniedException("Client unavailable"));
     }
     public Optional<Revision> latest(AppUserPrincipal a,UUID client) {
         return jdbc.query("select r.*,m.full_name maker from client_onboarding_revision r join members m on m.id=r.actor_id where r.client_id=? and r.sacco_id=? and r.station_id=? order by r.sequence desc limit 1",

@@ -199,4 +199,8 @@ public final class LoanRecordingDtos {
                 : firstPaymentDate.plusMonths(installments - 1L);
         }
     }
+
+    public record BranchLoan(UUID id,String number,String client,String product,String status,BigDecimal principal,LocalDate disbursed) {}
+    public record ReviewedLoan(UUID id, String number, String client, String status, java.time.LocalDate disbursed) {}
+    public record ReviewArchive(java.util.List<ReviewedLoan> rows, long count, int page, boolean hasNext) {}
 }

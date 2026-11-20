@@ -1,0 +1,2 @@
+<c:url value="/staff/branches" var="branchOverview"><c:param name="branch" value="${branch.id}" /></c:url>
+<nav class="erp-page-path"><a href="<c:out value='${branchOverview}' />"><spring:message code="branches.oversight" /></a><span>›</span><span aria-current="page"><c:out value="${branch.id}" /></span></nav>

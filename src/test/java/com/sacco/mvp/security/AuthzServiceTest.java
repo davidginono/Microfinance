@@ -97,7 +97,7 @@ class AuthzServiceTest {
             .saccoId("CIRCLE-1001")
             .memberNo("MEM2")
             .fullName("Claim Only")
-            .memberAccount(true)
+            .memberAccount(false)
             .status(MemberStatus.ACTIVE)
             .position(Position.MEMBER)
             .passwordHash("x")

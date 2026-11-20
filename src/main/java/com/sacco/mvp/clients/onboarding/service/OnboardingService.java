@@ -68,6 +68,30 @@ public class OnboardingService {
         var rows=records.clients(a,search,state,page,column+" "+direction+" nulls last",today());
         return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
     }
+    @Transactional(readOnly=true)
+    public Page<Client> branchClients(com.sacco.mvp.branches.service.BranchService.ReadScope scope,String search,int page,String sort) {
+        scope.require(com.sacco.mvp.domain.UserClaim.CLIENT_ONBOARDING_VIEW);
+        page(page);
+        check(search!=null && search.length()<=100,"search");
+        String order=switch(sort) {
+            case "number_desc" -> "member_no desc";
+            case "name_asc" -> "full_name asc";
+            case "name_desc" -> "full_name desc";
+            case "status_asc" -> "state asc";
+            case "status_desc" -> "state desc";
+            case "number_asc" -> "member_no asc";
+            default -> throw new IllegalArgumentException("branches.error.filter");
+        };
+        var rows=records.clients(scope.institution(),scope.branch().id(),search,"",page,order,today());
+        return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
+
+    @Transactional(readOnly=true)
+    public Client branchClient(com.sacco.mvp.branches.service.BranchService.ReadScope scope,UUID client) {
+        scope.require(com.sacco.mvp.domain.UserClaim.CLIENT_ONBOARDING_VIEW);
+        return records.client(scope.institution(),scope.branch().id(),client,today());
+    }
+
     @Transactional(readOnly=true) public Client client(AppUserPrincipal a,UUID client) {authorize(a,"VIEW");return records.client(a,client,today());}
     @Transactional(readOnly=true) public Optional<Revision> latest(AppUserPrincipal a,UUID client) {client(a,client);return records.latest(a,client);}
     @Transactional(readOnly=true) public Revision version(AppUserPrincipal a,UUID client,int sequence) {client(a,client);return records.version(a,client,sequence);}

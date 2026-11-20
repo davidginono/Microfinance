@@ -309,7 +309,7 @@ class StaffAnalyticsControllerSecurityTest {
 
         @Bean
         SaccoAccessFilter saccoAccessFilter(SaccoStationRepository saccoStationRepository) {
-            return new SaccoAccessFilter(new com.sacco.mvp.service.StationAccessService(saccoStationRepository));
+            return new SaccoAccessFilter(new com.sacco.mvp.service.StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         }
 
         @Bean("authz")

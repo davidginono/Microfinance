@@ -203,6 +203,109 @@ public class AdminService {
             .map(this::toUserAccessView);
     }
 
+    @Transactional(readOnly = true)
+    public Set<UserClaim> workspaceClaims(com.sacco.mvp.security.AppUserPrincipal actor) {
+        if(actor==null || !actor.isStaffSession() || actor.isPlatformIdentity())
+            throw new org.springframework.security.access.AccessDeniedException("Staff access required");
+        var current=memberRepository.findByIdAndSaccoIdAndStationIdIgnoreCase(actor.getMemberId(),actor.getSaccoId(),actor.getStationId())
+            .filter(member -> member.getStatus()==MemberStatus.ACTIVE && member.isStaffAccessActive())
+            .filter(member -> !member.getActiveStaffRolesResolved().contains(Position.ADMIN))
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Staff assignment changed"));
+        if(saccoRegistryService.findActiveSacco(actor.getSaccoId()).isEmpty())
+            throw new org.springframework.security.access.AccessDeniedException("Institution unavailable");
+        requireActiveBranch(actor.getSaccoId(),actor.getStationId());
+        var live=java.util.EnumSet.noneOf(UserClaim.class);
+        userClaimService.effectiveClaims(current.getId(),current.getActiveStaffRolesResolved(),false).stream()
+            .filter(claim -> actor.getClaims().contains(claim.name())).forEach(live::add);
+        return live;
+    }
+
+    public String requireActiveBranch(String institution,String branch) {
+        if(branch==null || branch.isBlank() || branch.length()>255)
+            throw new org.springframework.security.access.AccessDeniedException("Branch unavailable");
+        return saccoRegistryService.findStation(institution,branch).filter(com.sacco.mvp.domain.SaccoStation::isActive)
+            .filter(station -> !station.isAccessSuspended()).map(com.sacco.mvp.domain.SaccoStation::getStationId)
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Branch unavailable"));
+    }
+
+    public List<String> staffBranches(com.sacco.mvp.security.AppUserPrincipal actor,Set<UserClaim> live) {
+        if(!hasBranchDelegation(live)) return List.of(actor.getStationId());
+        return saccoRegistryService.openBranchIds(actor.getSaccoId());
+    }
+
+    public boolean hasBranchDelegation(Set<UserClaim> claims) {
+        return claims.containsAll(Set.of(UserClaim.INSTITUTION_BRANCH_ADMIN,UserClaim.STAFF_BRANCH_ASSIGN));
+    }
+
+    @Transactional
+    public Member createBranchUser(com.sacco.mvp.security.AppUserPrincipal actor,String branch,String fullName,String email,String phone,List<Position> roles) {
+        var live=workspaceClaims(actor);
+        requireClaim(live,UserClaim.USER_ACCESS_CREATE);
+        String target=staffBranch(actor,live,branch);
+        return createUser(actor.getSaccoId(),target,actor.getMemberId(),actor.getGrantedPositions(),fullName,email,phone,roles);
+    }
+
+    @Transactional
+    public String updateBranchUser(com.sacco.mvp.security.AppUserPrincipal actor,UUID id,String source,String destination,
+                                   List<Position> roles,MemberStatus status,List<UserClaim> claims) {
+        var live=workspaceClaims(actor);
+        requireClaim(live,UserClaim.USER_ACCESS_UPDATE);
+        String current=staffBranch(actor,live,source);
+        String target=destination==null || destination.isBlank()?current:staffBranch(actor,live,destination);
+        var member=memberRepository.findForStaffInvitation(id,actor.getSaccoId(),current)
+            .filter(account -> !account.isMemberAccess() && !account.getStaffRolesResolved().isEmpty())
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Staff account unavailable"));
+        var existing=userClaimService.effectiveClaims(id,member.getStaffRolesResolved(),false);
+        if(existing.contains(UserClaim.INSTITUTION_BRANCH_ADMIN) && !id.equals(actor.getMemberId()))
+            throw new org.springframework.security.access.AccessDeniedException("Platform-managed administrator");
+        var submitted=claims==null?new ArrayList<UserClaim>():new ArrayList<>(claims);
+        if(!hasBranchDelegation(live)) {
+            submitted.remove(UserClaim.OTHER_BRANCHES_VIEW);
+            if(existing.contains(UserClaim.OTHER_BRANCHES_VIEW)) submitted.add(UserClaim.OTHER_BRANCHES_VIEW);
+        }
+        updateUser(member,actor.getSaccoId(),current,target,actor.getMemberId(),actor.getGrantedPositions(),id,roles,status,submitted,existing);
+        return target;
+    }
+
+    public String staffBranch(com.sacco.mvp.security.AppUserPrincipal actor,Set<UserClaim> live,String requested) {
+        String branch=requested==null || requested.isBlank()?actor.getStationId():requested.strip();
+        if(!actor.getStationId().equalsIgnoreCase(branch) && !hasBranchDelegation(live))
+            throw new org.springframework.security.access.AccessDeniedException("Branch assignment unavailable");
+        return requireActiveBranch(actor.getSaccoId(),branch);
+    }
+
+    private static void requireClaim(Set<UserClaim> claims,UserClaim claim) {
+        if(!claims.contains(claim)) throw new org.springframework.security.access.AccessDeniedException("Permission required");
+    }
+
+    @Transactional
+    public void delegateBranchAdministration(com.sacco.mvp.security.AppUserPrincipal actor,String institution,UUID id,boolean enabled) {
+        if(actor==null || !actor.isPlatformIdentity() || !actor.getClaims().containsAll(Set.of("SACCO_REGISTRY_UPDATE","USER_ACCESS_UPDATE")))
+            throw new org.springframework.security.access.AccessDeniedException("Platform administration required");
+        var current=memberRepository.findById(actor.getMemberId())
+            .filter(m -> m.getStatus()==MemberStatus.ACTIVE && m.getActiveStaffRolesResolved().contains(Position.ADMIN))
+            .orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Platform administration required"));
+        var live=userClaimService.effectiveClaims(current.getId(),current.getActiveStaffRolesResolved(),false);
+        requireClaim(live,UserClaim.SACCO_REGISTRY_UPDATE);
+        requireClaim(live,UserClaim.USER_ACCESS_UPDATE);
+        var target=memberRepository.findForStaffInvitation(id,institution,null)
+            .filter(m -> !m.isMemberAccess() && !m.getStaffRolesResolved().contains(Position.ADMIN) &&
+                !UserClaim.lockedClaims(m.getStaffRolesResolved()).isEmpty())
+            .orElseThrow(() -> new IllegalArgumentException("branches.error.ictRequired"));
+        if(enabled) {
+            if(target.getStatus()!=MemberStatus.ACTIVE || !target.isStaffAccessActive())
+                throw new IllegalArgumentException("branches.error.ictRequired");
+            requireActiveBranch(institution,target.getStationId());
+        }
+        var claims=new ArrayList<>(userClaimService.effectiveClaims(id,target.getStaffRolesResolved(),false));
+        boolean before=claims.remove(UserClaim.INSTITUTION_BRANCH_ADMIN);
+        if(before==enabled) return;
+        if(enabled) claims.add(UserClaim.INSTITUTION_BRANCH_ADMIN);
+        userClaimService.updateClaims(id,claims);
+        auditService.log("STAFF_USER",id,"BRANCH_ADMIN_DELEGATION",actor.getMemberId(),
+            Map.of("enabled",before),Map.of("enabled",enabled,"saccoId",institution,"stationId",target.getStationId()));
+    }
+
     @Transactional
     public Member createUser(String saccoId,
                              String stationId,
@@ -377,7 +480,7 @@ public class AdminService {
             ensureChairpersonSlotAvailable(saccoId, accountId);
         }
         Map<String, Object> before = snapshotMember(member);
-        if (!member.isMemberAccess()) member.setStatus(MemberStatus.INVITED);
+        member.setStatus(MemberStatus.INVITED);
         memberRepository.save(member);
         minorAdminInvitationService.issueInvitation(member, adminId);
         auditService.log("STAFF_USER", accountId, "ADMIN_RESEND_STAFF_INVITE", adminId, before, snapshotMember(member));
@@ -589,6 +692,14 @@ public class AdminService {
                                        List<UserClaim> claims) {
         Member member = memberRepository.findById(accountId)
             .orElseThrow(() -> new IllegalArgumentException("Member not found"));
+        updateUser(member,saccoId,stationId,stationId,adminId,actorRoles,accountId,positions,status,claims,
+            member.isMemberAccess() || UserClaim.lockedClaims(member.getStaffRolesResolved()).isEmpty()?Set.of():
+                userClaimService.effectiveClaims(accountId,member.getStaffRolesResolved(),false));
+    }
+
+    private void updateUser(Member member,String saccoId,String stationId,String destination,UUID adminId,Set<Position> actorRoles,
+                            UUID accountId,List<Position> positions,MemberStatus status,List<UserClaim> claims,Set<UserClaim> existing) {
+        String targetStationId=normalizeOptional(destination);
         String normalizedStationId = normalizeOptional(stationId);
         boolean sameSacco = saccoId.equals(member.getSaccoId());
         boolean sameStation = normalizedStationId == null
@@ -599,6 +710,7 @@ public class AdminService {
         if (!sameSacco) {
             throw new IllegalArgumentException("Member not found in this SACCO");
         }
+        if(member.isMemberAccess()) throw new org.springframework.security.access.AccessDeniedException("Client records cannot have staff access");
         boolean actorIsSuperAdmin = Position.containsSuperAdminRole(actorRoles);
         if (!actorIsSuperAdmin && member.getStaffRolesResolved().contains(Position.ADMIN)) {
             throw new IllegalStateException("Only super admins can update Super Admin accounts.");
@@ -610,7 +722,7 @@ public class AdminService {
         LinkedHashSet<Position> staffRoles = validateStaffRoles(actorRoles, positions);
         member.getStaffRolesResolved().stream().filter(role->role!=role.userGroup()&&staffRoles.contains(role.userGroup())).forEach(staffRoles::add);
         if (staffRoles.contains(Position.MINOR_ADMIN)) {
-            String slotStationId = normalizedStationId != null ? normalizedStationId : member.getStationId();
+            String slotStationId = targetStationId != null ? targetStationId : member.getStationId();
             ensureMinorAdminSlotAvailable(saccoId, slotStationId, accountId);
         }
         if (staffRoles.contains(Position.CHAIRPERSON)) {
@@ -619,6 +731,9 @@ public class AdminService {
         List<UserClaim> normalizedClaims = staffRoles.isEmpty()
             ? new ArrayList<>(userClaimService.defaultClaims(List.of(), true))
             : normalizeAssignableClaims(staffRoles, member.isMemberAccess(), claims);
+        if(!UserClaim.lockedClaims(staffRoles).isEmpty() && existing!=null && existing.contains(UserClaim.INSTITUTION_BRANCH_ADMIN)) {
+            normalizedClaims.add(UserClaim.INSTITUTION_BRANCH_ADMIN);
+        }
         validateRequiredAccessClaims(staffRoles, normalizedClaims);
         boolean memberAccess = member.isMemberAccess();
         Position primaryRole = Position.primaryRole(staffRoles, memberAccess);
@@ -630,8 +745,8 @@ public class AdminService {
         Position previousPosition = member.getPosition();
         OffsetDateTime now = OffsetDateTime.now();
         applyStaffAccessState(member, staffRoles, memberAccess, now);
-        if (normalizedStationId != null) {
-            member.setStationId(normalizedStationId);
+        if (targetStationId != null) {
+            member.setStationId(targetStationId);
         }
         member.setPosition(primaryRole);
         member.setStaffRoles(staffRoles);
@@ -1754,6 +1869,8 @@ public class AdminService {
             normalized.removeIf(claim -> claim.getFeature() == AccessFeature.MEMBER_LOANS
                 || claim.getFeature() == AccessFeature.GUARANTOR_REQUESTS);
         }
+        normalized.remove(UserClaim.INSTITUTION_BRANCH_ADMIN);
+        normalized.addAll(UserClaim.lockedClaims(staffRoles));
         if (normalized.contains(UserClaim.DISBURSEMENT_QUEUE_DISBURSE)) {
             normalized.add(UserClaim.DISBURSEMENT_QUEUE_VIEW);
         }
@@ -1799,10 +1916,7 @@ public class AdminService {
     }
 
     private String resolveMembershipLabel(Member member) {
-        if (!member.isMemberAccess()) {
-            return "Staff";
-        }
-        return member.getStaffRolesResolved().isEmpty() ? "Client record" : "Staff with client record";
+        return member.isMemberAccess() ? "Client record" : "Staff";
     }
 
     private List<AdminIncident> filterIncidentsByStation(List<AdminIncident> incidents, String stationId) {
@@ -1857,6 +1971,7 @@ public class AdminService {
         boolean memberAccess = member.isMemberAccess();
         return UserAccessView.builder()
             .accountId(member.getId())
+            .stationId(member.getStationId())
             .userIdLabel(formatUserId(member.getId()))
             .loginId(member.getUsername() == null || member.getUsername().isBlank() ? displayOrDash(member.getEmail()) : member.getUsername())
             .memberNumber(memberAccess ? displayOrDash(member.getMemberNo()) : "-")
@@ -1877,10 +1992,9 @@ public class AdminService {
     }
 
     private boolean canResendStaffInvitation(Member member) {
-        return member != null && !member.getStaffRolesResolved().isEmpty()
+        return member != null && !member.isMemberAccess() && !member.getStaffRolesResolved().isEmpty()
             && INVITED_ACCOUNT_PASSWORD_PLACEHOLDER.equals(member.getPasswordHash())
-            && (member.getStatus() == MemberStatus.INVITED || member.getStatus() == MemberStatus.INACTIVE
-                || member.isMemberAccess() && member.getStatus() == MemberStatus.ACTIVE);
+            && (member.getStatus() == MemberStatus.INVITED || member.getStatus() == MemberStatus.INACTIVE);
     }
 
     private boolean canDeleteStaffRecord(Member member) {
@@ -2019,18 +2133,6 @@ public class AdminService {
         }
         java.util.stream.Stream.of("CLIENT_REGISTRATION_EMAIL/" + normalizedEmail, "CLIENT_REGISTRATION_PHONE/" + normalizedPhone)
             .sorted().forEach(memberRepository::lockClientRegistrationIdentity);
-        Optional<Member> existingLocalMember = findLocalMemberByIdentity(normalizedEmail, normalizedPhone);
-
-        if (existingLocalMember.isPresent() && existingLocalMember.get().isMemberAccess()) {
-            Member member = existingLocalMember
-                .filter(Member::isMemberAccess)
-                .orElseThrow(() -> new IllegalStateException("This person must be a registered local client before staff access can be added."));
-            ensureExistingMemberIdentityMatches(member, normalizedEmail, normalizedPhone);
-            ensureExistingMemberScopeMatches(member, saccoId, normalizedStationId);
-            return assignStaffAccessToExistingMember(member, normalizedFullName, normalizedEmail, normalizedPhone,
-                staffRoles, adminId, auditAction, primaryRole);
-        }
-
         if (memberRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new IllegalStateException("That email address is already in use.");
         }
@@ -2077,69 +2179,8 @@ public class AdminService {
         return saved;
     }
 
-    private Optional<Member> findLocalMemberByIdentity(String normalizedEmail, String normalizedPhone) {
-        Optional<Member> emailMatch = memberRepository.findByEmailIgnoreCase(normalizedEmail);
-        Optional<Member> phoneMatch = memberRepository.findByPhone(normalizedPhone);
-        if (emailMatch.isPresent() && phoneMatch.isPresent()
-            && !emailMatch.get().getId().equals(phoneMatch.get().getId())) {
-            throw new IllegalStateException("That email address and phone number belong to different LMS accounts.");
-        }
-        return emailMatch.or(() -> phoneMatch);
-    }
 
-    private void ensureExistingMemberIdentityMatches(Member member, String normalizedEmail, String normalizedPhone) {
-        if (!normalizedEmail.equalsIgnoreCase(member.getEmail() == null ? "" : member.getEmail())
-            || !normalizedPhone.equals(member.getPhone())) {
-            throw new IllegalStateException("Use the same email address and phone number the member registered with in LMS.");
-        }
-    }
-
-    private void ensureExistingMemberScopeMatches(Member member, String saccoId, String stationId) {
-        if (!saccoId.equals(member.getSaccoId())) {
-            throw new IllegalStateException("This LMS member is not registered under the selected SACCO.");
-        }
-        String memberStationId = normalizeOptional(member.getStationId());
-        if (stationId != null && (memberStationId == null || !stationId.equalsIgnoreCase(memberStationId))) {
-            throw new IllegalStateException("This LMS member is not registered under the selected station.");
-        }
-    }
-
-    private Member assignStaffAccessToExistingMember(Member member,
-                                                     String fullName,
-                                                     String email,
-                                                     String phone,
-                                                     LinkedHashSet<Position> staffRoles,
-                                                     UUID adminId,
-                                                     String auditAction,
-                                                     Position primaryRole) {
-        Map<String, Object> before = snapshotMember(member);
-        boolean invitationNeeded = !member.isStaffAccessActive();
-        OffsetDateTime now = OffsetDateTime.now();
-        Position previousPosition = member.getPosition();
-        applyStaffAccessState(member, staffRoles, true, now);
-        member.setFullName(fullName);
-        member.setEmail(email);
-        member.setPhone(phone);
-        member.setPosition(primaryRole);
-        member.setStaffRoles(staffRoles);
-        member.setMemberAccount(true);
-        member.setStatus(MemberStatus.ACTIVE);
-        if (invitationNeeded) member.setPasswordHash(INVITED_ACCOUNT_PASSWORD_PLACEHOLDER);
-        if (previousPosition != primaryRole || member.getRank() == null) {
-            member.setRank(nextRank(member.getSaccoId(), primaryRole == null ? Position.MEMBER : primaryRole));
-        }
-        Member saved = memberRepository.save(member);
-        ensureUserSettings(saved.getId(), now);
-        ensureSavingsAccount(saved.getId(), now);
-        userClaimService.updateClaims(saved.getId(), new ArrayList<>(userClaimService.defaultClaims(staffRoles, true)));
-        if (invitationNeeded) minorAdminInvitationService.issueInvitation(saved, adminId);
-        auditService.log("MEMBER", saved.getId(), auditAction, adminId, before, snapshotMember(saved));
-        return saved;
-    }
-
-    public String userIdLabel(UUID accountId) {
-        return formatUserId(accountId);
-    }
+    public String userIdLabel(UUID accountId) { return formatUserId(accountId); }
 
     private String generateUniqueStaffNo() {
         int candidateCount = LAST_GENERATED_USER_ID - FIRST_GENERATED_USER_ID + 1;
@@ -2519,6 +2560,8 @@ public class AdminService {
     @lombok.Builder
     public static class UserAccessView {
         private UUID accountId;
+        private String stationId;
+        public Set<UserClaim> getLockedClaims() { return UserClaim.lockedClaims(staffRoles); }
         private String userIdLabel;
         private String loginId;
         private String memberNumber;

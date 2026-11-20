@@ -43,7 +43,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void suspendedWorkspaceUserIsSignedOutAndRedirected() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         AppUserPrincipal principal = principal(Position.MANAGER, "SACCO-01");
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "AR704")).thenReturn(Optional.of(station(SaccoAccessStatus.SUSPENDED, "payment overdue")));
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
@@ -62,8 +62,24 @@ class SaccoAccessFilterTest {
     }
 
     @Test
+    void aTransferInvalidatesTheOldBranchSessionBeforeTheRequestProceeds() throws Exception {
+        var directory=org.mockito.Mockito.mock(com.sacco.mvp.service.MemberDirectoryService.class);
+        var filter=new SaccoAccessFilter(new StationAccessService(saccoStationRepository),directory);
+        var actor=principal(Position.MANAGER,"SACCO-01");
+        SecurityContextHolder.getContext().setAuthentication(authentication(actor));
+        var request=new MockHttpServletRequest("GET","/finance/loan-records");
+        var session=(org.springframework.mock.web.MockHttpSession)request.getSession(true);
+        var response=new MockHttpServletResponse();
+        var chain=new MockFilterChain();
+        filter.doFilter(request,response,chain);
+        assertThat(session.isInvalid()).isTrue();
+        assertThat(response.getRedirectedUrl()).isEqualTo("/login");
+        assertThat(chain.getRequest()).isNull();
+    }
+
+    @Test
     void platformAdminBypassesSuspendedWorkspaceCheck() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         AppUserPrincipal principal = principal(Position.ADMIN, "SACCO-01");
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
 
@@ -80,7 +96,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void suspendedStationDoesNotBlockOtherStationsInSameSacco() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         AppUserPrincipal principal = principal(Position.MANAGER, "SACCO-01", "BR001");
         when(saccoStationRepository.findBySaccoIdAndStationId("SACCO-01", "BR001")).thenReturn(Optional.of(station(SaccoAccessStatus.ACTIVE, null)));
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
@@ -97,7 +113,7 @@ class SaccoAccessFilterTest {
 
     @Test
     void missingSaccoIdDoesNotBreakFiltering() throws ServletException, IOException {
-        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
+        SaccoAccessFilter filter = new SaccoAccessFilter(new StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         AppUserPrincipal principal = principal(Position.MANAGER, null);
         SecurityContextHolder.getContext().setAuthentication(authentication(principal));
 

@@ -9,6 +9,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface SaccoStationRepository extends JpaRepository<SaccoStation, UUID> {
+    @org.springframework.data.jpa.repository.Query("""
+        select b from SaccoStation b where b.saccoId=:institution and (:branch is null or b.stationId=:branch)
+        """)
+    org.springframework.data.domain.Slice<SaccoStation> branchPage(
+        @org.springframework.data.repository.query.Param("institution") String institution,
+        @org.springframework.data.repository.query.Param("branch") String branch,
+        org.springframework.data.domain.Pageable page);
+
     List<SaccoStation> findBySaccoIdOrderByStationIdAsc(String saccoId);
 
     List<SaccoStation> findBySaccoIdAndActiveTrueOrderByStationIdAsc(String saccoId);

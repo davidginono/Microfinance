@@ -137,10 +137,6 @@ class AdminServiceTest {
             .status(scenario.equals("active") ? MemberStatus.ACTIVE : MemberStatus.INACTIVE)
             .passwordHash(scenario.equals("accepted") ? "encoded-password" : "OTP_ONLY_LOGIN").build();
         when(memberRepository.findForStaffInvitation(id, "SACCO-01", "ST-1")).thenReturn(Optional.of(member));
-        if(scenario.equals("client")) {
-            adminService.resendStaffInvitation("SACCO-01","ST-1",UUID.randomUUID(),Set.of(Position.MINOR_ADMIN),id);
-            assertThat(issuedInvitationCount.get()).isEqualTo(1);assertThat(member.isMemberAccess()).isTrue();return;
-        }
         assertThatThrownBy(() -> adminService.resendStaffInvitation("SACCO-01", "ST-1", UUID.randomUUID(), Set.of(Position.MINOR_ADMIN), id))
             .isInstanceOf(IllegalStateException.class);
         assertThat(issuedInvitationCount.get()).isZero();
@@ -411,7 +407,7 @@ class AdminServiceTest {
         UUID id = UUID.randomUUID();
         OffsetDateTime previous = OffsetDateTime.now().minusDays(2);
         Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
-            .memberNo("MEMBER-1").memberAccount(true).position(Position.MANAGER)
+            .memberNo("STAFF-1").memberAccount(false).position(Position.MANAGER)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER)))
             .staffNo("12345").staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
             .staffAccessAssignedAt(previous).staffAccessActivatedAt(previous).build();
@@ -467,7 +463,7 @@ class AdminServiceTest {
         UUID id = UUID.randomUUID();
         OffsetDateTime acknowledgedAt = OffsetDateTime.now().minusDays(2);
         Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
-            .memberNo("MEMBER-1").memberAccount(true).position(Position.MANAGER)
+            .memberNo("STAFF-1").memberAccount(false).position(Position.MANAGER)
             .staffRoles(new LinkedHashSet<>(List.of(Position.MANAGER, Position.BOARD)))
             .staffNo("12345").staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE)
             .staffAccessAssignedAt(acknowledgedAt).staffAccessActivatedAt(acknowledgedAt).build();
@@ -522,7 +518,7 @@ class AdminServiceTest {
 
         assertThat(row.getAccountId()).isEqualTo(accountId);
         assertThat(row.getLoginId()).isEqualTo("dual@example.com");
-        assertThat(row.getMembershipLabel()).isEqualTo("Staff with client record");
+        assertThat(row.getMembershipLabel()).isEqualTo("Client record");
         assertThat(row.getRoleSummary()).isEqualTo("General Manager");
         assertThat(row.getPhone()).isEqualTo("255700000001");
     }
@@ -598,14 +594,14 @@ class AdminServiceTest {
     }
 
     @Test
-    void memberAdministratorCannotRemoveOwnLastAdminRole() {
+    void aLegacyDualAccountCannotBeEditedAsStaff() {
         UUID id = UUID.randomUUID();
         Member member = Member.builder().id(id).saccoId("SACCO-01").stationId("ST-1")
             .memberAccount(true).position(Position.MINOR_ADMIN).status(MemberStatus.ACTIVE).build();
         when(memberRepository.findById(id)).thenReturn(Optional.of(member));
         assertThatThrownBy(() -> adminService.updateUser("SACCO-01", "ST-1", id,
             Set.of(Position.MINOR_ADMIN), id, List.of(), MemberStatus.ACTIVE, null))
-            .hasMessage("Select at least one staff role for the user.");
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class).hasMessage("Client records cannot have staff access");
         verify(memberRepository, never()).save(any());
     }
 
@@ -989,7 +985,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void updateUserRejectsAdministratorWithoutRecoveryClaims() {
+    void updateUserKeepsIctRecoveryClaimsWhenTheyAreOmitted() {
         UUID accountId = UUID.randomUUID();
         Member member = Member.builder()
             .id(accountId)
@@ -1005,28 +1001,12 @@ class AdminServiceTest {
             .createdAt(OffsetDateTime.now().minusDays(1))
             .build();
         when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
-        when(memberRepository.existsBySaccoIdAndStationIdIgnoreCaseAndPositionAndIdNot(
-            "SACCO-01", "ST-1", Position.MINOR_ADMIN, accountId
-        )).thenReturn(false);
-
-        assertThatThrownBy(() -> adminService.updateUser(
-            "SACCO-01",
-            "ST-1",
-            accountId,
-            Set.of(Position.MINOR_ADMIN),
-            accountId,
-            List.of(Position.MINOR_ADMIN),
-            MemberStatus.ACTIVE,
-            List.of(UserClaim.USER_ACCESS_UPDATE)
-        ))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage(
-                "Administrator access requires Admin Dashboard - View, Access Matrix - View and Update, "
-                    + "and User Access - View and Update. Select these permissions or use Restore Default Permissions."
-            );
-
-        verify(memberRepository, never()).save(any(Member.class));
-        verifyNoInteractions(memberAccessClaimRepository);
+        adminService.updateUser("SACCO-01","ST-1",accountId,Set.of(Position.MINOR_ADMIN),accountId,
+            List.of(Position.MINOR_ADMIN),MemberStatus.ACTIVE,List.of(UserClaim.USER_ACCESS_UPDATE));
+        verify(memberRepository).save(member);
+        for(var claim:UserClaim.lockedClaims(Set.of(Position.ICT_MANAGER))) {
+            verify(memberAccessClaimRepository).save(claimNamed(claim));
+        }
     }
 
     @Test
@@ -1637,7 +1617,7 @@ class AdminServiceTest {
         var contactLocks = inOrder(memberRepository);
         contactLocks.verify(memberRepository).lockClientRegistrationIdentity("CLIENT_REGISTRATION_EMAIL/manager@example.com");
         contactLocks.verify(memberRepository).lockClientRegistrationIdentity("CLIENT_REGISTRATION_PHONE/255700000001");
-        contactLocks.verify(memberRepository).findByEmailIgnoreCase("manager@example.com");
+        contactLocks.verify(memberRepository).existsByEmailIgnoreCase("manager@example.com");
         verify(memberAccessClaimRepository).deleteByMemberId(lastInvitedMember.get().getId());
         verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_DOCUMENTS_VIEW));
@@ -1668,49 +1648,13 @@ class AdminServiceTest {
     }
 
     @Test
-    void createUserAssignsStaffAccessToExistingLocalClient() {
-        UUID memberId = UUID.randomUUID();
-        Member member = Member.builder()
-            .id(memberId)
-            .saccoId("SACCO-01")
-            .stationId("ST-1")
-            .memberNo("MBR-002")
-            .fullName("Existing Member")
-            .email("member@example.com")
-            .phone("255700000003")
-            .position(Position.MEMBER)
-            .memberAccount(true)
-            .staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.NONE)
-            .status(MemberStatus.ACTIVE)
-            .createdAt(OffsetDateTime.now())
-            .build();
-        when(memberRepository.findByEmailIgnoreCase("member@example.com")).thenReturn(Optional.of(member));
-        when(memberRepository.findByPhone("255700000003")).thenReturn(Optional.of(member));
-        when(memberRepository.nextStaffNumberValue()).thenReturn(10002L);
-        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        adminService.createUser(
-            "SACCO-01",
-            "ST-1",
-            UUID.randomUUID(),
-            Set.of(Position.ADMIN),
-            "Existing Client Member",
-            "member@example.com",
-            "255700000003",
-            List.of(Position.MANAGER)
-        );
-
-        assertThat(member.getStaffNo()).isEqualTo("10002");
-        assertThat(member.getMemberNo()).isEqualTo("MBR-002");
-        assertThat(member.getPosition()).isEqualTo(Position.MANAGER);
-        assertThat(member.getStaffRolesResolved()).containsExactly(Position.MANAGER);
-        assertThat(member.isMemberAccess()).isTrue();
-        assertThat(member.getStatus()).isEqualTo(MemberStatus.ACTIVE);
-        assertThat(member.getStaffAccessStatus()).isEqualTo(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE);
-        org.assertj.core.api.Assertions.assertThat(issuedInvitationCount.get()).isEqualTo(1);
-
-        verify(memberRepository).save(any(Member.class));
-        verify(notificationRepository,never()).save(any(Notification.class));
-        verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
+    void createUserRejectsExistingClientContactsWithoutIssuingStaffAccess() {
+        when(memberRepository.existsByEmailIgnoreCase("client@example.com")).thenReturn(true);
+        assertThatThrownBy(() -> adminService.createUser("SACCO-01","ST-1",UUID.randomUUID(),Set.of(Position.ADMIN),
+            "Existing Client Member","client@example.com","255700000003",List.of(Position.MANAGER)))
+            .isInstanceOf(IllegalStateException.class).hasMessage("That email address is already in use.");
+        assertThat(issuedInvitationCount.get()).isZero();
+        verify(memberRepository,never()).save(any(Member.class));
     }
 
     @Test

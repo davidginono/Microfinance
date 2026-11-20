@@ -268,7 +268,7 @@ class LoanDocumentControllerSmsUsageSecurityTest {
 
         @Bean
         SaccoAccessFilter saccoAccessFilter(SaccoStationRepository saccoStationRepository) {
-            return new SaccoAccessFilter(new StationAccessService(saccoStationRepository));
+            return new SaccoAccessFilter(new StationAccessService(saccoStationRepository),com.sacco.mvp.config.MvcSecurityTestConfiguration.activeAssignmentDirectory());
         }
 
         @Bean("authz")

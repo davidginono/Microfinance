@@ -23,6 +23,13 @@ public class SaccoAccessFilter extends OncePerRequestFilter {
     static final long RECHECK_AFTER_MS = 30_000L;
 
     private final StationAccessService stationAccessService;
+    private final com.sacco.mvp.service.MemberDirectoryService members;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path=request.getRequestURI().substring(request.getContextPath().length());
+        return path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/images/") || path.startsWith("/fonts/");
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -31,6 +38,14 @@ public class SaccoAccessFilter extends OncePerRequestFilter {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         Object principal = authentication == null ? null : authentication.getPrincipal();
         if (principal instanceof AppUserPrincipal appUser) {
+            if(appUser.isStaffSession() && !members.hasCurrentStaffAssignment(appUser.getMemberId(),appUser.getSaccoId(),appUser.getStationId())) {
+                SecurityContextHolder.clearContext();
+                HttpSession session=request.getSession(false);
+                if(session!=null) session.invalidate();
+                String login=appUser.isPlatformIdentity()?"/system-admin/login":"/login";
+                response.sendRedirect(response.encodeRedirectURL(request.getContextPath()+login));
+                return;
+            }
             Optional<SaccoStation> suspendedStation = suspendedStation(request, appUser);
             if (suspendedStation.isEmpty()) {
                 filterChain.doFilter(request, response);

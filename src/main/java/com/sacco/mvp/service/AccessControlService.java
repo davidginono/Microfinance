@@ -104,6 +104,7 @@ public class AccessControlService {
         return isStaffSession(principal) && (isPlatformIdentity(principal)
             || principal.getSaccoId()!=null&&!principal.getSaccoId().isBlank()&&principal.getStationId()!=null&&!principal.getStationId().isBlank()) && hasAny(principal,
             UserClaim.ADMIN_DASHBOARD_VIEW,
+            UserClaim.BRANCHES_VIEW,
             UserClaim.USER_ACCESS_VIEW,
             UserClaim.WORKSPACE_SETTINGS_VIEW,
             UserClaim.WORKSPACE_SETTINGS_UPDATE,
