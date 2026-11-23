@@ -167,6 +167,7 @@ public final class LoanRecordingDtos {
         public BigDecimal charges(){return Set.of("PAYMENT","REVERSAL").contains(kind)?amount.subtract(principal).subtract(interest):new BigDecimal("0.00");}
         public BigDecimal getCharges(){return charges();}
     }
+    public record StatementMovement(Posting posting, BigDecimal outstandingInterest) {}
     public record Detail(LoanRow loan, String institution, String branch, String recordedBy, OffsetDateTime recordedAt,
         String purpose, String business, BigDecimal income, BigDecimal expenses, BigDecimal otherDebt,
         String informationSource, String guarantors, String collateral, String evidence, String notes,

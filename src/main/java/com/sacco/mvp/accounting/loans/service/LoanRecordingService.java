@@ -608,10 +608,10 @@ public class LoanRecordingService {
         var owner=statementClient(a,client);
         var record=records.loan(a,loan,clock.today());
         if(!Objects.equals(record.clientId(),client))throw new org.springframework.security.access.AccessDeniedException("Loan outside client statement");
-        var rows=records.loanPosts(a,loan,export?501:26,export?0:page*25);if(export)check(rows.size()<=500,"reportLimit");
+        var rows=records.statementPosts(a,loan,export?501:26,export?0:page*25);if(export)check(rows.size()<=500,"reportLimit");
         return new LoanStatementView(new StatementExport(owner,List.of(record),export?rows:rows.stream().limit(25).toList(),records.statementTerms(a,client,loan)),records.loanOpening(a,loan).orElse(null),page,!export && rows.size()>25);
     }
-    public record StatementExport(StatementClient client,List<LoanRow> loans,List<Posting> movements,List<StatementTerms> terms) {}
+    public record StatementExport(StatementClient client,List<LoanRow> loans,List<StatementMovement> movements,List<StatementTerms> terms) {}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public BalanceExport exportStatement(AppUserPrincipal a, UUID client) {
         authorize(a,"EXPORT");

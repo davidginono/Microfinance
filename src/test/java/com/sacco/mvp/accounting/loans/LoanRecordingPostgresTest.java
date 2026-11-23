@@ -330,6 +330,9 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("475.48");
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and kind='PAYMENT'",Integer.class,source)).isZero();
         assertThat(service.history(actor,source,0).rows()).anySatisfy(row->assertThat(row.kind()).isEqualTo("SETTLEMENT"));
+        assertThat(service.loanStatement(actor,client,source,0,true).source().movements())
+            .filteredOn(row->row.posting().kind().equals("SETTLEMENT")).singleElement()
+            .satisfies(row->assertThat(row.outstandingInterest()).isZero());
         assertThatThrownBy(()->service.topUpQuote(operator("B2"),source,TODAY,null)).isInstanceOf(IllegalArgumentException.class);
     }
     @Test void topUpRequiresFreshPreviewAndKeepsRecordedTermsFrozen(){
@@ -354,6 +357,12 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,original.journalId(),reversal.journalId())).isZero();
         var reversals=new Filter("",null,null,"REVERSAL","newest",0,null);
         assertThat(service.register(actor,"DISBURSEMENT",reversals).rows()).anySatisfy(row->assertThat(row.kind()).isEqualTo("FUNDING_UNDO"));
+        assertThat(service.loanStatement(actor,client,source,0,true).source().movements())
+            .filteredOn(row->row.posting().kind().equals("SETTLEMENT_UNDO")).singleElement()
+            .satisfies(row->assertThat(row.outstandingInterest()).isEqualByComparingTo("40.00"));
+        assertThat(service.loanStatement(actor,client,loan,0,true).source().movements())
+            .filteredOn(row->row.posting().kind().equals("FUNDING_UNDO")).singleElement()
+            .satisfies(row->assertThat(row.outstandingInterest()).isZero());
         assertThat(service.totals(actor,"DISBURSEMENT",reversals).amount()).isEqualByComparingTo(original.cash().negate());
     }
     @Test void concurrentTopUpRetriesPostOnce()throws Exception{
@@ -1143,7 +1152,7 @@ class LoanRecordingPostgresTest {
             .extracting(Posting::reference).containsExactly("D-PRODUCT-1");
         assertThat(service.movements(actor,client,new MovementFilter(null,null,first,other),0).page().rows()).isEmpty();
         assertThat(service.loanStatement(actor,client,first,0,true).source().movements())
-            .extracting(Posting::reference).containsExactlyInAnyOrder("D-PRODUCT-1","PRODUCT-R1");
+            .extracting(row->row.posting().reference()).containsExactlyInAnyOrder("D-PRODUCT-1","PRODUCT-R1");
         assertThat(service.exportStatement(actor,client).loans())
             .extracting(balance->balance.loan().id()).containsExactlyInAnyOrder(first,second);
         assertThatThrownBy(()->service.movements(actor,client,new MovementFilter(TODAY,TODAY.minusDays(1),null,null),0))
@@ -1178,6 +1187,10 @@ class LoanRecordingPostgresTest {
             """,paid.id())).isInstanceOf(org.springframework.dao.DataAccessException.class).hasStackTraceContaining("A different accountant must record the repayment correction");
         var corrector=operator("B1");var key=UUID.randomUUID();var reversed=service.reverse(corrector,paid.id(),key,TODAY,"Wrong collection");assertThat(reversed.principalBalance()).isEqualByComparingTo("1000.00");assertThat(service.reverse(corrector,paid.id(),key,TODAY,"Wrong collection").id()).isEqualTo(reversed.id());
         assertThat(service.posting(actor,paid.id()).reversedBy()).isEqualTo(reversed.id());assertThatThrownBy(()->service.reverse(corrector,paid.id(),UUID.randomUUID(),TODAY,"Again")).hasMessage("recording.error.reversal");
+        var statement=service.loanStatement(actor,client,id,0,false).source().movements();
+        assertThat(statement).extracting(row->row.posting().kind()).containsExactly("DISBURSEMENT","PAYMENT","REVERSAL");
+        assertThat(statement).extracting(StatementMovement::outstandingInterest)
+            .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"),new BigDecimal("20.00"));
         var filter=new Filter("R1",TODAY,TODAY,"","newest",0,null);
         assertThat(service.report(actor,"PAYMENT",filter)).hasSize(2);
         var totals=service.totals(actor,"PAYMENT",filter);
@@ -1248,6 +1261,17 @@ class LoanRecordingPostgresTest {
     @Test void earlierStaffSessionCannotKeepRecordingAfterCurrentPermissionRevocation(){
         when(context.getBean(UserClaimService.class).effectiveClaims(eq(actor.getMemberId()),anyCollection(),anyBoolean())).thenReturn(Set.of(UserClaim.LOAN_RECORDING_VIEW));
         assertThatThrownBy(()->service.save(actor,form())).isInstanceOf(AccessDeniedException.class);
+    }
+    @Test void loanStatementUsesRecordedWaiversInInterestAfterPayment() {
+        var id=disbursed("D-STATEMENT-WAIVER");
+        ledger.waiveInterest(id,actor,UUID.randomUUID(),TODAY,new BigDecimal("2.00"),"Synthetic interest waiver",null);
+        var payment=post(id,"38.00","STATEMENT-WAIVER-PAYMENT");
+        payment.setInterestAccountId(interest);
+        var paid=service.repay(actor,payment);
+        assertThat(paid.interest()).isEqualByComparingTo("18.00");
+        var rows=service.loanStatement(actor,client,id,0,true).source().movements();
+        assertThat(rows).extracting(StatementMovement::outstandingInterest)
+            .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"));
     }
     @Test void individualLoanStatementKeepsOpeningOnLaterPagesAndChecksOwnership(){
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));

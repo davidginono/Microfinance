@@ -522,6 +522,53 @@ public class LoanRecordingRepository {
     public Posting posting(AppUserPrincipal a,UUID id){return jdbc.query(POSTS+" where p.id=? and p.sacco_id=? and p.station_id=?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,id,a.getSaccoId(),a.getStationId()).stream().findFirst().orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Posting unavailable"));}
     public Optional<Posting> loanOpening(AppUserPrincipal a,UUID loan){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='DISBURSEMENT' and p.state='POSTED' order by p.recorded_at,p.id limit 1",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Posting> loanPosts(AppUserPrincipal a,UUID loan,int limit,int offset){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by "+historyOrder()+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId(),limit,offset);}
+    public List<StatementMovement> statementPosts(AppUserPrincipal actor, UUID loan, int limit, int offset) {
+        var parameters = Map.of("loan",loan,"institution",actor.getSaccoId(),"branch",actor.getStationId(),
+            "limit",limit,"offset",offset);
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+            with scoped_ledger as (
+                select loan_application_id,sacco_id,station_id from loan_ledgers
+                where loan_application_id=:loan and sacco_id=:institution and station_id=:branch
+            ), contract as (
+                select sum(i.interest) as opening_interest from scoped_ledger l
+                join loan_ledger_installments i on i.loan_application_id=l.loan_application_id
+            ), interest_movements as (
+                select t.id as transaction_id,t.sequence,
+                    (case when t.kind in ('PAYMENT','SETTLEMENT') then 1 else -1 end)
+                      *(t.interest_amount+t.future_interest_excluded+coalesce(u.excluded_interest,0)) as reduction
+                from scoped_ledger l join loan_repayment_transactions t on t.loan_application_id=l.loan_application_id
+                    and t.sacco_id=l.sacco_id and t.station_id=l.station_id
+                left join accountant_loan_topup u on u.transaction_id=t.id and u.source_id=t.loan_application_id
+                    and u.sacco_id=t.sacco_id and u.station_id=t.station_id
+                union all
+                select null::uuid,w.sequence,case when w.kind='WAIVER' then w.amount else -w.amount end
+                from scoped_ledger l join loan_interest_waiver w on w.loan_id=l.loan_application_id
+                    and w.sacco_id=l.sacco_id and w.station_id=l.station_id
+            ), running as (
+                select transaction_id,sum(reduction) over (order by sequence rows unbounded preceding) as interest_reduced
+                from interest_movements
+            ), page as (
+                select m.*,row_number() over (order by m.recorded_at,
+                    case m.kind when 'CHARGE_ASSESS' then 0 when 'DISBURSEMENT' then 1 else 2 end,
+                    t.sequence nulls last,m.id) as statement_order
+                from (
+            """+POSTS+"""
+                where p.loan_id=:loan and p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
+                    and a.sacco_id=p.sacco_id and a.station_id=p.station_id
+                ) m left join loan_repayment_transactions t on t.id=m.transaction_id and t.loan_application_id=m.loan_id
+                    and t.sacco_id=m.sacco_id and t.station_id=m.station_id
+                order by statement_order limit :limit offset :offset
+            )
+            select p.*, case
+                when c.opening_interest is null then null
+                when p.kind='DISBURSEMENT' then c.opening_interest
+                when p.kind='FUNDING_UNDO' then 0
+                when b.interest_reduced between 0 and c.opening_interest then c.opening_interest-b.interest_reduced
+            end as outstanding_interest
+            from page p cross join contract c left join running b on b.transaction_id=p.transaction_id
+            order by p.statement_order
+            """,parameters,(row,n)->new StatementMovement(posting(row,n),row.getBigDecimal("outstanding_interest")));
+    }
     public List<Posting> clientPosts(AppUserPrincipal a, UUID client, MovementFilter filter, int limit, int offset) {
         return jdbc.query(POSTS+"""
             where a.borrower_party_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED'

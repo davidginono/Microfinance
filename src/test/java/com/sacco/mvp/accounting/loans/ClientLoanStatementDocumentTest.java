@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 class ClientLoanStatementDocumentTest {
-    @Test void screenPrintAndPdfUseCompactFieldsAndPostedPrincipalMovements() throws Exception {
+    @Test void screenPrintAndPdfShowPostedPrincipalAndInterestMovements() throws Exception {
         var service=mock(LoanRecordingService.class);var clock=mock(ApplicationClock.class);
         var actor=mock(AppUserPrincipal.class);var client=UUID.randomUUID();var loan=UUID.randomUUID();
         var date=LocalDate.of(2026,9,17);when(clock.today()).thenReturn(date.plusDays(2));
@@ -34,7 +34,8 @@ class ClientLoanStatementDocumentTest {
         var movements=List.of(post(loan,"DISBURSEMENT",date,"D001","1000","0","1000"),
             post(loan,"PAYMENT",date.plusDays(1),"P001","100","10","900"),
             post(loan,"REVERSAL",date.plusDays(2),"R001","100","10","1000"));
-        var source=new LoanRecordingService.StatementExport(new StatementClient("0001","JAMES Mafumba","CLIENT"),List.of(row),movements,List.of(terms));
+        var source=new LoanRecordingService.StatementExport(new StatementClient("0001","JAMES Mafumba","CLIENT"),List.of(row),List.of(new StatementMovement(movements.get(0),money("120")),
+            new StatementMovement(movements.get(1),money("110")),new StatementMovement(movements.get(2),money("120"))),List.of(terms));
         var second = new LoanRow(UUID.randomUUID(),"7527",client,"James Mafumba","0001","Education loan",date,
             money("2150.50"),money("2150.50"),"DISBURSED",money("2150.50"),money("4.12"),money("0"),money("300"),money("0"),money("0"));
         when(service.exportStatement(actor,client)).thenReturn(new BalanceExport(source.client(),List.of(
@@ -47,14 +48,15 @@ class ClientLoanStatementDocumentTest {
         assertThat(controller.loanStatement(actor,client,loan,0,Locale.ENGLISH,screen)).isEqualTo("accounting/loans/loan-statement");
         var document=(StatementDocument)screen.get("document");
         var section=document.sections().getFirst();
-        assertThat(section.columns()).containsExactly("Date","Details","Debit (principal)","Credit (principal)","Interest","Principal balance");
+        assertThat(section.columns()).containsExactly("Date","Details","Debit (P + I)","Credit (P + I)","Interest","Principal","Principal balance","Outstanding interest");
         assertThat(document.client()).hasSize(3);
         assertThat(section.fields()).hasSize(14);
         assertThat(section.fields()).extracting(StatementField::label)
             .contains("Loan ID","Loan product","Interest rate","First / last payment","Outstanding principal (TZS)","Due interest (TZS)","Outstanding charges","Overdue amount (TZS)")
             .doesNotContain("Fund","Opening principal balance (TZS)","Future scheduled interest (TZS)","Supporting evidence","Application component");
-        assertThat(section.rows().get(1)).containsExactly("18/09/2026","Repayment / Marejesho ya mkopo","","100","10","900");
-        assertThat(section.rows().get(2)).containsExactly("19/09/2026","Repayment reversal / Marejesho ya mkopo","100","","-10","1,000");
+        assertThat(section.rows().get(0)).containsExactly("17/09/2026","Disbursement / Marejesho ya mkopo","1,000","","0","1,000","1,000","120");
+        assertThat(section.rows().get(1)).containsExactly("18/09/2026","Repayment / Marejesho ya mkopo","","110","10","100","900","110");
+        assertThat(section.rows().get(2)).containsExactly("19/09/2026","Repayment reversal / Marejesho ya mkopo","110","","10","100","1,000","120");
         var model=new ExtendedModelMap();var request=new MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/print");
         var print=(ResponseEntity<?>)controller.statementExport(actor,client,request,Locale.ENGLISH,model);
         assertThat(print.getHeaders().getFirst("Content-Disposition")).startsWith("inline");
@@ -69,8 +71,11 @@ class ClientLoanStatementDocumentTest {
             assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("James’s Loan Statements","7526","7527","Business loan","Education loan","Outstanding principal (TZS)").doesNotContain("Repayment reversal","JAMES Mafumba");
         }
         request.setRequestURI("/finance/client-ledgers/"+client+"/loans/"+loan+"/statement/pdf");
-        try(var pdf=Loader.loadPDF(controller.loanStatementPdf(actor,client,loan,request,Locale.ENGLISH).getBody())){
-            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("JAMES Mafumba","Repayment reversal","900","-10").doesNotContain("7527","900.00","Document reference","Document number");
+        byte[] loanPdf=controller.loanStatementPdf(actor,client,loan,request,Locale.ENGLISH).getBody();
+        if(Boolean.getBoolean("microfinance.loan.statement.sample"))
+            java.nio.file.Files.write(java.nio.file.Path.of("target/loan-interest-statement-sample.pdf"),loanPdf);
+        try(var pdf=Loader.loadPDF(loanPdf)){
+            assertThat(new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ")).contains("JAMES Mafumba","Repayment reversal","Debit (P + I)","Credit (P + I)","Outstanding interest","900","110","120").doesNotContain("7527","900.00","Document reference","Document number");
         }
         var fixedTerms=new StatementTerms(loan,null,"WEEKLY",12,52,date.plusDays(7),money("25"),"Test institution","Branch 1",
             "AMOUNT","MONTHS",12,null,"",money("60"));
@@ -118,12 +123,12 @@ class ClientLoanStatementDocumentTest {
     @Test void localizedFieldsAndRightmostAmountsStayWithinPrintableMargins() throws Exception {
         var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");messages.setFallbackToSystemLocale(false);
         for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
-            var columns=List.of("date","description","debit","credit","interest","balance").stream()
+            var columns=List.of("date","description","debit","credit","interest","principalPart","balance","interestBalance").stream()
                 .map(key->messages.getMessage("recording.statement."+key,null,locale)).toList();
-            var rows=IntStream.rangeClosed(1,45).mapToObj(n->List.of("19/10/2026", "Repayment "+n+" / Posted repayment with a description that wraps across several lines.","9,999,999.99","9,999,999.99","999,999.99","9,999,999.99")).toList();
+            var rows=IntStream.rangeClosed(1,45).mapToObj(n->List.of("19/10/2026", "Repayment "+n+" / Posted repayment with a description that wraps across several lines.","9,999,999.99","9,999,999.99","999,999.99","9,999,999.99","9,999,999.99","9,999,999.99")).toList();
             var source=new StatementDocument(messages.getMessage("recording.statement",null,locale).toUpperCase(locale),
                 List.of(new StatementField("Client Number","CL10001"),new StatementField("Name","Long client name for statement layout checks"),new StatementField("As of","19-OCT-2026")),
-                List.of(new StatementSection(List.of(new StatementField("Institution / Branch","Long institution name / Branch office with a long name")),columns,rows)),"No transactions","Amounts in TZS.");
+                List.of(new StatementSection(List.of(new StatementField("Institution / Branch","Long institution name / Branch office with a long name")),columns,rows,List.of(10f,26f,11f,11f,8f,8f,13f,13f))),"No transactions","Amounts in TZS.");
             try(var pdf=Loader.loadPDF(new LoanRecordingPdfService(new ReportExportLimiter(1)).renderStatement(source))){
                 assertThat(pdf.getNumberOfPages()).isGreaterThan(1);
                 float right=pdf.getPage(0).getMediaBox().getWidth()-36;

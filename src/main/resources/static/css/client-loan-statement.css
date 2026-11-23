@@ -29,12 +29,11 @@
     .statement-facts dd { font-size: 8pt; }
 }
 
-.statement-transactions col:nth-child(1) { width: 10.4%; }
-.statement-transactions col:nth-child(2) { width: 37.6%; }
-.statement-transactions col:nth-child(3) { width: 13%; }
-.statement-transactions col:nth-child(4) { width: 13%; }
-.statement-transactions col:nth-child(5) { width: 11.7%; }
-.statement-transactions col:nth-child(6) { width: 14.3%; }
+.statement-transactions col:nth-child(1) { width: 10%; }
+.statement-transactions col:nth-child(2) { width: 26%; }
+.statement-transactions col:is(:nth-child(3), :nth-child(4)) { width: 11%; }
+.statement-transactions col:is(:nth-child(5), :nth-child(6)) { width: 8%; }
+.statement-transactions col:is(:nth-child(7), :nth-child(8)) { width: 13%; }
 
 /* Workspace cards stretch equally; only the table canvas may scroll. */
 .client-statement-workspace { grid-template-columns: minmax(0, 1fr); }

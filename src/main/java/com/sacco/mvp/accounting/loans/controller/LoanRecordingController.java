@@ -274,13 +274,13 @@ public class LoanRecordingController {
             new StatementField(label("recording.statement.name",locale),source.client().name()),
             new StatementField(label("recording.asOf",locale),statementDate(clock.today(),locale)));
         var terms=source.terms().stream().collect(java.util.stream.Collectors.toMap(StatementTerms::loanId,t->t));
-        var posts=source.movements().stream().collect(java.util.stream.Collectors.groupingBy(Posting::loanId,LinkedHashMap::new,java.util.stream.Collectors.toList()));
-        var columns=List.of("date","description","debit","credit","interest","balance")
+        var posts=source.movements().stream().collect(java.util.stream.Collectors.groupingBy(movement -> movement.posting().loanId(),LinkedHashMap::new,java.util.stream.Collectors.toList()));
+        var columns=List.of("date","description","debit","credit","interest","principalPart","balance","interestBalance")
             .stream().map(key->label("recording.statement."+key,locale)).toList();
         var sections=new ArrayList<StatementSection>();
         for(var loan:source.loans()){
             var term=terms.get(loan.id());var movements=posts.getOrDefault(loan.id(),List.of());
-            var disbursement=opening!=null?opening:movements.stream().filter(p->"DISBURSEMENT".equals(p.kind())).findFirst().orElse(null);
+            var disbursement=opening!=null?opening:movements.stream().map(StatementMovement::posting).filter(p->"DISBURSEMENT".equals(p.kind())).findFirst().orElse(null);
             var fields=new ArrayList<StatementField>();
             statementField(fields,"loan",loan.number(),locale);statementField(fields,"product",loan.product(),locale);
             statementField(fields,"disbursementDate",disbursement==null?missing:statementDate(disbursement.date(),locale),locale);
@@ -302,8 +302,11 @@ public class LoanRecordingController {
             statementField(fields,"arrears",disbursement==null?missing:reportMoney(loan.arrears(),locale),locale);
             statementField(fields,"branch",term==null?missing:term.institution()+" / "+term.branch(),locale);
             var rows=new ArrayList<List<String>>();
-            for(var post:movements){
+            for(var movement:movements){
+                var post=movement.posting();
                 boolean credit=Set.of("PAYMENT","SETTLEMENT","FUNDING_UNDO").contains(post.kind());
+                BigDecimal amount=post.principal().add(post.interest());
+                String postedAmount=amount.signum()==0?"":reportMoney(amount,locale);
                 String description=label(switch(post.kind()){
                     case "DISBURSEMENT" -> "recording.statement.disbursement";
                     case "PAYMENT" -> "recording.statement.repayment";
@@ -313,10 +316,12 @@ public class LoanRecordingController {
                 if(post.charges().signum()>0)description+=" / "+label("charges.title",locale)+": "+reportMoney(post.charges(),locale);
                 if(Set.of("CHARGE_ASSESS","CHARGE_UNDO").contains(post.kind()))description+=" / TZS "+reportMoney(post.amount(),locale);
                 rows.add(List.of(statementDate(post.date(),locale),description,
-                    credit?"":reportMoney(post.principal(),locale),credit?reportMoney(post.principal(),locale):"",
-                    reportMoney(Set.of("REVERSAL","SETTLEMENT_UNDO").contains(post.kind())?post.interest().negate():post.interest(),locale),reportMoney(post.principalBalance(),locale)));
+                    credit?"":postedAmount,credit?postedAmount:"",
+                    amount.signum()==0?"":reportMoney(post.interest(),locale),
+                    amount.signum()==0?"":reportMoney(post.principal(),locale),
+                    reportMoney(post.principalBalance(),locale),reportMoney(movement.outstandingInterest(),locale)));
             }
-            sections.add(new StatementSection(fields,columns,rows));
+            sections.add(new StatementSection(fields,columns,rows,List.of(10f,26f,11f,11f,8f,8f,13f,13f)));
         }
         return new StatementDocument(label("recording.statement",locale).toUpperCase(locale),identity,sections,
             label("recording.statement.empty",locale),label("recording.statement.note",locale));
