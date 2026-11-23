@@ -113,7 +113,7 @@ public class AdminController {
     }
 
     @InitBinder("chargePolicy") void chargePolicyBinder(org.springframework.web.bind.WebDataBinder binder) {
-        binder.setAllowedFields("requestKey","expectedVersion","effectiveFrom","enabled","managementTiming","insuranceTiming","receivableAccountId","applicationAccountId","processingAccountId","insuranceAccountId","policyReference","agreementReference","insurer","insurerVerification","allowCustom","customManagementLimit","saveChargePolicy");
+        binder.setAllowedFields("requestKey","expectedVersion","effectiveFrom","enabled","managementTiming","insuranceTiming","receivableAccountId","applicationAccountId","processingAccountId","insuranceAccountId","policyReference","agreementReference","insurer","insurerVerification","allowCustom","customManagementLimit","saveChargePolicy","feeRecoveryAccountId");
     }
     private void productCharges(AppUserPrincipal actor,UUID product,Model model) {
         if(!actor.getClaims().containsAll(List.of("LOAN_PRODUCTS_CONFIGURE","ACCOUNTING_ACCOUNTS_UPDATE"))){
@@ -127,6 +127,12 @@ public class AdminController {
             :loanCharges.accountEditor(actor,product,(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.AccountMappingForm)model.asMap().get("chargeAccountDraft"));
         model.addAttribute("chargePolicy",editor.form());model.addAttribute("currentChargePolicy",editor.current());
         model.addAttribute("chargeAccounts",editor.accounts());model.addAttribute("generatedChargeAccounts",editor.generated());model.addAttribute("currentChargeMappings",editor.currentMappings());
+        if(product!=null){
+            var draft=(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm)model.getAttribute("chargePolicyDraft");
+            var setup=draft==null && !model.containsAttribute("chargeAccountDraft")?editor:loanCharges.policySetupEditor(actor,product,draft);
+            model.addAttribute("chargePolicySetup",setup.form());
+            model.addAttribute("chargePolicySetupAccounts",setup.accounts());
+        }
     }
     private void productApproval(AppUserPrincipal actor, UUID product, Model model) {
         if (!actor.getClaims().contains(UserClaim.APPROVAL_FLOW_VIEW.name())) return;

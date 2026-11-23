@@ -11,3 +11,8 @@
     </label>
 </c:forEach>
 </c:otherwise></c:choose>
+<c:if test="${not empty currentChargeMappings.MANAGEMENT}">
+    <label class="block min-w-0"><spring:message code="charges.recoveryHolding" />
+        <input type="text" readonly class="aws-control min-w-0 max-w-full" value="<c:out value='${currentChargeMappings.MANAGEMENT}' />" />
+    </label>
+</c:if>

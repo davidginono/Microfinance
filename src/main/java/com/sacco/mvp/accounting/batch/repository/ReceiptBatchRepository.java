@@ -53,6 +53,12 @@ public class ReceiptBatchRepository {
     public int nextLine(UUID batch){return jdbc.queryForObject("select coalesce(max(line_no),0)+1 from receipt_batch_item where batch_id=?",Integer.class,batch);}
     public void delete(UUID batch,UUID id){jdbc.update("delete from receipt_batch_item where batch_id=? and id=? and state<>'POSTED'",batch,id);}
     public void invalidate(UUID batch){jdbc.update("update receipt_batch_item set state='DRAFT',preview_json=null,failure_key=null,attempts=0 where batch_id=? and state<>'POSTED'",batch);}
+    public boolean needsFeePreview(UUID batch){
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from receipt_batch_item
+             where batch_id=? and state='READY' and (preview_json->>'charges') is null)
+            """,Boolean.class,batch));
+    }
     public void state(UUID batch,String state,OffsetDateTime now){jdbc.update("update receipt_batch set state=?,version=version+1,worker_token=null,lease_until=null,cancel_requested=false,updated_at=? where id=?",state,now,batch);}
     public void cancel(UUID batch){jdbc.update("update receipt_batch set cancel_requested=true where id=?",batch);}
     public Optional<Batch> claim(OffsetDateTime now){
@@ -60,7 +66,19 @@ public class ReceiptBatchRepository {
     }
     public Optional<Batch> workerLock(UUID id,UUID token){return jdbc.query("select * from receipt_batch where id=? and worker_token=? and state in('VALIDATING','POSTING') for update",this::batch,id,token).stream().findFirst();}
     public Optional<Item> next(UUID batch,boolean posting){return jdbc.query("select * from receipt_batch_item where batch_id=? and state=? order by payment_date nulls last,line_no,id limit 1",this::item,batch,posting?"READY":"DRAFT").stream().findFirst();}
-    public List<Plan> priorPlans(UUID batch){return jdbc.query("select preview_json::text from receipt_batch_item where batch_id=? and state='READY' order by payment_date,line_no limit 1000",(r,n)->json.readValue(r.getString(1),Plan.class),batch);}
+    public List<Plan> priorPlans(UUID batch,Set<String> loanIds){
+        if(loanIds.isEmpty())return List.of();
+        var args=new ArrayList<Object>();
+        args.add(batch);
+        args.addAll(loanIds);
+        return jdbc.query("""
+            select preview_json::text from receipt_batch_item where batch_id=? and state='READY'
+            and exists(select 1 from jsonb_array_elements(preview_json->'lines') as line
+                       where line->>'loanId' in (%s))
+            order by payment_date,line_no,id limit 1000
+            """.formatted(String.join(",",Collections.nCopies(loanIds.size(),"?"))),
+            (r,n)->json.readValue(r.getString(1),Plan.class),args.toArray());
+    }
     public boolean duplicateReference(UUID batch,UUID id,UUID money,String reference){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from receipt_batch_item where batch_id=? and id<>? and form_json->>'moneyAccountId'=? and btrim(form_json->>'reference')=?)",Boolean.class,batch,id,Objects.toString(money,""),reference));}
     public void ready(UUID batch,UUID id,Plan plan){jdbc.update("update receipt_batch_item set state='READY',preview_json=?::jsonb,failure_key=null where batch_id=? and id=? and state<>'POSTED'",write(plan),batch,id);}
     public void posted(UUID batch,UUID id,UUID receipt,OffsetDateTime now){jdbc.update("update receipt_batch_item set state='POSTED',receipt_id=?,posted_at=?,failure_key=null where batch_id=? and id=? and state='READY'",receipt,now,batch,id);}

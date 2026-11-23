@@ -46,6 +46,16 @@ Frozen charge terms, calculation basis, amounts, timing, policy/agreement refere
 
 A source top-up quote includes remaining posted principal, due contractual interest and outstanding assessed source charges. Future scheduled interest is excluded under the existing supported settlement convention. New insurance charges/deductions belong to the replacement agreement. Source charges are settled once; they are not assessed again. Both debt and charge sequences/amounts must still match the teller's accepted dated preview. For example, source principal 1,000, due interest 20 and source charges 30, against new principal 1,500 and new insurance deduction 7.50, produce net cash 442.50. Saving or approving the application does not settle the source.
 
+## Withheld fees recovered through repayments
+
+A new version of an approved product charge policy can specify a withheld fee holding account. Choose an active liability clearing account and retain the approved policy and signed agreement references. The option applies to application and processing fees on ordinary individual funding. Insurance follows the frozen insurance policy.
+
+For a full payout, record the actual cash or bank receipt and reference for the management fees. Funding and the fee receipt are linked and commit together. For a reduced payout, the amount paid out must equal approved principal less the agreed management fees and any authorized insurance deductions. The contract and ledger retain gross principal. The funding journal transfers the withheld management fees to the holding account.
+
+On an individual or batch repayment, the principal portion first releases available application fees, then processing fees. Each release transfers the amount from the holding account to that fee's retained account inside the same repayment journal. The entire principal portion reduces the loan balance. Linked corrections restore the matching withheld-fee amounts. The batch and receipt screens show that recovery within principal.
+
+Existing loans require a reconciled per-loan proposal and review by a different authorized staff member. Under Loan details, open **Review withheld fees** to record the verified outstanding amounts, holding account, and supporting record references. An open-period reclassification moves those amounts to the holding account. Loan and repayment history remains append-only. The new submit and approve claims require explicit assignment. Top-up settlement and other unsupported debt closures stop while a withholding recovery balance remains.
+
 ## Accounting ownership
 
 | Event | Debit | Credit |
@@ -86,7 +96,7 @@ Fee levels, reasonableness/affordability, overrides, account mappings, timing an
 
 - Financed fees, income recognition/EIR amortization, insurer remittance/refunds, tax/third-party fees, new penalties, discretionary waivers and early-settlement/cancellation fees need their own approved policy and specialized accounting. None is synthesized by this increment.
 - Separate cash collections before funding and arbitrary new charge kinds are unsupported. The enabled separate-collection timing is after disbursement.
-- The batch allocator still supports principal/interest only. Loans with outstanding charges are visibly blocked there with directions to the interactive loan-repayment receipt form. Once deductions/collections have discharged the charges, existing batch behavior is unchanged.
+- Batch receipts support separately outstanding fees with the same allocation as individual receipts. See [receipt batch processing](receipt-batch-processing.md).
 - Unverified legacy charges/openings and other borrower-originated fee-posting paths are not migrated. Do not infer a verified legacy settlement from product settings or a JSON estimate.
 - The existing supported scheduled-interest settlement convention, legal agreement/consent requirements and underwriting gates still apply. Complete bank reconciliation and the broader accounting/report-builder backlog are not declared complete.
 

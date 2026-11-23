@@ -18,10 +18,23 @@
 <div class="md:col-span-2 erp-detail-card" data-funding-charges>
 <h3><spring:message code="charges.title" /></h3>
 <fieldset id="funding-charge-picker" class="funding-charge-picker" hidden><legend><spring:message code="charges.chooseDeductions" /></legend>
-<c:forEach items="${fundingCharges.plan.terms}" var="term"><label><input type="checkbox" value="${term.id}" ${term.timing=='DEDUCT'?'checked disabled':''} <c:if test="${term.timing=='SEPARATE'}">name="deductChargeIds" ${not empty postingDeductChargeIds and postingDeductChargeIds.contains(term.id)?'checked':''}</c:if> /><span><spring:message code="charges.kind.${term.kind}" /> · TZS <fmt:formatNumber value="${term.amount}" minFractionDigits="2" maxFractionDigits="2" /></span></label></c:forEach>
+<c:forEach items="${fundingCharges.plan.terms}" var="term"><c:if test="${not feeRecoveryFunding or term.kind=='INSURANCE'}"><label><input type="checkbox" value="${term.id}" ${term.timing=='DEDUCT'?'checked disabled':''} <c:if test="${term.timing=='SEPARATE'}">name="deductChargeIds" ${not empty postingDeductChargeIds and postingDeductChargeIds.contains(term.id)?'checked':''}</c:if> /><span><spring:message code="charges.kind.${term.kind}" /> · TZS <fmt:formatNumber value="${term.amount}" minFractionDigits="2" maxFractionDigits="2" /></span></label></c:if></c:forEach>
 </fieldset>
 <dl class="loan-topup-facts" aria-live="polite"><div><dt><spring:message code="charges.deductions" /> (TZS)</dt><dd data-funding-deductions><fmt:formatNumber value="${fundingQuote.deductions}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="charges.separate" /> (TZS)</dt><dd data-funding-separate><fmt:formatNumber value="${fundingQuote.separate}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-funding-cash><fmt:formatNumber value="${disbursementBaseAmount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div></dl>
-<p><spring:message code="charges.notPaid" /></p>
+<c:choose><c:when test="${feeRecoveryFunding}">
+    <dl class="loan-topup-facts" aria-live="polite">
+        <div><dt><spring:message code="charges.fullPayout" /> (TZS)</dt><dd><fmt:formatNumber value="${app.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="charges.reducedPayout" /> (TZS)</dt><dd data-funding-reduced><fmt:formatNumber value="${fundingQuote.reducedCash}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+        <div><dt><spring:message code="charges.fundingManagementFees" /> (TZS)</dt><dd><fmt:formatNumber value="${fundingQuote.recoveryFees}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+    </dl>
+    <div data-loan-choice data-category="money" data-choice-url="${pageContext.request.contextPath}/disbursement/loan-applications/${app.id}/posting-accounts/fee-money">
+        <label><spring:message code="charges.fullPayoutFeeAccount" /><select name="feeReceivingAccountId" class="aws-control" data-choice-select="true">
+            <option value="">${chooseLabel}</option><c:if test="${not empty postingFeeReceivingAccount}"><option value="${postingFeeReceivingAccount.id}" selected><c:out value="${postingFeeReceivingAccount.label}" /></option></c:if>
+        </select></label>
+        <%@ include file="../accounting/loans/choice-search.jspf" %>
+    </div>
+    <label><spring:message code="charges.fullPayoutFeeReference" /><input name="feePaymentReference" class="aws-control" maxlength="80" value="${fn:escapeXml(postingFeePaymentReference)}" /></label>
+</c:when><c:otherwise><p><spring:message code="charges.notPaid" /></p></c:otherwise></c:choose>
 </div></c:if>
 <div class="md:col-span-2"><label><spring:message code="recording.paymentReference" />
     <input name="disbursementReference" class="aws-control" required maxlength="100" value="${fn:escapeXml(postingDisbursementReference)}" />

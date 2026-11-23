@@ -206,6 +206,96 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("970.00");
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where account_id=?",BigDecimal.class,chargeAccount)).isZero();
     }
+    UUID enableWithheldFeeRecovery(){
+        var holding=account("FEE-HOLDING","LIABILITY","CREDIT","POSTING","CLEARING");
+        var policy=chargeService().editor(actor,product,null).form();
+        policy.setFeeRecoveryAccountId(holding);
+        policy.setEffectiveFrom(chargeService().policy(actor,product).orElseThrow().effectiveFrom());
+        var saved=chargeService().revisePolicy(actor,product,policy);
+        assertThat(chargeService().revisePolicy(actor,product,policy)).isEqualTo(saved);
+        return holding;
+    }
+
+    @Test void reducedFundingRecoversFeesInsidePrincipalAndReversesTheSameAllocation(){
+        seedHistoricalPolicy();
+        chargePolicy("SEPARATE");
+        UUID holding=enableWithheldFeeRecovery();
+        UUID loan=chargedLoan();
+        var funding=chargedFunding(loan);
+        var terms=chargeService().frozen(actor,loan);
+        BigDecimal fees=terms.managementTotal();
+        funding.setActualCashPaid(new BigDecimal("999.00"));
+        assertThatThrownBy(()->service.disburse(actor,funding)).hasMessage("recording.error.disbursementAmount");
+        funding.setActualCashPaid(new BigDecimal("1000.00").subtract(fees));
+        var funded=service.disburse(actor,funding);
+        assertThat(service.disburse(actor,funding).id()).isEqualTo(funded.id());
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,holding)).isEqualByComparingTo(fees);
+
+        UUID batch=batches().create(actor,"Withheld fees");
+        var receipt=receiptForm(loan);receipt.getRows().getFirst().setAmount(new BigDecimal("38.00"));
+        batchItem(batch,receipt);processBatch(batch,false);
+        var plan=batches().items(actor,batch,0,"").rows().getFirst().preview().lines().getFirst();
+        assertThat(plan.feesRecovered()).isEqualByComparingTo("8.00");
+        processBatch(batch,true);
+        var posted=batches().items(actor,batch,0,"POSTED").rows().getFirst();
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("992.00");
+        assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,holding)).isEqualByComparingTo(fees.subtract(new BigDecimal("8.00")));
+        assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isEqualTo(1);
+        receiptService().reverse(operator("B1"),posted.receiptId(),UUID.randomUUID(),TODAY,"Reverse synthetic receipt");
+        assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,holding)).isEqualByComparingTo(fees);
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+
+        UUID earlyLoan=chargedLoan();
+        var earlyFunding=chargedFunding(earlyLoan);
+        earlyFunding.setActualCashPaid(funding.getActualCashPaid());
+        service.disburse(actor,earlyFunding);
+        var earlyPayment=receiptForm(earlyLoan);
+        earlyPayment.setEffectiveDate(earlyFunding.getEffectiveDate());
+        earlyPayment.getRows().getFirst().setAmount(new BigDecimal("1010.00"));
+        var settled=receiptService().post(actor,earlyPayment).rows().getFirst();
+        assertThat(settled.principal()).isEqualByComparingTo("1000.00");
+        assertThat(settled.feesRecovered()).isEqualByComparingTo(fees);
+        assertThat(chargeService().recoveryBalances(actor,earlyLoan,TODAY)).allSatisfy(balance->
+            assertThat(balance.outstanding()).isZero());
+        assertThat(status(earlyLoan)).isEqualTo("PAID");
+    }
+
+    @Test void fullFundingRequiresAndLinksRealFeeCash(){
+        chargePolicy("SEPARATE");enableWithheldFeeRecovery();UUID loan=chargedLoan();
+        var funding=chargedFunding(loan);funding.setActualCashPaid(new BigDecimal("1000.00"));
+        assertThatThrownBy(()->service.disburse(actor,funding)).isInstanceOf(IllegalArgumentException.class);
+        funding.setFeeReceivingAccountId(cash);funding.setFeePaymentReference("Verified separate fee cash");
+        var funded=service.disburse(actor,funding);assertThat(service.disburse(actor,funding).id()).isEqualTo(funded.id());
+        assertThat(jdbc.queryForObject("select sum(credit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,funded.journalId(),cash)).isEqualByComparingTo("1000.00");
+        assertThat(jdbc.queryForObject("select r.charge_amount from loan_fee_funding_receipt f join accountant_loan_post r on r.id=f.receipt_id where f.funding_id=?",BigDecimal.class,funded.id()))
+            .isEqualByComparingTo(chargeService().frozen(actor,loan).managementTotal());
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
+        assertThat(chargeService().balance(actor,loan,TODAY).outstanding()).isEqualByComparingTo("10.00");
+    }
+
+    @Test void existingWithheldFeesRequireIndependentCurrentCutoverEvidence(){
+        chargePolicy("DEDUCT");UUID loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
+        UUID holding=account("OLD-FEE-HOLD","LIABILITY","CREDIT","POSTING","CLEARING");
+        var form=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.RecoveryReviewForm();
+        form.setHoldingAccountId(holding);form.setApplication(new BigDecimal("5.00"));
+        assertThatThrownBy(()->chargeService().submitRecoveryReview(actor,loan,form)).hasMessage("charges.error.evidence");
+        form.setEvidence("Verified funding, repayment and GL records");
+        UUID review=chargeService().submitRecoveryReview(actor,loan,form);
+        assertThat(chargeService().submitRecoveryReview(actor,loan,form)).isEqualTo(review);
+        assertThatThrownBy(()->chargeService().approveRecoveryReview(actor,loan,review,TODAY,"Independent review")).hasMessage("charges.error.independent");
+        var payment=post(loan,"21.00","BEFORE-FEE-CUTOVER");
+        payment.setInterestAccountId(interest);service.repay(actor,payment);
+        var reviewer=operator("B1");
+        assertThatThrownBy(()->chargeService().approveRecoveryReview(reviewer,loan,review,TODAY,"Reviewed accounts")).hasMessage("charges.error.stale");
+        form.setRequestKey(UUID.randomUUID());
+        UUID current=chargeService().submitRecoveryReview(actor,loan,form);
+        UUID journal=chargeService().approveRecoveryReview(reviewer,loan,current,TODAY,"Reconciled accounts");
+        assertThat(jdbc.queryForObject("select credit from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,journal,holding)).isEqualByComparingTo("5.00");
+        assertThatThrownBy(()->chargeService().approveRecoveryReview(reviewer,loan,current,TODAY,"Apply again")).hasMessage("charges.error.stale");
+        var after=post(loan,"5.00","AFTER-FEE-CUTOVER");after.setInterestAccountId(interest);service.repay(actor,after);
+        assertThat(chargeService().recoveryBalances(actor,loan,TODAY).getFirst().outstanding()).isZero();
+    }
     @Test void chargeOnlyReceiptsAreAtomicConcurrentAndDoNotInventPrincipalPayments()throws Exception{
         chargePolicy("SEPARATE");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var f=receiptForm(id);f.setEffectiveDate(LocalDate.of(2026,9,1));f.getRows().getFirst().setAmount(new BigDecimal("7.00"));
         try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<UUID> work=()->{start.await();return receiptService().post(actor,f).header().id();};var one=pool.submit(work);var two=pool.submit(work);start.countDown();assertThat(one.get()).isEqualTo(two.get());}
@@ -896,6 +986,37 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=? and allocation_policy_id is not null",Integer.class,institution)).isEqualTo(3);
         var saved=batches().items(actor,batch,0,"").rows().getFirst();assertThat(receiptService().find(actor,saved.receiptId()).orElseThrow().rows()).hasSize(2);
         assertThatThrownBy(()->jdbc.update("update receipt_batch_item set receipt_id=null where id=?",saved.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
+    }
+    @Test void receiptBatchStagesOutstandingFeesAndPostsChargeOnlyRows(){
+        seedHistoricalPolicy();
+        chargePolicy("SEPARATE");
+        UUID loan=chargedLoan();
+        service.disburse(actor,chargedFunding(loan));
+        UUID batch=batches().create(actor,"Fees and principal");
+        var expected=receiptForm(loan);
+        expected.getRows().getFirst().setAmount(new BigDecimal("25.00"));
+        var individual=receiptService().preview(actor,expected).getFirst();
+        assertThat(individual.charges()).isEqualByComparingTo("5.00");
+        batchItem(batch,expected);
+        var chargeOnly=receiptForm(loan);
+        chargeOnly.getRows().getFirst().setAmount(new BigDecimal("25.00"));
+        batchItem(batch,chargeOnly);
+        var principal=receiptForm(loan);
+        principal.getRows().getFirst().setAmount(new BigDecimal("10.00"));
+        batchItem(batch,principal);
+        processBatch(batch,false);
+        var rows=batches().items(actor,batch,0,"").rows();
+        assertThat(rows).allMatch(row->row.state().equals("READY"));
+        assertThat(rows).extracting(row->row.preview().charges()).containsExactly(
+            new BigDecimal("5.00"),new BigDecimal("25.00"),new BigDecimal("0.00"));
+        assertThat(rows.getLast().preview().principal()).isEqualByComparingTo("10.00");
+        processBatch(batch,true);
+        var posted=batches().get(actor,batch);
+        assertThat(posted.posted()).isEqualTo(3);
+        assertThat(posted.postedTotal()).isEqualByComparingTo("60.00");
+        assertThat(service.chargeSummary(actor,loan).balance().outstanding()).isZero();
+        assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("990.00");
+        assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,loan)).isEqualTo(2);
     }
     @Test void spreadsheetImportIsScopedAtomicAndUsesTheExistingBatchWorker() {
         seedHistoricalPolicy();

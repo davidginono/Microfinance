@@ -128,9 +128,14 @@ public class LoanRepaymentLedgerService {
 
     public record PreviewAllocation(UUID installmentId,BigDecimal principal,BigDecimal interest,BigDecimal excluded) {}
     public record StagedPayment(LocalDate date,List<PreviewAllocation> allocations) {}
-    public record PaymentPreview(PaymentBalance before,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,List<PreviewAllocation> allocations) {}
+    public record PaymentPreview(PaymentBalance before,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,List<PreviewAllocation> allocations,BigDecimal charges) {}
     @Transactional(readOnly=true)
     public PaymentPreview previewPayment(UUID id,AppUserPrincipal actor,LocalDate date,BigDecimal amount,List<StagedPayment> prior){
+        return previewPayment(id,actor,date,amount,prior,ZERO);
+    }
+
+    @Transactional(readOnly=true)
+    public PaymentPreview previewPayment(UUID id,AppUserPrincipal actor,LocalDate date,BigDecimal amount,List<StagedPayment> prior,BigDecimal charges){
         var l=readableLedger(id,actor);require(date!=null && !date.isBefore(l.getDisbursementDate()) && !date.isAfter(clock.today()),"date");
         var rows=rows(id).stream().map(r->new LoanLedgerInstallment(r.getId(),r.getLoanApplicationId(),r.getInstallmentNumber(),r.getDueDate(),r.getPrincipal(),r.getInterest(),r.getPrincipalPaid(),r.getInterestPaid(),r.getInterestExcluded(),r.getInterestWaived())).toList();
         var earned=new HashMap<>(prepayments.earned(id,date));var policy=prepayments.terms(id);
@@ -145,14 +150,19 @@ public class LoanRepaymentLedgerService {
                 start=row.getDueDate();
             }
         }
-        return calculatePayment(l,rows,date,amount,earned,policy,false);
+        return calculatePayment(l,rows,date,amount,earned,policy,false,charges);
     }
 
     private PaymentPreview calculatePayment(LoanLedger l,List<LoanLedgerInstallment> rows,LocalDate date,BigDecimal amount,
-        Map<UUID,BigDecimal> earned,Optional<com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository.Terms> policy,boolean principalFirst){
+        Map<UUID,BigDecimal> earned,Optional<com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository.Terms> policy,boolean principalFirst,BigDecimal charges){
         var duePrincipal=ZERO;var dueInterest=ZERO;var outstanding=ZERO;
         for(var row:rows){var p=row.getPrincipal().subtract(row.getPrincipalPaid());outstanding=outstanding.add(p);if(!row.getDueDate().isAfter(date))duePrincipal=duePrincipal.add(p);dueInterest=dueInterest.add(earnedInterest(row,date,earned).subtract(row.getInterestPaid()).max(ZERO));}
-        var split=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(money(amount),duePrincipal,dueInterest,outstanding,principalFirst?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST);
+        var before=new PaymentBalance(duePrincipal,dueInterest,outstanding);
+        var payment=money(amount);
+        var fees=charges.signum()==0?ZERO:com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.chargePortion(payment,dueInterest,outstanding,charges);
+        var debtAmount=payment.subtract(fees);
+        if(fees.signum()>0 && debtAmount.signum()==0)return new PaymentPreview(before,ZERO,ZERO,outstanding,List.of(),fees);
+        var split=com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator.allocate(debtAmount,duePrincipal,dueInterest,outstanding,principalFirst?com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.PRINCIPAL_FIRST:com.sacco.mvp.accounting.repayment.dto.RepaymentPolicyDtos.AllocationOrder.INTEREST_FIRST);
         var parts=new LinkedHashMap<UUID,BigDecimal[]>();BigDecimal interestLeft=split.interest(),principalLeft=split.principal();
         for(var row:rows){var take=interestLeft.min(earnedInterest(row,date,earned).subtract(row.getInterestPaid()).max(ZERO));if(take.signum()>0){parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[1]=take;row.setInterestPaid(row.getInterestPaid().add(take));interestLeft=interestLeft.subtract(take);}
             if(!row.getDueDate().isAfter(date)){take=principalLeft.min(row.getPrincipal().subtract(row.getPrincipalPaid()));if(take.signum()>0){parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[0]=take;row.setPrincipalPaid(row.getPrincipalPaid().add(take));principalLeft=principalLeft.subtract(take);}}}
@@ -161,7 +171,7 @@ public class LoanRepaymentLedgerService {
         boolean full=split.principalBalance().signum()==0 && split.interest().compareTo(dueInterest)==0;
         var reductions=prepayments.reductions(l,rows,date,prepaid,earned,full);
         for(var row:rows){var reduction=reductions.getOrDefault(row.getId(),ZERO);if(policy.isEmpty() && full && row.getDueDate().isAfter(date))reduction=row.getInterest().subtract(row.getInterestPaid()).subtract(row.getInterestExcluded()).subtract(row.getInterestWaived());if(reduction.signum()>0)parts.computeIfAbsent(row.getId(),x->new BigDecimal[]{ZERO,ZERO,ZERO})[2]=reduction;}
-        return new PaymentPreview(new PaymentBalance(duePrincipal,dueInterest,outstanding),split.principal(),split.interest(),split.principalBalance(),parts.entrySet().stream().map(e->new PreviewAllocation(e.getKey(),e.getValue()[0],e.getValue()[1],e.getValue()[2])).toList());
+        return new PaymentPreview(before,split.principal(),split.interest(),split.principalBalance(),parts.entrySet().stream().map(e->new PreviewAllocation(e.getKey(),e.getValue()[0],e.getValue()[1],e.getValue()[2])).toList(),fees);
     }
 
     @Transactional(readOnly = true)
@@ -266,7 +276,7 @@ public class LoanRepaymentLedgerService {
         require(Set.of(LoanStatus.DISBURSED, LoanStatus.PAR, LoanStatus.DEFAULTED).contains(loan.getStatus()), "state");
         List<LoanLedgerInstallment> rows = rows(loanId);
         require(!command.principalFirst() || command.policyId()!=null,"request");
-        var preview=calculatePayment(ledger,rows,date,amount,prepayments.earned(loanId,date),prepayments.terms(loanId),command.principalFirst());
+        var preview=calculatePayment(ledger,rows,date,amount,prepayments.earned(loanId,date),prepayments.terms(loanId),command.principalFirst(),ZERO);
         UUID id = UUID.randomUUID();
         Map<UUID, BigDecimal[]> parts = new LinkedHashMap<>();
         BigDecimal principal=preview.principal(),interest=preview.interest(),excluded=ZERO;

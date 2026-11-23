@@ -38,7 +38,11 @@ public class ReceiptBatchWorkerService {
             loans.lockReceiptLoans(actor,item.form().getRows().stream().map(r->r.getLoanId()).filter(Objects::nonNull).sorted().toList(),item.form().getClientId());
             var current=batches.plan(actor,item,List.of());if(!ReceiptBatchService.samePlan(item.preview(),current))throw new IllegalArgumentException("batch.error.changed");
             var receipt=receipts.post(actor,item.form());repository.posted(b.id(),item.id(),receipt.header().id(),clock.now());
-        }else repository.ready(b.id(),item.id(),batches.plan(actor,item,repository.priorPlans(b.id())));
+        }else {
+            var loanIds=new HashSet<String>();
+            item.form().getRows().forEach(row->{if(row.getLoanId()!=null)loanIds.add(row.getLoanId().toString());});
+            repository.ready(b.id(),item.id(),batches.plan(actor,item,repository.priorPlans(b.id(),loanIds)));
+        }
         repository.release(b.id(),b.workerToken(),clock.now());
     }
     @Transactional(propagation=Propagation.REQUIRES_NEW)

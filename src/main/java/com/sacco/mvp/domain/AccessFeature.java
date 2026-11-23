@@ -31,6 +31,7 @@ public enum AccessFeature {
     PAYMENT_DETAILS("Payment Details"),
     LOAN_REPAYMENTS("Repayments"),
     LOAN_RECORDING("Accountant loan recording"),
+    LOAN_FEE_RECOVERY("Loan fee recovery"),
     LOAN_ADJUSTMENTS("Loan provisions and corrections"),
     ACCOUNTING_ACCOUNTS("Chart of accounts"),
     ACCOUNTING_ACCOUNT_APPROVAL("Institution account version approvals"),

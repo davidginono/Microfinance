@@ -4,6 +4,7 @@
     ready(()=>document.querySelectorAll('form[data-funding-quote-url]').forEach(form=>{
         if(form.dataset.fundingReady)return;form.dataset.fundingReady='true';
         const date=form.elements.disbursementDate,amount=form.elements.depositAmount;
+        const recovery=form.dataset.feeRecoveryFunding==='true',reduced=form.querySelector('[data-funding-reduced]');
         const error=form.querySelector('[data-funding-error]'),submit=form.querySelector('[data-funding-submit]');
         const toggle=form.querySelector('[data-funding-picker-toggle]'),picker=form.querySelector('.funding-charge-picker');
         const initiallyDisabled=!!submit?.disabled;
@@ -16,7 +17,8 @@
             const current=++version;controller?.abort();const active=controller=new AbortController();
             if(loading)window.AppLoading?.end(loading);
             if(submit)submit.disabled=true;
-            if(amount)amount.value='';
+            if(amount&&!recovery)amount.value='';
+            if(reduced)reduced.textContent='—';
             for(const key of ['deductions','separate','cash']){const node=form.querySelector('[data-funding-'+key+']');if(node)node.textContent='—';}
             if(error){error.hidden=true;error.textContent='';}
             const confirmation=form.querySelector('[data-funding-confirm]');if(confirmation)confirmation.checked=false;
@@ -32,7 +34,8 @@
                 const quote=await response.json();if(current!==version)return;
                 if(!response.ok)throw new Error(quote.error || form.dataset.fundingError);
                 if(!['cash','deductions','separate'].every(key=>/^\d+\.\d{2}$/.test(quote[key])))throw new Error(form.dataset.fundingError);
-                if(amount)amount.value=quote.cash;
+                if(amount&&!recovery)amount.value=quote.cash;
+                if(reduced && /^\d+\.\d{2}$/.test(quote.reducedCash))reduced.textContent=money(quote.reducedCash);
                 for(const key of ['deductions','separate','cash']){const node=form.querySelector('[data-funding-'+key+']');if(node)node.textContent=money(quote[key]);}
                 form.dispatchEvent(new CustomEvent('funding:quote',{detail:quote}));
                 if(submit)submit.disabled=initiallyDisabled;

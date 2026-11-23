@@ -98,6 +98,12 @@ public final class LoanRecordingDtos {
     @Data public static class PostForm {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
         private List<UUID> deductChargeIds=new ArrayList<>();
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private BigDecimal actualCashPaid;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private UUID feeReceivingAccountId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+        private String feePaymentReference="";
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) private String sharedPayer;
         private UUID requestKey = UUID.randomUUID();
         private UUID loanId;
@@ -116,7 +122,12 @@ public final class LoanRecordingDtos {
         private String evidence = "";
         private String notes = "";
     }
-    public record FundingQuote(BigDecimal cash,BigDecimal deductions,BigDecimal separate,TopUpQuote settlement) {}
+    public record FundingQuote(BigDecimal cash,BigDecimal deductions,BigDecimal separate,TopUpQuote settlement,
+                               BigDecimal recoveryFees,BigDecimal reducedCash) {
+        public FundingQuote(BigDecimal cash,BigDecimal deductions,BigDecimal separate,TopUpQuote settlement){
+            this(cash,deductions,separate,settlement,BigDecimal.ZERO,null);
+        }
+    }
     public record Choice(UUID id, String label, String purpose, String tenureUnit,
         String minimumAmount, String maximumAmount, Integer minimumTenure, Integer maximumTenure) {
         public Choice(UUID id,String label,String purpose,String tenureUnit){this(id,label,purpose,tenureUnit,null,null,null,null);}
@@ -181,7 +192,8 @@ public final class LoanRecordingDtos {
         public ScheduleRow(int number,LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal amount){this(number,date,principal,interest,amount,null,null);}
     }
     public record CollectionAmount(UUID loanId,UUID clientId,BigDecimal amount) {}
-    public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges) {
+    public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges,BigDecimal feesRecovered) {
+        public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance,BigDecimal charges){this(principal,interest,balance,charges,new BigDecimal("0.00"));}
         public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance){this(principal,interest,balance,new BigDecimal("0.00"));}
     }
     public record StatementClient(String number, String name, String kind) {

@@ -149,6 +149,7 @@
                 </section>
 
                 <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')" var="canSetChargeAccounts" />
+                <c:if test="${chargePolicySaved}"><spring:message code="charges.policySaved" var="chargePolicySavedMessage" /><div hidden data-toast-message="${fn:escapeXml(chargePolicySavedMessage)}" data-toast-type="success" data-toast-placement="workspace"></div></c:if>
                 <section class="product-builder-section product-config-step" data-product-config-step="pricing" aria-label="Repayment and charges"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.repaymentCharges" /></h2></div>
                     <div id="product-config-pricing" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -178,6 +179,20 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
+                        <c:if test="${canSetChargeAccounts}">
+                            <c:set var="mappingChargePolicy" value="${chargePolicy}" />
+                            <c:set var="mappingChargeAccounts" value="${chargeAccounts}" />
+                            <c:set var="mappingChargeError" value="${chargeError}" />
+                            <c:set var="chargePolicy" value="${chargePolicySetup}" />
+                            <c:set var="chargeAccounts" value="${chargePolicySetupAccounts}" />
+                            <c:set var="chargeError" value="${chargePolicyError}" />
+                            <c:set var="chargeFormId" value="productChargePolicyForm" />
+                            <%@ include file="../fragments/loan-product-charge-fields.jspf" %>
+                            <div class="md:col-span-2"><button type="submit" form="productChargePolicyForm" class="app-btn btn-launch"><spring:message code="charges.savePolicy" /></button></div>
+                            <c:set var="chargePolicy" value="${mappingChargePolicy}" />
+                            <c:set var="chargeAccounts" value="${mappingChargeAccounts}" />
+                            <c:set var="chargeError" value="${mappingChargeError}" />
+                        </c:if>
                     </div>
                 </section>
 
@@ -213,7 +228,9 @@
                 </div>
     </div>
         </form>
-        <c:if test="${canSetChargeAccounts}"><form id="productChargeAccountsForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />" data-workspace-submit="recover" data-product-charge-form>
+        <c:if test="${canSetChargeAccounts}"><form id="productChargePolicyForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-policy' />" data-workspace-submit="recover">
+            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
+        </form><form id="productChargeAccountsForm" method="post" action="<c:url value='/admin/settings-controls/loan-products/${product.id}/charge-accounts' />" data-workspace-submit="recover" data-product-charge-form>
             <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
             <input type="hidden" name="requestKey" value="<c:out value='${chargePolicy.requestKey}' />" />
             <input type="hidden" name="expectedVersion" value="<c:out value='${chargePolicy.expectedVersion}' />" />

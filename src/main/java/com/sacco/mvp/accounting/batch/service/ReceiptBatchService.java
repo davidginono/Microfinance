@@ -6,7 +6,6 @@ import com.sacco.mvp.accounting.batch.repository.ReceiptBatchRepository;
 import com.sacco.mvp.accounting.dto.VoucherDtos.*;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ReceiptEntryLoan;
 import com.sacco.mvp.accounting.loans.service.LoanRecordingService;
-import com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator;
 import com.sacco.mvp.accounting.repayment.service.RepaymentPolicyService;
 import com.sacco.mvp.accounting.service.LoanReceiptService;
 import com.sacco.mvp.accounting.service.VoucherService;
@@ -49,7 +48,7 @@ public class ReceiptBatchService {
             boolean available = loan.disbursed() != null && !date.isBefore(loan.disbursed())
                 && !date.isAfter(clock.today()) && (loan.lastPayment() == null || !date.isBefore(loan.lastPayment()));
             return new Balances(loan.id(), loan.number(), available ? loan.outstandingPrincipal() : null,
-                available ? loan.duePrincipal() : null, available ? loan.dueInterest() : null);
+                available ? loan.duePrincipal() : null, available ? loan.dueInterest() : null, available ? loan.charges() : null);
         }).toList();
     }
 
@@ -144,7 +143,7 @@ public class ReceiptBatchService {
     @Transactional
     public void start(AppUserPrincipal a,UUID batch,int version,boolean post){
         authorize(a,true);var b=editable(a,batch);require(b.version()==version,"stale");var s=repository.summary(b);require(s.receipts()>s.posted(),"empty");
-        if(post){require(s.ready()+s.posted()==s.receipts() && s.failed()==0,"validate");repository.state(batch,"POSTING",clock.now());event(a,batch,"RECEIPT_BATCH_POSTING_STARTED");}
+        if(post){require(s.ready()+s.posted()==s.receipts() && s.failed()==0 && !repository.needsFeePreview(batch),"validate");repository.state(batch,"POSTING",clock.now());event(a,batch,"RECEIPT_BATCH_POSTING_STARTED");}
         else {repository.invalidate(batch);repository.state(batch,"VALIDATING",clock.now());}
     }
     @Transactional
@@ -166,19 +165,41 @@ public class ReceiptBatchService {
     // Used by both synchronous estimates and the durable validator; no balances come from the browser.
     public Plan plan(AppUserPrincipal a,Item item,List<Plan> prior){
         Form f=item.form();var policy=policies.effective(a,f.getEffectiveDate(),true);f.setInterestAccountId(null);receipts.preview(a,f);
-        var contexts=loans.receiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).toList(),f.getEffectiveDate());var lines=new ArrayList<PlanLine>();BigDecimal principal=BigDecimal.ZERO,interest=BigDecimal.ZERO;
+        var contexts=loans.receiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).toList(),f.getEffectiveDate());var lines=new ArrayList<PlanLine>();BigDecimal principal=BigDecimal.ZERO,interest=BigDecimal.ZERO,fees=BigDecimal.ZERO;
         for(var row:f.getRows()){
             var loan=contexts.stream().filter(l->l.id().equals(row.getLoanId())).findFirst().orElseThrow();
-            if(loan.charges().signum()>0)throw new IllegalArgumentException("charges.error.batch");
-            var earlier=prior.stream().flatMap(p->p.lines().stream()).filter(l->l.loanId().equals(loan.id())).map(l->{require(l.paymentDate()!=null && l.servicingAllocations()!=null,"validate");return new com.sacco.mvp.service.LoanRepaymentLedgerService.StagedPayment(l.paymentDate(),l.servicingAllocations());}).toList();
-            var split=loans.stagedReceiptPreview(a,loan.id(),f.getEffectiveDate(),row.getAmount(),earlier);
-            lines.add(new PlanLine(loan.id(),loan.number(),row.getAmount(),split.before().outstandingPrincipal(),split.before().duePrincipal(),split.before().dueInterest(),split.principal(),split.interest(),split.principalBalance(),loan.principalAccount(),loan.principalAccountId(),loan.interestAccountId(),loan.interestAccount(),loan.product(),f.getEffectiveDate(),split.allocations()));principal=principal.add(split.principal());interest=interest.add(split.interest());
+            var earlier=prior.stream().flatMap(p->p.lines().stream()).filter(l->l.loanId().equals(loan.id())).toList();
+            require(earlier.stream().allMatch(l->l.paymentDate()!=null && l.servicingAllocations()!=null && l.feePayments()!=null && l.recoveryPayments()!=null),"validate");
+            var debt=earlier.stream().map(l->new com.sacco.mvp.service.LoanRepaymentLedgerService.StagedPayment(l.paymentDate(),l.servicingAllocations())).toList();
+            var paidFees=earlier.stream().flatMap(l->l.feePayments().stream()).toList();
+            var recovered=earlier.stream().flatMap(l->l.recoveryPayments().stream()).toList();
+            var staged=loans.stagedReceiptPreview(a,loan.id(),f.getEffectiveDate(),row.getAmount(),debt,paidFees,recovered);
+            var split=staged.debt();
+            lines.add(new PlanLine(loan.id(),loan.number(),row.getAmount(),split.before().outstandingPrincipal(),split.before().duePrincipal(),split.before().dueInterest(),split.principal(),split.interest(),split.principalBalance(),loan.principalAccount(),loan.principalAccountId(),loan.interestAccountId(),loan.interestAccount(),loan.product(),f.getEffectiveDate(),split.allocations(),staged.feesBefore(),staged.feePayments(),staged.recoveryBefore(),staged.recoveries()));
+            principal=principal.add(split.principal());interest=interest.add(split.interest());fees=fees.add(split.charges());
         }
-        return new Plan(policy.id(),policy.version(),policy.allocationOrder(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label(),"",lines,principal.add(interest),principal,interest);
+        return new Plan(policy.id(),policy.version(),policy.allocationOrder(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label(),"",lines,principal.add(interest).add(fees),principal,interest,fees);
     }
     public static boolean samePlan(Plan expected,Plan actual){
-        if(expected==null || !Objects.equals(expected.policyId(),actual.policyId()) || !expected.moneyAccount().equals(actual.moneyAccount()) || !expected.interestAccount().equals(actual.interestAccount()) || expected.lines().size()!=actual.lines().size())return false;
-        for(int n=0;n<actual.lines().size();n++){var e=expected.lines().get(n);var a=actual.lines().get(n);if(!e.loanId().equals(a.loanId()) || e.servicingAllocations()==null || !Objects.equals(e.servicingAllocations(),a.servicingAllocations()) || !Objects.equals(e.paymentDate(),a.paymentDate()) || !Objects.equals(e.principalAccountId(),a.principalAccountId()) || !Objects.equals(e.interestAccountId(),a.interestAccountId()) || e.principalAccountId()==null || e.interestAccountId()==null || !Objects.equals(e.principalAccount(),a.principalAccount()) || e.amount().compareTo(a.amount())!=0 || e.principal().compareTo(a.principal())!=0 || e.interest().compareTo(a.interest())!=0 || e.principalBalance().compareTo(a.principalBalance())!=0 || e.duePrincipal().compareTo(a.duePrincipal())!=0 || e.dueInterest().compareTo(a.dueInterest())!=0)return false;}return true;
+        if(expected==null || expected.charges()==null || expected.policyVersion()!=actual.policyVersion()
+            || expected.allocationOrder()!=actual.allocationOrder() || !Objects.equals(expected.policyId(),actual.policyId())
+            || !expected.moneyAccount().equals(actual.moneyAccount()) || !expected.interestAccount().equals(actual.interestAccount())
+            || expected.lines().size()!=actual.lines().size())return false;
+        for(int n=0;n<actual.lines().size();n++){
+            var e=expected.lines().get(n);
+            var a=actual.lines().get(n);
+            if(!e.loanId().equals(a.loanId()) || e.servicingAllocations()==null
+                || !Objects.equals(e.feeBalances(),a.feeBalances()) || !Objects.equals(e.feePayments(),a.feePayments())
+                || !Objects.equals(e.recoveryBalances(),a.recoveryBalances()) || !Objects.equals(e.recoveryPayments(),a.recoveryPayments())
+                || !Objects.equals(e.servicingAllocations(),a.servicingAllocations()) || !Objects.equals(e.paymentDate(),a.paymentDate())
+                || e.principalAccountId()==null || e.interestAccountId()==null
+                || !Objects.equals(e.principalAccountId(),a.principalAccountId()) || !Objects.equals(e.interestAccountId(),a.interestAccountId())
+                || !Objects.equals(e.principalAccount(),a.principalAccount()) || e.amount().compareTo(a.amount())!=0
+                || e.principal().compareTo(a.principal())!=0 || e.interest().compareTo(a.interest())!=0
+                || e.principalBalance().compareTo(a.principalBalance())!=0 || e.duePrincipal().compareTo(a.duePrincipal())!=0
+                || e.dueInterest().compareTo(a.dueInterest())!=0)return false;
+        }
+        return true;
     }
     Batch find(AppUserPrincipal a,UUID id,boolean lock){return repository.find(a,id,lock).orElseThrow(()->new AccessDeniedException("Batch unavailable"));}
     private Batch editable(AppUserPrincipal a,UUID id){return editable(a,id,true);}

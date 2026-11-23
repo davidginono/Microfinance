@@ -3,6 +3,7 @@ package com.sacco.mvp.accounting.charges.service;
 import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.*;
 import com.sacco.mvp.accounting.charges.repository.LoanChargeRepository;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.RecordForm;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ChargeField;
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ChargeQuote;
 import com.sacco.mvp.accounting.repository.VoucherRepository;
@@ -50,7 +51,7 @@ public class LoanChargeService {
             f.setEffectiveFrom(prior.map(p->p.effectiveFrom().isAfter(clock.today())?p.effectiveFrom():clock.today()).orElse(clock.today()));
             prior.ifPresent(p->{f.setEnabled(p.enabled());f.setManagementTiming(p.managementTiming());f.setInsuranceTiming(p.insuranceTiming());
                 f.setReceivableAccountId(p.receivableAccountId());f.setInsuranceAccountId(p.insuranceAccountId());
-                f.setApplicationAccountId(p.applicationAccountId());f.setProcessingAccountId(p.processingAccountId());
+                f.setApplicationAccountId(p.applicationAccountId());f.setProcessingAccountId(p.processingAccountId());f.setFeeRecoveryAccountId(p.feeRecoveryAccountId());
                 f.setPolicyReference(p.policyReference());f.setAgreementReference(p.agreementReference());f.setInsurer(p.insurer());f.setInsurerVerification(p.insurerVerification());
                 f.setAllowCustom(p.allowCustom());f.setCustomManagementLimit(p.customManagementLimit());});
             for(var account:generated){
@@ -59,8 +60,8 @@ public class LoanChargeService {
             }
         }
         var choices=new LinkedHashMap<String,List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice>>();
-        for(String kind:List.of("APPLICATION","PROCESSING","RECEIVABLE","INSURANCE")){
-            UUID selected=switch(kind){case "APPLICATION"->f.getApplicationAccountId();case "PROCESSING"->f.getProcessingAccountId();case "RECEIVABLE"->f.getReceivableAccountId();default->f.getInsuranceAccountId();};
+        for(String kind:List.of("APPLICATION","PROCESSING","RECEIVABLE","INSURANCE","MANAGEMENT")){
+            UUID selected=switch(kind){case "APPLICATION"->f.getApplicationAccountId();case "PROCESSING"->f.getProcessingAccountId();case "RECEIVABLE"->f.getReceivableAccountId();case "MANAGEMENT"->f.getFeeRecoveryAccountId();default->f.getInsuranceAccountId();};
             var values=new ArrayList<>(repository.accounts(actor.getSaccoId(),kind,"",0).stream().limit(25).toList());
             if(selected!=null && values.stream().noneMatch(c->c.id().equals(selected))){var choice=repository.selectedAccount(actor.getSaccoId(),selected,kind);if(choice!=null)values.add(choice);}
             choices.put(kind,List.copyOf(values));
@@ -73,6 +74,7 @@ public class LoanChargeService {
             var selected=new LinkedHashMap<String,UUID>();
             selected.put("APPLICATION",p.account("APPLICATION"));selected.put("PROCESSING",p.account("PROCESSING"));
             selected.put("RECEIVABLE",p.receivableAccountId());selected.put("INSURANCE",p.insuranceAccountId());
+            selected.put("MANAGEMENT",p.feeRecoveryAccountId());
             var labels=repository.accountLabels(institution,selected.values().stream().filter(Objects::nonNull).distinct().toList());
             selected.forEach((kind,id)->{if(id!=null && labels.containsKey(id))currentMappings.put(kind,labels.get(id));});
         }
@@ -95,13 +97,40 @@ public class LoanChargeService {
         String commandHash=hash(List.of("ACCOUNT_MAPPINGS_V2",f));
         var retry=repository.policyRetry(a,f.getRequestKey(),commandHash);if(retry.isPresent())return retry.get();
         var retained=editor(a,f.getProductId(),null).form();applyMappings(retained,f);
-        retained.setPolicyReference("");retained.setAgreementReference("");retained.setInsurerVerification("");
+        if(retained.getFeeRecoveryAccountId()==null){
+            retained.setPolicyReference("");retained.setAgreementReference("");retained.setInsurerVerification("");
+        }
         retained.setInsurer(f.getInsuranceAccountId()==null?"":repository.accountName(a.getSaccoId(),f.getInsuranceAccountId(),"INSURANCE").orElse(""));
         retained.setEnabled(f.getReceivableAccountId()!=null && f.getApplicationAccountId()!=null && f.getProcessingAccountId()!=null
             && (!repository.requiresInsurance(a.getSaccoId(),f.getProductId()) || f.getInsuranceAccountId()!=null));
         return recordPolicy(a,retained,commandHash);
     }
     @Transactional public UUID savePolicy(AppUserPrincipal a,PolicyForm f){return recordPolicy(a,f,null);}
+    @Transactional
+    public UUID revisePolicy(AppUserPrincipal actor,UUID product,PolicyForm form){
+        configure(actor);
+        require(form.getRequestKey()!=null,"input");
+        require(repository.product(actor.getSaccoId(),product),"policy");
+        repository.policyLock(actor.getSaccoId(),product);
+        form.setProductId(product);
+        String commandHash=hash(List.of("CHARGE_POLICY_SETUP",form));
+        var retry=repository.policyRetry(actor,form.getRequestKey(),commandHash);
+        if(retry.isPresent())return retry.get();
+        var command=new PolicyForm();
+        org.springframework.beans.BeanUtils.copyProperties(form,command);
+        var current=editor(actor,product,null).form();
+        command.setApplicationAccountId(current.getApplicationAccountId());
+        command.setProcessingAccountId(current.getProcessingAccountId());
+        command.setReceivableAccountId(current.getReceivableAccountId());
+        command.setInsuranceAccountId(current.getInsuranceAccountId());
+        return recordPolicy(actor,command,commandHash);
+    }
+    @Transactional(readOnly=true)
+    public Editor policySetupEditor(AppUserPrincipal actor,UUID product,PolicyForm draft){
+        configure(actor);
+        require(repository.product(actor.getSaccoId(),product),"policy");
+        return editor(actor,product,draft);
+    }
     private UUID recordPolicy(AppUserPrincipal a,PolicyForm f,String commandHash){
         configure(a);require(f!=null && f.getRequestKey()!=null && f.getProductId()!=null && f.getEffectiveFrom()!=null && f.getManagementTiming()!=null && f.getInsuranceTiming()!=null,"input");
         require(f.getManagementTiming()!=Timing.FINANCED && f.getInsuranceTiming()!=Timing.FINANCED,"financed");text(f.getPolicyReference(),false);text(f.getAgreementReference(),false);text(f.getInsurer(),false);text(f.getInsurerVerification(),false);
@@ -119,6 +148,11 @@ public class LoanChargeService {
             if(generated.component().equals("PROCESSING") && f.getProcessingAccountId()==null)f.setProcessingAccountId(generated.accountId());
         }
         f.setManagementAccountId(null);
+        if(f.getFeeRecoveryAccountId()!=null){
+            require(f.isEnabled() && f.getManagementTiming()==Timing.SEPARATE,"recovery");
+            text(f.getPolicyReference(),true);text(f.getAgreementReference(),true);
+            repository.account(a.getSaccoId(),f.getFeeRecoveryAccountId(),"MANAGEMENT");
+        }
         var prior=repository.policy(a.getSaccoId(),f.getProductId(),LocalDate.of(9999,12,31));require(Objects.equals(prior.map(Policy::id).orElse(null),f.getExpectedVersion()),"stale");require(prior.isEmpty() || !f.getEffectiveFrom().isBefore(prior.get().effectiveFrom()),"date");
         if(f.isEnabled() || f.getReceivableAccountId()!=null)repository.account(a.getSaccoId(),f.getReceivableAccountId(),"RECEIVABLE");
         if(f.isEnabled() || f.getApplicationAccountId()!=null)repository.account(a.getSaccoId(),f.getApplicationAccountId(),"APPLICATION");
@@ -248,6 +282,175 @@ public class LoanChargeService {
         return repository.pendingPlan(actor,loan).map(snapshot->json.readValue(snapshot,Plan.class)).orElseGet(()->repository.frozen(loan));
     }
     @Transactional(readOnly=true) public Plan frozen(AppUserPrincipal a,UUID loan){readable(a,loan,false);return repository.frozen(loan);}
+    @Transactional(readOnly=true)
+    public List<FeeBalance> collectionBalances(AppUserPrincipal actor,UUID loan,LocalDate date){
+        readable(actor,loan,false);
+        dated(loan,date);
+        var balances=repository.feeBalances(loan);
+        balances.stream().filter(b->b.outstanding().signum()>0)
+            .forEach(b->require(repository.selectedAccount(actor.getSaccoId(),b.accountId(),"RECEIVABLE")!=null,"account"));
+        return balances;
+    }
+    @Transactional(readOnly=true)
+    public Optional<UUID> fundingRecoveryAccount(AppUserPrincipal a,UUID loan,LocalDate date){
+        readable(a,loan,false);
+        return repository.contractPolicy(loan).map(Policy::feeRecoveryAccountId)
+            .or(()->repository.pendingRecoveryAccount(a,loan,date==null?clock.today():date));
+    }
+
+    public void requireNoUnrecoveredFees(AppUserPrincipal actor,UUID loan){
+        readable(actor,loan,false);
+        require(repository.recoveryBalances(loan).stream().noneMatch(b->b.outstanding().signum()>0),"recoveryClose");
+    }
+
+    @Transactional(readOnly=true)
+    public List<RecoveryBalance> recoveryBalances(AppUserPrincipal a,UUID loan,LocalDate date){
+        readable(a,loan,false);
+        var balances=repository.recoveryBalances(loan);
+        require(balances.stream().noneMatch(b->date.isBefore(b.startsOn())),"date");
+        return balances;
+    }
+
+    @Transactional(readOnly=true)
+    public Map<UUID,BigDecimal> recoveredAmounts(AppUserPrincipal a,List<UUID> postingIds){
+        accounting.requireActor(a,"LOAN_RECORDING_VIEW");
+        require(postingIds.size()<=50,"input");
+        return repository.recoveredAmounts(a,postingIds);
+    }
+
+    public List<RecoveryPayment> allocateRecovery(AppUserPrincipal a,List<RecoveryBalance> balances,BigDecimal principal){
+        var payments=new ArrayList<RecoveryPayment>();
+        var remaining=principal;
+        for(var balance:balances){
+            var paid=remaining.min(balance.outstanding()).setScale(2);
+            if(paid.signum()<=0)continue;
+            require(repository.selectedAccount(a.getSaccoId(),balance.holdingAccountId(),"MANAGEMENT")!=null,"account");
+            require(repository.selectedAccount(a.getSaccoId(),balance.accountId(),balance.kind())!=null ||
+                repository.selectedAccount(a.getSaccoId(),balance.accountId(),"MANAGEMENT")!=null,"account");
+            payments.add(new RecoveryPayment(balance.termId(),balance.accountId(),balance.holdingAccountId(),paid));
+            remaining=remaining.subtract(paid);
+        }
+        return List.copyOf(payments);
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void linkFundingFeeReceipt(UUID funding,UUID receipt){
+        repository.linkFundingFeeReceipt(funding,receipt);
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void recordFundingRecovery(AppUserPrincipal a,UUID journal,Plan plan,UUID holding){
+        repository.account(a.getSaccoId(),holding,"MANAGEMENT");
+        for(var term:plan.terms()){
+            if(term.kind().equals("INSURANCE"))continue;
+            repository.account(a.getSaccoId(),term.liabilityAccountId(),term.kind());
+            repository.recoveryEvent(a,term.id(),journal,"FUND",term.amount(),holding,term.liabilityAccountId(),null);
+        }
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void recordRecoveryPayments(AppUserPrincipal a,UUID journal,List<RecoveryPayment> payments){
+        for(var payment:payments){
+            repository.account(a.getSaccoId(),payment.holdingAccountId(),"MANAGEMENT");
+            repository.recoveryEvent(a,payment.termId(),journal,"RECOVER",payment.amount(),
+                payment.holdingAccountId(),payment.accountId(),null);
+        }
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void reverseRecovery(AppUserPrincipal a,UUID original,UUID journal,String expected,String correction){
+        for(var event:repository.recoveryEvents(original)){
+            require(event.kind().equals(expected),"dependent");
+            repository.recoveryEvent(a,event.termId(),journal,correction,event.amount(),event.holdingAccountId(),event.accountId(),event.id());
+        }
+    }
+
+    @Transactional(readOnly=true)
+    public Optional<RecoveryReview> recoveryReview(AppUserPrincipal a,UUID loan){
+        accounting.requireActor(a,"LOAN_RECORDING_VIEW");
+        if(!a.getClaims().contains("LOAN_FEE_RECOVERY_APPROVE"))accounting.requireActor(a,"LOAN_FEE_RECOVERY_SUBMIT");
+        else accounting.requireActor(a,"LOAN_FEE_RECOVERY_APPROVE");
+        readable(a,loan,false);
+        return repository.recoveryReview(a,loan,null,false);
+    }
+
+    @Transactional(readOnly=true)
+    public List<Choice> recoveryAccountChoices(AppUserPrincipal a,String search,int page){
+        accounting.requireActor(a,"LOAN_FEE_RECOVERY_SUBMIT");
+        require(search!=null && search.length()<=100 && page>=0 && page<=10000,"input");
+        return repository.accounts(a.getSaccoId(),"MANAGEMENT",search,page*25);
+    }
+
+    @Transactional(readOnly=true)
+    public com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice recoveryHolding(AppUserPrincipal actor,UUID account){
+        accounting.requireActor(actor,"LOAN_FEE_RECOVERY_SUBMIT");
+        return repository.selectedAccount(actor.getSaccoId(),account,"MANAGEMENT");
+    }
+
+    @Transactional
+    public UUID submitRecoveryReview(AppUserPrincipal a,UUID loan,RecoveryReviewForm form){
+        accounting.requireActor(a,"LOAN_RECORDING_VIEW");
+        accounting.requireActor(a,"LOAN_FEE_RECOVERY_SUBMIT");
+        require(form.getRequestKey()!=null,"input");text(form.getEvidence(),true);
+        var amounts=new LinkedHashMap<String,BigDecimal>();
+        var application=amount(form.getApplication());var processing=amount(form.getProcessing());
+        if(application.signum()>0)amounts.put("APPLICATION",application);
+        if(processing.signum()>0)amounts.put("PROCESSING",processing);
+        var identity=readable(a,loan,true);
+        var existing=repository.recoveryReview(a,loan,form.getRequestKey(),true);
+        if(existing.isPresent()){
+            var review=existing.get();
+            require(review.makerId().equals(a.getMemberId()) && review.holdingAccountId().equals(form.getHoldingAccountId())
+                && review.amounts().equals(amounts) && review.evidence().equals(form.getEvidence().strip()),"retry");
+            return review.id();
+        }
+        var snapshot=repository.recoverySnapshot(loan);
+        validateRecoveryReview(a,identity,form.getHoldingAccountId(),amounts,snapshot);
+        var id=UUID.randomUUID();
+        repository.submitRecoveryReview(a,id,loan,form,snapshot,json.writeValueAsString(amounts),clock.now());
+        event(a,id,"LOAN_FEE_RECOVERY_REVIEW_SUBMITTED");
+        return id;
+    }
+
+    @Transactional
+    public UUID approveRecoveryReview(AppUserPrincipal a,UUID loan,UUID id,LocalDate date,String reason){
+        accounting.requireActor(a,"LOAN_RECORDING_VIEW");
+        accounting.requireActor(a,"LOAN_FEE_RECOVERY_APPROVE");
+        require(id!=null && date!=null && !date.isAfter(clock.today()),"date");text(reason,true);
+        var identity=readable(a,loan,true);
+        var review=repository.recoveryReview(a,loan,id,false).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Fee review unavailable"));
+        require(!review.makerId().equals(a.getMemberId()),"independent");
+        require(!review.approved() && repository.recoveryReview(a,loan,null,false).filter(latest->latest.id().equals(id)).isPresent(),"stale");
+        var snapshot=repository.recoverySnapshot(loan);
+        require(snapshot.sequence()==review.postingSnapshot() && snapshot.principal().compareTo(review.principalSnapshot())==0,"stale");
+        require(snapshot.latestDate()!=null && !date.isBefore(snapshot.latestDate()),"date");dated(loan,date);
+        var terms=validateRecoveryReview(a,identity,review.holdingAccountId(),review.amounts(),snapshot);
+        var now=clock.now();
+        var journal=UUID.randomUUID();
+        var period=periods.period(a.getSaccoId(),date,a.getMemberId(),now);
+        repository.approveRecoveryReview(a,review,journal,period,date,reason.strip(),hash(List.of(review,date,reason.strip())),now);
+        for(var term:terms)repository.recoveryEvent(a,term.id(),journal,"CUTOVER",review.amounts().get(term.kind()),review.holdingAccountId(),term.liabilityAccountId(),null);
+        repository.post(a,journal,now);event(a,id,"LOAN_FEE_RECOVERY_REVIEW_APPROVED");
+        return journal;
+    }
+
+    private List<Term> validateRecoveryReview(AppUserPrincipal a,LoanChargeRepository.Loan loan,UUID holding,Map<String,BigDecimal> amounts,RecoverySnapshot snapshot){
+        require(loan.client()!=null && loan.source()==null && Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
+        require(!amounts.isEmpty() && snapshot.principal().signum()>0 &&
+            amounts.values().stream().reduce(ZERO,BigDecimal::add).compareTo(snapshot.principal())<=0,"recovery");
+        require(repository.recoveryBalances(loan.id()).isEmpty(),"stale");
+        repository.account(a.getSaccoId(),holding,"MANAGEMENT");
+        var deductions=repository.withheldAmounts(loan.id());
+        var terms=repository.frozen(loan.id()).terms().stream().filter(t->amounts.containsKey(t.kind())).toList();
+        require(terms.size()==amounts.size(),"recovery");
+        for(var term:terms){
+            require(!holding.equals(term.liabilityAccountId()) && amounts.get(term.kind()).compareTo(deductions.getOrDefault(term.id(),ZERO))<=0,"recovery");
+            var policy=repository.contractPolicy(loan.id()).orElseThrow(()->new IllegalArgumentException("charges.error.policy"));
+            repository.account(a.getSaccoId(),term.liabilityAccountId(),policy.accountKind(term.kind()));
+        }
+        return terms;
+    }
+
     @Transactional(readOnly=true) public Balance balance(AppUserPrincipal a,UUID loan,LocalDate date){readable(a,loan,false);return repository.balance(loan,date);}
     @Transactional(readOnly=true) public Summary summary(AppUserPrincipal a,UUID loan){var identity=readable(a,loan,false);var assessment=repository.fundingAssessments(loan).stream().findFirst().orElse(null);return new Summary(displayPlan(a,loan),repository.balance(loan,clock.today()),assessment==null?null:assessment.journalId(),assessment==null?null:assessment.actorId(),identity.number(),identity.institution(),identity.branch());}
     @Transactional public UUID assess(AppUserPrincipal a,UUID loan,AssessmentForm f){accounting.requireActor(a,"LOAN_RECORDING_POST");return assessment(a,loan,f);}
@@ -287,9 +490,10 @@ public class LoanChargeService {
         for(var e:repository.journalEvents(originalJournal)){if(!Set.of("COLLECT","DEDUCT","SETTLE").contains(e.kind()))continue;readable(a,e.loanId(),true);dated(e.loanId(),date);require(!e.actorId().equals(a.getMemberId()),"independent");var t=repository.frozen(e.loanId()).terms().stream().filter(v->v.id().equals(e.termId())).findFirst().orElseThrow();repository.event(a,e.loanId(),t,e.kind()+"_UNDO",e.amount(),date,reversalJournal,posting,null,e.id(),evidence,reason,clock.now());}
     }
     @Transactional(readOnly=true) public boolean hasCollections(UUID journal){return !repository.journalEvents(journal).isEmpty();}
-    @Transactional(propagation=Propagation.MANDATORY) public void beforeCorrection(AppUserPrincipal a,UUID loan,UUID original,LocalDate date){readable(a,loan,true);if(repository.frozen(loan).terms().isEmpty())return;require(!repository.laterPayment(loan,original,date),"dependent");dated(loan,date);}
-    @Transactional(propagation=Propagation.MANDATORY) public void checkFundingCorrection(AppUserPrincipal a,UUID loan){readable(a,loan,true);require(!repository.fundingDependencies(loan),"dependent");}
-    @Transactional(propagation=Propagation.MANDATORY) public List<Object[]> correctFunding(AppUserPrincipal a,UUID loan,UUID original,UUID journal,UUID key,LocalDate date,String evidence,String reason){checkFundingCorrection(a,loan);undoCollections(a,original,journal,repository.fundingPosting(loan),date,evidence,reason);reverseAssessmentsForFunding(a,loan,key,date,evidence,reason);return repository.reversalLines(original);}
+    @Transactional(propagation=Propagation.MANDATORY) public void beforeCorrection(AppUserPrincipal a,UUID loan,UUID original,LocalDate date){readable(a,loan,true);if(repository.frozen(loan).terms().isEmpty())return;require(!repository.includedInRecoveryReview(loan,original),"dependent");require(!repository.laterPayment(loan,original,date),"dependent");dated(loan,date);}
+    @Transactional(propagation=Propagation.MANDATORY) public void checkFundingCorrection(AppUserPrincipal a,UUID loan){readable(a,loan,true);require(!repository.fundingDependencies(loan),"dependent");
+        require(repository.recoveryReview(a,loan,null,false).stream().noneMatch(RecoveryReview::approved),"recoveryClose");}
+    @Transactional(propagation=Propagation.MANDATORY) public List<Object[]> correctFunding(AppUserPrincipal a,UUID loan,UUID original,UUID journal,UUID key,LocalDate date,String evidence,String reason){checkFundingCorrection(a,loan);undoCollections(a,original,journal,repository.fundingPosting(loan),date,evidence,reason);reverseAssessmentsForFunding(a,loan,key,date,evidence,reason);reverseRecovery(a,original,journal,"FUND","UNDO_FUND");return repository.reversalLines(original);}
     @Transactional public void reverseAssessment(AppUserPrincipal a,UUID loan,UUID journal,UUID key,LocalDate date,String evidence,String reason){accounting.requireActor(a,"LOAN_RECORDING_REVERSE");undoAssessment(a,loan,journal,key,date,evidence,reason,true);}
     @Transactional(propagation=Propagation.MANDATORY) public void reverseAssessmentsForFunding(AppUserPrincipal a,UUID loan,UUID key,LocalDate date,String evidence,String reason){
         readable(a,loan,true);require(repository.balance(loan,LocalDate.MAX).collected().signum()==0,"dependent");

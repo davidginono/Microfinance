@@ -489,10 +489,11 @@ public class LoanRecordingRepository {
     public List<Choice> accounts(AppUserPrincipal a,String purpose,String search,int page){return jdbc.query("""
         select id,code||' - '||name label,purpose from gl_account where sacco_id=? and active and
         ((? in ('FUNDING_MONEY','MONEY') and gl_loan_disbursement_account(id,sacco_id))
+        or (?='FEE_MONEY' and type='ASSET' and kind='POSTING' and purpose in ('CASH','BANK'))
         or (?='PRINCIPAL' and kind in ('POSTING','CONTROL'))
         or (?='INTEREST' and kind in ('POSTING','CONTROL')))
         and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?
-        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
     public Choice account(AppUserPrincipal a,UUID id,String category){
         return account(a,id,category,true);
     }
@@ -608,7 +609,7 @@ public class LoanRecordingRepository {
     public void lines(AppUserPrincipal a,UUID journal,List<Object[]> amounts){var rows=new ArrayList<Object[]>();for(var line:amounts)rows.add(new Object[]{UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),line[0],line[1],line[2]});jdbc.batchUpdate("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,?)",rows);}
     public void postJournal(AppUserPrincipal a,UUID journal,OffsetDateTime now){jdbc.update("insert into accounting_outbox(id,journal_id,sacco_id,station_id,event_type,created_at) values(?,?,?,?,?,?)",UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),"LOAN_RECORD_POSTED",now);jdbc.update("update gl_journal set state='POSTED',posted_at=? where id=?",now,journal);}
     public List<JournalLine> journalLines(AppUserPrincipal a,UUID journal){return jdbc.query("select g.code||' - '||g.name account,z.debit,z.credit from gl_journal_line z join gl_account g on g.id=z.account_id where z.journal_id=? and z.sacco_id=? and z.station_id=? order by z.debit desc,z.id limit 10",(r,n)->new JournalLine(r.getString(1),r.getBigDecimal(2),r.getBigDecimal(3)),journal,a.getSaccoId(),a.getStationId());}
-    public List<Object[]> reversedLines(UUID journal){return jdbc.query("select account_id,credit,debit from gl_journal_line where journal_id=? order by account_id",(r,n)->new Object[]{r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)},journal);}
+    public List<Object[]> reversedLines(UUID journal){return jdbc.query("select account_id,credit,debit from loan_base_journal_line where journal_id=? order by account_id",(r,n)->new Object[]{r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)},journal);}
     public UUID postingInterestAccount(UUID id){return jdbc.queryForObject("select interest_account_id from accountant_loan_post where id=?",UUID.class,id);}
     public UUID principalAccount(UUID loan){return jdbc.queryForObject("select principal_account_id from accountant_loan_post where loan_id=? and kind='DISBURSEMENT'",UUID.class,loan);}
     private LoanRow loan(ResultSet r,int n)throws SQLException{return new LoanRow(r.getObject("id",UUID.class),r.getString("loan_id"),r.getObject("client_id",UUID.class),r.getString("full_name"),r.getString("member_no"),r.getString("product_name"),r.getObject("application_date",LocalDate.class),r.getBigDecimal("requested_principal"),r.getBigDecimal("amount"),r.getString("status"),r.getBigDecimal("outstanding"),r.getBigDecimal("due_interest"),r.getBigDecimal("arrears"),r.getBigDecimal("future_interest"),r.getBigDecimal("principal_paid"),r.getBigDecimal("interest_paid"),r.getBoolean("topup_eligible"),r.getBigDecimal("charges"),r.getBoolean("cancel_eligible"),r.getString("loan_for"));}

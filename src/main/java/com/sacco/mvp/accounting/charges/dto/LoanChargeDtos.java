@@ -13,6 +13,8 @@ public final class LoanChargeDtos {
     }
     @Data public static class PolicyForm {
         private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,managementAccountId,insuranceAccountId,applicationAccountId,processingAccountId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private UUID feeRecoveryAccountId;
         private boolean saveChargePolicy;
         @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
         private LocalDate effectiveFrom;
@@ -24,7 +26,14 @@ public final class LoanChargeDtos {
     public record Policy(UUID id,UUID productId,LocalDate effectiveFrom,boolean enabled,Timing managementTiming,Timing insuranceTiming,
         UUID receivableAccountId,UUID managementAccountId,UUID insuranceAccountId,String policyReference,String agreementReference,
         String insurer,String insurerVerification,boolean allowCustom,BigDecimal customManagementLimit,
-        int accountingVersion,UUID applicationAccountId,UUID processingAccountId) {
+        int accountingVersion,UUID applicationAccountId,UUID processingAccountId,UUID feeRecoveryAccountId) {
+        public Policy(UUID id,UUID productId,LocalDate effectiveFrom,boolean enabled,Timing managementTiming,Timing insuranceTiming,
+                UUID receivableAccountId,UUID managementAccountId,UUID insuranceAccountId,String policyReference,String agreementReference,
+                String insurer,String insurerVerification,boolean allowCustom,BigDecimal customManagementLimit,int accountingVersion,
+                UUID applicationAccountId,UUID processingAccountId) {
+            this(id,productId,effectiveFrom,enabled,managementTiming,insuranceTiming,receivableAccountId,managementAccountId,insuranceAccountId,
+                policyReference,agreementReference,insurer,insurerVerification,allowCustom,customManagementLimit,accountingVersion,applicationAccountId,processingAccountId,null);
+        }
         public Policy(UUID id,UUID productId,LocalDate effectiveFrom,boolean enabled,Timing managementTiming,Timing insuranceTiming,
                 UUID receivableAccountId,UUID managementAccountId,UUID insuranceAccountId,String policyReference,String agreementReference,
                 String insurer,String insurerVerification,boolean allowCustom,BigDecimal customManagementLimit) {
@@ -55,6 +64,24 @@ public final class LoanChargeDtos {
         public BigDecimal deductions(){return terms.stream().filter(t->t.timing()==Timing.DEDUCT).map(Term::amount).reduce(new BigDecimal("0.00"),BigDecimal::add);}
         public BigDecimal separate(){return total().subtract(deductions());}
         public BigDecimal getTotal(){return total();} public BigDecimal getDeductions(){return deductions();} public BigDecimal getSeparate(){return separate();}
+    }
+    public record FeeBalance(UUID termId,UUID accountId,@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) BigDecimal outstanding) {}
+    public record FeePayment(UUID termId,UUID accountId,@com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) BigDecimal amount) {}
+    public record RecoveryBalance(UUID termId,String kind,UUID accountId,UUID holdingAccountId,
+        @com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) BigDecimal outstanding,
+        LocalDate startsOn) {}
+    public record RecoveryPayment(UUID termId,UUID accountId,UUID holdingAccountId,
+        @com.fasterxml.jackson.annotation.JsonFormat(shape=com.fasterxml.jackson.annotation.JsonFormat.Shape.STRING) BigDecimal amount) {}
+    public record RecoveryEvent(UUID id,UUID termId,UUID accountId,UUID holdingAccountId,String kind,BigDecimal amount) {}
+    public record RecoveryReview(UUID id,UUID loanId,UUID makerId,UUID holdingAccountId,BigDecimal principalSnapshot,
+        long postingSnapshot,Map<String,BigDecimal> amounts,String evidence,UUID journalId) {
+        public boolean approved(){return journalId!=null;}
+    }
+    public record RecoverySnapshot(BigDecimal principal,long sequence,LocalDate latestDate) {}
+    @Data public static class RecoveryReviewForm {
+        private UUID requestKey=UUID.randomUUID(),holdingAccountId;
+        private BigDecimal application,processing;
+        private String evidence="";
     }
     public record Balance(UUID loanId,long sequence,BigDecimal assessed,BigDecimal collected,BigDecimal outstanding,LocalDate lastDate) {}
     public record Movement(UUID id,UUID loanId,UUID termId,String kind,BigDecimal amount,UUID journalId,UUID actorId) {}

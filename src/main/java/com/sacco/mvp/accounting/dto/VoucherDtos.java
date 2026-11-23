@@ -132,9 +132,17 @@ public final class VoucherDtos {
     }
     public record LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,
                                  BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,
-                                 String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount,List<SharedReceiptBenefit> sharedBenefits) {
+                                 String moneyAccount,String principalAccount,String interestAccount,String reference,String chargeAccount,List<SharedReceiptBenefit> sharedBenefits,BigDecimal feesRecovered) {
+        public LoanReceiptRow(int lineNo,UUID postingId,UUID loanId,String loanNumber,String description,BigDecimal amount,BigDecimal principal,
+                              BigDecimal interest,BigDecimal principalBalance,String moneyAccount,String principalAccount,String interestAccount,
+                              String reference,String chargeAccount,List<SharedReceiptBenefit> sharedBenefits){
+            this(lineNo,postingId,loanId,loanNumber,description,amount,principal,interest,principalBalance,moneyAccount,principalAccount,interestAccount,reference,chargeAccount,sharedBenefits,BigDecimal.ZERO);
+        }
+        public LoanReceiptRow withRecoveredFees(BigDecimal value){
+            return new LoanReceiptRow(lineNo,postingId,loanId,loanNumber,description,amount,principal,interest,principalBalance,moneyAccount,principalAccount,interestAccount,reference,chargeAccount,sharedBenefits,value);
+        }
         public LoanReceiptRow(int line,UUID posting,UUID loan,String number,String description,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,String money,String principalAccount,String interestAccount,String reference,String chargeAccount){this(line,posting,loan,number,description,amount,principal,interest,balance,money,principalAccount,interestAccount,reference,chargeAccount,List.of());}
-        public LoanReceiptRow withSharedBenefits(List<SharedReceiptBenefit> benefits){return new LoanReceiptRow(lineNo,postingId,loanId,loanNumber,description,amount,principal,interest,principalBalance,moneyAccount,principalAccount,interestAccount,reference,chargeAccount,List.copyOf(benefits));}
+        public LoanReceiptRow withSharedBenefits(List<SharedReceiptBenefit> benefits){return new LoanReceiptRow(lineNo,postingId,loanId,loanNumber,description,amount,principal,interest,principalBalance,moneyAccount,principalAccount,interestAccount,reference,chargeAccount,List.copyOf(benefits),feesRecovered);}
         public LoanReceiptRow(int line,UUID posting,UUID loan,String number,String description,BigDecimal amount,BigDecimal principal,BigDecimal interest,BigDecimal balance,String money,String principalAccount,String interestAccount,String reference){this(line,posting,loan,number,description,amount,principal,interest,balance,money,principalAccount,interestAccount,reference,"");}
         public BigDecimal charges(){return amount.subtract(principal).subtract(interest);}
         public BigDecimal getCharges(){return charges();}

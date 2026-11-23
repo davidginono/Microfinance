@@ -114,7 +114,6 @@ function initializeReceiptBatches() {
         else if(/productPrincipalMismatch/.test(code))fieldIssue(item,'loan','principalAccount');
         else if(/productAccountsMissing/.test(code))fieldIssue(item,'loan','productAccounts');
         else if(/productAccountsInvalid/.test(code))fieldIssue(item,'loan','inactiveAccounts');
-        else if(/charges\.error\.batch/.test(code))fieldIssue(item,'loan','charges');
         else if(/\.policy$/.test(code))fieldIssue(item,'date','policy');
         else if(/\.period$/.test(code))fieldIssue(item,'date','closedPeriod');
         else if(/\.adjustmentDate$/.test(code))fieldIssue(item,'date','adjustmentDate');
@@ -189,7 +188,11 @@ function initializeReceiptBatches() {
     function paintBalance(target,balance,totalLabel = 'totalLoanOutstanding'){
         balanceRequests.delete(target);
         const facts = el('dl',null,'batch-balance');
-        for(const [label,value] of [[totalLabel,balance.totalLoanOutstanding],['principalOutstanding',balance.outstandingPrincipal],['interestDue',balance.dueInterest]]){
+        const amounts = [[totalLabel,balance.totalLoanOutstanding],['principalOutstanding',balance.outstandingPrincipal],['interestDue',balance.dueInterest]];
+        if('chargesOutstanding' in balance)amounts.push(['chargesOutstanding',balance.chargesOutstanding]);
+        if(balance.chargesPaid != null)amounts.push(['interestPaid',balance.interest],['chargesPaid',balance.chargesPaid],['principalPaid',balance.principal]);
+        if(balance.feesRecovered != null)amounts.push(['feesRecovered',balance.feesRecovered]);
+        for(const [label,value] of amounts){
             facts.append(el('dt',t(label)),el('dd',value == null?'—':money(value)));
         }
         target.replaceChildren(facts);

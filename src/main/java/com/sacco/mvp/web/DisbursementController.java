@@ -74,6 +74,7 @@ public class DisbursementController {
             var q=loanRecordingService.fundingQuote(actor,id,date,deductChargeIds==null?List.of():deductChargeIds);
             var result=new LinkedHashMap<String,Object>();
             result.put("cash",q.cash().toPlainString());result.put("deductions",q.deductions().toPlainString());result.put("separate",q.separate().toPlainString());
+            if(q.reducedCash()!=null)result.put("reducedCash",q.reducedCash().toPlainString());
             var s=q.settlement();
             if(s!=null){result.put("principal",s.principal().toPlainString());result.put("interest",s.interest().toPlainString());result.put("excludedInterest",s.excludedInterest().toPlainString());result.put("total",s.total().toPlainString());result.put("charges",s.charges().toPlainString());result.put("sequence",s.sequence());result.put("chargeSequence",s.chargeSequence());}
             return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(result);
@@ -431,6 +432,8 @@ public class DisbursementController {
             @SuppressWarnings("unchecked") var selected=model.getAttribute("postingDeductChargeIds") instanceof List<?> values?(List<UUID>)values:List.<UUID>of();
             var q=loanRecordingService.fundingQuote(principal,app.getId(),date,selected);
             model.addAttribute("topUpQuote",q.settlement());model.addAttribute("disbursementBaseAmount",q.cash());model.addAttribute("fundingQuote",q);model.addAttribute("fundingCharges",loanRecordingService.fundingCharges(principal,app.getId()));
+            if(model.asMap().get("postingFeeReceivingAccountId") instanceof UUID feeAccount)
+                model.addAttribute("postingFeeReceivingAccount", loanRecordingService.fundingAccount(principal,feeAccount));
         }catch(IllegalArgumentException ex){model.addAttribute("topUpUnavailable",ex.getMessage());}
         model.addAttribute("showDisbursementForm", app.getStatus() == LoanStatus.READY_FOR_DISBURSEMENT && canDisburseLoan);
         model.addAttribute("disbursementOtpEnabled", stationOtpSettingsService.requiresApprovalOtp(
@@ -504,6 +507,8 @@ public class DisbursementController {
                            @RequestParam(defaultValue = "false") boolean settlementConfirmed,
                            @RequestParam(required = false) List<MultipartFile> attachments,
                            @RequestParam(required = false) List<UUID> deductChargeIds,
+                           @RequestParam(required = false) UUID feeReceivingAccountId,
+                           @RequestParam(defaultValue = "") String feePaymentReference,
                            RedirectAttributes ra) {
         try {
             LoanApplication application=requireVisibleApplication(id,principal.getSaccoId(),principal.getStationId());
@@ -518,7 +523,13 @@ public class DisbursementController {
                 form.setDeductChargeIds(deductChargeIds==null?List.of():deductChargeIds);
                 if(application.getTopUpSourceLoanId()!=null && !settlementConfirmed)throw new IllegalArgumentException("recording.error.topUpChanged");
                 form.setReference(disbursementReference==null?"":disbursementReference);form.setNotes(disbursementNotes==null?"":disbursementNotes);
-                if(depositAmount!=null && depositAmount.compareTo(loanRecordingService.fundingQuote(principal,id,disbursementDate,form.getDeductChargeIds()).cash())!=0)throw new IllegalArgumentException("recording.error.disbursementAmount");
+                var quote=loanRecordingService.fundingQuote(principal,id,disbursementDate,form.getDeductChargeIds());
+                form.setFeeReceivingAccountId(feeReceivingAccountId);form.setFeePaymentReference(feePaymentReference);
+                if(quote.recoveryFees().signum()>0){
+                    form.setActualCashPaid(depositAmount);
+                }else if(depositAmount!=null && depositAmount.compareTo(quote.cash())!=0){
+                    throw new IllegalArgumentException("recording.error.disbursementAmount");
+                }
                 var documents=new java.util.ArrayList<MultipartFile>();if(disbursementProofFile!=null && !disbursementProofFile.isEmpty())documents.add(disbursementProofFile);
                 if(attachments!=null)documents.addAll(attachments);
                 loanRecordingService.disburse(principal,form,documents);
@@ -545,6 +556,9 @@ public class DisbursementController {
         ra.addFlashAttribute("postingDisbursementReference",disbursementReference);ra.addFlashAttribute("postingDisbursementNotes",disbursementNotes);
         ra.addFlashAttribute("postingDisbursementDate",disbursementDate);ra.addFlashAttribute("postingFirstPaymentDate",firstRepaymentDate);
         ra.addFlashAttribute("postingDeductChargeIds",deductChargeIds==null?List.of():deductChargeIds);
+        ra.addFlashAttribute("postingActualCashPaid",depositAmount);
+        ra.addFlashAttribute("postingFeeReceivingAccountId",feeReceivingAccountId);
+        ra.addFlashAttribute("postingFeePaymentReference",feePaymentReference);
         return "redirect:/disbursement/loan-applications/" + id;
     }
 
