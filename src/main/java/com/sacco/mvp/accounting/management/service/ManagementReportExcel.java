@@ -104,7 +104,7 @@ public class ManagementReportExcel {
                 groupFacts(book, sheet, result, "", List.of(), locale);
             }
             book.headers(sheet, headings, repayment ? columns - 1 : -1);
-            book.line(sheet, label("empty", locale), columns, false);
+            book.line(sheet, label(result.getEmptyKey(), locale), columns, false);
         }
         if (result.count()>0)
             total(book, sheet, result, result.totals(), label("total", locale), amounts);
@@ -115,7 +115,7 @@ public class ManagementReportExcel {
 
     private void reportWidths(Sheet sheet, Result result) {
         int[] widths = switch (result.kind()) {
-            case DISBURSED_LOANS_AUDIT -> new int[]{7, 15, 25, 13, 20, 21, 20, 21, 20, 17, 17, 19, 12, 11};
+            case DISBURSED_LOANS_AUDIT -> new int[]{7, 15, 25, 13, 20, 21, 21, 20, 17, 17, 19, 12, 11};
             case EXPECTED_REPAYMENTS -> new int[]{13, 14, 30, 20, 25, 21, 20, 19, 21};
             case LOAN_REPAYMENT_TRANSACTIONS -> new int[]{27, 20, 21, 24, 21, 23, 20};
             default -> result.columns().stream()

@@ -93,7 +93,7 @@ public class ManagementReportPdf {
                 if(groups.isEmpty()){
                     if(r.isReferenceLayout())sourceGroup(page,r,r.emptyGroupFacts(),locale);
                     page.columns(labels,widths,numeric);
-                    page.text(message(r.kind()==Kind.DAILY_COLLECTIONS?"dailyEmpty":"empty",locale));
+                    page.text(message(r.getEmptyKey(),locale));
                 }
                 if(r.count()>0)page.row(totalRow(r,r.totals(),message("total",locale),locale),true);
                 page.endTable();
@@ -125,12 +125,6 @@ public class ManagementReportPdf {
     private String cell(Result r,Map<String,Object> row,Column c,Locale locale){
         Object amount=row.get(c.key());
         String text=r.isReferenceLayout()?sourceValue(amount,locale):value(amount,locale);
-        if(amount instanceof BigDecimal number && (c.key().equals("netDisbursed") ||
-            r.kind()==Kind.EXPECTED_REPAYMENTS && Set.of("principalDue","interestDue","expectedTotal").contains(c.key()))){
-            var format=NumberFormat.getNumberInstance(locale);
-            format.setMaximumFractionDigits(2);
-            text=format.format(number);
-        }
         if(r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS && c.key().equals("date")){
             if(row.get("entryKind")!=null)text+="\n"+message("entry."+row.get("entryKind"),locale)+" "+value(row.get("reference"),locale);
             if(row.get("reversesReference")!=null)text+="\n"+message("field.reversesReference",locale)+": "+value(row.get("reversesReference"),locale);
@@ -154,5 +148,5 @@ public class ManagementReportPdf {
         if(value instanceof LocalDate date)return LoanReportReferenceText.date(date,locale);
         return value(value,locale);
     }
-    private String value(Object value,Locale locale){if(value==null)return "—";if(value instanceof BigDecimal n){var format=NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(n);}return com.sacco.mvp.service.ApplicationTimestamps.display(value);}
+    private String value(Object value,Locale locale){if(value==null)return "—";if(value instanceof BigDecimal n){var format=NumberFormat.getNumberInstance(locale);format.setMaximumFractionDigits(2);return format.format(n);}return com.sacco.mvp.service.ApplicationTimestamps.display(value);}
 }

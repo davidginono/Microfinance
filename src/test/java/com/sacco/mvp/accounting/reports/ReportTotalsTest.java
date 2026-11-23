@@ -64,7 +64,7 @@ class ReportTotalsTest {
     }
     @Test void instalmentSizesRemainDetailFieldsAndAreNeverSummed(){
         assertThat(ManagementReports.totalFields(Kind.DISBURSED_LOANS_AUDIT)).containsExactly("disbursed","totalInterest","netDisbursed");
-        assertThat(ManagementReports.documentColumns(Kind.DISBURSED_LOANS_AUDIT)).extracting(Column::key).contains("principalInstallment","instalment");
+        assertThat(ManagementReports.documentColumns(Kind.DISBURSED_LOANS_AUDIT)).extracting(Column::key).contains("instalment").doesNotContain("principalInstallment");
         assertThat(ManagementReports.totalFields(Kind.LOAN_PORTFOLIO)).doesNotContain("instalment");
         assertThat(ManagementReports.totalFields(Kind.EXPECTED_REPAYMENTS)).doesNotContain("principalBalance");
         assertThat(ManagementReports.totalFields(Kind.LOAN_REPAYMENT_TRANSACTIONS)).doesNotContain("openingPrincipal","closingPrincipal");

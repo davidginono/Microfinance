@@ -584,7 +584,12 @@
             if(!control || control.disabled)return;
             event.preventDefault();event.stopImmediatePropagation();
             if(control.hasAttribute('data-resource-refresh'))region.dispatchEvent(new Event('resource-table:refresh',{bubbles:true,cancelable:true}));
-            else void updateTable(control.href);
+            else if (region.dataset.tablePreservePageQuery === 'true' && control.matches('.resource-table-pagination a[href]')) {
+                // On tabbed details the other table may have updated the shared URL since this pager was rendered.
+                const url = new URL(location.href);
+                url.searchParams.set(pageParam,new URL(control.href,location.href).searchParams.get(pageParam) || '0');
+                void updateTable(url);
+            } else void updateTable(control.href);
         },{capture:true,signal});
         if(filters?.tagName==='FORM')filters.addEventListener('submit',event=>{
             if(event.defaultPrevented || filters.method==='post')return;

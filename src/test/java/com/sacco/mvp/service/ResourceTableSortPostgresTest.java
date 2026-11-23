@@ -111,7 +111,7 @@ class ResourceTableSortPostgresTest {
         var loans=new com.sacco.mvp.accounting.loans.repository.LoanRecordingRepository(jdbc);
         columns("accounting-loans-clients-1","client",()->loans.ledgerClients(actor,"",0));
         columns("accounting-loans-details-1","date,reference,kind,amount,principal,interest,balance",()->loans.loanPosts(actor,id,26,0));
-        columns("client-statement-movements","date,loan,product,reference,kind,amount,principal,interest,balance",()->loans.clientPosts(actor,id,26,0));
+        columns("client-statement-movements","date,loan,product,reference,kind,amount,principal,interest,balance",()->loans.clientPosts(actor,id,new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.MovementFilter(null,null,null,null),26,0));
         var filter=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Filter("",null,null,"","newest",0,id);
         columns("client-statement-loans","loan,product,status,principal,interest,charges,arrears",()->loans.loans(actor,filter,LocalDate.of(2026,10,20),26,0));
         var terms=new com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository(jdbc);

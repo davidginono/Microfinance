@@ -27,6 +27,36 @@ test('OTP validation can cancel a submission without locking the later verified 
   dom.window.close();
 });
 
+test('posted transactions export uses the chosen loan and keeps the full history',()=>{
+  const url='http://localhost/finance/client-ledgers/client';
+  const dom=new JSDOM(`<section data-loan-statement-base="/finance/client-ledgers/client">
+    <a data-loan-statement-format="print">Print</a><a data-loan-statement-format="pdf">PDF</a>
+    <form><input type="hidden" name="page" value="0">
+      <input type="date" name="from" value="2026-11-01">
+      <input type="date" name="through" value="2026-11-30" data-range-error="Date range is invalid">
+      <select name="loanId"><option value="">All</option><option value="loan-1">1</option></select>
+      <a data-table-query-for="client-statement-movements" href="?page=0">Clear</a>
+    </form></section>`,{runScripts:'outside-only',url});
+  const w=dom.window,d=w.document,form=d.querySelector('form');
+  const links=[...d.querySelectorAll('[data-loan-statement-format]')];
+  w.eval(fs.readFileSync('src/main/resources/static/js/loan-recording.js','utf8'));
+  assert.ok(links.every(link=>link.getAttribute('aria-disabled')==='true' && !link.hasAttribute('href')));
+  form.elements.loanId.value='loan-1';
+  form.elements.loanId.dispatchEvent(new w.Event('change',{bubbles:true}));
+  assert.deepEqual(links.map(link=>link.href),[url+'/loans/loan-1/statement/print',url+'/loans/loan-1/statement/pdf']);
+  form.elements.through.value='2026-10-01';
+  form.elements.through.dispatchEvent(new w.Event('input',{bubbles:true}));
+  assert.equal(form.elements.through.validationMessage,'Date range is invalid');
+  w.history.replaceState({},'',url+'?page=2');
+  d.dispatchEvent(new w.Event('resource-table:query'));
+  assert.equal(form.elements.page.value,'2');
+  assert.equal(new URL(form.querySelector('[data-table-query-for]').href).searchParams.get('page'),'2');
+  form.elements.loanId.value='';
+  d.querySelector('section').dispatchEvent(new w.Event('resource-table:updated'));
+  assert.ok(links.every(link=>link.getAttribute('aria-disabled')==='true' && !link.hasAttribute('href')));
+  dom.window.close();
+});
+
 test('staff posting lookups use the scoped review endpoint and preserve the chosen account',async()=>{
   const dom=new JSDOM(`<form data-loan-form><div data-loan-choice data-category="money" data-choice-url="/disbursement/loan-applications/scoped-loan/posting-accounts/money"><select data-choice-select><option value="">Choose</option><option value="account" selected>Cash account</option></select><span data-choice-error data-search-label="Search accounts" data-error="Lookup failed"></span></div></form>`,{runScripts:'outside-only',url:'http://localhost/disbursement/loan-applications/scoped-loan'});
   const w=dom.window,input=w.document.createElement('input'),more=w.document.createElement('button');let requested;

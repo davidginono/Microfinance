@@ -729,6 +729,23 @@ test('two tables retain independent sorts and reset their own page counters',asy
     dom.window.close();
 });
 
+test('paging one detail table retains the other tab’s current filters',async()=>{
+    const pager='<div data-table-pagination data-page="0"><a data-page-direction="next" href="?page=1&loanId=old&movementPage=0">Next</a></div>';
+    const markup=table('loans',row,'data-table-preserve-page-query="true"').replace('</section>',pager+'</section>');
+    const {dom,window:w,document:d}=await setup(markup,loadingSource);
+    const requests=[];
+    w.fetch=async url=>{requests.push(new URL(url));return {ok:true,redirected:false,text:async()=>markup};};
+    w.history.replaceState({},'','?page=0&movementPage=2&loanId=selected&from=2026-11-01');
+    d.dispatchEvent(new w.Event('resource-table:query'));
+    d.querySelector('.resource-table-pagination a').click();
+    await settle();await settle();
+    assert.equal(requests[0].searchParams.get('page'),'1');
+    assert.equal(requests[0].searchParams.get('movementPage'),'2');
+    assert.equal(requests[0].searchParams.get('loanId'),'selected');
+    assert.equal(requests[0].searchParams.get('from'),'2026-11-01');
+    dom.window.close();
+});
+
 test('a server response can change a conditional reference heading without leaving its old sort key',async()=>{
     const markup=table('conditional',row).replace('<th>Reference</th>','<th data-table-order="number">Application number</th>');
     const {dom,window:w,document:d}=await setup(markup,loadingSource);

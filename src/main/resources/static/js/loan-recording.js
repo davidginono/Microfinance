@@ -56,6 +56,44 @@
     if (!lazy) load();
   });
   initChoices(document);
+  const movements = document.querySelector('[data-loan-statement-base]');
+  if (movements) {
+    const form = movements.querySelector('form');
+    const loan = form.elements.loanId;
+    const from = form.elements.from, through = form.elements.through;
+    const commands = movements.querySelectorAll('[data-loan-statement-format]');
+    const clear = form.querySelector('[data-table-query-for]');
+    const syncCriteria = () => {
+      for (const command of commands) {
+        if (loan.value) {
+          command.href = movements.dataset.loanStatementBase + '/loans/' + encodeURIComponent(loan.value)
+            + '/statement/' + command.dataset.loanStatementFormat;
+          command.removeAttribute('aria-disabled');
+        } else {
+          command.setAttribute('aria-disabled','true');
+          command.removeAttribute('href');
+        }
+      }
+      through.setCustomValidity(from.value && through.value && from.value > through.value ? through.dataset.rangeError : '');
+    };
+    const syncPage = () => {
+      if (!form.isConnected) return;
+      const page = new URL(location.href).searchParams.get('page') || '0';
+      form.elements.page.value = page;
+      const target = new URL(clear.href,location.href);
+      target.searchParams.set('page',page);
+      clear.href = target.href;
+    };
+    form.addEventListener('input', syncCriteria);
+    form.addEventListener('change', syncCriteria);
+    movements.addEventListener('resource-table:updated', syncCriteria);
+    const pageScope = new AbortController();
+    document.addEventListener('resource-table:query', syncPage,{signal:pageScope.signal});
+    document.addEventListener('workspace:navigated', () => {
+      if (!movements.isConnected) pageScope.abort();
+    }, {signal:pageScope.signal});
+    syncCriteria();
+  }
   window.addEventListener('pagehide', () => document.querySelectorAll('[data-loan-choice]').forEach(box => choiceCleanup.get(box)?.()));
   const disbursementSelect = document.querySelector('[data-category="disbursement-clients"] select');
   if(disbursementSelect){let sequence=0, controller;disbursementSelect.addEventListener('change',async()=>{

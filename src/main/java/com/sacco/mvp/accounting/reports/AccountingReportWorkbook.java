@@ -19,8 +19,9 @@ import java.util.Set;
 public final class AccountingReportWorkbook implements AutoCloseable {
     private static final XSSFColor GRID = color(0x9AA4AE);
     private final XSSFWorkbook book = new XSSFWorkbook();
-    private final CellStyle caption, section, fact, factText, factLabel, factMoney, factDate, factEmphasis;
-    private final CellStyle text, literal, money, date, integer, total, totalMoney;
+    private final CellStyle caption, section, fact, factText, factLabel, factDate, factEmphasis;
+    private final CellStyle text, literal, date, integer, total;
+    private final CellStyle[] factMoney, money, totalMoney;
     private final XSSFCellStyle heading, accentHeading;
     private boolean exactText;
 
@@ -43,10 +44,8 @@ public final class AccountingReportWorkbook implements AutoCloseable {
         var emphasis = font(factsFamily, 11, true);
         emphasis.setItalic(true);
         factEmphasis.setFont(emphasis);
-        factMoney = copy(fact);
         factDate = copy(fact);
         var formats = book.createDataFormat();
-        factMoney.setDataFormat(formats.getFormat("#,##0.00;[Red](#,##0.00)"));
         factDate.setDataFormat(formats.getFormat("dd-mmm-yyyy"));
         factDate.setAlignment(HorizontalAlignment.LEFT);
         factEmphasis.setDataFormat(factDate.getDataFormat());
@@ -56,21 +55,30 @@ public final class AccountingReportWorkbook implements AutoCloseable {
         literal = copy(text);
         literal.setAlignment(HorizontalAlignment.LEFT);
         literal.setDataFormat(factText.getDataFormat());
-        money = copy(text);
-        money.setDataFormat(factMoney.getDataFormat());
         date = copy(text);
         date.setDataFormat(factDate.getDataFormat());
         integer = copy(text);
         integer.setDataFormat(formats.getFormat("0"));
         total = table(style(family, true));
         total.setBorderTop(BorderStyle.MEDIUM);
-        totalMoney = copy(total);
-        totalMoney.setDataFormat(money.getDataFormat());
+        factMoney = amountStyles(fact, formats);
+        money = amountStyles(text, formats);
+        totalMoney = amountStyles(total, formats);
         heading = table(factLabel);
         heading.setBorderBottom(BorderStyle.MEDIUM);
         fill(heading, 0xEEF1F4);
         accentHeading = copy(heading);
         fill(accentHeading, 0xFFDFBF);
+    }
+
+    private CellStyle[] amountStyles(CellStyle base, DataFormat formats) {
+        var styles = new CellStyle[3];
+        for (int scale = 0; scale < styles.length; scale++) {
+            String pattern = "#,##0" + (scale == 0 ? "" : "." + "0".repeat(scale));
+            styles[scale] = copy(base);
+            styles[scale].setDataFormat(formats.getFormat(pattern + ";[Red](" + pattern + ")"));
+        }
+        return styles;
     }
 
     private Font font(String family, int points, boolean bold) {
@@ -231,14 +239,15 @@ public final class AccountingReportWorkbook implements AutoCloseable {
             if (value == null && !grid) continue;
             var cell = row.createCell(column);
             boolean amount = monetary.contains(column);
-            cell.setCellStyle(grid ? (bold ? (amount ? totalMoney : total) : (amount ? money : text))
-                : amount ? factMoney : labels.contains(column) ? factLabel : fact);
+            int scale = value instanceof BigDecimal decimal ? Math.clamp(decimal.stripTrailingZeros().scale(), 0, 2) : 0;
+            cell.setCellStyle(grid ? (bold ? (amount ? totalMoney[scale] : total) : (amount ? money[scale] : text))
+                : amount ? factMoney[scale] : labels.contains(column) ? factLabel : fact);
             if (value instanceof BigDecimal decimal) {
                 double number = decimal.doubleValue();
                 if (Double.isFinite(number) && decimal.stripTrailingZeros().precision() <= 15 && BigDecimal.valueOf(number).compareTo(decimal) == 0) {
                     cell.setCellValue(number);
                 } else {
-                    String exact = decimal.toPlainString();
+                    String exact = decimal.stripTrailingZeros().toPlainString();
                     cell.setCellValue(exact);
                     lines = Math.max(lines, lineCount(sheet, column, exact));
                     exactText = true;

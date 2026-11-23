@@ -73,7 +73,7 @@ class StatementWorkspacePostgresTest {
         var line=new VoucherDtos.RowForm();line.setDescription("Synthetic client transaction");line.setAmount(new BigDecimal("3.00"));line.setDebitAccountId(bank);line.setCreditAccountId(capital);f.setRows(List.of(line));
         var posted=vouchers.post(actor,VoucherDtos.Type.JOURNAL,f);UUID run=preview();
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
-        assertThat(reports.clients(actor,clientNumber,0,null)).extracting(c->c.id()).containsExactly(client);
+        assertThat(reports.clients(actor,clientNumber,0,null,false)).extracting(c->c.id()).containsExactly(client);
         var selected=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,through,OffsetDateTime.now(),bank,bank,client,"",0);
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,selected,false).rows())
             .singleElement().satisfies(row->assertThat(row.get("clientNumber")).isEqualTo(clientNumber));
@@ -152,7 +152,7 @@ class StatementWorkspacePostgresTest {
         var foreign=new AppUserPrincipal(Member.builder().id(actor.getMemberId()).saccoId("OTHER").stationId("B1").position(Position.ACCOUNTANT).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),Set.of());
         assertThat(reports.accounts(foreign,"",0,List.of())).isEmpty();
         UUID client=UUID.randomUUID();jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,created_at,is_member,password_hash) values(?,?,'B2',?,'Other branch client','ACTIVE','MEMBER',now(),true,'test-only')",client,institution,"CL-"+client);
-        assertThat(reports.clients(actor,"",0,client)).isEmpty();
+        assertThat(reports.clients(actor,"",0,client,false)).isEmpty();
     }
     @Test void legacyIncomeIsFlaggedAndIncludedInIncomeTotals() {
         UUID legacy=UUID.randomUUID();

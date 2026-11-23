@@ -16,8 +16,8 @@
         <dl class="reference-loan-facts">
           <div><dt><spring:message code="management.field.loanId" /></dt><dd><c:out value="${facts.loanId}" default="—" /></dd></div>
           <div><dt><spring:message code="management.pdf.loanType" /></dt><dd><c:out value="${facts.product}" default="—" /></dd></div>
-          <div><dt><spring:message code="management.pdf.disbursedLoanAmount" /></dt><dd><c:choose><c:when test="${facts.disbursed!=null}"><fmt:formatNumber value="${facts.disbursed}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
-          <div><dt><spring:message code="management.pdf.loanBalance" /></dt><dd><c:choose><c:when test="${facts.principalBalance!=null}"><fmt:formatNumber value="${facts.principalBalance}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
+          <div><dt><spring:message code="management.pdf.disbursedLoanAmount" /></dt><dd><c:choose><c:when test="${facts.disbursed!=null}"><fmt:formatNumber value="${facts.disbursed}" minFractionDigits="0" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
+          <div><dt><spring:message code="management.pdf.loanBalance" /></dt><dd><c:choose><c:when test="${facts.principalBalance!=null}"><fmt:formatNumber value="${facts.principalBalance}" minFractionDigits="0" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
         </dl>
       </c:when>
       <c:when test="${auditSource}">
@@ -46,7 +46,7 @@
         <c:forEach items="${report.getDocumentColumns()}" var="column"><th scope="col" class="${column.money?'reference-money':''}"><c:out value="${referenceHeadings[column.key]}" /></th></c:forEach>
       </tr></thead>
       <tbody>
-        <c:if test="${emptySource}"><tr><td colspan="${referenceWidths.size()}"><spring:message code="management.empty" /></td></tr></c:if>
+        <c:if test="${emptySource}"><tr><td colspan="${referenceWidths.size()}"><spring:message code="management.${report.getEmptyKey()}" /></td></tr></c:if>
         <c:forEach items="${report.rows}" var="row"><c:if test="${row.groupName==group.name}">
           <tr>
             <c:if test="${auditSource}"><c:set var="recordNumber" value="${recordNumber+1}" /><td><c:out value="${recordNumber}" /></td></c:if>
@@ -54,7 +54,7 @@
               <td class="${column.money?'reference-money':''}">
                 <c:choose>
                   <c:when test="${row[column.key]==null}">—</c:when>
-                  <c:when test="${column.money}"><fmt:formatNumber value="${row[column.key]}" minFractionDigits="${column.key=='netDisbursed' or (report.kind=='EXPECTED_REPAYMENTS' and column.key!='principalBalance')?0:2}" maxFractionDigits="2" /></c:when>
+                  <c:when test="${column.money}"><fmt:formatNumber value="${row[column.key]}" minFractionDigits="0" maxFractionDigits="2" /></c:when>
                   <c:when test="${column.key=='frequency' and (row[column.key]=='MONTHLY' or row[column.key]=='WEEKLY')}"><spring:message code="recording.frequency.${row[column.key]}" /></c:when>
                   <c:otherwise><c:out value="${appTime:referenceDate(row[column.key],referenceLocale)}" /></c:otherwise>
                 </c:choose>

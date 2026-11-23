@@ -178,7 +178,31 @@ public class LoanRecordingController {
     }
     @GetMapping("/loan-recording/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,category,search,page);}
     @GetMapping("/client-ledgers") public String clients(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,Model model){model.addAttribute("clients",service.choices(a,"ledger-clients",search,page));model.addAttribute("search",search);model.addAttribute("page",page);return "accounting/loans/clients";}
-    @GetMapping("/client-ledgers/{id}") public String statement(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="0") int movementPage,Model model){model.addAttribute("movements",service.movements(a,id,movementPage));model.addAttribute("statement",service.statement(a,id,page));model.addAttribute("clientId",id);return "accounting/loans/statement";}
+    @GetMapping("/client-ledgers/{id}")
+    public String statement(@AuthenticationPrincipal AppUserPrincipal actor, @PathVariable UUID id,
+        @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="0") int movementPage,
+        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
+        @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,
+        @RequestParam(required=false) UUID loanId, @RequestParam(required=false) UUID productId, Locale locale, Model model) {
+        var filter = new MovementFilter(from,through,loanId,productId);
+        var movements = service.movements(actor,id,filter,movementPage);
+        var statement = service.statement(actor,id,page);
+        model.addAttribute("movementFilter",filter);
+        model.addAttribute("movementSelection",movements);
+        model.addAttribute("movements",movements.page());
+        model.addAttribute("statement",statement);
+        model.addAttribute("statementTitle",clientStatementTitle(statement.client(),locale));
+        model.addAttribute("clientId",id);
+        return "accounting/loans/statement";
+    }
+
+    @GetMapping("/client-ledgers/{client}/choices/{category}")
+    @ResponseBody
+    public List<Choice> statementChoices(@AuthenticationPrincipal AppUserPrincipal actor, @PathVariable UUID client,
+        @PathVariable String category, @RequestParam(defaultValue="") String search, @RequestParam(defaultValue="0") int page) {
+        return service.movementChoices(actor,client,category,search,page);
+    }
+
     @GetMapping({"/loan-records/{id}/pdf","/loan-records/{id}/print"}) public Object loanExport(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
         var data=service.exportLoan(a,id);var document=amortizationDocument(data,locale);
         var topUp=service.topUp(a,id);if(topUp.isPresent())return output(topUpDocument(topUp.get(),data.detail(),locale,null,data.charges()),request,model);
@@ -201,7 +225,7 @@ public class LoanRecordingController {
             .header("X-Content-Type-Options","nosniff").body(pdf.renderPosting(postDocument(p,d,locale,logo,service.postingLines(a,id))));
     }
     @GetMapping({"/client-ledgers/{id}/pdf","/client-ledgers/{id}/print"}) public Object statementExport(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
-        var document=statementDocument(service.exportStatement(a,id),locale);
+        var document=clientBalanceDocument(service.exportStatement(a,id),locale);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF)
             .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=client-statement.pdf")
             .header("X-Content-Type-Options","nosniff").body(pdf.renderStatement(document));
@@ -217,11 +241,37 @@ public class LoanRecordingController {
             .header(HttpHeaders.CONTENT_DISPOSITION,(request.getRequestURI().endsWith("/print")?"inline":"attachment")+"; filename=loan-statement.pdf")
             .header("X-Content-Type-Options","nosniff").body(pdf.renderStatement(statementDocument(source.source(),locale,source.opening())));
     }
-    private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale){return statementDocument(source,locale,null);}
+    private StatementDocument clientBalanceDocument(BalanceExport source, Locale locale) {
+        var identity = List.of(new StatementField(label("recording.statement.clientNumber",locale),source.client().number()),
+            new StatementField(label("recording.asOf",locale),statementDate(source.asOf(),locale)));
+        var columns = List.of(label("recording.statement.loan",locale),label("recording.statement.product",locale),
+            label("recording.statement.outstanding",locale),label("recording.statement.dueInterest",locale),
+            label("charges.outstanding",locale)+" (TZS)",label("recording.statement.arrears",locale),
+            label("recording.futureInterest",locale)+" (TZS)");
+        var rows = source.loans().stream().map(balance -> {
+            var loan = balance.loan();
+            return List.of(loan.number(),loan.product(),
+                reportMoney(balance.hasLedger()?loan.outstandingPrincipal():null,locale),
+                reportMoney(balance.hasLedger()?loan.dueInterest():null,locale),
+                reportMoney(balance.hasLedger()?loan.charges():null,locale),
+                reportMoney(balance.hasLedger()?loan.arrears():null,locale),
+                reportMoney(balance.hasLedger()?loan.futureInterest():null,locale));
+        }).toList();
+        var section = new StatementSection(List.of(),columns,rows,List.of(70f,160f,99f,99f,99f,99f,99f),2,true);
+        return new StatementDocument(clientStatementTitle(source.client(),locale),identity,List.of(section),
+            label("recording.statement.noLoans",locale),label("recording.statement.balanceNote",locale));
+    }
+
+    private String clientStatementTitle(StatementClient client, Locale locale) {
+        String name = client.titleName();
+        return name==null || name.isBlank()?label("recording.statements",locale)
+            :messages.getMessage("recording.statements.named",new Object[]{name},locale);
+    }
+
     private StatementDocument statementDocument(LoanRecordingService.StatementExport source,Locale locale,Posting opening){
-        String missing="—";String[] client=source.client().split(" - ",2);
-        var identity=List.of(new StatementField(label("recording.statement.clientNumber",locale),client[0]),
-            new StatementField(label("recording.statement.name",locale),client.length>1?client[1]:source.client()),
+        String missing="—";
+        var identity=List.of(new StatementField(label("recording.statement.clientNumber",locale),source.client().number()),
+            new StatementField(label("recording.statement.name",locale),source.client().name()),
             new StatementField(label("recording.asOf",locale),statementDate(clock.today(),locale)));
         var terms=source.terms().stream().collect(java.util.stream.Collectors.toMap(StatementTerms::loanId,t->t));
         var posts=source.movements().stream().collect(java.util.stream.Collectors.groupingBy(Posting::loanId,LinkedHashMap::new,java.util.stream.Collectors.toList()));
@@ -234,22 +284,22 @@ public class LoanRecordingController {
             var fields=new ArrayList<StatementField>();
             statementField(fields,"loan",loan.number(),locale);statementField(fields,"product",loan.product(),locale);
             statementField(fields,"disbursementDate",disbursement==null?missing:statementDate(disbursement.date(),locale),locale);
-            statementField(fields,"principal",statementMoney(loan.principal(),locale),locale);
+            statementField(fields,"principal",reportMoney(loan.principal(),locale),locale);
             statementField(fields,"months",term==null?missing:term.tenureValue()+" "+label("recording.tenure."+term.tenureUnit(),locale),locale);
             if(term!=null && "AMOUNT".equals(term.rateBasis())){
-                statementField(fields,"fixedInterest",statementMoney(term.fixedInterest(),locale),locale);
+                statementField(fields,"fixedInterest",reportMoney(term.fixedInterest(),locale),locale);
             }else{
                 String rate=term==null || term.rate()==null?missing
-                    :statementMoney(term.rate().movePointRight(2),locale)+"% "+label("recording.basis."+term.rateBasis(),locale);
+                    :reportMoney(term.rate().movePointRight(2),locale)+"% "+label("recording.basis."+term.rateBasis(),locale);
                 statementField(fields,"rateAnnual",rate,locale);
             }
             statementField(fields,"paymentDates",term==null?missing:statementDate(term.firstPaymentDate(),locale)+" / "+statementDate(term.lastPaymentDate(),locale),locale);
-            statementField(fields,"installment",term==null || term.frequency()==null?missing:statementMoney(term.installment(),locale)+" / "+label("recording.frequency."+term.frequency(),locale),locale);
-            statementField(fields,"disbursed",disbursement==null?missing:statementMoney(disbursement.amount(),locale),locale);
-            statementField(fields,"outstanding",disbursement==null?missing:statementMoney(loan.outstandingPrincipal(),locale),locale);
-            statementField(fields,"dueInterest",disbursement==null?missing:statementMoney(loan.dueInterest(),locale),locale);
-            fields.add(new StatementField(label("charges.outstanding",locale),disbursement==null?missing:statementMoney(loan.charges(),locale)));
-            statementField(fields,"arrears",disbursement==null?missing:statementMoney(loan.arrears(),locale),locale);
+            statementField(fields,"installment",term==null || term.frequency()==null?missing:reportMoney(term.installment(),locale)+" / "+label("recording.frequency."+term.frequency(),locale),locale);
+            statementField(fields,"disbursed",disbursement==null?missing:reportMoney(disbursement.amount(),locale),locale);
+            statementField(fields,"outstanding",disbursement==null?missing:reportMoney(loan.outstandingPrincipal(),locale),locale);
+            statementField(fields,"dueInterest",disbursement==null?missing:reportMoney(loan.dueInterest(),locale),locale);
+            fields.add(new StatementField(label("charges.outstanding",locale),disbursement==null?missing:reportMoney(loan.charges(),locale)));
+            statementField(fields,"arrears",disbursement==null?missing:reportMoney(loan.arrears(),locale),locale);
             statementField(fields,"branch",term==null?missing:term.institution()+" / "+term.branch(),locale);
             var rows=new ArrayList<List<String>>();
             for(var post:movements){
@@ -260,11 +310,11 @@ public class LoanRecordingController {
                     default -> "recording.document."+post.kind();
                 },locale);
                 if(post.notes()!=null && !post.notes().isBlank())description+=" / "+post.notes();
-                if(post.charges().signum()>0)description+=" / "+label("charges.title",locale)+": "+statementMoney(post.charges(),locale);
-                if(Set.of("CHARGE_ASSESS","CHARGE_UNDO").contains(post.kind()))description+=" / TZS "+statementMoney(post.amount(),locale);
+                if(post.charges().signum()>0)description+=" / "+label("charges.title",locale)+": "+reportMoney(post.charges(),locale);
+                if(Set.of("CHARGE_ASSESS","CHARGE_UNDO").contains(post.kind()))description+=" / TZS "+reportMoney(post.amount(),locale);
                 rows.add(List.of(statementDate(post.date(),locale),description,
-                    credit?"":statementMoney(post.principal(),locale),credit?statementMoney(post.principal(),locale):"",
-                    statementMoney(Set.of("REVERSAL","SETTLEMENT_UNDO").contains(post.kind())?post.interest().negate():post.interest(),locale),statementMoney(post.principalBalance(),locale)));
+                    credit?"":reportMoney(post.principal(),locale),credit?reportMoney(post.principal(),locale):"",
+                    reportMoney(Set.of("REVERSAL","SETTLEMENT_UNDO").contains(post.kind())?post.interest().negate():post.interest(),locale),reportMoney(post.principalBalance(),locale)));
             }
             sections.add(new StatementSection(fields,columns,rows));
         }
@@ -274,12 +324,18 @@ public class LoanRecordingController {
     private void statementField(List<StatementField> fields,String key,String value,Locale locale){fields.add(new StatementField(label("recording.statement."+key,locale),value));}
     private String statementDate(LocalDate value,Locale locale){return value==null?"—":value.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/uuuu",locale)).toUpperCase(locale);}
     private String statementMoney(BigDecimal value,Locale locale){if(value==null)return "—";var format=java.text.NumberFormat.getNumberInstance(locale);format.setMinimumFractionDigits(2);format.setMaximumFractionDigits(2);return format.format(value);}
+    private String reportMoney(BigDecimal value, Locale locale) {
+        if (value == null) return "—";
+        var format = java.text.NumberFormat.getNumberInstance(locale);
+        format.setMaximumFractionDigits(2);
+        return format.format(value);
+    }
     @GetMapping({"/loan-disbursements/report/pdf","/loan-disbursements/report/print","/loan-repayments/report/pdf","/loan-repayments/report/print"})
     public Object report(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="newest") String sort,@RequestParam(required=false) UUID productId,jakarta.servlet.http.HttpServletRequest request,Locale locale,Model model){
         String kind=kind(request);Choice selectedProduct=productId==null?null:service.filterProduct(a,productId);var rows=service.report(a,kind,new Filter(search,from,through,state,sort,0,null,productId));var lines=new ArrayList<String>();lines.add(label("recording.asOf",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(clock.today()));lines.add(label("voucher.from",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(from)+" | "+label("voucher.through",locale)+": "+com.sacco.mvp.service.ApplicationTimestamps.date(through));
         if(selectedProduct!=null)lines.add(label("recording.product",locale)+": "+selectedProduct.label());
-        BigDecimal total=BigDecimal.ZERO;for(var p:rows){total=total.add(Set.of("REVERSAL","FUNDING_UNDO").contains(p.kind())?p.amount().negate():p.amount());lines.add(com.sacco.mvp.service.ApplicationTimestamps.date(p.date())+" | "+p.loanNumber()+" | "+p.client()+" | "+p.reference()+" | TZS "+(Set.of("REVERSAL","FUNDING_UNDO").contains(p.kind())?p.amount().negate():p.amount())+" | "+label("recording.principal",locale)+": "+p.principal()+" | "+label("recording.interest",locale)+": "+p.interest()+" | "+label("charges.title",locale)+": "+p.charges()+" | "+label(Set.of("REVERSAL","FUNDING_UNDO").contains(p.kind())?"voucher.status.REVERSAL":p.reversedBy()==null?"voucher.status.POSTED":"voucher.status.REVERSED",locale));}
-        lines.add(label("voucher.records",locale)+": "+rows.size()+" | "+label("voucher.total",locale)+": TZS "+total);String institution="",branch=a.getStationId();if(!rows.isEmpty()){var d=service.detail(a,rows.getFirst().loanId());institution=d.institution();branch=d.branch();}
+        BigDecimal total=BigDecimal.ZERO;for(var p:rows){total=total.add(Set.of("REVERSAL","FUNDING_UNDO").contains(p.kind())?p.amount().negate():p.amount());lines.add(com.sacco.mvp.service.ApplicationTimestamps.date(p.date())+" | "+p.loanNumber()+" | "+p.client()+" | "+p.reference()+" | TZS "+reportMoney(Set.of("REVERSAL","FUNDING_UNDO").contains(p.kind())?p.amount().negate():p.amount(),locale)+" | "+label("recording.principal",locale)+": "+reportMoney(p.principal(),locale)+" | "+label("recording.interest",locale)+": "+reportMoney(p.interest(),locale)+" | "+label("charges.title",locale)+": "+reportMoney(p.charges(),locale)+" | "+label(Set.of("REVERSAL","FUNDING_UNDO").contains(p.kind())?"voucher.status.REVERSAL":p.reversedBy()==null?"voucher.status.POSTED":"voucher.status.REVERSED",locale));}
+        lines.add(label("voucher.records",locale)+": "+rows.size()+" | "+label("voucher.total",locale)+": TZS "+reportMoney(total,locale));String institution="",branch=a.getStationId();if(!rows.isEmpty()){var d=service.detail(a,rows.getFirst().loanId());institution=d.institution();branch=d.branch();}
         return output(new Document(label("recording.register."+kind,locale),institution,branch,"loan-"+kind.toLowerCase(Locale.ROOT)+"-report.pdf",lines),request,model);
     }
     private Object output(Document doc,jakarta.servlet.http.HttpServletRequest request,Model model){if(request.getRequestURI().endsWith("/print")){model.addAttribute("document",doc);return "accounting/loans/print";}return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.APPLICATION_PDF).header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename="+doc.filename()).header("X-Content-Type-Options","nosniff").body(pdf.render(doc));}

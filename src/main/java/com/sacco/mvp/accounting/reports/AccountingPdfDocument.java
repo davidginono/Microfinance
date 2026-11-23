@@ -55,7 +55,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
     /** Column boundaries measured in points on the Legal and Letter reference pages. */
     public static float[] sourceEdges(Style style) {
         return switch(style){
-            case AUDIT -> new float[]{0,23,85,226,267,334,442,538,636,707,783,856,895,940,1000};
+            case AUDIT -> new float[]{0,23,91,230,276,361,462,570,656,732,811,910,950,1000};
             case EXPECTED -> new float[]{9,54,94,243,333,416,500,577,723,790};
             case REPAYMENT -> new float[]{9,76,153,220,292,378,472,544};
             default -> new float[0];
@@ -349,7 +349,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
         if(style==Style.ORIGINAL)y-=5;
     }
     private boolean compactSourceColumn(int column){
-        return style==Style.AUDIT && (column==1 || column==3 || column>=9)
+        return style==Style.AUDIT && (column==1 || column==3 || column>=8)
             || style==Style.EXPECTED && column<=1;
     }
     public void text(String value)throws IOException {for(String line:wrap(value,9,width())){if(y<65)next();draw(line,tableLeft(),y,9,false,false);y-=13;}y-=4;}

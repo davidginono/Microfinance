@@ -571,25 +571,70 @@ public class LoanRecordingService {
         return Optional.of(new Page<>(stored.stream().map(r->new ScheduleRow(r.number(),r.dueDate(),r.principal(),r.interest(),r.principal().add(r.interest()),r.beginningBalance(),r.endingBalance())).toList(),page,stored.hasNext()));
     }
     @Transactional(readOnly=true) public Page<Posting> history(AppUserPrincipal a,UUID id,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");records.record(a,id,false);var rows=records.loanPosts(a,id,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
-    @Transactional(readOnly=true) public Page<Posting> movements(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");check(records.ledgerClient(a,client).isPresent(),"client");var rows=records.clientPosts(a,client,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
+    @Transactional(readOnly=true)
+    public StatementMovements movements(AppUserPrincipal a, UUID client, MovementFilter filter, int page) {
+        authorize(a,"VIEW");
+        check(page>=0 && page<=10000 && (filter.from()==null || filter.through()==null
+            || !filter.from().isAfter(filter.through())),"filter");
+        statementClient(a,client);
+        var loan = selectedMovementChoice(a,client,false,filter.loanId());
+        var product = selectedMovementChoice(a,client,true,filter.productId());
+        var rows = records.clientPosts(a,client,filter,26,page*25);
+        return new StatementMovements(new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25),loan,product);
+    }
+
+    @Transactional(readOnly=true)
+    public List<Choice> movementChoices(AppUserPrincipal a, UUID client, String category, String search, int page) {
+        authorize(a,"VIEW");
+        check(Set.of("loans","products").contains(category) && search.length()<=100 && page>=0 && page<=10000
+            && search.chars().noneMatch(Character::isISOControl),"filter");
+        statementClient(a,client);
+        return records.statementMovementChoices(a,client,category.equals("products"),search.strip().toLowerCase(Locale.ROOT),26,page*25,null);
+    }
+
+    private Choice selectedMovementChoice(AppUserPrincipal a, UUID client, boolean products, UUID id) {
+        if (id == null) return null;
+        return records.statementMovementChoices(a,client,products,"",1,0,id).stream().findFirst()
+            .orElseThrow(() -> new AccessDeniedException("Loan or product unavailable"));
+    }
+
+    private StatementClient statementClient(AppUserPrincipal a, UUID client) {
+        return records.statementClient(a,client).orElseThrow(() -> new AccessDeniedException("Client unavailable"));
+    }
     public record LoanStatementView(StatementExport source,Posting opening,int page,boolean hasNext) {}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
     public LoanStatementView loanStatement(AppUserPrincipal a,UUID client,UUID loan,int page,boolean export){
         authorize(a,export?"EXPORT":"VIEW");check(page>=0 && page<=10000,"filter");
-        var owner=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
+        var owner=statementClient(a,client);
         var record=records.loan(a,loan,clock.today());
         if(!Objects.equals(record.clientId(),client))throw new org.springframework.security.access.AccessDeniedException("Loan outside client statement");
         var rows=records.loanPosts(a,loan,export?501:26,export?0:page*25);if(export)check(rows.size()<=500,"reportLimit");
-        return new LoanStatementView(new StatementExport(owner.label(),List.of(record),export?rows:rows.stream().limit(25).toList(),records.statementTerms(a,client,loan)),records.loanOpening(a,loan).orElse(null),page,!export && rows.size()>25);
+        return new LoanStatementView(new StatementExport(owner,List.of(record),export?rows:rows.stream().limit(25).toList(),records.statementTerms(a,client,loan)),records.loanOpening(a,loan).orElse(null),page,!export && rows.size()>25);
     }
-    public record StatementExport(String client,List<LoanRow> loans,List<Posting> movements,List<StatementTerms> terms) {}
+    public record StatementExport(StatementClient client,List<LoanRow> loans,List<Posting> movements,List<StatementTerms> terms) {}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
-    public StatementExport exportStatement(AppUserPrincipal a,UUID client){
-        authorize(a,"EXPORT");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));
-        var f=new Filter("",null,null,"","oldest",0,client);var loans=records.loans(a,f,clock.today(),501,0);var movements=records.clientPosts(a,client,501,0);
-        check(loans.size()<=500 && movements.size()<=500,"reportLimit");return new StatementExport(c.label(),loans,movements,records.statementTerms(a,client));
+    public BalanceExport exportStatement(AppUserPrincipal a, UUID client) {
+        authorize(a,"EXPORT");
+        var owner = statementClient(a,client);
+        var today = clock.today();
+        var loans = records.statementBalances(a,client,today,501);
+        check(loans.size()<=500,"reportLimit");
+        return new BalanceExport(owner,loans,today);
     }
-    @Transactional(readOnly=true) public Statement statement(AppUserPrincipal a,UUID client,int page){authorize(a,"VIEW");var c=records.ledgerClient(a,client).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Client unavailable"));var f=new Filter("",null,null,"","newest",page,client);filter(f,false);var t=records.clientTotals(a,f,clock.today());var rows=records.loans(a,f,clock.today(),26,page*25);return new Statement(c.label(),c.label().split(" - ",2)[0],(BigDecimal)t.get("principal"),(BigDecimal)t.get("interest"),(BigDecimal)t.get("arrears"),(BigDecimal)t.get("future_interest"),((Number)t.get("loans")).longValue(),new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25),(BigDecimal)t.get("charges"));}
+
+    @Transactional(readOnly=true)
+    public Statement statement(AppUserPrincipal a, UUID client, int page) {
+        authorize(a,"VIEW");
+        var owner = statementClient(a,client);
+        var f = new Filter("",null,null,"","newest",page,client);
+        filter(f,false);
+        var today = clock.today();
+        var totals = records.clientTotals(a,f,today);
+        var rows = records.loans(a,f,today,26,page*25);
+        return new Statement(owner,(BigDecimal)totals.get("principal"),(BigDecimal)totals.get("interest"),
+            (BigDecimal)totals.get("arrears"),(BigDecimal)totals.get("future_interest"),((Number)totals.get("loans")).longValue(),
+            new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25),(BigDecimal)totals.get("charges"));
+    }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public List<Posting> report(AppUserPrincipal a,String kind,Filter f){authorize(a,"EXPORT");filter(f,true);kind(kind);var total=records.totals(a,kind,f);check(total.count()<=500,"reportLimit");return records.posts(a,kind,f,500,0);}
     @Transactional(readOnly=true) public Totals totals(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);return records.totals(a,kind,f);}
     private LoanProductSetting product(AppUserPrincipal a,RecordForm f){

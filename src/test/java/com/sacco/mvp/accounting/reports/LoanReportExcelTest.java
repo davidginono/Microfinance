@@ -94,6 +94,24 @@ class LoanReportExcelTest {
         var oversized=new Result(source.kind(),source.parameters(),source.institution(),source.branch(),source.columns(),Collections.nCopies(5001,source.rows().getFirst()),source.groups(),source.totals(),5001,0,false,"","");assertThatThrownBy(()->export.build(oversized,Locale.ENGLISH)).hasMessage("management.error.large");
         for(var kind:List.of(Kind.CASHBOOK,Kind.DAILY_COLLECTIONS))assertThatThrownBy(()->export.build(result(kind,1),Locale.ENGLISH)).hasMessage("management.error.parameters");
     }
+    @Test void workbookDisplaysOnlySignificantDecimalsInNumericCells() throws Exception {
+        var source = result(Kind.EXPECTED_REPAYMENTS,1);
+        var row = source.rows().getFirst();
+        row.put("principalBalance",new BigDecimal("1500000.00"));
+        row.put("principalDue",new BigDecimal("37500.50"));
+        row.put("interestDue",new BigDecimal("2083.33"));
+        var writer = new ManagementReportExcel(messages(),new ReportExportLimiter(1),new ApplicationClock("Africa/Dar_es_Salaam"));
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(writer.build(source,Locale.ENGLISH)))) {
+            var data = book.getSheetAt(1);
+            var amounts = data.getRow(data.getPaneInformation().getHorizontalSplitPosition());
+            var formatter = new DataFormatter(Locale.ENGLISH);
+            for (int column=5;column<=7;column++) assertThat(amounts.getCell(column).getCellType()).isEqualTo(CellType.NUMERIC);
+            assertThat(formatter.formatCellValue(amounts.getCell(5))).isEqualTo("1,500,000");
+            assertThat(formatter.formatCellValue(amounts.getCell(6))).isEqualTo("37,500.5");
+            assertThat(formatter.formatCellValue(amounts.getCell(7))).isEqualTo("2,083.33");
+        }
+    }
+
     static int column(Sheet s,int header,String label){for(var cell:s.getRow(header))if(cell.getStringCellValue().equals(label))return cell.getColumnIndex();throw new AssertionError(label);}
     private static void assertSubtitleLayout(Sheet report,int header,Kind kind,ResourceBundleMessageSource messages,Locale locale){
         var range=report.getRow(1);

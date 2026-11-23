@@ -2,6 +2,6 @@
 <tr class="reference-total">
   <td colspan="${auditSource?4:1}"><spring:message code="${sourceTotalLabel}" /></td>
   <c:forEach items="${report.getDocumentColumns()}" var="column" begin="${auditSource?3:1}">
-    <td class="${column.money?'reference-money':''}"><c:choose><c:when test="${column.money and report.getTotalFields().contains(column.key) and sourceTotals[column.key]!=null}"><fmt:formatNumber value="${sourceTotals[column.key]}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:when test="${column.money and report.getTotalFields().contains(column.key)}">—</c:when></c:choose></td>
+    <td class="${column.money?'reference-money':''}"><c:choose><c:when test="${column.money and report.getTotalFields().contains(column.key) and sourceTotals[column.key]!=null}"><fmt:formatNumber value="${sourceTotals[column.key]}" minFractionDigits="0" maxFractionDigits="2" /></c:when><c:when test="${column.money and report.getTotalFields().contains(column.key)}">—</c:when></c:choose></td>
   </c:forEach>
 </tr>

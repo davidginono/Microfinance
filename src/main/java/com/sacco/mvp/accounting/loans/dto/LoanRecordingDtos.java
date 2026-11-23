@@ -183,10 +183,21 @@ public final class LoanRecordingDtos {
     public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges) {
         public AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal balance){this(principal,interest,balance,new BigDecimal("0.00"));}
     }
-    public record Statement(String client, String clientNumber, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
-        BigDecimal futureInterest, long loans, Page<LoanRow> page,BigDecimal charges) {
-        public Statement(String client,String clientNumber,BigDecimal principal,BigDecimal interest,BigDecimal arrears,BigDecimal futureInterest,long loans,Page<LoanRow> page){this(client,clientNumber,principal,interest,arrears,futureInterest,loans,page,BigDecimal.ZERO);}
+    public record StatementClient(String number, String name, String kind) {
+        public String titleName() {
+            if (!"CLIENT".equals(kind) || name == null || name.isBlank()) return name;
+            String first = name.strip().split("\\s+", 2)[0];
+            if (!first.equals(first.toUpperCase(Locale.ROOT))) return first;
+            int firstLetter = first.offsetByCodePoints(0, 1);
+            return first.substring(0, firstLetter) + first.substring(firstLetter).toLowerCase(Locale.ROOT);
+        }
     }
+    public record Statement(StatementClient client, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
+        BigDecimal futureInterest, long loans, Page<LoanRow> page, BigDecimal charges) {}
+    public record StatementBalance(LoanRow loan, boolean hasLedger) {}
+    public record BalanceExport(StatementClient client, List<StatementBalance> loans, LocalDate asOf) {}
+    public record MovementFilter(LocalDate from, LocalDate through, UUID loanId, UUID productId) {}
+    public record StatementMovements(Page<Posting> page, Choice loan, Choice product) {}
     public record Totals(long count, BigDecimal amount, BigDecimal principal, BigDecimal interest) {}
     public record StatementTerms(UUID loanId, BigDecimal rate, String frequency, int months, int installments,
         LocalDate firstPaymentDate, BigDecimal installment, String institution, String branch, String rateBasis, String tenureUnit, int tenureValue, LocalDate maturityDate,String chargeSnapshot,BigDecimal fixedInterest) {

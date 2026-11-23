@@ -173,18 +173,24 @@ public class ManagementReportRepository {
             order by a.code collate "C",a.id limit 26 offset :offset
             """,p,this::choice);
     }
-    public List<Choice> clients(AppUserPrincipal a,String search,int page,UUID selected) {
+    public List<Choice> clients(AppUserPrincipal a,String search,int page,UUID selected,boolean includeScopedLoanBorrowers) {
         return jdbc.query("""
           select b.id,b.member_no,b.full_name from (
             select m.id,m.member_no,m.full_name from members m
-            where m.sacco_id=:institution and m.station_id=:branch and m.is_member
+            where m.sacco_id=:institution and m.is_member and (m.station_id=:branch
+              or (:includeScopedLoanBorrowers and exists (
+                select 1 from loan_applications a
+                where a.sacco_id=:institution and a.station_id=:branch and a.borrower_party_id=m.id
+                  and a.disbursement_date is not null
+              )))
             union all
             select g.party_id,g.member_no,g.full_name from loan_borrower_directory g
             where g.sacco_id=:institution and g.group_station_id=:branch and g.kind<>'CLIENT'
           ) b
           where (cast(:id as uuid) is null or b.id=:id) and strpos(lower(b.member_no||' '||b.full_name),:search)>0
           order by b.member_no,b.id limit 26 offset :offset
-          """,parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25).addValue("id",selected,java.sql.Types.OTHER),
+          """,parameters(a,null).addValue("search",search.toLowerCase(Locale.ROOT)).addValue("offset",page*25).addValue("id",selected,java.sql.Types.OTHER)
+              .addValue("includeScopedLoanBorrowers",includeScopedLoanBorrowers),
           this::choice);
     }
     private Choice choice(ResultSet row,int index)throws SQLException {
@@ -341,7 +347,6 @@ public class ManagementReportRepository {
                 (select sum(l.credit-l.debit) from gl_journal_line l
                   where l.journal_id=p.journal_id and l.sacco_id=p.sacco_id and l.station_id=p.station_id
                     and l.account_id=p.money_account_id) as "netDisbursed",
-                case when e.complete then first_installment.principal end as "principalInstallment",
                 case when jsonb_typeof(a.financial_snapshot->'interestRate')='number'
                      then round((a.financial_snapshot->>'interestRate')::numeric*100,2) end as "loanRate",
                 case when e.complete then e.scheduled_interest end as "totalInterest",
@@ -354,8 +359,6 @@ public class ManagementReportRepository {
               left join accountant_loan_post p on p.loan_id=a.id and p.sacco_id=a.sacco_id and p.station_id=a.station_id
                 and p.kind='DISBURSEMENT' and p.state='POSTED' and p.recorded_at<=:cutoff
                 and exists(select 1 from gl_journal j where j.id=p.journal_id and j.state='POSTED' and j.posted_at<=:cutoff)
-              left join loan_ledger_installments first_installment on first_installment.loan_application_id=e.loan_application_id
-                and first_installment.installment_number=1
             ) """;
     }
     private static String expected(){

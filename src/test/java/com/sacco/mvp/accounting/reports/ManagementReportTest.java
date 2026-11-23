@@ -94,7 +94,7 @@ class ManagementReportTest {
             try(var doc=Loader.loadPDF(bytes)){
                 if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(612);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(792);}
                 if(kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.EXPECTED_REPAYMENTS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(1008);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(612);}
-                String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.40");
+                String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.4").doesNotContain("5,999,999,999,999,999.40");
                 if(kind==Kind.EXPECTED_REPAYMENTS){
                     String productLabel=exporter.message("pdf.loanTypeName",Locale.forLanguageTag(language)).toUpperCase(Locale.ROOT);
                     assertThat(text.replaceAll("\\s+","")).contains(productLabel.replace(" ",""))
@@ -160,7 +160,7 @@ class ManagementReportTest {
         }
     }
     @Test void sourceFieldOrderMatchesTheRetainedReferenceColumns(){
-        assertThat(ManagementReports.documentColumns(Kind.DISBURSED_LOANS_AUDIT).stream().map(Column::key)).containsExactly("clientNumber","name","loanId","netDisbursed","disbursed","principalInstallment","totalInterest","instalment","disbursementDate","maturity","reference","loanRate","periods");
+        assertThat(ManagementReports.documentColumns(Kind.DISBURSED_LOANS_AUDIT).stream().map(Column::key)).containsExactly("clientNumber","name","loanId","netDisbursed","disbursed","totalInterest","instalment","disbursementDate","maturity","reference","loanRate","periods");
         assertThat(ManagementReports.documentColumns(Kind.EXPECTED_REPAYMENTS).stream().map(Column::key)).containsExactly("clientNumber","loanId","name","phone","dueDate","principalBalance","principalDue","interestDue","expectedTotal");
         assertThat(ManagementReports.documentColumns(Kind.LOAN_REPAYMENT_TRANSACTIONS).stream().map(Column::key)).containsExactly("date","openingPrincipal","principalPaid","interestPaid","payment","closingPrincipal","interestExcluded");
     }

@@ -68,7 +68,7 @@ public final class LoanReportReferenceText {
     public static String documentHeading(Kind kind, String key, Function<String, String> label) {
         if (kind == Kind.DISBURSED_LOANS_AUDIT || kind == Kind.EXPECTED_REPAYMENTS) {
             String caption=switch(key) {
-                case "netDisbursed", "principalInstallment", "loanRate" -> key;
+                case "netDisbursed", "loanRate" -> key;
                 case "disbursed" -> "loanAmount";
                 case "totalInterest" -> "totalInterest";
                 case "instalment" -> "totalInstallment";

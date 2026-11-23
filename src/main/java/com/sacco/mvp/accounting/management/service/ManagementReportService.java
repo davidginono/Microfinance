@@ -28,7 +28,7 @@ public class ManagementReportService {
         authorize(a,kind,false);check(search!=null && search.length()<=100 && search.chars().noneMatch(Character::isISOControl) && page>=0 && page<=10000,"parameters");
         return switch(category) {
             case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of());}
-            case "clients" -> reports.clients(a,search,page,null);
+            case "clients" -> reports.clients(a,search,page,null,kind==Kind.EXPECTED_REPAYMENTS);
             case "products" -> {
                 loanReport(kind);
                 yield reports.products(a,search,page,null,customisedLabel());
@@ -49,7 +49,7 @@ public class ManagementReportService {
         return selected;
     }
     @Transactional(readOnly=true) public Choice selectedClient(AppUserPrincipal a,Kind kind,UUID id) {
-        authorize(a,kind,false);return id==null?null:reports.clients(a,"",0,id).stream().findFirst().orElseThrow(()->error("client"));
+        authorize(a,kind,false);return id==null?null:reports.clients(a,"",0,id,kind==Kind.EXPECTED_REPAYMENTS).stream().findFirst().orElseThrow(()->error("client"));
     }
     @Transactional(readOnly=true) public Choice selectedProduct(AppUserPrincipal a,Kind kind,UUID id) {
         authorize(a,kind,false);loanReport(kind);

@@ -23,9 +23,9 @@ public class LoanRecordingPdfService {
     private static final float STATEMENT_WIDTH=PDRectangle.A4.getHeight()-2*STATEMENT_MARGIN;
     public record Document(String title,String institution,String branch,String filename,List<String> lines) {}
     public record StatementField(String label,String value) {}
-    public record StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths,int monetaryColumnStart) {
-        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows){this(fields,columns,rows,List.of(),2);}
-        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths){this(fields,columns,rows,columnWidths,2);}
+    public record StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths,int monetaryColumnStart,boolean leadingAmounts) {
+        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows){this(fields,columns,rows,List.of(),2,false);}
+        public StatementSection(List<StatementField> fields,List<String> columns,List<List<String>> rows,List<Float> columnWidths){this(fields,columns,rows,columnWidths,2,false);}
     }
     public record StatementDocument(String title,List<StatementField> client,List<StatementSection> sections,String empty,String note) {}
     public byte[] renderAmortization(LoanAmortizationPdfDocument.Source source){return limiter.run(()->{
@@ -78,7 +78,7 @@ public class LoanRecordingPdfService {
                             }
                         }
                         float x=STATEMENT_MARGIN;
-                        for(int c=0;c<cells.size();c++){float lineY=y-12;PDFont face=faces.get(c);float point=points.get(c);for(var line:cells.get(c)){float textX=x+4;if(row.size()>1 && c>=section.monetaryColumnStart())textX=x+widths[c]-4-face.getStringWidth(line)*point/1000;draw(stream,face,textX,lineY,point,Color.BLACK,line);lineY-=11;}x+=row.size()==1?STATEMENT_WIDTH:widths[c];}
+                        for(int c=0;c<cells.size();c++){float lineY=y-12;PDFont face=faces.get(c);float point=points.get(c);for(var line:cells.get(c)){float textX=x+4;if(row.size()>1 && !section.leadingAmounts() && c>=section.monetaryColumnStart())textX=x+widths[c]-4-face.getStringWidth(line)*point/1000;draw(stream,face,textX,lineY,point,Color.BLACK,line);lineY-=11;}x+=row.size()==1?STATEMENT_WIDTH:widths[c];}
                         y-=height;
                     }
                 }finally{if(stream!=null)stream.close();}

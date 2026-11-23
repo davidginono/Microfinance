@@ -307,7 +307,7 @@ class LoanRecordingPostgresTest {
         for(var language:List.of("en","sw")){
             var locale=Locale.forLanguageTag(language);var loanPdf=(org.springframework.http.ResponseEntity<?>)controller.loanExport(actor,id,new org.springframework.mock.web.MockHttpServletRequest("GET","/finance/loan-records/"+id+"/pdf"),locale,new org.springframework.ui.ExtendedModelMap());
             try(var document=org.apache.pdfbox.Loader.loadPDF((byte[])loanPdf.getBody())){var text=new org.apache.pdfbox.text.PDFTextStripper().getText(document);assertThat(text.toUpperCase(Locale.ROOT).replaceAll("\\s+"," ")).contains("25.00","10.00",language.equals("en")?"APPLICATION COMPONENT":"SEHEMU YA MAOMBI");if(language.equals("en"))javax.imageio.ImageIO.write(new org.apache.pdfbox.rendering.PDFRenderer(document).renderImageWithDPI(0,100),"png",java.nio.file.Path.of("target/loan-charges-verified.png").toFile());}
-            var statement=(org.springframework.http.ResponseEntity<?>)controller.statementExport(actor,client,new org.springframework.mock.web.MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/pdf"),locale,new org.springframework.ui.ExtendedModelMap());try(var document=org.apache.pdfbox.Loader.loadPDF((byte[])statement.getBody())){assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document).toUpperCase(Locale.ROOT).replaceAll("\\s+"," ")).contains("25.00",language.equals("en")?"OUTSTANDING CHARGES":"TOZO AMBAZO HAZIJALIPWA");}
+            var statement=(org.springframework.http.ResponseEntity<?>)controller.statementExport(actor,client,new org.springframework.mock.web.MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/pdf"),locale,new org.springframework.ui.ExtendedModelMap());try(var document=org.apache.pdfbox.Loader.loadPDF((byte[])statement.getBody())){assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document).toUpperCase(Locale.ROOT).replaceAll("\\s+"," ")).contains("25",language.equals("en")?"OUTSTANDING CHARGES":"TOZO AMBAZO HAZIJALIPWA");}
         }
     }
     @Test void topUpSeparatesInternalSettlementFromCashAndExcludesFutureInterest(){
@@ -525,6 +525,53 @@ class LoanRecordingPostgresTest {
         disbursed("D-REPORT-PARAMETERS-SECOND");
         assertThat(reports.soleRepaymentLoan(actor,p)).isEmpty();
     }
+    @Test void expectedRepaymentsSelectsOneBorrowerAndRetainsBranchLoansAfterClientMoves() {
+        var other = UUID.randomUUID();
+        jdbc.update("""
+            insert into members(id,sacco_id,station_id,member_no,full_name,status,position,is_member,password_hash,created_at)
+            values (?,?,'B1',?,'Synthetic other borrower','ACTIVE','MEMBER',true,'test-only',now())
+            """,other,institution,other.toString());
+        var due = TODAY.plusDays(7);
+        var first = form();
+        first.setFirstPaymentDate(due);
+        var firstId = service.save(actor,first);
+        var firstFunding = post(firstId,"1000.00","D-EXPECTED-SELECTED");
+        firstFunding.setFirstPaymentDate(due);
+        var selectedLoan = service.disburse(actor,firstFunding).loanNumber();
+        var second = form();
+        second.setClientId(other);
+        second.setFirstPaymentDate(due);
+        var secondId = service.save(actor,second);
+        var secondFunding = post(secondId,"1000.00","D-EXPECTED-OTHER");
+        secondFunding.setFirstPaymentDate(due);
+        var otherLoan = service.disburse(actor,secondFunding).loanNumber();
+
+        var reports = new com.sacco.mvp.accounting.reports.ManagementReportRepository(
+            new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var kind = com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.EXPECTED_REPAYMENTS;
+        var cutoff = context.getBean(ApplicationClock.class).now();
+        var filtered = new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            due,due,cutoff,null,null,client,"",0,product);
+        var all = new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            due,due,cutoff,null,null,null,"",0,product);
+        assertThat(reports.read(actor,kind,all,false).rows()).extracting(row->row.get("loanId"))
+            .containsExactlyInAnyOrder(selectedLoan,otherLoan);
+
+        jdbc.update("update members set station_id='B2',status='INACTIVE' where id=?",client);
+        var preview = reports.read(actor,kind,filtered,false);
+        assertThat(preview.rows()).extracting(row->row.get("loanId")).containsExactly(selectedLoan);
+        assertThat(preview.excluded()).isZero();
+        assertThat(reports.read(actor,kind,filtered,true).rows()).isEqualTo(preview.rows());
+        assertThat(reports.read(operator("B2"),kind,filtered,false).rows()).isEmpty();
+        assertThat(reports.clients(actor,client.toString(),0,null,true))
+            .extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Choice::id).containsExactly(client);
+        assertThat(reports.clients(actor,"",0,client,true))
+            .extracting(com.sacco.mvp.accounting.management.dto.ManagementReports.Choice::id).containsExactly(client);
+        var beforeDue = new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            due.minusDays(1),due.minusDays(1),cutoff,null,null,client,"",0,product);
+        assertThat(reports.read(actor,kind,beforeDue,false).rows()).isEmpty();
+    }
+
     @Test void referenceReportsReconcileGroupedReceiptsCorrectionsAndPortfolioBalances(){
         var first=disbursed("D-REFERENCE-1");var second=disbursed("D-REFERENCE-2");
         var receipt=receiptService().post(actor,receiptForm(first,second));
@@ -1084,7 +1131,25 @@ class LoanRecordingPostgresTest {
         assertThat(service.choices(actor,"filter-products","",0)).extracting(Choice::id).contains(product,other);
         assertThat(service.filterProduct(actor,product).label()).isEqualTo("Renamed business loan");
         assertThat(service.register(actor,"PAYMENT",filter).rows()).extracting(Posting::product).containsExactly("Synthetic business loan");
-        assertThat(service.movements(actor,client,0).rows()).extracting(Posting::product).contains("Synthetic business loan","Other business loan");
+        assertThat(service.movements(actor,client,new MovementFilter(null,null,null,null),0).page().rows())
+            .extracting(Posting::product).contains("Synthetic business loan","Other business loan");
+        assertThat(service.movementChoices(actor,client,"products","",0)).extracting(Choice::id).containsExactlyInAnyOrder(product,other);
+        assertThat(service.movementChoices(actor,client,"loans","",0)).extracting(Choice::id).containsExactlyInAnyOrder(first,second);
+        assertThat(service.movements(actor,client,new MovementFilter(TODAY,TODAY,first,product),0).page().rows())
+            .extracting(Posting::reference).containsExactly("PRODUCT-R1");
+        assertThat(service.movements(actor,client,new MovementFilter(TODAY,TODAY,null,other),0).page().rows())
+            .extracting(Posting::reference).containsExactly("PRODUCT-R2");
+        assertThat(service.movements(actor,client,new MovementFilter(null,TODAY.minusDays(1),first,null),0).page().rows())
+            .extracting(Posting::reference).containsExactly("D-PRODUCT-1");
+        assertThat(service.movements(actor,client,new MovementFilter(null,null,first,other),0).page().rows()).isEmpty();
+        assertThat(service.loanStatement(actor,client,first,0,true).source().movements())
+            .extracting(Posting::reference).containsExactlyInAnyOrder("D-PRODUCT-1","PRODUCT-R1");
+        assertThat(service.exportStatement(actor,client).loans())
+            .extracting(balance->balance.loan().id()).containsExactlyInAnyOrder(first,second);
+        assertThatThrownBy(()->service.movements(actor,client,new MovementFilter(TODAY,TODAY.minusDays(1),null,null),0))
+            .hasMessage("recording.error.filter");
+        assertThatThrownBy(()->service.movements(actor,client,new MovementFilter(null,null,UUID.randomUUID(),null),0))
+            .isInstanceOf(AccessDeniedException.class);
         assertThat(service.list(operator("B2"),filter).rows()).isEmpty();
         assertThat(service.report(operator("B2"),"PAYMENT",filter)).isEmpty();
         assertThat(service.list(actor,new Filter("",null,null,"","newest",1,null,product)).rows()).isEmpty();
@@ -1230,7 +1295,7 @@ class LoanRecordingPostgresTest {
         assertThat(service.detail(actor,id).schedule().getLast().date()).isEqualTo(p.getEffectiveDate().plusDays(10));
         var annual=form();annual.setLoanMode("CUSTOM");annual.setCustomApplicationCharge(BigDecimal.ZERO);annual.setCustomProcessingCharge(BigDecimal.ZERO);annual.setInsurancePremium(BigDecimal.ZERO);annual.setInterestBasis("ANNUAL");annual.setInterestPercent(new BigDecimal("12"));annual.setMonths(6);annual.setFirstPaymentDate(null);var annualId=service.save(actor,annual);assertThat(service.detail(actor,annualId).contractualInterest()).isEqualByComparingTo("60.00");
         var amount=form();amount.setLoanMode("CUSTOM");amount.setCustomApplicationCharge(BigDecimal.ZERO);amount.setCustomProcessingCharge(BigDecimal.ZERO);amount.setInsurancePremium(BigDecimal.ZERO);amount.setInterestEntry("AMOUNT");amount.setInterestAmount(new BigDecimal("17.03"));var amountId=service.save(actor,amount);assertThat(service.detail(actor,amountId).contractualInterest()).isEqualByComparingTo("17.03");
-        assertThat(service.exportStatement(actor,client).terms()).filteredOn(t->t.loanId().equals(amountId)).singleElement()
+        assertThat(service.loanStatement(actor,client,amountId,0,false).source().terms()).singleElement()
             .satisfies(t->assertThat(t.fixedInterest()).isEqualByComparingTo("17.03"));
     }
     @Test void uploadedEvidenceIsScopedFingerprintProtectedAndRollsBackWithTheLoan() throws Exception {

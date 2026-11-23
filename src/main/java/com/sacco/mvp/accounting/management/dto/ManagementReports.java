@@ -39,6 +39,11 @@ public final class ManagementReports {
         public List<Column> getDocumentColumns(){return isReferenceLayout()?documentColumns(kind):columns;}
         public boolean hasSpreadsheet(){return spreadsheetSupported(kind);}
         public boolean isReferenceLayout(){return Set.of(Kind.DISBURSED_LOANS_AUDIT,Kind.EXPECTED_REPAYMENTS,Kind.LOAN_REPAYMENT_TRANSACTIONS).contains(kind);}
+        public String getEmptyKey() {
+            if (kind==Kind.DAILY_COLLECTIONS) return "dailyEmpty";
+            if (kind==Kind.EXPECTED_REPAYMENTS && count==0 && excluded==0 && !clientSelection.isBlank()) return "expectedClientEmpty";
+            return "empty";
+        }
         public String getNoteKey(){
             if(excluded>0) return kind==Kind.DAILY_COLLECTIONS?"unlinkedReceipts":"exclusionBasis";
             if(count==0) return "";
@@ -97,7 +102,7 @@ public final class ManagementReports {
     public static List<Column> documentColumns(Kind kind) {
         return switch(kind) {
             case DISBURSED_LOANS_AUDIT -> List.of(text("clientNumber",.8f),text("name",1.8f),text("loanId",.8f),
-                money("netDisbursed"),money("disbursed"),money("principalInstallment"),money("totalInterest"),money("instalment"),
+                money("netDisbursed"),money("disbursed"),money("totalInterest"),money("instalment"),
                 text("disbursementDate",1),text("maturity",1),text("reference",1),text("loanRate",.8f),text("periods",.7f));
             case EXPECTED_REPAYMENTS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.8f),text("phone",1.2f),text("dueDate",1),
                 money("principalBalance"),money("principalDue"),money("interestDue"),money("expectedTotal"));
