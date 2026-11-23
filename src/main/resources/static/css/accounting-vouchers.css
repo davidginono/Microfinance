@@ -22,6 +22,10 @@
 
 .aws-console .voucher-form .voucher-account-choice{border:0;padding:0;gap:8px;min-height:32px}
 .voucher-account-choice>.neo-select{flex:1 1 0;min-width:0;max-width:100%}
+.voucher-activity-list{display:grid;gap:5px}
+.voucher-activity-row{display:flex;align-items:center;gap:8px;min-width:0}
+.voucher-activity-row>[data-activity-name]{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.voucher-activity-row>button{flex:none}
 .voucher-row-tools>[data-configured-transactions]{flex:1 1 240px;min-width:0;max-width:100%}.voucher-row-tools>[data-configured-transactions]>.neo-select{width:100%}
 .voucher-number-output{display:inline-flex;align-items:center;gap:9px;min-height:38px;padding:7px 10px;border:1px solid #d5dbdb;border-radius:4px;background:#f8fafb;color:#172b4d;font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .voucher-number-spinner{width:15px;height:15px;flex:none;border:2px solid transparent;border-top-color:#0073bb;border-right-color:#0073bb;border-radius:50%;animation:voucher-number-spin .75s linear infinite}

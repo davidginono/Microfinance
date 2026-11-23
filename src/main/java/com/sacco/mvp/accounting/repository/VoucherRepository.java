@@ -66,26 +66,40 @@ public class VoucherRepository {
         return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and active and code<>'SYSTEM.LOAN_REPAYMENT' and strpos(lower(code||' '||name||' '||coalesce(name_sw,'')),?)>0 order by code,id limit 26 offset ?",
             (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw")),institution,search.toLowerCase(Locale.ROOT),offset);
     }
-    public Optional<Activity> activity(String institution,UUID id){
-        return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and id=? and active",
-            (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw")),institution,id).stream().findFirst();
+    public List<Activity> selectedActivities(String institution,List<UUID> ids){
+        if(ids.isEmpty())return List.of();
+        var args=new ArrayList<Object>();args.add(institution);args.addAll(ids);
+        return jdbc.query("select id,name,name_sw from gl_activity where sacco_id=? and code<>'SYSTEM.LOAN_REPAYMENT' and id in ("
+            +String.join(",",Collections.nCopies(ids.size(),"?"))+")",
+            (r,n)->new Activity(r.getObject("id",UUID.class),r.getString("name"),r.getString("name_sw")),args.toArray());
     }
-    public List<Mapping> mappings(String institution,UUID activity,String search,int offset){return mappingQuery(institution,null,activity,search,offset,false);}
-    public List<Mapping> lockMappings(String institution,List<UUID> ids,UUID activity){return mappingQuery(institution,ids,activity,"",0,true);}
+    public List<Mapping> mappings(String institution,UUID activity,String search,int offset){
+        return mappingQuery(institution,null,activity==null?List.of():List.of(activity),search,offset,false);
+    }
+    public List<Mapping> mappingsForActivities(String institution,List<UUID> activities,String search,int offset){
+        return activities.isEmpty()?List.of():mappingQuery(institution,null,activities,search,offset,false);
+    }
+    public List<Mapping> lockMappings(String institution,List<UUID> ids,List<UUID> activities){
+        return mappingQuery(institution,ids,activities,"",0,true);
+    }
     public List<Mapping> selectedMappings(String institution,List<UUID> ids){return ids.isEmpty()?List.of():mappingQuery(institution,ids,"",0,false);}
     public List<Mapping> lockMappings(String institution,List<UUID> ids){return mappingQuery(institution,ids,"",0,true);}
     private List<Mapping> mappingQuery(String institution,List<UUID> ids,String search,int offset,boolean lock){
-        return mappingQuery(institution,ids,null,search,offset,lock);
+        return mappingQuery(institution,ids,List.of(),search,offset,lock);
     }
-    private List<Mapping> mappingQuery(String institution,List<UUID> ids,UUID activity,String search,int offset,boolean lock){
+    private List<Mapping> mappingQuery(String institution,List<UUID> ids,List<UUID> activities,String search,int offset,boolean lock){
         var args=new ArrayList<Object>();args.add(institution);
         String filter;
-        if(ids==null){filter=" and strpos(lower(concat_ws(' ',t.code,t.name,d.component,da.code,da.name,ca.code,ca.name)),?)>0";args.add(search.toLowerCase(Locale.ROOT));}
+        if(ids==null){filter=" and strpos(lower(concat_ws(' ',t.code,t.name,t.name_sw,a.code,a.name,a.name_sw,d.component,da.code,da.name,ca.code,ca.name)),?)>0";args.add(search.toLowerCase(Locale.ROOT));}
         else {filter=" and t.id in ("+String.join(",",Collections.nCopies(ids.size(),"?"))+")";args.addAll(ids);}
-        if(activity!=null){filter+=" and a.id=?";args.add(activity);}
+        if(!activities.isEmpty()){
+            filter+=" and a.code<>'SYSTEM.LOAN_REPAYMENT' and a.id in ("+String.join(",",Collections.nCopies(activities.size(),"?"))+")";
+            args.addAll(activities);
+        }
         if(!lock && ids==null)args.add(offset);
         return jdbc.query("""
             select t.id,t.code||' - '||t.name transaction_name,p.request_key,d.component,
+            a.id activity_id,a.name activity_name,a.name_sw activity_name_sw,
             da.id debit_id,da.code debit_code,da.name debit_name,da.purpose debit_purpose,gl_loan_disbursement_account(da.id,da.sacco_id) debit_money,
             ca.id credit_id,ca.code credit_code,ca.name credit_name,ca.purpose credit_purpose,gl_loan_disbursement_account(ca.id,ca.sacco_id) credit_money
             from gl_transaction_code t join gl_activity a on a.id=t.activity_id and a.sacco_id=t.sacco_id
@@ -100,7 +114,8 @@ public class VoucherRepository {
             """+filter+" order by t.id,d.component"+(lock?" for share of a,t,p,d,c,da,ca":ids==null?" limit 26 offset ?":" limit 250"),
             (r,n)->new Mapping(r.getObject("id",UUID.class),r.getObject("request_key",UUID.class),r.getString("transaction_name"),r.getString("component"),
                 new Account(r.getObject("debit_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),r.getString("debit_purpose"),r.getBoolean("debit_money")),
-                new Account(r.getObject("credit_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),r.getString("credit_purpose"),r.getBoolean("credit_money"))),args.toArray());
+                new Account(r.getObject("credit_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),r.getString("credit_purpose"),r.getBoolean("credit_money")),
+                new Activity(r.getObject("activity_id",UUID.class),r.getString("activity_name"),r.getString("activity_name_sw"))),args.toArray());
     }
     public UUID period(String institution,LocalDate date,UUID actor,OffsetDateTime now){
         var existing=jdbc.queryForList("select id,state from accounting_period where sacco_id=? and starts_on<=? and ends_on>=? for share",institution,date,date);

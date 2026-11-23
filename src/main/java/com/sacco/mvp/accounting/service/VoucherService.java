@@ -92,9 +92,51 @@ public class VoucherService {
     @Transactional(readOnly=true)
     public List<Mapping> mappings(AppUserPrincipal actor,Type type,UUID activity,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.mappings(actor.getSaccoId(),activity,search,page*25);}
     @Transactional(readOnly=true)
+    public List<Mapping> mappingsForActivities(AppUserPrincipal actor,Type type,List<UUID> activities,String search,int page){
+        authorize(actor,type,"CREATE");query(search,page);validateActivityIds(activities);
+        return vouchers.mappingsForActivities(actor.getSaccoId(),activities,search,page*25);
+    }
+    @Transactional(readOnly=true)
     public List<Activity> activities(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return vouchers.activities(actor.getSaccoId(),search,page*25);}
     @Transactional(readOnly=true)
-    public Optional<Activity> selectedActivity(AppUserPrincipal actor,Type type,UUID id){authorize(actor,type,"CREATE");return id==null?Optional.empty():vouchers.activity(actor.getSaccoId(),id);}
+    public Map<UUID,Activity> selectedActivities(AppUserPrincipal actor,Type type,Form form){
+        authorize(actor,type,"CREATE");return activityLabels(actor,form);
+    }
+    @Transactional(readOnly=true)
+    public Map<UUID,Activity> reviewActivities(AppUserPrincipal actor,Type type,Form form){
+        approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");authorize(actor,type,"VIEW");
+        return activityLabels(actor,form);
+    }
+    private Map<UUID,Activity> activityLabels(AppUserPrincipal actor,Form form){
+        var ids=form.selectedActivityIds().stream().limit(com.sacco.mvp.accounting.dto.VoucherDtos.MAX_ACTIVITIES)
+            .filter(Objects::nonNull).distinct().toList();
+        var result=new HashMap<UUID,Activity>();
+        vouchers.selectedActivities(actor.getSaccoId(),ids).forEach(activity->result.put(activity.id(),activity));
+        return result;
+    }
+    @Transactional(readOnly=true)
+    public void validateDraftActivities(AppUserPrincipal actor,Type type,Form form){
+        authorize(actor,type,"CREATE");validateActivitySelection(form);checkActivityScope(actor,form);
+    }
+    @Transactional(readOnly=true)
+    public Map<Integer,Mapping> selectedMappings(AppUserPrincipal actor,Type type,Form form){
+        authorize(actor,type,"CREATE");return mappingsByRow(actor,form);
+    }
+    private Map<Integer,Mapping> mappingsByRow(AppUserPrincipal actor,Form form){
+        if(form.getRows()==null)return Map.of();
+        var rows=form.getRows().stream().limit(50).toList();
+        var ids=rows.stream().filter(Objects::nonNull).map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().toList();
+        var mappings=vouchers.selectedMappings(actor.getSaccoId(),ids);
+        var result=new HashMap<Integer,Mapping>();
+        for(int n=0;n<rows.size();n++){
+            var row=rows.get(n);
+            if(row==null || row.getTransactionId()==null)continue;
+            var selected=mappings.stream().filter(m->m.transactionId().equals(row.getTransactionId())
+                && m.templateKey().equals(row.getTemplateKey()) && m.component().equals(row.getComponent())).findFirst();
+            if(selected.isPresent())result.put(n,selected.get());
+        }
+        return result;
+    }
     @Transactional(readOnly=true)
     public Map<UUID,Account> selectedAccounts(AppUserPrincipal actor,Type type,Form form){
         authorize(actor,type,"CREATE");var ids=new TreeSet<UUID>();
@@ -103,21 +145,21 @@ public class VoucherService {
         if(ids.size()>501)throw new Invalid("","rows");var result=new HashMap<UUID,Account>();vouchers.selectedAccounts(actor.getSaccoId(),new ArrayList<>(ids),false).forEach(a->result.put(a.id(),a));return result;
     }
     @Transactional(readOnly=true)
-    public Map<String,Account> reviewAccounts(AppUserPrincipal actor,Type type,Form form){
+    public ReviewLines reviewLines(AppUserPrincipal actor,Type type,Form form){
         approvals.authorize(actor,"VOUCHER_WORKSPACE_VIEW");authorize(actor,type,"VIEW");
         require(form.getRows()!=null && form.getRows().size()<=50,"","rows");
         var ids=new TreeSet<UUID>();if(form.getMoneyAccountId()!=null)ids.add(form.getMoneyAccountId());
         for(var row:form.getRows()){if(row.getDebitAccountId()!=null)ids.add(row.getDebitAccountId());if(row.getCreditAccountId()!=null)ids.add(row.getCreditAccountId());if(row.getEntries()!=null)for(var entry:row.getEntries())if(entry!=null && entry.getAccountId()!=null)ids.add(entry.getAccountId());}
         require(ids.size()<=501,"","rows");var byId=new HashMap<UUID,Account>();vouchers.selectedAccounts(actor.getSaccoId(),new ArrayList<>(ids),false).forEach(a->byId.put(a.id(),a));
-        var mappings=vouchers.selectedMappings(actor.getSaccoId(),form.getRows().stream().map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().toList());
+        var mappings=mappingsByRow(actor,form);
         var result=new HashMap<String,Account>();if(byId.containsKey(form.getMoneyAccountId()))result.put("moneyAccountId",byId.get(form.getMoneyAccountId()));
         for(int n=0;n<form.getRows().size();n++){
             var row=form.getRows().get(n);Account debit=byId.get(row.getDebitAccountId()),credit=byId.get(row.getCreditAccountId());
-            if(row.getTransactionId()!=null){var mapping=mappings.stream().filter(m->m.transactionId().equals(row.getTransactionId()) && m.templateKey().equals(row.getTemplateKey()) && m.component().equals(row.getComponent())).findFirst();debit=mapping.map(Mapping::debit).orElse(null);credit=mapping.map(Mapping::credit).orElse(null);}
+            if(row.getTransactionId()!=null){var mapping=mappings.get(n);debit=mapping==null?null:mapping.debit();credit=mapping==null?null:mapping.credit();}
             if(row.getEntries()!=null)for(int e=0;e<row.getEntries().size();e++){var entry=row.getEntries().get(e);if(entry!=null && byId.containsKey(entry.getAccountId()))result.put("rows["+n+"].entries["+e+"].accountId",byId.get(entry.getAccountId()));}
             if(debit!=null)result.put("rows["+n+"].debitAccountId",debit);if(credit!=null)result.put("rows["+n+"].creditAccountId",credit);
         }
-        return result;
+        return new ReviewLines(result,mappings);
     }
     @Transactional
     public Preview preview(AppUserPrincipal actor,Type type,Form form){authorize(actor,type,"CREATE");authorizeEquitySelection(actor,form);validate(form,type,clock.today());return plan(actor,type,form);}
@@ -192,8 +234,9 @@ public class VoucherService {
     }
     private Preview plan(AppUserPrincipal actor,Type type,Form f){
         client(actor,f);
+        checkActivityScope(actor,f);
         var transactionIds=f.getRows().stream().map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().sorted().toList();
-        var mappings=transactionIds.isEmpty()?List.<Mapping>of():f.getActivityId()==null?vouchers.lockMappings(actor.getSaccoId(),transactionIds):vouchers.lockMappings(actor.getSaccoId(),transactionIds,f.getActivityId());
+        var mappings=transactionIds.isEmpty()?List.<Mapping>of():vouchers.lockMappings(actor.getSaccoId(),transactionIds,f.selectedActivityIds());
         var accountIds=new TreeSet<UUID>();if(f.getMoneyAccountId()!=null)accountIds.add(f.getMoneyAccountId());
         for(var r:f.getRows())if(r.getTransactionId()==null){if(r.getDebitAccountId()!=null)accountIds.add(r.getDebitAccountId());if(r.getCreditAccountId()!=null)accountIds.add(r.getCreditAccountId());if(r.getEntries()!=null)for(var e:r.getEntries())if(e.getAccountId()!=null)accountIds.add(e.getAccountId());}
         require(!accountIds.isEmpty() || !mappings.isEmpty(),"rows[0].amount","account");
@@ -254,11 +297,26 @@ public class VoucherService {
         vouchers.validatePettyCash(actor.getSaccoId(),actor.getStationId(),f.getEffectiveDate(),type,json.writeValueAsString(entries));
         return new Preview(List.copyOf(result),total,classification);
     }
+    private static void validateActivityIds(List<UUID> ids){
+        require(ids!=null && ids.size()<=com.sacco.mvp.accounting.dto.VoucherDtos.MAX_ACTIVITIES
+            && ids.stream().noneMatch(Objects::isNull) && new HashSet<>(ids).size()==ids.size(),"activityIds","activities");
+    }
+    private static void validateActivitySelection(Form form){
+        var ids=form.selectedActivityIds();
+        validateActivityIds(ids);
+        require(form.getActivityId()==null || form.getActivityIds()==null || form.getActivityIds().isEmpty(),"activityIds","activities");
+        require(!form.isEquity() || ids.isEmpty(),"activityIds","equityActivity");
+    }
+    private void checkActivityScope(AppUserPrincipal actor,Form form){
+        var ids=form.getActivityIds();
+        if(ids!=null && !ids.isEmpty())require(vouchers.selectedActivities(actor.getSaccoId(),ids).size()==ids.size(),"activityIds","activities");
+    }
     static void validate(Form f,Type type,LocalDate today){
         require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");
+        validateActivitySelection(f);
         require(f.isEquity() || f.getEquityRow()==null && f.getEquityMovement()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()),"equityChoice","equityActivity");
         if(f.isEquity()){
-            require(f.getActivityId()==null && !f.isPettyCash(),"equity","equityActivity");
+            require(!f.isPettyCash(),"equity","equityActivity");
             require(f.getEquityRow()==null?com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(type).contains(f.getEquityMovement()):
                     type==Type.JOURNAL&&f.getEquityMovement()==null&&f.getEquityRow().version()>0&&f.getEquityRow().id()!=null,
                 "equityChoice","equityMovement");
@@ -272,7 +330,7 @@ public class VoucherService {
         int entryCount=0;
         for(int n=0;n<f.getRows().size();n++){
             var r=f.getRows().get(n);String field="rows["+n+"]";require(r!=null,field,"rows");text(r.getDescription(),500,true,field+".description");
-            require(f.getActivityId()==null || r.getTransactionId()!=null,field+".transactionId","activityTransaction");
+            require(f.selectedActivityIds().isEmpty() || r.getTransactionId()!=null,field+".transactionId","activityTransaction");
             require(r.getAmount()!=null && r.getAmount().signum()>0 && r.getAmount().scale()>=-16 && r.getAmount().scale()<=2 && r.getAmount().precision()-r.getAmount().scale()<=16,field+".amount","amount");
             require(r.getComponent()!=null && COMPONENTS.contains(r.getComponent()),field+".component","template");
             if(r.getEntries()!=null && !r.getEntries().isEmpty()){
@@ -297,6 +355,7 @@ public class VoucherService {
         // Keep ordinary-voucher retry hashes compatible with the pre-unification form.
         var payload=(tools.jackson.databind.node.ObjectNode)json.valueToTree(f);
         payload.remove("receiptPurpose");if(f.getClientId()==null)payload.remove("clientId");payload.remove("interestAccountId");if(f.getActivityId()==null)payload.remove("activityId");
+        if(f.getActivityIds()!=null && !f.getActivityIds().isEmpty())payload.set("activityIds",json.valueToTree(f.getActivityIds().stream().sorted().toList()));
         for(var row:payload.path("rows"))((tools.jackson.databind.node.ObjectNode)row).remove("loanId");
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((type.name()+json.writeValueAsString(payload)).getBytes(StandardCharsets.UTF_8)));
     }catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}}

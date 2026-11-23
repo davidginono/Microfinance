@@ -36,6 +36,7 @@ class VoucherMvcTest {
   reset(service,pdf,receipts,loanPdf,gate,workflows,workflowPosting,documents);mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
   var m=Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").memberNo("SYNTHETIC").position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build();actor=new AppUserPrincipal(m,EnumSet.allOf(UserClaim.class));
   lenient().when(service.selectedAccounts(any(),any(),any())).thenReturn(Map.of());
+  lenient().when(workflows.reviewLines(any(),any(),any())).thenReturn(new ReviewLines(Map.of(),Map.of()));
  }
  @Test void multipleRowsBindAndTenantAndPostedTotalsAreNotAccepted()throws Exception{
   when(service.post(any(),eq(Type.RECEIPT),any())).thenReturn(voucher());
@@ -56,7 +57,9 @@ class VoucherMvcTest {
   verify(service).post(eq(actor),eq(Type.JOURNAL),any());
  }
  @Test void configuredTypesAndTransactionLookupsUseTheAuthorizedVoucherContext()throws Exception{
-  UUID activity=UUID.randomUUID();
+  UUID activity=UUID.randomUUID(),second=UUID.randomUUID();
+  var activities=List.of(activity,second);
+  var parameters=activities.stream().map(UUID::toString).toArray(String[]::new);
   mvc.perform(get("/finance/vouchers/receipts/activities").with(user(actor)).param("search","Income").param("page","2")).andExpect(status().isOk());
   verify(service).activities(actor,Type.RECEIPT,"Income",2);
   for(String kind:List.of("receipts","payments","journals")){
@@ -66,7 +69,21 @@ class VoucherMvcTest {
    when(service.post(eq(actor),eq(type),any())).thenReturn(voucher());
    mvc.perform(post("/finance/vouchers/"+kind).with(user(actor)).with(csrf()).param("activityId",activity.toString()).param("action","post")).andExpect(status().is3xxRedirection());
    verify(service).post(eq(actor),eq(type),argThat(f->activity.equals(f.getActivityId())));
+   mvc.perform(get("/finance/vouchers/"+kind+"/transactions").with(user(actor))
+    .param("activityIds",parameters).param("search","income").param("page","1")).andExpect(status().isOk());
+   verify(service).mappingsForActivities(actor,type,activities,"income",1);
+   mvc.perform(get("/finance/vouchers/"+kind+"/transactions").with(user(actor))
+    .param("activityId",activity.toString()).param("activityIds",parameters)).andExpect(status().isBadRequest());
+   mvc.perform(post("/finance/vouchers/"+kind).with(user(actor)).with(csrf()).param("activityIds",parameters)
+    .param("action","preview")).andExpect(view().name("accounting/vouchers/form")).andExpect(model().attribute("voucherActivityIds",activities));
+   verify(service).preview(eq(actor),eq(type),argThat(f->f.getActivityId()==null&&f.getActivityIds().equals(activities)));
   }
+ }
+ @Test void approvalTransactionLookupUsesTheSavedItemAndExistingScope()throws Exception{
+  UUID item=UUID.randomUUID();
+  mvc.perform(get("/finance/approval/"+id+"/vouchers/"+item+"/transactions").with(user(actor))
+   .param("search","fees").param("page","1")).andExpect(status().isOk());
+  verify(workflows).transactions(actor,id,item,"fees",1);
  }
  @Test void numberReservationRequiresCreatePermissionAndReturnsAnUncachedVoucherNumber()throws Exception{
   UUID key=UUID.randomUUID();when(service.reserveNumber(actor,Type.PAYMENT,LocalDate.of(2026,10,8),key)).thenReturn(new NumberReservation("PV-2026-00000017"));
@@ -185,7 +202,7 @@ class VoucherMvcTest {
  }
  @Test void anIndividualEditorCannotSubmitItsParentBatch()throws Exception{
   var details=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Details.class);var workflow=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Workflow.class);
-  when(details.workflow()).thenReturn(workflow);when(workflow.scope()).thenReturn("BATCH");UUID itemId=UUID.randomUUID();var item=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Item.class);when(item.id()).thenReturn(itemId);when(details.items()).thenReturn(List.of(item));when(details.actions()).thenReturn(Set.of("EDIT"));when(workflows.details(actor,id)).thenReturn(details);
+  when(details.workflow()).thenReturn(workflow);when(workflow.scope()).thenReturn("BATCH");UUID itemId=UUID.randomUUID();var item=mock(com.sacco.mvp.accounting.approval.dto.VoucherWorkflowDtos.Item.class);when(item.id()).thenReturn(itemId);when(item.form()).thenReturn(new Form());when(details.items()).thenReturn(List.of(item));when(details.actions()).thenReturn(Set.of("EDIT"));when(workflows.details(actor,id)).thenReturn(details);
   mvc.perform(post("/finance/approval/"+id+"/vouchers/"+itemId).with(user(actor)).with(csrf()).param("version","1").param("itemVersion","1").param("command","SUBMIT"))
    .andExpect(status().isOk()).andExpect(view().name("accounting/approval/editor"));
   verify(workflows,never()).save(any(),any(),any(),anyInt(),anyInt(),any());verify(workflows,never()).action(any(),any(),anyInt(),any(),any());

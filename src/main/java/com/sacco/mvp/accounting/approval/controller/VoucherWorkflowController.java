@@ -26,7 +26,7 @@ public class VoucherWorkflowController {
             "rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @InitBinder("ruleForm") void ruleBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(20);b.setAllowedFields("type","version","rules[*].minimum","rules[*].maximum","rules[*].scope","rules[*].autoPost","rules[*].stages[*].role","rules[*].stages[*].approvals");}
-    @ExceptionHandler({org.springframework.beans.InvalidPropertyException.class,Invalid.class})
+    @ExceptionHandler({org.springframework.beans.InvalidPropertyException.class,Invalid.class,com.sacco.mvp.accounting.dto.VoucherDtos.Invalid.class})
     @ResponseStatus(org.springframework.http.HttpStatus.BAD_REQUEST) @ResponseBody String invalid() {return "Invalid voucher workflow request";}
     @GetMapping
     public String list(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) Type type,
@@ -78,11 +78,22 @@ public class VoucherWorkflowController {
     }
     private void editor(AppUserPrincipal a,Details d,UUID item,int itemVersion,Model m) {
         support(a,d.workflow().id(),m);m.addAttribute("readOnly",!d.actions().contains("EDIT"));m.addAttribute("details",d);m.addAttribute("itemId",item);m.addAttribute("itemVersion",itemVersion);
-        var f=(Form)m.getAttribute("voucherForm");m.addAttribute("accounts",workflows.selectedAccounts(a,d.workflow().id(),f));
+        var f=(Form)m.getAttribute("voucherForm");
+        var recorded=existingItem(d,item);
+        var lines=workflows.reviewLines(a,d.workflow().type(),f);
+        m.addAttribute("accounts",lines.accounts());
+        m.addAttribute("voucherMappings",lines.mappings());
+        m.addAttribute("voucherActivityIds",recorded.form().selectedActivityIds());
+        m.addAttribute("voucherActivities",workflows.reviewActivities(a,d.workflow().type(),recorded.form()));
         m.addAttribute("equityTypes",com.sacco.mvp.accounting.dto.VoucherDtos.equityTypes(d.workflow().type()));
         m.addAttribute("equityOptions",workflows.equityOptions(a,d,existingItem(d,item),f));
         m.addAttribute("voucherClient",workflows.selectedClient(a,d.workflow().id(),f));
         m.addAttribute("itemNumber",java.util.stream.IntStream.range(0,d.items().size()).filter(n->d.items().get(n).id().equals(item)).findFirst().orElse(d.items().size())+1);m.addAttribute("issues",d.items().stream().filter(i->i.id().equals(item)).findFirst().map(Item::issues).orElse(List.of()));
+    }
+    @GetMapping("/{id}/vouchers/{item}/transactions") @ResponseBody
+    public Object transactions(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID item,
+            @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {
+        return workflows.transactions(a,id,item,search,page);
     }
     @GetMapping("/{id}/accounts") @ResponseBody public Object accounts(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="") String purpose) {return workflows.accounts(a,id,search,page,purpose);}
     @GetMapping("/{id}/clients") @ResponseBody public Object clients(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page) {return workflows.clients(a,id,search,page);}

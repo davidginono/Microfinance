@@ -25,6 +25,7 @@ class VoucherFormRenderingTest {
         String body=source.substring(source.indexOf("<c:url value=\"${base}\""),source.indexOf("</form:form>")+12);
         Files.copy(directory.resolve("shared-benefits.jspf"),temporary.resolve("shared-benefits.jspf"));
         Files.copy(directory.resolve("equity-fields.jspf"),temporary.resolve("equity-fields.jspf"));
+        Files.copy(directory.resolve("activity-row.jspf"),temporary.resolve("activity-row.jspf"));
         Files.writeString(temporary.resolve("form.jsp"),"""
             <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
             <%@ taglib prefix="c" uri="jakarta.tags.core" %>
@@ -60,12 +61,26 @@ class VoucherFormRenderingTest {
                     var debit=new Account(UUID.randomUUID(),"111001","Test bank","BANK");var credit=new Account(UUID.randomUUID(),"411001","Test account","OTHER");
                     request.setAttribute("preview",new Preview(List.of(new Transaction(UUID.randomUUID(),1,null,null,"","TOTAL","Test transaction",amount,debit,credit)),amount));
                 }
+                request.setAttribute("maxVoucherActivities",com.sacco.mvp.accounting.dto.VoucherDtos.MAX_ACTIVITIES);
+                if(request.getParameter("activities")!=null){
+                    var operations=new Activity(UUID.randomUUID(),"Operations <main>","Shughuli kuu");
+                    var fees=new Activity(UUID.randomUUID(),"Fees","Ada");
+                    form.setActivityIds(List.of(operations.id(),fees.id()));
+                    var debit=new Account(UUID.randomUUID(),"111001","Test bank","BANK");
+                    var credit=new Account(UUID.randomUUID(),"411001","Test account","OTHER");
+                    var mapping=new Mapping(UUID.randomUUID(),UUID.randomUUID(),"Bank deposit","TOTAL",debit,credit,operations);
+                    form.getRows().getFirst().setTransactionId(mapping.transactionId());
+                    form.getRows().getFirst().setTemplateKey(mapping.templateKey());
+                    request.setAttribute("voucherActivityIds",form.getActivityIds());
+                    request.setAttribute("voucherActivities",Map.of(operations.id(),operations,fees.id(),fees));
+                    request.setAttribute("voucherMappings",Map.of(0,mapping));
+                }
                 request.setAttribute("selectedAccounts",Map.of());request.getRequestDispatcher("/form.jsp").forward(request,response);
             }
         });context.addServletMappingDecoded("/form","form");
         try {
             tomcat.start();var client=HttpClient.newHttpClient();
-            for(String language:List.of("en","sw"))for(Type type:Type.values())for(String split:List.of("","&split=true","&equity=true")){
+            for(String language:List.of("en","sw"))for(Type type:Type.values())for(String split:List.of("","&split=true","&equity=true","&activities=true")){
                 var response=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/form?type="+type+split)).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
                 assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
                 assertThat(response.body()).doesNotContain("<spring:message","&lt;spring:message");
@@ -81,8 +96,14 @@ class VoucherFormRenderingTest {
                         language.equals("sw")?"Faida iliyotengwa":"Profit &lt;set aside&gt;");
                     else assertThat(response.body()).contains("value=\"CONTRIBUTION\" selected=\"selected\"").doesNotContain("value=\"EARNINGS_TRANSFER\"","value=\"TRANSFER\"");
                 }
+                if(split.equals("&activities=true")){
+                    assertThat(response.body()).contains("name=\"activityIds\"", "data-voucher-add-activity", "Bank deposit",
+                        messages.getMessage("voucher.addActivity",null,locale),messages.getMessage("voucher.removeActivity",null,locale));
+                    assertThat(response.body()).contains(language.equals("sw")?"Shughuli kuu":"Operations &lt;main&gt;",
+                        language.equals("sw")?"Ada":"Fees");
+                }
                 String output=System.getProperty("microfinance.voucher.render-output");
-                if(output!=null){Files.createDirectories(Path.of(output));Files.writeString(Path.of(output,language+"-"+type+(split.equals("&equity=true")?"-equity":split.isEmpty()?"-new":"-split")+".html"),response.body());}
+                if(output!=null){Files.createDirectories(Path.of(output));Files.writeString(Path.of(output,language+"-"+type+(split.equals("&activities=true")?"-activities":split.equals("&equity=true")?"-equity":split.isEmpty()?"-new":"-split")+".html"),response.body());}
             }
         }finally{tomcat.stop();tomcat.destroy();spring.close();}
     }

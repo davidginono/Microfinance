@@ -94,6 +94,7 @@ public class VoucherWorkflowService {
     public UUID capture(AppUserPrincipal a,Type type,Form source,boolean send) {
         authorize(a,"VOUCHER_WORKSPACE_CREATE");viewAccess(a,type);vouchers.authorize(a,type,"CREATE");
         vouchers.authorizeEquitySelection(a,source);
+        vouchers.validateDraftActivities(a,type,source);
         repository.policyLock(a,false);var form=gate.canonical(source,source.getRequestKey());repository.requestLock(a,source.getRequestKey());var existing=repository.request(a,source.getRequestKey());
         if(existing.isPresent()) {var w=existing.get();require(w.owner().equals(a.getMemberId()) && w.type()==type && w.scope().equals("SINGLE"),"retry");var items=repository.items(w.id());require(items.size()==1 && gate.formHash(type,items.getFirst().form()).equals(gate.formHash(type,form)),"retry");return w.id();}
         if(send)vouchers.preview(a,type,form);
@@ -109,6 +110,7 @@ public class VoucherWorkflowService {
         require(form.isEquity()==prior.form().isEquity(),"changed");
         vouchers.authorizeEquitySelection(a,form);
         form.setActivityId(prior.form().getActivityId());
+        form.setActivityIds(prior.form().getActivityIds());
         repository.save(w,a,item,prior.line(),form,false);repository.invalidate(id);changed(w,w.itemCount());event(a,w,"CORRECTED","");return item;
     }
     private void changed(Workflow w,int count) {
@@ -262,8 +264,20 @@ public class VoucherWorkflowService {
     public List<com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementOption> equityOptions(AppUserPrincipal actor,Details workspace,Item item,Form submitted){
         return vouchers.reviewEquityOptions(actor,workspace.workflow().type(),item.form(),submitted,workspace.actions().contains("EDIT"));
     }
-    public Map<String,Account> selectedAccounts(AppUserPrincipal a,UUID id,Form f) {
-        var d=details(a,id);return vouchers.reviewAccounts(a,d.workflow().type(),f);
+    public ReviewLines reviewLines(AppUserPrincipal a,Type type,Form f) {
+        return vouchers.reviewLines(a,type,f);
+    }
+    public Map<UUID,Activity> reviewActivities(AppUserPrincipal a,Type type,Form f) {
+        return vouchers.reviewActivities(a,type,f);
+    }
+    @Transactional(readOnly=true)
+    public List<Mapping> transactions(AppUserPrincipal a,UUID id,UUID item,String search,int page){
+        authorize(a,"VOUCHER_WORKSPACE_UPDATE");
+        var w=find(a,id,false);viewAccess(a,w.type());
+        require(w.owner().equals(a.getMemberId()) && w.approval()!=Approval.INITIATED
+            && !Set.of("POSTING","POSTED").contains(w.posting()),"transition");
+        var saved=repository.item(id,item).orElseThrow(()->new Invalid("unavailable")).form();
+        return vouchers.mappingsForActivities(a,w.type(),saved.selectedActivityIds(),search,page);
     }
     @Transactional
     public void configure(AppUserPrincipal a,RuleForm f) {

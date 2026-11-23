@@ -46,5 +46,8 @@
  new MutationObserver(()=>{for(const [select,state] of bindings)if(!select.isConnected)state.dispose();}).observe(document.body,{childList:true,subtree:true});
  window.addEventListener('pagehide',()=>{for(const state of bindings.values())state.cancel();});
  function cleanClone(root){root.querySelectorAll('.neo-select').forEach(wrapper=>{const select=wrapper.querySelector('select');select.removeAttribute('data-neo-enhanced');select.classList.remove('neo-select-native');select.removeAttribute('tabindex');wrapper.replaceWith(select);});}
- window.VoucherSelect={bind,cleanClone};
+ const activityLabel=item=>document.documentElement.lang==='sw'&&item.nameSw?item.nameSw:item.name;
+ const mappingLabel=item=>[item.activity&&activityLabel(item.activity),item.transactionName,item.debit.name+' → '+item.credit.name]
+  .filter(Boolean).join(' · ');
+ window.VoucherSelect={bind,cleanClone,activityLabel,mappingLabel};
 })();

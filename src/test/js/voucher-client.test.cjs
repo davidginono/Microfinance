@@ -12,8 +12,23 @@ async function setup(approval=false,fetcher,activityTypes=false,numbering=false,
  const dom=new JSDOM(`<body data-select-search="Search options" data-select-no-matches="No matches" data-select-load-more="Load more" data-shell-select="Choose" data-shell-no-options="No options" data-shell-loading="Loading">${html}</body>`,{url:'http://localhost',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document,calls=[];
  if(!approval)d.querySelector('form').insertAdjacentHTML('afterbegin',hidden('equity','false')+'<label data-equity-only hidden><select name="equityChoice" data-equity-control><option value="">Choose type</option><option value="CONTRIBUTION">Capital added</option><option value="3:f82c2471-0267-4cc1-ba10-730c78ef5eb2">Profit set aside for operations</option></select></label><label data-equity-only hidden><textarea name="equityReason" data-equity-control></textarea></label>');
  if(numbering){const form=d.querySelector('form');Object.assign(form.dataset,{numberLoading:'Loading voucher number',numberError:'Could not generate voucher number',numberCsrfHeader:'X-CSRF-TOKEN',numberCsrfToken:'synthetic-token'});form.insertAdjacentHTML('beforeend',hidden('requestKey','synthetic-key')+'<input name="effectiveDate" type="date" value="2026-10-20"><span data-voucher-number><span class="voucher-number-spinner"></span><span data-voucher-number-value></span></span><button type="button" data-retry-voucher-number hidden>Retry</button>');}
- if(activityTypes){const purpose=d.querySelector('[data-receipt-purpose]');purpose.replaceWith(Object.assign(d.createElement('input'),{name:'receiptPurpose',type:'hidden',value:'OTHER'}));d.querySelector('[name=receiptPurpose]').dataset.receiptPurpose='';const holder=d.createElement('div');holder.className='voucher-account-choice';holder.innerHTML=hidden('activityId')+'<span data-account-label hidden></span>'+select('data-voucher-type aria-label="Receipt type"').replace('</select>','<option value="OTHER">Manual entry</option><option value="EQUITY">Equity</option><option value="LOAN_REPAYMENT">Loan repayment</option></select>');d.querySelector('form').prepend(holder);}
- if(!approval&&!activityTypes)d.querySelector('form').insertAdjacentHTML('afterbegin',hidden('activityId',direct?'':'activity-1'));
+ if(!approval){
+  const activityRow=value=>`<div data-voucher-activity-row><input type="hidden" name="activityIds" data-activity-id value="${value}"><span data-activity-name>Activity</span><button type="button" data-remove-activity>Remove activity</button></div>`;
+  const primary=select('data-voucher-type aria-label="Activities"').replace('</select>','<option value="OTHER">Manual entry</option><option value="EQUITY">Equity</option><option value="LOAN_REPAYMENT">Loan repayment</option></select>');
+  d.querySelector('form').insertAdjacentHTML('afterbegin',`<div data-voucher-activities data-max-activities="50">
+    <div data-voucher-activity-list>${activityTypes||direct?'':activityRow('activity-1')}</div>
+    <template>${activityRow('')}</template>
+    <div class="voucher-account-choice" data-voucher-primary-activity>${primary}</div>
+    <div class="voucher-account-choice" data-voucher-extra-activity>${select('data-voucher-add-activity aria-label="Add activity"','Add activity')}</div>
+  </div>`);
+ }
+ if(approval&&activityTypes){
+  const form=d.querySelector('form'),row=d.querySelector('[data-editor-line]');
+  Object.assign(form.dataset,{configuredVoucher:'true',transactionUrl:'/finance/approval/id/vouchers/item/transactions'});
+  form.insertAdjacentHTML('afterbegin','<select data-approval-transaction disabled><option value="">Choose transaction</option></select>');
+  row.querySelector('[name="rows[0].description"]').insertAdjacentHTML('afterend','<small data-mapping-label></small>');
+  row.querySelector('.approval-account').parentElement.outerHTML='<td>'+hidden('rows[0].debitAccountId')+'<input readonly data-posting-side="debit"></td><td>'+hidden('rows[0].creditAccountId')+'<input readonly data-posting-side="credit"></td>';
+ }
  if(fresh)d.querySelector('form').dataset.newVoucher='true';
  const clear=d.createElement('button');clear.type='button';clear.dataset.clientClear='';clear.textContent='Clear';d.querySelector('input[name=clientId]').parentElement.append(clear);
  w.HTMLElement.prototype.scrollIntoView=function(){};w.fetch=async(url,options)=>{calls.push(String(url));return fetcher?fetcher(new URL(url),options):response([{id:'client-1',name:'Synthetic client',number:'CL-001',label:'Synthetic client'}]);};
@@ -60,12 +75,12 @@ test('client changes invalidate loan choices, and new voucher rows bind their ow
  }finally{dom.window.close();}
 });
 test('configured activity mappings retain their exact template/component and manual mode restores entries',async()=>{
- const mapping={transactionId:'transaction-1',templateKey:'template-1',transactionName:'Expense',component:'PRINCIPAL',debit:{name:'Expense account'},credit:{name:'Cash'}};
+ const mapping={transactionId:'transaction-1',templateKey:'template-1',transactionName:'Expense',component:'PRINCIPAL',activity:{id:'activity-1',name:'Expenses'},debit:{name:'Expense account'},credit:{name:'Cash'}};
  const {dom,d,open,options}=await setup(false,url=>response(url.pathname.endsWith('/activities')?[{id:'activity-1',name:'Expenses'}]:url.pathname.endsWith('/transactions')?[mapping]:[{id:'account-1',name:'Cash account',purpose:'CASH'},{id:'account-2',name:'Expense',purpose:'ORDINARY'}]),true);try{
   await open(d.querySelector('[data-voucher-type]'));options().find(o=>o.textContent==='Expenses').click();
   await open(d.querySelector('[data-money-only]'));assert.equal(options().length,1);options()[0].click();assert.equal(d.querySelector('[name=moneyAccountId]').value,'account-1');
   await open(d.querySelector('[data-mapping]'));options()[0].click();assert.equal(d.querySelector('[name="rows[0].transactionId"]').value,'transaction-1');assert.equal(d.querySelector('[name="rows[0].templateKey"]').value,'template-1');assert.equal(d.querySelector('[name="rows[0].component"]').value,'PRINCIPAL');assert.equal(d.querySelector('[data-manual-accounts]').hidden,true);
-  await open(d.querySelector('[data-voucher-type]'));options().find(o=>o.textContent==='Manual entry').click();assert.equal(d.querySelector('[name="rows[0].templateKey"]').value,'');assert.equal(d.querySelector('[name="rows[0].component"]').value,'TOTAL');assert.equal(d.querySelector('[data-manual-accounts]').hidden,false);
+  d.querySelector('[data-remove-activity]').click();await open(d.querySelector('[data-voucher-type]'));options().find(o=>o.textContent==='Manual entry').click();assert.equal(d.querySelector('[name="rows[0].templateKey"]').value,'');assert.equal(d.querySelector('[name="rows[0].component"]').value,'TOTAL');assert.equal(d.querySelector('[data-manual-accounts]').hidden,false);
  }finally{dom.window.close();}
 });
 test('approval rows added during editing have independent account dropdowns',async()=>{
@@ -95,17 +110,66 @@ test('new voucher starts with its activity placeholder and retains an explicit m
   d.querySelector('[data-add-row]').click();assert.equal(control.value,'OTHER');assert.equal(d.querySelector('form').dataset.newVoucher,'false');
  }finally{dom.window.close();}
 });
-test('configured receipt types filter transactions, reset old mappings and preserve entered amounts',async()=>{
- const mapping={transactionId:'transaction-1',templateKey:'template-1',transactionName:'Income',component:'TOTAL',debit:{name:'Cash'},credit:{name:'Income'}};
- const {dom,w,d,open,options,calls}=await setup(false,url=>response(url.pathname.endsWith('/activities')?[{id:'activity-1',name:'Operations'},{id:'activity-2',name:'Fees'}]:url.pathname.endsWith('/transactions')?[mapping]:[]),true);try{
-  let submits=0;d.querySelector('form').addEventListener('submit',e=>{submits++;e.preventDefault();});
-  const type=d.querySelector('[data-voucher-type]');await open(type);assert.match(calls.at(-1),/\/activities\?/);assert.deepEqual(options().map(o=>o.textContent),['Manual entry','Equity','Loan repayment','Operations','Fees']);options().find(o=>o.textContent==='Operations').click();
-  assert.equal(d.querySelector('[name=activityId]').value,'activity-1');assert.equal(d.querySelector('[name=receiptPurpose]').value,'OTHER');assert.equal(d.querySelector('[data-manual-accounts]').hidden,true);
-  await open(d.querySelector('[data-mapping]'));assert.match(calls.at(-1),/activityId=activity-1/);options()[0].click();assert.equal(d.querySelector('[name="rows[0].transactionId"]').value,'transaction-1');assert.equal(d.querySelector('[data-configured-transactions]').hidden,false);assert.equal(d.querySelector('[data-transaction-amount]').hidden,false);
-  await open(type);options().find(o=>o.textContent==='Fees').click();assert.equal(d.querySelector('[name=activityId]').value,'activity-2');assert.equal(d.querySelector('[name="rows[0].transactionId"]').value,'');assert.equal(d.querySelector('[name="rows[0].amount"]').value,'1.00');assert.equal(d.querySelector('[name="rows[0].description"]').value,'Income');
-  d.querySelector('[data-add-row]').click();await open(d.querySelectorAll('[data-mapping]')[1]);assert.match(calls.at(-1),/activityId=activity-2/);
-  await open(type);options().find(o=>o.textContent==='Loan repayment').click();assert.equal(d.querySelector('[name=activityId]').value,'');assert.equal(d.querySelector('[name=receiptPurpose]').value,'LOAN_REPAYMENT');assert.equal(d.querySelector('[data-mapping]').disabled,true);
-  await open(type);options().find(o=>o.textContent==='Manual entry').click();assert.equal(d.querySelector('[name=activityId]').value,'');assert.equal(d.querySelector('[data-manual-accounts]').hidden,false);assert.equal(submits,0);
+test('adding and removing activities preserves eligible mappings and rejects stale lookup results',async()=>{
+ const activities=[{id:'activity-1',name:'Operations'},{id:'activity-2',name:'Fees'}];
+ const mappings=activities.map((activity,i)=>({transactionId:'transaction-'+i,templateKey:'template-'+i,transactionName:'Income '+i,component:'TOTAL',activity,debit:{name:'Cash'},credit:{name:'Income'}}));
+ let waitForLookup=false,finishLookup,oldSignal;
+ const {dom,w,d,open,options,calls}=await setup(false,(url,request)=>{
+  if(url.pathname.endsWith('/activities'))return response(activities);
+  if(waitForLookup)return new Promise(resolve=>{finishLookup=()=>resolve(response(mappings));oldSignal=request.signal;});
+  return response(mappings.filter(item=>url.searchParams.getAll('activityIds').includes(item.activity.id)));
+ },true);try{
+  const form=d.querySelector('form'),type=d.querySelector('[data-voucher-type]'),add=d.querySelector('[data-voucher-add-activity]');
+  const ids=()=>new w.FormData(form).getAll('activityIds');
+  const field=(index,suffix)=>form.elements.namedItem('rows['+index+'].'+suffix);
+  await open(type);options().find(o=>o.textContent==='Operations').click();
+  assert.deepEqual(ids(),['activity-1']);
+  await open(d.querySelector('[data-mapping]'));assert.deepEqual(new URL(calls.at(-1)).searchParams.getAll('activityIds'),ids());options()[0].click();
+  assert.equal(field(0,'transactionId').value,'transaction-0');
+  await open(add);assert.deepEqual(options().map(o=>o.textContent),['Fees']);options()[0].click();
+  assert.deepEqual(ids(),['activity-1','activity-2']);
+  assert.equal(field(0,'transactionId').value,'transaction-0');
+  d.querySelector('[data-add-row]').click();
+  const second=d.querySelectorAll('[data-mapping]')[1];
+  await open(second);assert.deepEqual(new URL(calls.at(-1)).searchParams.getAll('activityIds'),ids());
+  options().find(o=>o.textContent.includes('Fees')).click();
+  field(1,'amount').value='2.30';
+  form.insertAdjacentHTML('beforeend','<section data-voucher-preview>Preview</section>');
+  waitForLookup=true;await open(second);
+  assert.ok(finishLookup);
+  d.querySelector('[data-remove-activity]').click();assert.equal(oldSignal.aborted,true);
+  waitForLookup=false;finishLookup();await tick();
+  assert.deepEqual(ids(),['activity-2']);
+  assert.equal(field(0,'transactionId').value,'');
+  assert.equal(field(0,'description').value,'Income 0');
+  assert.equal(field(0,'amount').value,'1.00');
+  assert.equal(field(1,'transactionId').value,'transaction-1');
+  assert.equal(field(1,'amount').value,'2.30');
+  assert.equal(d.querySelector('[data-voucher-preview]').hidden,true);
+  await open(d.querySelector('[data-mapping]'));assert.equal(options().length,1);assert.match(options()[0].textContent,/Fees/);
+  d.querySelector('[data-remove-activity]').click();assert.deepEqual(ids(),[]);
+  assert.equal(type.value,'');assert.equal(d.querySelector('[data-mapping]').disabled,true);
+  await open(type);options().find(o=>o.textContent==='Loan repayment').click();
+  assert.equal(form.elements.receiptPurpose.value,'LOAN_REPAYMENT');
+ }finally{dom.window.close();}
+});
+
+test('approval transaction picker targets only the selected line and keeps its amount',async()=>{
+ const mapping={transactionId:'transaction-1',templateKey:'template-1',transactionName:'Income',component:'TOTAL',activity:{name:'Operations'},debit:{code:'101',name:'Cash'},credit:{code:'201',name:'Income'}};
+ const {dom,d,open,options,calls}=await setup(true,()=>response([mapping]),true);try{
+  const chooser=d.querySelector('[data-approval-transaction]');
+  assert.equal(chooser.disabled,true);
+  d.querySelector('[data-line-add]').click();
+  const form=d.querySelector('form');
+  form.elements['rows[1].amount'].value='22.47';
+  d.querySelectorAll('[data-line-select]')[1].click();assert.equal(chooser.disabled,false);
+  await open(chooser);assert.match(calls.at(-1),/approval\/id\/vouchers\/item\/transactions/);options()[0].click();
+  assert.equal(form.elements['rows[0].transactionId'].value,'');
+  assert.equal(form.elements['rows[1].transactionId'].value,'transaction-1');
+  assert.equal(form.elements['rows[1].description'].value,'Income');
+  assert.equal(form.elements['rows[1].amount'].value,'22.47');
+  assert.equal(d.querySelectorAll('[data-posting-side="credit"]')[1].value,'201 · Income');
+  d.querySelectorAll('[data-line-select]')[1].click();assert.equal(chooser.disabled,true);
  }finally{dom.window.close();}
 });
 
@@ -133,14 +197,14 @@ for(const kind of ['RECEIPT','PAYMENT','JOURNAL'])test(`${kind} direct entries h
  }finally{dom.window.close();}
 });
 test('direct and configured modes keep the amount formatter and submitted total in sync',async()=>{
- const {dom,w,d}=await setup(false,undefined,false,false,false,true);try{
+ const {dom,w,d,open,options}=await setup(false,url=>response(url.pathname.endsWith('/activities')?[{id:'activity-1',name:'Operations'}]:[]),true,false,false,true);try{
   w.eval(read('amount-inputs.js'));await tick();const form=d.querySelector('form'),row=d.querySelector('[data-voucher-row]'),total=form.elements['rows[0].amount'];
   assert.equal(total.type,'hidden');assert.equal(row.querySelectorAll('[data-amount-display]').length,2);
   const displays=row.querySelectorAll('[data-amount-display]');displays[0].value='1,200';displays[0].dispatchEvent(new w.Event('input',{bubbles:true}));displays[1].value='1,200';displays[1].dispatchEvent(new w.Event('input',{bubbles:true}));
   assert.equal(total.value,'1200.00');assert.equal(total.validity.valid,true);assert.equal(new w.FormData(form).get('rows[0].amount'),'1200.00');
-  form.elements.activityId.value='activity-1';form.elements.receiptPurpose.dispatchEvent(new w.Event('change',{bubbles:true}));await tick();
+  const type=d.querySelector('[data-voucher-type]');await open(type);options().find(o=>o.textContent==='Operations').click();await tick();
   assert.equal(row.querySelectorAll('[data-split-entry]').length,0);assert.equal(row.querySelector('[data-transaction-amount]').hidden,false);assert.equal(total.type,'number');assert.equal(row.querySelectorAll('[data-amount-display]').length,1);assert.equal(total.value,'1200.00');assert.equal(row.querySelector('[data-configured-transactions]').hidden,false);
-  form.elements.activityId.value='';form.elements.receiptPurpose.dispatchEvent(new w.Event('change',{bubbles:true}));await tick();
+  d.querySelector('[data-remove-activity]').click();await open(type);options().find(o=>o.textContent==='Manual entry').click();await tick();
   assert.equal(total.type,'hidden');assert.equal(total.required,false);assert.equal(row.querySelector('[data-transaction-amount]').hidden,true);assert.equal(row.querySelectorAll('[data-split-entry]').length,2);assert.equal(new w.FormData(form).get('rows[0].amount'),'1200.00');assert.equal(row.querySelector('[data-mapping]').disabled,true);
  }finally{dom.window.close();}
 });
@@ -163,7 +227,7 @@ for(const kind of ['RECEIPT','PAYMENT','JOURNAL'])test(`${kind} Equity activity 
  try{
   const form=d.querySelector('form'),type=d.querySelector('[data-voucher-type]');form.dataset.kind=kind;
   await open(type);options().find(o=>o.textContent==='Equity').click();
-  assert.equal(form.elements.equity.value,'true');assert.equal(form.elements.activityId.value,'');assert.equal(form.elements.receiptPurpose.value,'OTHER');
+  assert.equal(form.elements.equity.value,'true');assert.deepEqual(new w.FormData(form).getAll('activityIds'),[]);assert.equal(form.elements.receiptPurpose.value,'OTHER');
   assert.equal(d.querySelector('[data-equity-only]').hidden,false);assert.equal(form.elements.equityChoice.required,true);assert.equal(form.elements.equityReason.disabled,false);
   assert.equal(d.querySelector('[data-manual-accounts]').hidden,false);assert.equal(d.querySelectorAll('[data-split-entry]').length,2);assert.equal(d.querySelector('[data-configured-transactions]').hidden,true);
   form.elements.equityChoice.value='3:f82c2471-0267-4cc1-ba10-730c78ef5eb2';form.elements.equityReason.value='Owner adds capital';d.querySelector('[data-add-row]').click();

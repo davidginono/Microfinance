@@ -1,0 +1,5 @@
+<div class="voucher-activity-row erp-form-row-tools" data-voucher-activity-row>
+    <input type="hidden" name="${activityField}" value="<c:out value='${activityId}' />" data-activity-id />
+    <span data-activity-name><c:choose><c:when test="${not empty activity}"><c:out value="${pageContext.response.locale.language=='sw' and not empty activity.nameSw?activity.nameSw:activity.name}" /></c:when><c:when test="${not empty activityId}"><spring:message code="voucher.activityUnavailable" /></c:when></c:choose></span>
+    <button class="app-btn btn-neutral erp-icon-btn erp-form-row-action" type="button" data-remove-activity aria-label="<spring:message code='voucher.removeActivity' />" title="<spring:message code='voucher.removeActivity' />"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
+</div>

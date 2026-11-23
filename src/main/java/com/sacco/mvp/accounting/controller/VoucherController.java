@@ -38,7 +38,7 @@ public class VoucherController {
     public static Type type(String kind){return switch(kind){case "receipts"->Type.RECEIPT;case "payments"->Type.PAYMENT;case "journals"->Type.JOURNAL;default->throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);};}
     @InitBinder("voucherForm") void binder(WebDataBinder binder){
         binder.setAutoGrowCollectionLimit(50);
-        binder.setAllowedFields("equity","equityMovement","equityChoice","equityReason","pettyCash","requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
+        binder.setAllowedFields("equity","equityMovement","equityChoice","equityReason","pettyCash","requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","activityIds","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @GetMapping
     public String list(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
@@ -120,7 +120,13 @@ public class VoucherController {
     @GetMapping("/accounts") @ResponseBody
     public List<Account> accounts(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="") String purpose){return vouchers.accounts(actor,type(kind),search,page,purpose);}
     @GetMapping("/transactions") @ResponseBody
-    public List<Mapping> transactions(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID activityId,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return vouchers.mappings(actor,type(kind),activityId,search,page);}
+    public List<Mapping> transactions(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
+            @RequestParam(required=false) UUID activityId,@RequestParam(required=false) List<UUID> activityIds,
+            @RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){
+        if(activityIds==null)return vouchers.mappings(actor,type(kind),activityId,search,page);
+        if(activityId!=null)throw new Invalid("activityIds","activities");
+        return vouchers.mappingsForActivities(actor,type(kind),activityIds,search,page);
+    }
     @GetMapping("/activities") @ResponseBody
     public List<Activity> activities(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return vouchers.activities(actor,type(kind),search,page);}
     @GetMapping("/clients") @ResponseBody
@@ -132,7 +138,10 @@ public class VoucherController {
         if(form.isPettyCash()&&type==Type.PAYMENT&&form.getMoneyAccountId()==null)form.setMoneyAccountId(pettyCash.expenseFund(actor).accountId());
         context(kind,model);
         model.addAttribute("equityOptions",vouchers.equityOptions(actor,type,form));
-        model.addAttribute("voucherActivity",vouchers.selectedActivity(actor,type,form.getActivityId()).orElse(null));
+        model.addAttribute("maxVoucherActivities",com.sacco.mvp.accounting.dto.VoucherDtos.MAX_ACTIVITIES);
+        model.addAttribute("voucherActivityIds",form.selectedActivityIds().stream().limit(com.sacco.mvp.accounting.dto.VoucherDtos.MAX_ACTIVITIES).toList());
+        model.addAttribute("voucherActivities",vouchers.selectedActivities(actor,type,form));
+        model.addAttribute("voucherMappings",vouchers.selectedMappings(actor,type,form));
         boolean repayment="LOAN_REPAYMENT".equals(form.getReceiptPurpose());
         model.addAttribute("approvalRequired",!repayment&&approvalGate.required(actor,type));
         model.addAttribute("selectedAccounts",vouchers.selectedAccounts(actor,type,form));

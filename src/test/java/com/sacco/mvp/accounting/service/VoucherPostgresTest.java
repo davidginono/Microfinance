@@ -354,7 +354,7 @@ class VoucherPostgresTest {
   var reviewer=approver(Position.MANAGER);configure(rule("SINGLE",false,Position.MANAGER,1));
   var form=split(Type.JOURNAL);UUID id=workflows.capture(actor,Type.JOURNAL,form);
   var saved=workflows.details(actor,id).items().getFirst().form();assertThat(saved.getRows().getFirst().getEntries()).hasSize(3);
-  assertThat(service.reviewAccounts(actor,Type.JOURNAL,saved)).containsKey("rows[0].entries[0].accountId");
+  assertThat(service.reviewLines(actor,Type.JOURNAL,saved).accounts()).containsKey("rows[0].entries[0].accountId");
   command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
   assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
  }
@@ -595,7 +595,7 @@ class VoucherPostgresTest {
   workflows.save(actor,workflow,item.id(),details.workflow().version(),item.version(),edit);
   assertThat(workflows.details(actor,workflow).items().getFirst().form().getActivityId()).isEqualTo(activity);
   assertThat(service.preview(actor,Type.RECEIPT,f).total()).isEqualByComparingTo("30.03");
-  var reviewed=service.reviewAccounts(actor,Type.RECEIPT,f);assertThat(reviewed.get("rows[0].debitAccountId").id()).isEqualTo(cash);assertThat(reviewed.get("rows[0].creditAccountId").id()).isEqualTo(capital);
+  var reviewed=service.reviewLines(actor,Type.RECEIPT,f).accounts();assertThat(reviewed.get("rows[0].debitAccountId").id()).isEqualTo(cash);assertThat(reviewed.get("rows[0].creditAccountId").id()).isEqualTo(capital);
   var v=service.post(actor,Type.RECEIPT,f);assertThat(v.transactions()).allSatisfy(t->{assertThat(t.credit().id()).isEqualTo(capital);assertThat(t.transactionName()).contains("Operating income").hasSizeGreaterThan(160);});
   template.setRequestKey(UUID.randomUUID());template.setExpectedRequestKey(revision);rule.setCreditCode("EXPENSE");tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
   assertThat(service.post(actor,Type.RECEIPT,f).id()).isEqualTo(v.id());
@@ -603,6 +603,84 @@ class VoucherPostgresTest {
   template.setExpectedRequestKey(library.template(actor,transaction).requestKey());template.setRequestKey(UUID.randomUUID());rule.setComponent("INTEREST");
   assertThatThrownBy(()->tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template))).hasMessage("library.error.components");
   assertThat(lookup.mappings(institution,"interest",0)).isEmpty();
+ }
+ @Test void vouchersPostTransactionsFromTwoActivitiesAndKeepSavedSelections(){
+  var configClock=mock(ApplicationClock.class);when(configClock.now()).thenReturn(now);when(configClock.today()).thenReturn(now.toLocalDate());
+  var library=new AccountingCodeLibraryService(new AccountingCodeLibraryRepository(jdbc),
+   new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,configClock,claims,directory,institutions),audit,configClock);
+  var reviewer=approver(Position.MANAGER);
+  for(var type:Type.values()){
+   String debit=type==Type.PAYMENT?"EXPENSE":"CASH";
+   String credit=type==Type.PAYMENT?"CASH":"CAPITAL";
+   var first=configuredMapping(library,type,type.name()+"-A",debit,credit);
+   var second=configuredMapping(library,type,type.name()+"-B",debit,credit);
+   var activityIds=List.of(second.activity().id(),first.activity().id());
+   var form=form(type);form.setActivityIds(activityIds);
+   for(int i=0;i<form.getRows().size();i++){
+    var mapping=i==0?first:second;
+    var row=form.getRows().get(i);row.setTransactionId(mapping.transactionId());row.setTemplateKey(mapping.templateKey());
+    row.setDebitAccountId(null);row.setCreditAccountId(null);
+   }
+   assertThat(service.mappingsForActivities(actor,type,activityIds,"",0)).extracting(Mapping::transactionId)
+    .containsExactlyInAnyOrder(first.transactionId(),second.transactionId());
+   assertThat(service.mappingsForActivities(actor,type,activityIds,second.activity().name(),0))
+    .extracting(Mapping::transactionId).containsExactly(second.transactionId());
+   assertThat(service.preview(actor,type,form).total()).isEqualByComparingTo("30.03");
+   form.setActivityIds(List.of(first.activity().id()));
+   assertThatThrownBy(()->service.post(actor,type,form)).hasMessage("voucher.error.template");
+   form.setActivityIds(List.of(first.activity().id(),UUID.randomUUID()));
+   assertThatThrownBy(()->service.preview(actor,type,form)).hasMessage("voucher.error.activities");
+   form.setActivityIds(List.of(first.activity().id(),first.activity().id()));
+   assertThatThrownBy(()->service.preview(actor,type,form)).hasMessage("voucher.error.activities");
+   form.setActivityIds(activityIds);
+   var voucher=service.post(actor,type,form);
+   assertThat(voucher.transactions()).extracting(Transaction::transactionId).containsExactly(first.transactionId(),second.transactionId());
+   form.setActivityIds(activityIds.reversed());
+   assertThat(service.post(actor,type,form).id()).isEqualTo(voucher.id());
+
+   form.setRequestKey(UUID.randomUUID());
+   form.setReference("Draft "+type);
+   var workflow=workflows.capture(actor,type,form,false);
+   var details=workflows.details(actor,workflow);
+   var item=details.items().getFirst();
+   assertThat(item.form().getActivityIds()).containsExactlyInAnyOrderElementsOf(activityIds);
+   assertThat(workflows.transactions(actor,workflow,item.id(),"",0)).extracting(Mapping::transactionId)
+    .containsExactlyInAnyOrder(first.transactionId(),second.transactionId());
+   form.setActivityIds(List.of(first.activity().id()));
+   workflows.save(actor,workflow,item.id(),details.workflow().version(),item.version(),form);
+   var saved=workflows.details(actor,workflow);
+   assertThat(saved.items().getFirst().form().getActivityIds()).containsExactlyInAnyOrderElementsOf(activityIds);
+   workflows.validate(actor,workflow,saved.workflow().version());
+   assertThat(workflows.details(actor,workflow).workflow().validation()).isEqualTo("VALIDATED");
+   var rules=new RuleForm();rules.setType(type);rules.setRules(List.of(rule("SINGLE",false,Position.MANAGER,1)));
+   workflows.configure(actor,rules);
+   command(actor,workflow,"SEND");
+   command(reviewer,workflow,"APPROVE");
+   workflowPosting.post(actor,workflow,version(workflow));
+   var approved=workflows.details(actor,workflow);
+   assertThat(approved.workflow().posting()).isEqualTo("POSTED");
+   assertThat(service.view(actor,type,approved.items().getFirst().voucherId()).transactions())
+    .extracting(Transaction::transactionId).containsExactly(first.transactionId(),second.transactionId());
+
+   jdbc.update("update gl_activity set active=false where id=?",second.activity().id());
+   assertThat(service.mappingsForActivities(actor,type,activityIds,"",0)).extracting(Mapping::transactionId).containsExactly(first.transactionId());
+   form.setActivityIds(activityIds);
+   assertThatThrownBy(()->service.preview(actor,type,form)).hasMessage("voucher.error.template");
+  }
+ }
+ private Mapping configuredMapping(AccountingCodeLibraryService library,Type type,String code,String debit,String credit){
+  var activityForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();
+  activityForm.setCode(code);activityForm.setName(code);
+  UUID activity=tx.execute(s->library.createActivity(actor,activityForm));
+  var transactionForm=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.CodeForm();
+  transactionForm.setActivityId(activity);transactionForm.setCode(code+"-TX");transactionForm.setName(code+" transaction");
+  UUID transaction=tx.execute(s->library.createTransaction(actor,transactionForm));
+  var template=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.TemplateForm();
+  var rule=new com.sacco.mvp.accounting.dto.AccountingLibraryDtos.RuleForm();
+  rule.setComponent("TOTAL");rule.setDebitCode(debit);rule.setCreditCode(credit);
+  template.setRules(List.of(rule));
+  tx.executeWithoutResult(s->library.saveTemplate(actor,transaction,template));
+  return service.mappingsForActivities(actor,type,List.of(activity),"",0).getFirst();
  }
  @Test void loanProductAccountChoicesAndValidationAcceptPostingAccountsOnly(){
   var accounts=new com.sacco.mvp.accounting.loans.repository.LoanProductAccountRepository(jdbc);

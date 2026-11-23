@@ -11,6 +11,7 @@ import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.MovementSele
 
 public final class VoucherDtos {
     private VoucherDtos() {}
+    public static final int MAX_ACTIVITIES = 50;
     public enum Type { RECEIPT, PAYMENT, JOURNAL }
     @Data public static class Form {
         private UUID requestKey=UUID.randomUUID();
@@ -21,6 +22,13 @@ public final class VoucherDtos {
         private boolean pettyCash;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private UUID activityId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
+        private List<UUID> activityIds = new ArrayList<>();
+
+        public List<UUID> selectedActivityIds() {
+            if (activityIds != null && !activityIds.isEmpty()) return activityIds;
+            return activityId == null ? List.of() : List.of(activityId);
+        }
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_DEFAULT)
         private boolean equity;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
@@ -72,7 +80,9 @@ public final class VoucherDtos {
     public record Client(UUID id,String number,String name) {}
     public record Activity(UUID id,String name,String nameSw) {}
     public record NumberReservation(String number) {}
-    public record Mapping(UUID transactionId,UUID templateKey,String transactionName,String component,Account debit,Account credit) {}
+    public record Mapping(UUID transactionId,UUID templateKey,String transactionName,String component,Account debit,Account credit,
+                          Activity activity) {}
+    public record ReviewLines(Map<String,Account> accounts,Map<Integer,Mapping> mappings) {}
     public record Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,
                               String description,BigDecimal amount,Account debit,Account credit,List<Entry> entries) {
         public Transaction(UUID id,int lineNo,UUID transactionId,UUID templateKey,String transactionName,String component,

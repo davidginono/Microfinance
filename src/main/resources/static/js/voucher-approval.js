@@ -59,21 +59,48 @@ function selection(region,prefix){if(!region)return;const button=qs(`[data-${pre
 selection(qs('[data-approval-register]'),'approval');selection(qs('[data-resource-table="voucher-approval-items"]'),'item');
 const register=qs('[data-approval-register]');if(register){const table=qs('[data-resource-table=voucher-approval-register]',register);const updateCards=()=>{const category=qs('[name=category]',table)?.value;all('.approval-tile',register).forEach(tile=>{let active=false;all('a[data-table-query-param]',tile).forEach(link=>{const current=!!category&&new URL(link.href,location.href).searchParams.get('category')===category;link.toggleAttribute('aria-current',current);if(current)link.setAttribute('aria-current','page');active||=current;const url=new URL(link.href);const type=qs('[name=type]',table)?.value;if(type)url.searchParams.set('type',type);else url.searchParams.delete('type');link.href=url.href;});tile.classList.toggle('is-active',active);});};table?.addEventListener('resource-table:updated',updateCards);updateCards();}
 const editor=qs('[data-approval-editor]');
-if(editor){const rows=qs('[data-editor-lines]',editor),template=rows.firstElementChild.cloneNode(true),readonly=editor.dataset.readonly==='true',pickers=new WeakMap();
+if(editor){const rows=qs('[data-editor-lines]',editor),template=rows.firstElementChild.cloneNode(true),readonly=editor.dataset.readonly==='true',configured=editor.dataset.configuredVoucher==='true',pickers=new WeakMap();
  window.VoucherSelect.cleanClone(template);
  const visibleField=field=>{if(field.hasAttribute('data-amount-input'))return qs('[data-amount-display]',field.parentElement)||field;if(field.hasAttribute('data-date-native'))return qs('[data-date-display]',field.parentElement);if(field.type!=='hidden')return field;const select=qs('select[data-voucher-select]',field.parentElement);return select?.closest('.neo-select')?.querySelector('button')||select||qs('[data-account-label]',field.parentElement)||qs('[data-mapping-clear]',field.closest('tr')||editor)||qs('[name$=".description"]',field.closest('tr')||editor);};
  const renumber=()=>{all('[data-editor-line]',rows).forEach((r,n)=>{const number=qs('[data-line-number]',r);number.firstChild.textContent=String(n+1);const checkbox=qs('[data-line-select]',r);if(checkbox)checkbox.setAttribute('aria-label',`${editor.dataset.lineLabel} ${n+1}`);all('[aria-label]',r).forEach(i=>i.setAttribute('aria-label',i.getAttribute('aria-label').replace(/\d+$/,String(n+1))));all('[name]',r).forEach(i=>{i.name=i.name.replace(/rows\[\d+\]/,`rows[${n}]`);i.id=`field-${i.name}`;});const remove=qs('[data-line-remove]',r);if(remove)remove.disabled=rows.children.length<=1;});const add=qs('[data-line-add]',editor);if(add)add.disabled=rows.children.length>=50;bindChoices();};
  all('[name]',editor).forEach(i=>{if(!i.id)i.id=`field-${i.name}`;});
  bindChoices();
  all('[data-issue-field]',editor).forEach(link=>{const field=editor.elements.namedItem(link.dataset.issueField);if(!field)return;const visible=visibleField(field);let message=link.textContent;const line=field.name.match(/^rows\[(\d+)\]/);if(!field.value&&field.name.endsWith('.debitAccountId'))message=editor.dataset.debitRequired;if(!field.value&&field.name.endsWith('.creditAccountId'))message=editor.dataset.creditRequired;link.textContent=(line?`${editor.dataset.lineLabel} ${Number(line[1])+1}: `:'')+message;visible.classList.add('approval-field-error');visible.setAttribute('aria-invalid','true');visible.closest('tr')?.classList.add('approval-warning-row');const note=document.createElement('small');note.className='approval-inline-error';note.id='approval-error-'+field.name.replace(/\W/g,'-');note.textContent=message;visible.setAttribute('aria-describedby',note.id);visible.parentElement.append(note);link.addEventListener('click',e=>{e.preventDefault();visible.scrollIntoView({block:'center',behavior:'smooth'});visible.focus();const row=visible.closest('[data-editor-line]');if(row){all('[data-editor-line]',rows).forEach(r=>{r.classList.remove('is-selected');qs('[data-line-select]',r).checked=false;});selectedLine=row;row.classList.add('is-selected');qs('[data-line-select]',row).checked=true;refreshLines();}});});
- qs('[data-line-add]',editor)?.addEventListener('click',()=>{if(rows.children.length>=50)return;const row=template.cloneNode(true);all('input',row).forEach(i=>{if(!i.name.endsWith('.side'))i.value=i.name.endsWith('.component')?'TOTAL':'';i.removeAttribute('aria-invalid');if(i.getAttribute('aria-describedby')?.startsWith('approval-error-'))i.removeAttribute('aria-describedby');i.classList.remove('approval-field-error');});all('small',row).forEach(i=>i.remove());all('.approval-account',row).forEach(a=>{if(!qs('[data-account-pick]',a) && !qs('[data-money-side="true"]',a)){accountSelect(a);}});all('.approval-inline-error',row).forEach(e=>e.remove());all('[data-line-select]',row).forEach(e=>e.checked=false);row.classList.remove('approval-warning-row');rows.append(row);renumber();qs('[name$=".description"]',row).focus();editor.dispatchEvent(new Event('input',{bubbles:true}));});
+ qs('[data-line-add]',editor)?.addEventListener('click',()=>{if(rows.children.length>=50)return;const row=template.cloneNode(true);all('input',row).forEach(i=>{if(!i.name.endsWith('.side'))i.value=i.name.endsWith('.component')?'TOTAL':'';i.removeAttribute('aria-invalid');if(i.getAttribute('aria-describedby')?.startsWith('approval-error-'))i.removeAttribute('aria-describedby');i.classList.remove('approval-field-error');});all('small',row).forEach(i=>{if(configured&&i.hasAttribute('data-mapping-label'))i.textContent='';else i.remove();});all('.approval-account',row).forEach(a=>{if(configured){qs('[data-account-label]',a).value='';}else if(!qs('[data-account-pick]',a) && !qs('[data-money-side="true"]',a)){accountSelect(a);}});all('.approval-inline-error',row).forEach(e=>e.remove());all('[data-line-select]',row).forEach(e=>e.checked=false);row.classList.remove('approval-warning-row');rows.append(row);renumber();qs('[name$=".description"]',row).focus();editor.dispatchEvent(new Event('input',{bubbles:true}));});
  rows.addEventListener('click',e=>{const clear=e.target.closest('[data-mapping-clear]');if(clear && !readonly){const row=clear.closest('[data-editor-line]');all('input[type=hidden]',row).forEach(i=>i.value=i.name.endsWith('.component')?'TOTAL':'');all('.approval-account',row).forEach(a=>{qs('[data-account-label]',a).value='';if(!qs('[data-account-pick]',a) && !qs('[data-money-side="true"]',a)){accountSelect(a);}});clear.closest('[data-mapping-label]').remove();bindChoices();all('[data-voucher-select]',row).forEach(select=>pickers.get(select)?.reset());qs('[data-account-pick]',row)?.focus();editor.dispatchEvent(new Event('input',{bubbles:true}));return;}if(!readonly && e.target.closest('[data-line-remove]') && rows.children.length>1){e.target.closest('[data-editor-line]').remove();renumber();editor.dispatchEvent(new Event('input',{bubbles:true}));}});
  renumber();
- let selectedLine;
+ let selectedLine,lastSelectedLine;
+ const transactionSelect=qs('[data-approval-transaction]',editor);
+ const rowInput=suffix=>selectedLine?.querySelector('input[name$=".'+suffix+'"]');
+ const mappingPicker=transactionSelect&&window.VoucherSelect.bind(transactionSelect,{
+  field:{get value(){return rowInput('transactionId')?.value?rowInput('templateKey').value+'|'+rowInput('component').value:'';},set value(value){}},
+  label:()=>selectedLine?.querySelector('[data-mapping-label]').textContent||'',
+  url:()=>editor.dataset.transactionUrl,error:editor.dataset.lookupError,
+  choice:item=>({value:item.templateKey+'|'+item.component,label:window.VoucherSelect.mappingLabel(item)}),
+  changed:(item,label)=>{
+   if(!selectedLine)return;
+   rowInput('transactionId').value=item.transactionId;
+   rowInput('templateKey').value=item.templateKey;
+   rowInput('component').value=item.component;
+   for(const side of ['debit','credit']){
+    rowInput(side+'AccountId').value='';
+    qs('[data-posting-side="'+side+'"]',selectedLine).value=item[side].code+' · '+item[side].name;
+   }
+   qs('[data-mapping-label]',selectedLine).textContent=label;
+   if(!rowInput('description').value)rowInput('description').value=item.transactionName;
+   editor.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+ });
  const refreshLines=()=>{
    const remove=qs('[data-line-remove-selected]',editor),choose=qs('[data-choose-selected]',editor);
    if(remove)remove.disabled=readonly||!selectedLine||rows.children.length<=1;
    if(choose)choose.disabled=readonly||!selectedLine||!qs('[data-account-pick]',selectedLine);
+   if(transactionSelect&&lastSelectedLine!==selectedLine){
+    lastSelectedLine=selectedLine;
+    transactionSelect.disabled=!selectedLine;
+    mappingPicker.reset();
+    window.refreshEnhancedSelects?.(transactionSelect.parentElement);
+   }
    const money=qs('[name=moneyAccountId]',editor)?.parentElement;
    all('[data-money-side="true"]',rows).forEach(i=>i.value=qs('[data-account-label]',money||editor)?.value||'');
    window.VoucherBalance.refresh(editor);
