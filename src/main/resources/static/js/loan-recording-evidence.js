@@ -10,6 +10,8 @@
         const last = panels.length - 1;
         const guarantors = panels.find(panel => panel.querySelector('[data-repeat-list="guarantors"]'));
         let active = 0, reached = 0, requiredGuarantors = null;
+        let pending, passedSubmit = false;
+        const stepName = index => panels[index].id.replace('recording-panel-', '');
 
         function skipped(index) {
             return !!guarantors && panels[index] === guarantors && form.elements.loanFor?.value === 'GROUP'
@@ -40,19 +42,77 @@
             }
         }
 
-        function go(index) {
-            if (index < 0 || index > last || skipped(index)) return;
-            for (let step = active; step < index; step++) {
-                if (skipped(step)) continue;
-                const invalid = [...panels[step].querySelectorAll('input,select,textarea')]
-                    .filter(control => control.willValidate && !control.validity.valid);
-                if (invalid.length) {
-                    show(step, false);
-                    invalid.forEach(control => control.checkValidity());
-                    return;
-                }
+        function sectionError(index, message, focus = true) {
+            const notice = panels[index].querySelector('[data-recording-step-error]');
+            notice.textContent = message;
+            notice.hidden = !message;
+            if (message && focus) notice.focus();
+        }
+
+        async function checkStep(index, signal) {
+            sectionError(index, '');
+            const invalid = [...panels[index].querySelectorAll('input,select,textarea')]
+                .filter(control => control.willValidate && !control.validity.valid);
+            if (invalid.length) {
+                show(index, false);
+                invalid.forEach(control => control.checkValidity());
+                return false;
             }
-            show(index);
+            const step = stepName(index);
+            const entries = new FormData(form);
+            const payload = step === 'attachments' ? entries : new URLSearchParams();
+            if (step !== 'attachments') entries.forEach((value, key) => {
+                if (typeof value === 'string') payload.append(key, value);
+            });
+            payload.set('step', step);
+            try {
+                const response = await fetch(root.dataset.validateUrl, {method:'POST', body:payload,
+                    signal:AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+                    headers:{Accept:'application/json'}, credentials:'same-origin', cache:'no-store'});
+                if (signal.aborted) return false;
+                if (response.status === 204 && !response.redirected) return true;
+                if (response.status !== 422) throw new Error('Validation request failed');
+                const {errors} = await response.json();
+                if (signal.aborted) return false;
+                const messages = errors.map(({field, message}) => {
+                    const node = document.createElement('span');
+                    node.dataset.fieldErrorFor = field;
+                    node.textContent = message;
+                    return node;
+                });
+                show(index, false);
+                const unbound = window.FormValidation.applyServerErrors(form, messages);
+                const focused = window.FormValidation.focusFirst(form);
+                if (unbound.length) sectionError(index, unbound.join(' '), !focused);
+                return false;
+            } catch (failure) {
+                if (!signal.aborted) { show(index, false); sectionError(index, root.dataset.validationUnavailable); }
+                return false;
+            }
+        }
+
+        async function go(index, saving = false) {
+            if (index < 0 || index > last || skipped(index)) return;
+            if (index < active) { pending?.abort(); show(index); return; }
+            if (pending || (!saving && index === active)) return;
+            const attempt = new AbortController();
+            pending = attempt;
+            const finishLoading = window.AppLoading?.action(saving ? submit : next);
+            let ready = false;
+            try {
+                for (let step = active; step < index + Number(saving); step++) {
+                    if (!skipped(step) && !await checkStep(step, attempt.signal)) return;
+                }
+                ready = !attempt.signal.aborted;
+            } finally {
+                pending = undefined;
+                finishLoading?.();
+            }
+            if (!ready) return;
+            if (saving) {
+                passedSubmit = true;
+                try { form.requestSubmit(submit); } finally { passedSubmit = false; }
+            } else show(index);
         }
 
         function move(direction) {
@@ -84,8 +144,11 @@
             updateSteps();
         });
         form.addEventListener('change', event => {
+            pending?.abort();
+            sectionError(active, '');
             if (['loanFor','loanMode','productId'].includes(event.target.name)) updateSteps();
         });
+        form.addEventListener('input', () => pending?.abort());
         form.addEventListener('keydown', event => {
             if (event.key !== 'Enter' || event.isComposing || event.defaultPrevented
                 || !panels[active].contains(event.target)
@@ -95,9 +158,10 @@
             else move(1);
         });
         form.addEventListener('submit', event => {
-            if (event.submitter !== submit || active === last) return;
+            if (event.submitter !== submit || passedSubmit) return;
             event.preventDefault();
-            move(1);
+            if (active === last) void go(last, true);
+            else move(1);
         });
         updateSteps();
         nav.hidden = false;
@@ -117,11 +181,13 @@
                 list.querySelectorAll('[data-repeat-row]').forEach(function (row) {
                     var controls = [...row.querySelectorAll('input,select,textarea')].filter(control =>
                         !control.matches('[data-document-field],[data-row-photos]') && (control.dataset.field || /^applicationDetails\./.test(control.name)));
-                    var populated = controls.some(control => control.value.trim()) || !!row.querySelector('[data-row-photo-list]')?.children.length;
+                    var groupGuarantor = form.elements.loanFor?.value === 'GROUP' && list.dataset.repeatList === 'guarantors';
+                    var populated = controls.some(control => (groupGuarantor ? control.dataset.field !== 'fullName' && !control.name.endsWith('.fullName') : !control.closest('[data-group-guarantee]'))
+                        && control.value.trim()) || !!row.querySelector('[data-row-photo-list]')?.children.length;
                     controls.forEach(function (control) {
                         if (!control.dataset.field) control.dataset.field = control.name.substring(control.name.lastIndexOf('.') + 1);
                         if (!('recordingRequired' in control.dataset)) control.dataset.recordingRequired = String(control.required);
-                        control.required = populated && control.dataset.recordingRequired === 'true';
+                        control.required = populated && (control.closest('[data-group-guarantee]') ? groupGuarantor : control.dataset.recordingRequired === 'true');
                         if (populated) control.name = 'applicationDetails.' + list.dataset.repeatList + '[' + index + '].' + control.dataset.field;
                         else control.removeAttribute('name');
                         if (!control.id) control.id = 'recording-evidence-control-' + (++nextFieldId);
@@ -142,6 +208,7 @@
                 else list.after(button);
             }
             root.querySelectorAll('[data-repeat-list]').forEach(function (list) { ensurePreview(list); reindex(list); });
+            form.elements.loanFor?.addEventListener('change', () => root.querySelectorAll('[data-repeat-list]').forEach(reindex));
             ['input','change'].forEach(type => root.addEventListener(type, function (event) {
                 var list = event.target.closest('[data-repeat-list]');
                 if (list) reindex(list);

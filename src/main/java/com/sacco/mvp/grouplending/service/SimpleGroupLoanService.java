@@ -1,6 +1,8 @@
 package com.sacco.mvp.grouplending.service;
 
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.RecordForm;
+import com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.FieldValidation;
+import com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.Profile;
 import com.sacco.mvp.domain.*;
@@ -112,9 +114,7 @@ public class SimpleGroupLoanService {
         if(f.getApplicationDetails()==null)f.setApplicationDetails(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ApplicationDetails());
         var memberIds=s.people().stream().map(Person::id).toList();
         if(submitting){
-            var guarantees=f.getApplicationDetails().getGuarantors();check(guarantees!=null&&guarantees.size()<=20,"guarantee");
-            var references=guarantees.stream().map(x->x.getClientId()==null?Objects.toString(x.getClientNumber(),"").strip():x.getClientId().toString()).toList();var candidates=records.guarantorPeople(a,references);
-            for(int index=0;index<guarantees.size();index++){var person=candidates.get(references.get(index));check(person!=null&&!memberIds.contains(person.id()),"guarantee");guarantees.get(index).setClientId(person.id());guarantees.get(index).setFullName(person.name());guarantees.get(index).setClientNumber(person.number());}
+            var guarantees=resolveGuarantors(a,f,memberIds);
             var locks=new HashSet<UUID>(memberIds);guarantees.forEach(x->locks.add(x.getClientId()));records.lockClients(a,locks.stream().sorted().toList());
         }
         var rows=records.profiles(a,s.groupId(),clock.today());check(rows.size()==s.people().size(),"members");
@@ -126,13 +126,19 @@ public class SimpleGroupLoanService {
             else profiles.put((UUID)row.get("id"),profile);
         }
         if(!missingIncome.isEmpty())throw new ProfileIncomeException(missingIncome);
-        if(submitting)check(g.getSignedOn()!=null&&!g.getSignedOn().isAfter(clock.today())&&!g.getSignedOn().isBefore(f.getApplicationDate()),"signatures");
+        if(submitting)validateSigningDate(f);
         check(g.getDebts()!=null&&g.getDebts().size()<=50,"outsideDebts");
         var externalByClient=new HashMap<UUID,BigDecimal>();var debtReferences=new HashSet<String>();BigDecimal externalDebt=BigDecimal.ZERO;
-        for(var obligation:g.getDebts()){
-            check(obligation!=null&&validText(obligation.getReference(),200)&&validMoney(obligation.getMonthlyPayment(),true),"outsideDebts");
-            check(debtReferences.add(obligation.getReference().strip().toLowerCase(Locale.ROOT))&&obligation.getClientIds()!=null&&!obligation.getClientIds().isEmpty()&&obligation.getClientIds().size()<=50,"outsideDebts");
-            var named=new HashSet<>(obligation.getClientIds());check(named.size()==obligation.getClientIds().size()&&memberIds.containsAll(named),"outsideDebts");
+        for(int index=0;index<g.getDebts().size();index++){
+            var obligation=g.getDebts().get(index);
+            String field="groupApplication.debts["+index+"].";
+            if(obligation==null || !validText(obligation.getReference(),200) || !debtReferences.add(obligation.getReference().strip().toLowerCase(Locale.ROOT)))
+                throw new FieldValidation(field+"reference","simpleGroup.error.outsideDebts");
+            if(!validMoney(obligation.getMonthlyPayment(),true))throw new FieldValidation(field+"monthlyPayment","recording.error.amount");
+            var ids=obligation.getClientIds();
+            if(ids==null || ids.isEmpty() || ids.size()>50)throw new FieldValidation(field+"clientIds","recording.validation.debtClients");
+            var named=new HashSet<>(ids);
+            if(named.size()!=ids.size() || !memberIds.containsAll(named))throw new FieldValidation(field+"clientIds","recording.validation.debtClients");
             for(var id:named)externalByClient.merge(id,obligation.getMonthlyPayment(),BigDecimal::add);externalDebt=externalDebt.add(obligation.getMonthlyPayment());
         }
         var assessments=new ArrayList<Assessment>();BigDecimal income=BigDecimal.ZERO;
@@ -196,14 +202,73 @@ public class SimpleGroupLoanService {
     @Transactional(readOnly=true) public void payment(AppUserPrincipal a,UUID loan,String payer){if(records.simple(a,loan)){access.requireActor(a,"GROUP_LENDING_POST");text(payer,160);}}
     @Transactional(readOnly=true) public void correction(AppUserPrincipal a,UUID loan){if(records.simple(a,loan))access.requireActor(a,"GROUP_LENDING_REVERSE");}
     @Transactional public void recordGuarantors(AppUserPrincipal a,UUID loan,RecordForm f,LoanProductSetting product){
-        access.requireActor(a,"LOAN_RECORDING_CREATE");var people=f.getApplicationDetails().getGuarantors();int required=product.getGuarantorsRequired()==null?0:product.getGuarantorsRequired();
-        check(people!=null&&people.size()>=required&&people.size()<=20,"guarantee");if(people.isEmpty())return;
-        var ids=people.stream().map(com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor::getClientId).toList();check(ids.stream().allMatch(Objects::nonNull)&&new HashSet<>(ids).size()==ids.size(),"guarantee");
-        ids.stream().sorted().forEach(id->records.lockGuarantor(a,id));var exposures=records.exposures(a,ids);var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());var cap=records.totalPayable(loan);
-        for(var g:people){money(g.getGuaranteeBudget(),true);text(g.getGuaranteeEvidence(),500);check(g.getSignedOn()!=null&&!g.getSignedOn().isAfter(clock.today())&&!g.getSignedOn().isBefore(f.getApplicationDate()),"guarantee");var e=exposures.get(g.getClientId());
-            check(e!=null&&e.missingHistory()==0&&(policy.guarantorActiveLoanAllowed()||e.activeLoans()==0)&&(policy.guarantorDefaultLimit()==null||e.riskLoans()<policy.guarantorDefaultLimit())&&(policy.guaranteeCountLimit()==null||e.guaranteeCount()<policy.guaranteeCountLimit())&&e.reserved().add(cap).compareTo(g.getGuaranteeBudget())<=0,"guarantee");records.guarantor(loan,g,cap);
+        access.requireActor(a,"LOAN_RECORDING_CREATE");var people=f.getApplicationDetails().getGuarantors();
+        requireGuarantorCount(people,product);
+        if(people.isEmpty())return;
+        var ids=people.stream().map(Guarantor::getClientId).toList();
+        ids.stream().sorted().forEach(id->records.lockGuarantor(a,id));
+        var cap=records.totalPayable(loan);
+        validateGuarantorCapacity(a,f,people,cap);
+        people.forEach(g->records.guarantor(loan,g,cap));
+    }
+
+    public void validateSigningDate(RecordForm f) {
+        if(!validSigningDate(f.getGroupApplication().getSignedOn(),f.getApplicationDate()))
+            throw new FieldValidation("groupApplication.signedOn","simpleGroup.error.signatures");
+    }
+
+    @Transactional(readOnly=true)
+    public void validateGuarantors(AppUserPrincipal a,RecordForm f,LoanProductSetting product,BigDecimal cap) {
+        var s=setup(a,f.getGroupApplication().getGroupId());
+        var people=resolveGuarantors(a,f,s.people().stream().map(Person::id).toList());
+        requireGuarantorCount(people,product);
+        if(!people.isEmpty())validateGuarantorCapacity(a,f,people,cap);
+    }
+
+    private List<Guarantor> resolveGuarantors(AppUserPrincipal a,RecordForm f,List<UUID> members) {
+        var people=f.getApplicationDetails().getGuarantors();
+        check(people!=null&&people.size()<=20,"guarantee");
+        var references=people.stream().map(g->g.getClientId()==null?Objects.toString(g.getClientNumber(),"").strip():g.getClientId().toString()).toList();
+        var candidates=records.guarantorPeople(a,references);
+        var selected=new HashSet<UUID>();
+        for(int index=0;index<people.size();index++){
+            var person=candidates.get(references.get(index));
+            if(person==null || members.contains(person.id()) || !selected.add(person.id()))
+                throw new FieldValidation(guarantorField(index,"clientNumber"),"recording.validation.guarantorClient");
+            var guarantor=people.get(index);
+            guarantor.setClientId(person.id());guarantor.setFullName(person.name());guarantor.setClientNumber(person.number());
+        }
+        return people;
+    }
+
+    private static void requireGuarantorCount(List<Guarantor> people,LoanProductSetting product) {
+        int required=Objects.requireNonNullElse(product.getGuarantorsRequired(),0);
+        if(people.size()<required)throw new FieldValidation("guarantors","recording.validation.guarantorCount");
+    }
+
+    private void validateGuarantorCapacity(AppUserPrincipal a,RecordForm f,List<Guarantor> people,BigDecimal cap) {
+        var exposures=records.exposures(a,people.stream().map(Guarantor::getClientId).toList());
+        var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
+        for(int index=0;index<people.size();index++){
+            var g=people.get(index);
+            if(!validMoney(g.getGuaranteeBudget(),true))throw new FieldValidation(guarantorField(index,"guaranteeBudget"),"recording.error.amount");
+            if(!validText(g.getGuaranteeEvidence(),500))throw new FieldValidation(guarantorField(index,"guaranteeEvidence"),"recording.validation.guaranteeEvidence");
+            if(!validSigningDate(g.getSignedOn(),f.getApplicationDate()))throw new FieldValidation(guarantorField(index,"signedOn"),"recording.validation.signedOn");
+            var e=exposures.get(g.getClientId());
+            if(e==null || e.missingHistory()!=0 || (!policy.guarantorActiveLoanAllowed() && e.activeLoans()!=0)
+                || (policy.guarantorDefaultLimit()!=null && e.riskLoans()>=policy.guarantorDefaultLimit())
+                || (policy.guaranteeCountLimit()!=null && e.guaranteeCount()>=policy.guaranteeCountLimit()))
+                throw new FieldValidation(guarantorField(index,"clientNumber"),"recording.validation.guarantorEligibility");
+            if(e.reserved().add(cap).compareTo(g.getGuaranteeBudget())>0)
+                throw new FieldValidation(guarantorField(index,"guaranteeBudget"),"recording.validation.guaranteeCapacity");
         }
     }
+
+    private boolean validSigningDate(LocalDate date,LocalDate applicationDate) {
+        return date!=null && applicationDate!=null && !date.isAfter(clock.today()) && !date.isBefore(applicationDate);
+    }
+
+    private static String guarantorField(int index,String name) {return "applicationDetails.guarantors["+index+"]."+name;}
     @Transactional(readOnly=true) public boolean guaranteesReady(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_RECORDING_VIEW");return records.guaranteesReady(a,loan);}
     private void event(AppUserPrincipal a,UUID id,String action){audit.logEvent("GROUP_LENDING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"GROUP",id.toString(),a.getSaccoId(),a.getStationId(),Map.of());}
     public static final class ProfileIncomeException extends IllegalArgumentException {

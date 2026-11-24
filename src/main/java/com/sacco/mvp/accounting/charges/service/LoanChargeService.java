@@ -162,13 +162,17 @@ public class LoanChargeService {
         var id=repository.insertPolicy(a,f,hash,clock.now());event(a,id,"LOAN_CHARGE_POLICY_RECORDED");return id;
     }
     @Transactional(readOnly=true) public Plan quote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean strict){
-        return quote(a,f,product,strict,false);
+        return quote(a,f,product,strict,false,true);
     }
     @Transactional(propagation=Propagation.MANDATORY)
     public Plan recordingQuote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean individual){
-        return quote(a,f,product,true,individual);
+        return quote(a,f,product,true,individual,true);
     }
-    private Plan quote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean strict,boolean allowPending){
+    @Transactional(readOnly=true)
+    public Plan validateRecordingQuote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean individual){
+        return quote(a,f,product,true,individual,false);
+    }
+    private Plan quote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean strict,boolean allowPending,boolean lockAccounts){
         boolean manual="CUSTOM".equals(f.getLoanMode());
         if(manual)accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");
         var application=amount(manual?f.getCustomApplicationCharge():product.getApplicationFee());
@@ -206,8 +210,8 @@ public class LoanChargeService {
             for(var t:terms){
                 text(t.evidence(),custom || t.kind().equals("INSURANCE"));
                 try{
-                    repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE");
-                    repository.account(a.getSaccoId(),t.liabilityAccountId(),policy.accountKind(t.kind()));
+                    repository.account(a.getSaccoId(),t.receivableAccountId(),"RECEIVABLE",lockAccounts);
+                    repository.account(a.getSaccoId(),t.liabilityAccountId(),policy.accountKind(t.kind()),lockAccounts);
                 }catch(IllegalArgumentException error){
                     var pending=new Plan(plan.policyId(),plan.policyReference(),plan.agreementReference(),plan.terms(),false,error.getMessage());
                     if(allowPending && canRecordWithPendingCharges(f,pending))return pending;

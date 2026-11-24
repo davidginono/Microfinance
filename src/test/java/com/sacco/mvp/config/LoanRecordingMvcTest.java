@@ -65,6 +65,33 @@ class LoanRecordingMvcTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.interest").value("60.00"));
         verify(service).interestQuote(eq(actor),argThat(f->f.getRequestedPrincipal()==null && f.getFirstPaymentDate()==null && Integer.valueOf(6).equals(f.getTenureValue()) && "ANNUAL".equals(f.getInterestBasis()) && f.getCustomMethod()==InterestMethod.REDUCING_BALANCE));
     }
+
+    @Test void stepValidationReturnsOnlyErrorsForTheCurrentStep() throws Exception {
+        var path="/finance/loan-recording/validate-step";
+        mvc.perform(post(path).with(user(actor)).param("step","guarantors")).andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(actor)).with(csrf()).param("step","guarantors")
+            .param("applicationDetails.guarantors[0].guaranteeBudget","wrong")
+            .param("applicationDetails.guarantors[1].signedOn","wrong"))
+            .andExpect(status().is(422)).andExpect(jsonPath("$.errors.length()").value(2))
+            .andExpect(jsonPath("$.errors[*].field",org.hamcrest.Matchers.containsInAnyOrder(
+                "applicationDetails.guarantors[0].guaranteeBudget","applicationDetails.guarantors[1].signedOn")));
+        verify(service,never()).validateStep(any(),any(),any(),any(),any());
+        mvc.perform(post(path).with(user(actor)).with(csrf()).param("step","loan")
+            .param("applicationDetails.guarantors[0].guaranteeBudget","wrong"))
+            .andExpect(status().isNoContent());
+        verify(service).validateStep(eq(actor),any(),eq("loan"),eq(List.of()),isNull());
+    }
+
+    @Test void stepValidationLocalizesAnIndexedBusinessErrorWithoutSaving() throws Exception {
+        String field="applicationDetails.guarantors[1].guaranteeBudget";
+        doThrow(new LoanRecordingEvidenceService.FieldValidation(field,"recording.error.amount"))
+            .when(service).validateStep(eq(actor),any(),eq("guarantors"),any(),any());
+        mvc.perform(post("/finance/loan-recording/validate-step").with(user(actor)).with(csrf()).param("step","guarantors"))
+            .andExpect(status().is(422)).andExpect(jsonPath("$.errors[0].field").value(field))
+            .andExpect(jsonPath("$.errors[0].message").isNotEmpty());
+        verify(service,never()).save(any(),any(),any());
+        verify(service,never()).saveGroup(any(),any(),any(),any());
+    }
     @Test void chargeQuoteBindsTheEditedRateAndReturnsOnlyChargeValues() throws Exception {
         when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",new BigDecimal("0.12"),"FLAT_RATE","MONTHLY",new BigDecimal("176.67"),new BigDecimal("60.00"),List.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(1,null,new BigDecimal("1000.00"),new BigDecimal("60.00"),new BigDecimal("1060.00"),new BigDecimal("1060.00"),new BigDecimal("0.00"))),"MONTHS",6));
         var term=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term(UUID.randomUUID(),"PROCESSING","PRINCIPAL_RATE",new BigDecimal("0.0075"),new BigDecimal("7.50"),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.SEPARATE,UUID.randomUUID(),UUID.randomUUID(),"Recorded charge entry","","");
@@ -299,6 +326,9 @@ class LoanRecordingMvcTest {
         @Bean com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups(){return mock(com.sacco.mvp.grouplending.service.SimpleGroupLoanService.class);}
         @Bean LoanRecordingService service(){return mock(LoanRecordingService.class);}
         @Bean com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals(){return mock(com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService.class);}
-        @Bean LoanRecordingController controller(LoanRecordingService service,com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals,com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups){return new LoanRecordingController(simpleGroups,service,approvals,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),new org.springframework.context.support.StaticMessageSource(),mock(SaccoLogoStorageService.class),org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.class));}
+        @Bean LoanRecordingController controller(LoanRecordingService service,com.sacco.mvp.accounting.loans.service.LoanGroupApprovalService approvals,com.sacco.mvp.grouplending.service.SimpleGroupLoanService simpleGroups){
+            var messages=new org.springframework.context.support.ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+            return new LoanRecordingController(simpleGroups,service,approvals,mock(LoanRecordingPdfService.class),mock(ApplicationClock.class),messages,mock(SaccoLogoStorageService.class),mock(LoanRecordingEvidenceService.class));
+        }
     }
 }

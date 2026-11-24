@@ -108,7 +108,12 @@ public class FormSchemaService {
             Schema schema = registry.getSchema(schemaNode);
             List<com.networknt.schema.Error> errors = schema.validate(dataNode);
             if (!errors.isEmpty()) {
-                throw new IllegalArgumentException("Form validation failed: " + errors.iterator().next().getMessage());
+                var error=errors.getFirst();
+                var path=error.getInstanceLocation();
+                String field=path.getNameCount()>0?path.getName(0):error.getProperty();
+                if(field==null && "required".equals(error.getKeyword()) && error.getArguments()!=null && error.getArguments().length>0)
+                    field=String.valueOf(error.getArguments()[0]);
+                throw new FieldError(field,"Form validation failed: " + error.getMessage(),null);
             }
         } catch (JacksonException e) {
             throw new IllegalArgumentException("Failed to parse JSON", e);
@@ -147,8 +152,14 @@ public class FormSchemaService {
                 default -> raw;
             };
         } catch (RuntimeException ex) {
-            throw new IllegalArgumentException("Invalid value for " + field + ": " + raw);
+            throw new FieldError(field,"Invalid value for " + field + ": " + raw,ex);
         }
+    }
+
+    public static final class FieldError extends IllegalArgumentException {
+        private final String field;
+        private FieldError(String field,String message,Throwable cause){super(message,cause);this.field=field;}
+        public String field(){return field;}
     }
 
     public String toJson(Map<String, Object> data) {

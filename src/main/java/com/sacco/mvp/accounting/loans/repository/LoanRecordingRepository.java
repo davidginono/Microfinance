@@ -121,6 +121,13 @@ public class LoanRecordingRepository {
         """,Boolean.class,loan,a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),loan,loan));}
     public boolean personalGuaranteesReady(AppUserPrincipal a,UUID id){return Boolean.TRUE.equals(jdbc.queryForObject("select coalesce(lending_personal_guarantees_ready(id),false) from loan_applications where id=? and sacco_id=? and station_id=?",Boolean.class,id,a.getSaccoId(),a.getStationId()));}
     public boolean recordedGuarantees(AppUserPrincipal a,UUID id,int required){return Boolean.TRUE.equals(jdbc.queryForObject("select count(distinct g.guarantor_member_id)>=? from guarantor_requests g join loan_applications l on l.id=g.loan_application_id where l.id=? and l.sacco_id=? and l.station_id=? and g.status='APPROVED'",Boolean.class,required,id,a.getSaccoId(),a.getStationId()));}
+
+    public String clientKycError(AppUserPrincipal actor,UUID client,LocalDate day) {
+        return jdbc.queryForObject("""
+            select case when (select kyc_required from lending_credit_policy where sacco_id=? and station_id=?
+                order by revision desc limit 1) then client_kyc_error(?,?,?,?) end
+            """,String.class,actor.getSaccoId(),actor.getStationId(),client,actor.getSaccoId(),actor.getStationId(),day);
+    }
     private final JdbcTemplate jdbc;
 
     public List<com.sacco.mvp.staffoffice.dto.OfficeWork.Task> officeReviews(AppUserPrincipal a,com.sacco.mvp.domain.Position group,String search,String sort,int page) {

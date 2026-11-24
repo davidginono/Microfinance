@@ -19,6 +19,7 @@ public class LoanRecordingEvidenceService {
     private static final Set<String> STANDARD = Set.of("purpose","business","monthlyIncome","monthlyExpenses",
         "otherDebtRepayments","loanPurpose","businessOrEmployerName","businessOrEmploymentType","incomeSource",
         "collateralDescription","collateralEstimatedValue");
+    private static final Set<String> COLLATERAL_FIELDS = Set.of("collateralDescription","collateralEstimatedValue");
     private final LoanRecordingRepository records;
     private final GeneralLedgerService accounting;
     private final FormSchemaService schemas;
@@ -67,6 +68,15 @@ public class LoanRecordingEvidenceService {
         check(details.getGuarantors()!=null && details.getGuarantors().size()<=20 && details.getCollateral()!=null
             && details.getCollateral().size()<=20 && details.getFields()!=null && details.getFields().size()<=100 && details.getDocumentNames()!=null && details.getDocumentTypes()!=null && details.getRequiredAttachmentIds()!=null
             && details.getDocumentNames().size()<=10 && details.getDocumentTypes().size()<=10 && details.getRequiredAttachmentIds().size()<=10,"details");
+        validateGuarantors(actor,form);
+        validateCollateral(details);
+        validateProductFields(actor,form,true);
+        return documentUploads(form,files);
+    }
+
+    public void validateGuarantors(AppUserPrincipal actor,RecordForm form) {
+        var details=form.getApplicationDetails();
+        if(details==null)return;
         var labels=labels(actor,details);
         var selected=new HashSet<UUID>();
         for(int index=0;index<details.getGuarantors().size();index++) {
@@ -85,21 +95,32 @@ public class LoanRecordingEvidenceService {
             text(guarantor.getRelationship(),255);text(guarantor.getBusiness(),255);text(guarantor.getLocation(),255);
             phone(guarantor.getPhone(),row+"phone");
         }
+    }
+
+    public void validateCollateral(ApplicationDetails details) {
+        if(details==null)return;
+        check(details.getCollateral()!=null && details.getCollateral().size()<=20,"details");
         for(int index=0;index<details.getCollateral().size();index++) {
             var asset=details.getCollateral().get(index);
             String row="applicationDetails.collateral["+index+"].";
             checkField(asset!=null && asset.getItemName()!=null && !asset.getItemName().isBlank(),row+"itemName","collateral");
-            text(asset.getItemName(),255);text(asset.getItemNumber(),100);text(asset.getItemType(),100);text(asset.getDescription(),500);
+            fieldText(asset.getItemName(),255,row+"itemName");fieldText(asset.getItemNumber(),100,row+"itemNumber");
+            fieldText(asset.getItemType(),100,row+"itemType");fieldText(asset.getDescription(),500,row+"description");
             text(asset.getOwner(),255);text(asset.getLocation(),255);phone(asset.getPhone(),row+"phone");
             BigDecimal value=asset.getEstimatedValue();
             checkField(value==null || value.signum()>=0 && value.scale()<=2 && value.precision()<=18,row+"estimatedValue","money");
         }
-        var definitions="CONFIGURED".equals(form.getLoanMode())?requirements.activeForProduct(form.getProductId()):List.<com.sacco.mvp.domain.LoanProductRequiredAttachment>of();
-        var required=new HashMap<UUID,com.sacco.mvp.domain.LoanProductRequiredAttachment>();definitions.forEach(d->required.put(d.getId(),d));
+    }
+
+    public void validateProductFields(AppUserPrincipal actor,RecordForm form,boolean includeCollateral) {
+        var details=form.getApplicationDetails();
+        if(details==null)return;
+        check(details.getFields()!=null && details.getFields().size()<=100,"details");
         if("CONFIGURED".equals(form.getLoanMode())) {
             var product=schemas.getSchema(actor.getSaccoId(),form.getProductId(),null);
             boolean group="GROUP".equals(form.getLoanFor());
             var schema=schemas.withoutFields(product.getFormSchema(),group?Set.of("monthlyExpenses"):Set.of("monthlyExpenses","otherDebtRepayments"));
+            if(!includeCollateral)schema=schemas.withoutFields(schema,COLLATERAL_FIELDS);
             var formFields=schemas.toFormModel(product.getLoanType(),schema).getFields();
             formFields.forEach(field->details.getFieldLabels().put(field.getName(),field.getLabelKey()));
             Set<String> allowed=formFields.stream()
@@ -122,10 +143,7 @@ public class LoanRecordingEvidenceService {
             }
             if(form.getIncome()!=null)values.put("monthlyIncome",form.getIncome().toPlainString());
             if(form.getOtherDebt()!=null)values.put("otherDebtRepayments",form.getOtherDebt().toPlainString());
-            values.put("collateralDescription",details.getCollateral().isEmpty()?form.getCollateral():details.getCollateral().stream()
-                .map(asset->asset.getItemName()+": "+asset.getDescription()).collect(java.util.stream.Collectors.joining("; ")));
-            if(!details.getCollateral().isEmpty() && details.getCollateral().stream().allMatch(asset->asset.getEstimatedValue()!=null))
-                values.put("collateralEstimatedValue",details.getCollateral().stream().map(ClientApplicationDtos.Collateral::getEstimatedValue).reduce(BigDecimal.ZERO,BigDecimal::add).toPlainString());
+            if(includeCollateral)values.putAll(collateralValues(form));
             values.keySet().retainAll(allowed);
             for(var field:formFields)if(!group && field.isRequired() && Set.of("monthlyIncome",
                 "businessOrEmployerName","businessOrEmploymentType","incomeSource").contains(field.getName())) {
@@ -136,21 +154,69 @@ public class LoanRecordingEvidenceService {
                 check(!details.getGroupClientValues().isEmpty(),"clientCashFlow");
                 for(var person:details.getGroupClientValues()){
                     var individual=new LinkedHashMap<>(values);individual.putAll(person);individual.keySet().retainAll(allowed);
-                    schemas.validateAgainstSchema(schema,schemas.extractFormData(individual,schema));
+                    validateSchema(form,schema,individual,allowed);
                 }
-            } else schemas.validateAgainstSchema(schema,schemas.extractFormData(values,schema));
+            } else validateSchema(form,schema,values,allowed);
         } else check(details.getFields().isEmpty(),"details");
+    }
+
+    public void validateCollateralFields(AppUserPrincipal actor,RecordForm form) {
+        if(!"CONFIGURED".equals(form.getLoanMode()) || form.getApplicationDetails()==null)return;
+        var product=schemas.getSchema(actor.getSaccoId(),form.getProductId(),null);
+        var excluded=schemas.toFormModel(product.getLoanType(),product.getFormSchema()).getFields().stream()
+            .map(com.sacco.mvp.service.dto.FormField::getName).filter(name->!COLLATERAL_FIELDS.contains(name)).collect(java.util.stream.Collectors.toSet());
+        validateSchema(form,schemas.withoutFields(product.getFormSchema(),excluded),collateralValues(form),COLLATERAL_FIELDS);
+    }
+
+    private Map<String,String> collateralValues(RecordForm form){
+        var assets=form.getApplicationDetails().getCollateral();
+        var values=new LinkedHashMap<String,String>();
+        values.put("collateralDescription",assets.isEmpty()?form.getCollateral():assets.stream()
+            .map(asset->asset.getItemName()+": "+asset.getDescription()).collect(java.util.stream.Collectors.joining("; ")));
+        if(!assets.isEmpty() && assets.stream().allMatch(asset->asset.getEstimatedValue()!=null))
+            values.put("collateralEstimatedValue",assets.stream().map(ClientApplicationDtos.Collateral::getEstimatedValue)
+                .reduce(BigDecimal.ZERO,BigDecimal::add).toPlainString());
+        return values;
+    }
+
+    private void validateSchema(RecordForm form,String schema,Map<String,String> values,Set<String> allowed) {
+        try{schemas.validateAgainstSchema(schema,schemas.extractFormData(values,schema));}
+        catch(FormSchemaService.FieldError e){
+            String field=e.field();
+            if(field==null || !allowed.contains(field))throw e;
+            var target=switch(field){
+                case "purpose","loanPurpose"->"purpose";
+                case "collateralDescription","collateralEstimatedValue"->"collateral";
+                default->STANDARD.contains(field)?("GROUP".equals(form.getLoanFor())?"groupApplication.groupId":"clientId"):"applicationDetails.fields["+field+"]";
+            };
+            throw new FieldValidation(target,"recording.validation.invalidValue");
+        }
+    }
+
+    public List<LoanAttachmentService.NamedUpload> documentUploads(RecordForm form,List<MultipartFile> files) {
+        var details=form.getApplicationDetails();
+        if(details==null)return null;
+        check(details.getDocumentNames()!=null && details.getDocumentTypes()!=null && details.getRequiredAttachmentIds()!=null
+            && details.getDocumentNames().size()<=10 && details.getDocumentTypes().size()<=10 && details.getRequiredAttachmentIds().size()<=10,"attachments");
         if(details.getDocumentNames().isEmpty() && details.getDocumentTypes().isEmpty() && details.getRequiredAttachmentIds().isEmpty())return null;
         check(files.size()<=10,"attachments");
+        var definitions="CONFIGURED".equals(form.getLoanMode())?requirements.activeForProduct(form.getProductId()):List.<com.sacco.mvp.domain.LoanProductRequiredAttachment>of();
+        var required=new HashMap<UUID,com.sacco.mvp.domain.LoanProductRequiredAttachment>();definitions.forEach(d->required.put(d.getId(),d));
         var uploads=new ArrayList<LoanAttachmentService.NamedUpload>();
         for(int i=0;i<files.size();i++) {
             var file=files.get(i);if(file==null || file.isEmpty())continue;
             String name=at(details.getDocumentNames(),i),type=at(details.getDocumentTypes(),i),slot=at(details.getRequiredAttachmentIds(),i);
-            text(name,120);check(!name.isBlank() && ClientApplicationService.DOCUMENT_TYPES.contains(type),"attachments");
-            UUID requirement=slot.isBlank()?null:UUID.fromString(slot);
+            String nameField="applicationDetails.documentNames["+i+"]";
+            fieldText(name,120,nameField);
+            if(name.isBlank())throw new FieldValidation(nameField,"recording.validation.documentName");
+            if(!ClientApplicationService.DOCUMENT_TYPES.contains(type))throw new FieldValidation("applicationDetails.documentTypes["+i+"]","recording.validation.documentType");
+            String requirementField="applicationDetails.requiredAttachmentIds["+i+"]";
+            UUID requirement;
+            try{requirement=slot.isBlank()?null:UUID.fromString(slot);}
+            catch(IllegalArgumentException e){throw new FieldValidation(requirementField,"recording.validation.documentRequirement");}
             if(requirement!=null) {
                 var definition=required.get(requirement);
-                check(definition!=null && file.getSize()<=requirements.maxSizeBytes(definition),"attachments");
+                if(definition==null || file.getSize()>requirements.maxSizeBytes(definition))throw new FieldValidation(requirementField,"recording.validation.documentRequirement");
                 name=definition.getAttachmentName();
             }
             uploads.add(new LoanAttachmentService.NamedUpload(file,name,type,requirement));
@@ -252,18 +318,21 @@ public class LoanRecordingEvidenceService {
 
     private static String at(List<String> values,int index) {return values!=null && index<values.size()?Objects.toString(values.get(index),""):"";}
     private static void text(String value,int max) {check(value!=null && value.length()<=max && value.codePoints().noneMatch(c->Character.isISOControl(c)&&c!=10&&c!=13&&c!=9),"details");}
+    private static void fieldText(String value,int max,String field) {
+        try{text(value,max);}catch(IllegalArgumentException e){throw new FieldValidation(field,"recording.validation.text");}
+    }
     private static void phone(String value,String field) {
         try{
             text(value,32);
             if(!value.isBlank())TanzaniaPhoneNumber.normalizeRequired(value);
-        }catch(IllegalArgumentException|IllegalStateException ex){throw new FieldValidation(field,"phone");}
+        }catch(IllegalArgumentException|IllegalStateException ex){throw new FieldValidation(field,"applications.error.phone");}
     }
     private static void checkField(boolean valid,String field,String key) {
-        if(!valid)throw new FieldValidation(field,key);
+        if(!valid)throw new FieldValidation(field,(key.startsWith("client")?"recording.error.":"applications.error.")+key);
     }
     public static final class FieldValidation extends IllegalArgumentException {
         private final String field;
-        private FieldValidation(String field,String key){super((key.startsWith("client")?"recording.error.":"applications.error.")+key);this.field=field;}
+        public FieldValidation(String field,String key){super(key);this.field=field;}
         public String field(){return field;}
     }
     private static void check(boolean value,String key) {if(!value)throw new IllegalArgumentException("applications.error."+key);}

@@ -208,7 +208,9 @@ class SimpleGroupLoanPostgresTest {
         var form=application();var debt=new ExternalDebt();debt.setReference("Outside loan");
         debt.setMonthlyPayment(new BigDecimal("10000.00"));debt.setClientIds(List.of(f.client));
         form.getGroupApplication().getDebts().add(debt);
-        assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),null)).hasMessage("simpleGroup.error.outsideDebts");
+        assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),null))
+            .isInstanceOfSatisfying(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.FieldValidation.class,
+                error->assertThat(error.field()).isEqualTo("groupApplication.debts[0].clientIds"));
     }
     @Test void aRecordedJointLoanIsNotCountedFiveTimesInTheNextGroupBudget(){fund();f.jdbc.update("update loan_product_settings set allow_application_with_active_loan=true,maximum_active_loans=3 where id=?",f.product);UUID next=record();assertThat(f.jdbc.queryForObject("select (form_data->>'otherDebt')::numeric from loan_applications where id=?",BigDecimal.class,next)).isEqualByComparingTo("500000.00");}
     @Test void customisedWeeklyGroupTermsUseTheExistingCalculator(){
@@ -227,7 +229,7 @@ class SimpleGroupLoanPostgresTest {
     }
     @Test void changedPaymentAccountInvalidatesAnUnsubmittedRosterRevision(){var form=application();configure("CHANGED-ACCOUNT");assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),paper())).hasMessage("simpleGroup.error.changed");}
     @Test void endingMembershipKeepsTheSignedRosterAndJointObligation(){UUID loan=record();var frozen=service.contract(f.actor,loan).orElseThrow();var setup=service.setup(f.actor,group);var membership=groups.members(f.actor,group,0,"startsOn_desc").rows().stream().filter(x->x.clientId().equals(setup.leaderId())).findFirst().orElseThrow();groups.endMember(f.actor,group,membership.id(),DAY,"Left after signing");assertThat(service.setup(f.actor,group).leaderId()).isNull();assertThat(service.contract(f.actor,loan).orElseThrow().leader()).isEqualTo(frozen.leader());assertThat(service.contract(f.actor,loan).orElseThrow().borrowers()).hasSize(5);assertThat(f.context.getBean(SharedCreditExposureService.class).summary(f.institution,setup.leaderId(),"B1").pending()).isEqualTo(1);}
-    @Test void borrowingMembersDoNotReplaceSeparatelyRequiredGuarantors(){f.jdbc.update("update loan_product_settings set guarantors_required=1 where id=?",f.product);assertThatThrownBy(()->record()).hasMessage("simpleGroup.error.guarantee");assertThat(f.jdbc.queryForObject("select count(*) from staff_group_loan where sacco_id=?",Integer.class,f.institution)).isZero();}
+    @Test void borrowingMembersDoNotReplaceSeparatelyRequiredGuarantors(){f.jdbc.update("update loan_product_settings set guarantors_required=1 where id=?",f.product);assertThatThrownBy(()->record()).hasMessage("recording.validation.guarantorCount");assertThat(f.jdbc.queryForObject("select count(*) from staff_group_loan where sacco_id=?",Integer.class,f.institution)).isZero();}
     @Test void requiredIdentityVerificationCannotBeSkippedForAGroup(){f.jdbc.update("insert into lending_credit_policy(id,sacco_id,station_id,revision,capacity_required,collateral_required,reference,request_key,payload_hash,actor_id,recorded_at,reminders_enabled,kyc_required) values(?,?,?,1,false,false,'Synthetic identity policy',?,?,?,?,false,true)",UUID.randomUUID(),f.institution,"B1",UUID.randomUUID(),"0".repeat(64),f.actor.getMemberId(),f.context.getBean(ApplicationClock.class).now());assertThatThrownBy(()->record()).isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("kyc.error.");}
     @Test void jointCreditRiskTracksOnlyTheUncoveredDuePayment(){
         var today=LocalDate.now(ZoneId.of("Africa/Dar_es_Salaam"));var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(today);when(clock.now()).thenReturn(today.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));var form=application();UUID loan=f.service.saveGroup(f.actor,form,List.of(),paper());var funding=f.post(loan,"5000000.00","D-RISK");funding.setEffectiveDate(DAY);funding.setFirstPaymentDate(today.minusDays(1));f.service.disburse(f.actor,funding);var credit=f.context.getBean(SharedCreditExposureService.class);assertThat(credit.summary(f.institution,clients.getFirst(),"B1").risk()).isEqualTo(1);
@@ -240,7 +242,28 @@ class SimpleGroupLoanPostgresTest {
         var person=new com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Guarantor();person.setClientNumber(f.jdbc.queryForObject("select member_no from members where id=?",String.class,guarantor));person.setGuaranteeBudget(new BigDecimal("10000000.00"));person.setGuaranteeEvidence("Synthetic checked independent guarantee capacity");person.setSignedOn(DAY);form.getApplicationDetails().getGuarantors().add(person);form.getApplicationDetails().setDocumentTypes(List.of("GUARANTOR_CONSENT"));form.getApplicationDetails().setDocumentNames(List.of("Synthetic signed external guarantee"));
         var evidence=new com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService(new com.sacco.mvp.accounting.loans.repository.LoanRecordingRepository(f.jdbc),f.context.getBean(com.sacco.mvp.accounting.service.GeneralLedgerService.class),new com.sacco.mvp.service.FormSchemaService(f.context.getBean(com.sacco.mvp.repository.LoanProductSettingRepository.class),f.context.getBean(tools.jackson.databind.ObjectMapper.class)),new com.sacco.mvp.service.LoanProductRequiredAttachmentService(f.context.getBean(com.sacco.mvp.repository.LoanProductRequiredAttachmentRepository.class)),mock(com.sacco.mvp.clients.applications.service.ClientApplicationService.class),f.context.getBean(OnboardingService.class));
         Object target=org.springframework.test.util.AopTestUtils.getUltimateTargetObject(f.service);Object previous=org.springframework.test.util.ReflectionTestUtils.getField(target,"evidence");org.springframework.test.util.ReflectionTestUtils.setField(target,"evidence",evidence);
-        try{UUID loan=f.service.saveGroup(f.actor,form,List.of(paper()),paper());assertThat(f.jdbc.queryForObject("select count(*) from staff_group_guarantor where loan_id=? and client_id=?",Integer.class,loan,guarantor)).isEqualTo(1);assertThat(service.contract(f.actor,loan).orElseThrow().borrowers()).hasSize(5);assertThat(f.jdbc.queryForObject("select loan_group_related(?,?)",Boolean.class,loan,guarantor)).isTrue();assertThat(service.guaranteesReady(f.actor,loan)).isTrue();}finally{org.springframework.test.util.ReflectionTestUtils.setField(target,"evidence",previous);}
+        try{
+            assertThatThrownBy(()->f.service.validateStep(f.actor,application(),"guarantors",List.of(),null))
+                .hasMessage("recording.validation.guarantorCount");
+            f.service.validateStep(f.actor,form,"loan",List.of(),null);
+            person.setGuaranteeBudget(new BigDecimal("1.00"));
+            assertThatThrownBy(()->f.service.validateStep(f.actor,form,"guarantors",List.of(),null))
+                .isInstanceOfSatisfying(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.FieldValidation.class,
+                    error->assertThat(error.field()).isEqualTo("applicationDetails.guarantors[0].guaranteeBudget"));
+            person.setGuaranteeBudget(new BigDecimal("10000000.00"));
+            f.service.validateStep(f.actor,form,"guarantors",List.of(),null);
+            f.service.validateStep(f.actor,form,"collateral",List.of(),null);
+            assertThatThrownBy(()->f.service.validateStep(f.actor,form,"attachments",List.of(),null))
+                .hasMessage("recording.error.guarantorConsentAttachment");
+            var consent=paper();
+            f.service.validateStep(f.actor,form,"attachments",List.of(consent),null);
+            assertThat(f.jdbc.queryForObject("select count(*) from staff_group_loan where sacco_id=?",Integer.class,f.institution)).isZero();
+            UUID loan=f.service.saveGroup(f.actor,form,List.of(consent),null);
+            assertThat(f.jdbc.queryForObject("select count(*) from staff_group_guarantor where loan_id=? and client_id=?",Integer.class,loan,guarantor)).isEqualTo(1);
+            assertThat(service.contract(f.actor,loan).orElseThrow().borrowers()).hasSize(5);
+            assertThat(f.jdbc.queryForObject("select loan_group_related(?,?)",Boolean.class,loan,guarantor)).isTrue();
+            assertThat(service.guaranteesReady(f.actor,loan)).isTrue();
+        }finally{org.springframework.test.util.ReflectionTestUtils.setField(target,"evidence",previous);}
     }
 
     @Test void draftRetriesCannotReplaceEvidenceWithDifferentBytes()throws Exception{

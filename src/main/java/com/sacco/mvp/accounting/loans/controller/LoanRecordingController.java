@@ -65,7 +65,7 @@ public class LoanRecordingController {
         }catch(SimpleGroupLoanService.ProfileIncomeException e){
             errors.rejectValue("groupApplication.groupId",e.getMessage(),new Object[]{String.join(", ",e.clients())},null);
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
-        catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,error(e));}
+        catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,recordForm,error(e));}
         catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
         if(recordForm.getTopUpSourceLoanId()!=null)try{model.addAttribute("topUpQuote",service.topUpQuote(a,recordForm.getTopUpSourceLoanId(),recordForm.getApplicationDate(),null));}catch(IllegalArgumentException ex){model.addAttribute("topUpError",error(ex));}
         recordProductContext(a,recordForm,model);
@@ -78,7 +78,7 @@ public class LoanRecordingController {
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
             service.edit(a,id,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("loanEditSaved",true);return "redirect:/finance/loan-records/"+id;
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
-        catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,error(e));}
+        catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,recordForm,error(e));}
         catch(org.springframework.dao.OptimisticLockingFailureException e){errors.reject("loanGroups.error.changed");}
         catch(DataIntegrityViolationException e){errors.reject("loanGroups.error.changed");}
         editContext(a,id,recordForm,model);return "accounting/loans/record-form";
@@ -86,22 +86,68 @@ public class LoanRecordingController {
     private void editContext(AppUserPrincipal a,UUID id,RecordForm form,Model model){
         model.addAttribute("editingLoanId",id);model.addAttribute("recordedAttachments",service.attachments(a,id));recordProductContext(a,form,model);
     }
-    private void rejectRecordField(BindingResult errors,String key){
-        var field=switch(key){
+    private String recordField(RecordForm form,String key){
+        return switch(key){
             case "recording.error.product","charges.error.topUpFee"->"productId";
             case "recording.error.customConfiguration","charges.error.custom"->"loanMode";
-            case "recording.error.client","recording.error.clientCashFlow","recording.error.clientBusiness","applications.error.client","applications.error.verification"->"clientId";
+            case "recording.error.client","recording.error.clientCashFlow","recording.error.clientBusiness","applications.error.client","applications.error.verification",
+                 "recording.error.sharedActiveLoan","recording.error.sharedCreditHistory","recording.error.sharedApplicationPending"->"clientId";
             case "recording.error.date","applications.error.date"->"applicationDate";
-            case "recording.error.productLimits","recording.error.topUpCash"->"principal";
+            case "recording.error.productLimits","recording.error.amount","recording.error.topUpCash","recording.error.sharedAffordability","simpleGroup.error.affordability"->"principal";
+            case "recording.error.terms"->"CUSTOM".equals(form.getLoanMode()) && form.getInterestPercent()==null && !"AMOUNT".equals(form.getInterestEntry())?"interestPercent":"tenureValue";
+            case "simpleGroup.error.changed","simpleGroup.error.inactive","simpleGroup.error.leader","simpleGroup.error.destination","simpleGroup.error.members",
+                 "simpleGroup.error.history","simpleGroup.error.activeLoans","simpleGroup.error.incomeSource","simpleGroup.error.budget"->"groupApplication.groupId";
+            case "simpleGroup.error.outsideDebts"->"groupApplication.groupId";
+            case "simpleGroup.error.signatures"->"groupApplication.checked";
+            case "simpleGroup.error.guarantee"->"guarantors";
+            case "simpleGroup.error.charges"->"CUSTOM".equals(form.getLoanMode())?"loanMode":"productId";
+            case "simpleGroup.error.document","simpleGroup.error.documentBusy","simpleGroup.error.freshAgreement"->"groupAgreement";
             case "applications.error.declaration"->"applicationDetails.declarationAccepted";
-            case "recording.error.attachments","applications.error.attachments"->"attachments";
+            case "recording.error.attachments","applications.error.attachments","recording.error.guarantorConsentAttachment"->"attachments";
             case "charges.error.insuranceLimit","charges.error.insuranceDuplicate"->"insurancePremium";
-            default->"";
+            default->key.startsWith("kyc.error.")?("GROUP".equals(form.getLoanFor())?"groupApplication.groupId":"clientId"):"";
         };
-        if(field.equals("attachments")){
+    }
+    private void rejectRecordField(BindingResult errors,RecordForm form,String key){
+        var field=recordField(form,key);
+        if(Set.of("attachments","groupAgreement").contains(field)){
             errors.addError(new org.springframework.validation.FieldError("recordForm",field,null,false,new String[]{key},null,null));
         }else if(field.isEmpty())errors.reject(key);
         else errors.rejectValue(field,key);
+    }
+
+    @PostMapping("/loan-recording/validate-step") @ResponseBody
+    public ResponseEntity<?> validateStep(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute RecordForm recordForm,
+            BindingResult binding,@RequestParam String step,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,
+            @RequestParam(required=false) org.springframework.web.multipart.MultipartFile groupAgreement,Locale locale){
+        service.authorize(actor,"CREATE");
+        if(!Set.of("loan","guarantors","collateral","attachments").contains(step))return ResponseEntity.badRequest().build();
+        var errors=binding.getFieldErrors().stream().filter(field->step.equals(recordStep(field.getField())))
+            .map(field->Map.of("field",field.getField(),"message",label("recording.validation.invalidValue",locale))).toList();
+        if(!errors.isEmpty())return invalidStep(errors);
+        try{
+            service.validateStep(actor,recordForm,step,attachments==null?List.of():attachments,groupAgreement);
+            return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+        }catch(SimpleGroupLoanService.ProfileIncomeException e){
+            return invalidStep(List.of(Map.of("field","groupApplication.groupId","message",messages.getMessage(e.getMessage(),new Object[]{String.join(", ",e.clients())},locale))));
+        }catch(LoanRecordingEvidenceService.FieldValidation e){
+            return invalidStep(List.of(Map.of("field",e.field(),"message",label(e.getMessage(),locale))));
+        }catch(IllegalArgumentException|IllegalStateException e){
+            var key=error(e);
+            return invalidStep(List.of(Map.of("field",recordField(recordForm,key),"message",label(key,locale))));
+        }
+    }
+
+    private ResponseEntity<?> invalidStep(List<Map<String,String>> errors){
+        return ResponseEntity.unprocessableContent().cacheControl(CacheControl.noStore()).body(Map.of("errors",errors));
+    }
+
+    private String recordStep(String field){
+        if(field.startsWith("applicationDetails.guarantors["))return "guarantors";
+        if(field.startsWith("applicationDetails.collateral[") || field.equals("groupApplication.checked"))return "collateral";
+        if(field.startsWith("applicationDetails.document") || field.startsWith("applicationDetails.requiredAttachmentIds")
+            || field.equals("applicationDetails.declarationAccepted"))return "attachments";
+        return "loan";
     }
     private void recordProductContext(AppUserPrincipal a,RecordForm form,Model model){
         supportingFormContext(a,form,model);

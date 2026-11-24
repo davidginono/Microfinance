@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.loans.service;
 
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
+import com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.FieldValidation;
 import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.FeeBalance;
 import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.FeePayment;
 import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.RecoveryBalance;
@@ -312,6 +313,87 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");boolean group="GROUP".equals(f.getLoanFor());validateRecord(f,group);check(group||records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);if(group)simpleGroups.prepare(a,f,product,result,false);
         return new Quote(product.getDisplayName(),product.getInterestRate(),product.getInterestMethod().name(),product.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),List.of(),tenure(f).unit(),tenure(f).value());}
+
+    @Transactional(readOnly=true)
+    public void validateStep(AppUserPrincipal actor,RecordForm form,String step,List<org.springframework.web.multipart.MultipartFile> files,
+                             org.springframework.web.multipart.MultipartFile agreement) {
+        authorize(actor,"CREATE");
+        if(form.getApplicationDetails()==null)form.setApplicationDetails(new ApplicationDetails());
+        boolean group="GROUP".equals(form.getLoanFor());
+        switch(step){
+            case "loan" -> validateLoanStep(actor,form,group);
+            case "guarantors" -> {
+                if(group){
+                    var selected=product(actor,form);
+                    var plan=charges.validateRecordingQuote(actor,form,selected,false);
+                    var cap=calculate(form,selected).totalRepayment().add(plan.total());
+                    simpleGroups.validateGuarantors(actor,form,selected,cap);
+                }
+                evidence.validateGuarantors(actor,form);
+            }
+            case "collateral" -> {
+                evidence.validateCollateral(form.getApplicationDetails());
+                evidence.validateCollateralFields(actor,form);
+                if(group && !form.getGroupApplication().isChecked())
+                    throw new FieldValidation("groupApplication.checked","simpleGroup.error.signatures");
+            }
+            case "attachments" -> validateRecordingUploads(actor,form,group,files,agreement);
+            default -> throw new IllegalArgumentException("recording.error.request");
+        }
+    }
+
+    private void validateLoanStep(AppUserPrincipal actor,RecordForm form,boolean group) {
+        validateRecord(form,group);
+        var selected=product(actor,form);
+        var calculation=calculate(form,selected);
+        if(group){
+            if(form.getGroupApplication().getGroupId()==null)throw new FieldValidation("groupApplication.groupId","recording.validation.chooseGroup");
+            simpleGroups.validateSigningDate(form);
+            var prepared=simpleGroups.prepare(actor,form,selected,calculation,false);
+            var sources=new HashSet<String>();
+            if(prepared.assessments().stream().anyMatch(row->row.source().length()>200 || !sources.add(row.source().toLowerCase(Locale.ROOT))))
+                throw new IllegalArgumentException("simpleGroup.error.incomeSource");
+        }else{
+            check(records.client(actor,form.getClientId()).isPresent(),"client");
+            String kyc=records.clientKycError(actor,form.getClientId(),clock.today());
+            if(kyc!=null)throw new IllegalArgumentException(kyc);
+            evidence.applyClientProfile(actor,form);
+            var shared=sharedCredit.summary(actor.getSaccoId(),form.getClientId(),actor.getStationId());
+            check(shared.known(),"sharedCreditHistory");check(shared.pending()==0,"sharedApplicationPending");
+            validateIndividualAffordability(actor,form,selected,calculation,shared);
+        }
+        evidence.validateProductFields(actor,form,false);
+        var plan=charges.validateRecordingQuote(actor,form,selected,!group);
+        if(group && !plan.supported())throw new IllegalArgumentException("simpleGroup.error.charges");
+        if(form.getTopUpSourceLoanId()!=null){
+            var settlement=topUpQuote(actor,form.getTopUpSourceLoanId(),form.getApplicationDate(),null);
+            check(settlement.clientId().equals(form.getClientId()),"client");
+            check(form.getPrincipal().subtract(plan.deductions()).compareTo(settlement.total())>0,"topUpCash");
+            text(form.getEvidence(),500,true);
+        }
+    }
+
+    private void validateRecordingUploads(AppUserPrincipal actor,RecordForm form,boolean group,
+                                          List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement) {
+        validateFiles(files);
+        var uploads=evidence.documentUploads(form,files);
+        attachments.validateUploads(files);
+        if(group){
+            var recovered=simpleGroups.draftFiles(actor,form,files,agreement);
+            simpleGroups.validatePaper(actor,recovered.agreement());
+            if(recovered.files().size()>files.size()){
+                validateFiles(recovered.files());
+                try{uploads=evidence.documentUploads(form,recovered.files());}
+                catch(FieldValidation e){throw new IllegalArgumentException("recording.error.attachments",e);}
+            }
+            validateGroupConsent(form,uploads);
+        }
+    }
+
+    private void validateGroupConsent(RecordForm form,List<LoanAttachmentService.NamedUpload> uploads) {
+        if(form.getApplicationDetails()!=null && !form.getApplicationDetails().getGuarantors().isEmpty())
+            check(uploads!=null && uploads.stream().anyMatch(upload->"GUARANTOR_CONSENT".equals(upload.purpose())),"guarantorConsentAttachment");
+    }
     @Transactional
     public UUID save(AppUserPrincipal a,RecordForm f){return save(a,f,List.of());}
     @Transactional
@@ -377,18 +459,9 @@ public class LoanRecordingService {
         }
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
-        if(borrowerParty==null && product.isAffordabilityCheckRequired()) {
-            check(f.getIncome()!=null && f.getIncome().signum()>0,"clientCashFlow");
-        }
+        if("GROUP".equals(f.getLoanFor()))validateGroupConsent(f,namedUploads);
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
-        if(shared.active()>0){
-            check(product.isApplicationWithActiveLoanAllowed(),"sharedActiveLoan");
-            if(product.getMaximumActiveLoans()!=null)check(shared.active()+loans.countBySaccoIdAndApplicantMemberIdAndStatusIn(a.getSaccoId(),f.getClientId(),List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF))<=product.getMaximumActiveLoans(),"sharedActiveLoan");
-            if(product.isAffordabilityCheckRequired()){
-                var incomeAfterKnownDebt=f.getIncome().subtract(shared.monthlyPayment());
-                check(incomeAfterKnownDebt.signum()>0&&LoanAmortizationCalculator.monthlyEquivalent(calculation.maximumInstallment(),product.getResolvedRepaymentFrequency()).compareTo(incomeAfterKnownDebt.multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,java.math.RoundingMode.DOWN))<=0,"sharedAffordability");
-            }
-        }
+        if(borrowerParty==null)validateIndividualAffordability(a,f,product,calculation,shared);
         var chargePlan=charges.recordingQuote(a,f,product,borrowerParty==null);
         if("GROUP".equals(f.getLoanFor())&&!chargePlan.supported())throw new IllegalArgumentException("simpleGroup.error.charges");
         var now=clock.now();
@@ -445,6 +518,19 @@ public class LoanRecordingService {
         if(borrowerParty!=null && !"GROUP".equals(f.getLoanFor()) && product.getGuarantorsRequired()!=null && product.getGuarantorsRequired()>0)loan.setStatus(LoanStatus.AWAITING_GUARANTORS);
         loans.saveAndFlush(loan);
         event(a,id,editing==null?"LOAN_APPLICATION_RECORDED":"LOAN_RECORD_EDITED",Map.of("principal",f.getPrincipal(),"status",loan.getStatus().name()));return id;
+    }
+
+    private void validateIndividualAffordability(AppUserPrincipal actor,RecordForm form,LoanProductSetting product,
+            LoanAmortizationCalculator.Result calculation,com.sacco.mvp.grouplending.dto.SharedCreditExposure shared) {
+        if(product.isAffordabilityCheckRequired())check(form.getIncome()!=null && form.getIncome().signum()>0,"clientCashFlow");
+        if(shared.active()==0)return;
+        check(product.isApplicationWithActiveLoanAllowed(),"sharedActiveLoan");
+        if(product.getMaximumActiveLoans()!=null)check(shared.active()+loans.countBySaccoIdAndApplicantMemberIdAndStatusIn(actor.getSaccoId(),form.getClientId(),List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF))<=product.getMaximumActiveLoans(),"sharedActiveLoan");
+        if(product.isAffordabilityCheckRequired()){
+            var remaining=form.getIncome().subtract(shared.monthlyPayment());
+            check(remaining.signum()>0 && LoanAmortizationCalculator.monthlyEquivalent(calculation.maximumInstallment(),product.getResolvedRepaymentFrequency())
+                .compareTo(remaining.multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,RoundingMode.DOWN))<=0,"sharedAffordability");
+        }
     }
     @Transactional(readOnly=true)
     public Detail detail(AppUserPrincipal a,UUID id){
@@ -732,16 +818,23 @@ public class LoanRecordingService {
             var configured=products.findBySaccoIdAndCustomRecordingConfigurationTrue(a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration"));
             check(configured.getStatus()==LoanProductStatus.ACTIVE,"customConfiguration");
             check(Set.of("PERCENTAGE","AMOUNT").contains(f.getInterestEntry()) && Set.of("WHOLE_LOAN","ANNUAL").contains(f.getInterestBasis()) && f.getCustomFrequency()!=null && f.getCustomMethod()!=null,"terms");
-            check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE || "PERCENTAGE".equals(f.getInterestEntry()),"terms");
+            if(f.getCustomMethod()==InterestMethod.REDUCING_BALANCE && !"PERCENTAGE".equals(f.getInterestEntry()))
+                throw new FieldValidation("interestEntry","recording.error.terms");
             BigDecimal rate=BigDecimal.ZERO;
-            if("AMOUNT".equals(f.getInterestEntry()))nonnegativeMoney(f.getInterestAmount());
-            else {check(f.getInterestPercent()!=null && f.getInterestPercent().signum()>=0 && f.getInterestPercent().compareTo(new BigDecimal("10000"))<=0 && f.getInterestPercent().scale()<=4,"terms");rate=f.getInterestPercent().movePointLeft(2);}
+            if("AMOUNT".equals(f.getInterestEntry())){
+                try{nonnegativeMoney(f.getInterestAmount());}catch(IllegalArgumentException e){throw new FieldValidation("interestAmount",e.getMessage());}
+            }else{
+                var percent=f.getInterestPercent();
+                if(percent==null || percent.signum()<0 || percent.compareTo(new BigDecimal("10000"))>0 || percent.scale()>4)
+                    throw new FieldValidation("interestPercent","recording.error.terms");
+                rate=percent.movePointLeft(2);
+            }
             // Keep the insurance ceiling while staff enter the custom loan's fee amounts.
             return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(f.getCustomMethod()).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).applicationFee(BigDecimal.ZERO).processingFeeRate(BigDecimal.ZERO).insuranceRate(configured.getInsuranceRate()).build();
         }
         var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
         check((p.getMinimumAmount()==null || f.getPrincipal().compareTo(p.getMinimumAmount())>=0) && (p.getMaximumAmount()==null || f.getPrincipal().compareTo(p.getMaximumAmount())<=0),"productLimits");
-        tenure(f).validate(p);
+        try{tenure(f).validate(p);}catch(IllegalArgumentException e){throw new FieldValidation("tenureValue",e.getMessage());}
         return p;}
     private LoanTenure tenure(RecordForm f){Integer value=f.getTenureValue()==null?f.getMonths():f.getTenureValue();check(value!=null,"terms");return new LoanTenure(f.getTenureUnit(),value);}
     private LoanAmortizationCalculator.Result calculate(RecordForm f,LoanProductSetting p){

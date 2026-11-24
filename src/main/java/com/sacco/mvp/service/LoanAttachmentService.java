@@ -145,6 +145,18 @@ public class LoanAttachmentService {
         attachments.add(item);
     }
 
+    public void validateUploads(List<MultipartFile> files) {
+        for(var file:files){
+            if(file.isEmpty())continue;
+            if(file.getSize()>MAX_ATTACHMENT_BYTES)throw new IllegalArgumentException("recording.error.attachments");
+            try(var input=file.getInputStream()) {
+                resolveAllowedContentType(file.getOriginalFilename(),input.readNBytes(8));
+            }catch(IOException | IllegalArgumentException e){
+                throw new IllegalArgumentException("recording.error.attachments",e);
+            }
+        }
+    }
+
     private String resolveAllowedContentType(String originalName, byte[] content) {
         if (content == null || content.length == 0) {
             throw new IllegalArgumentException("Upload a valid PDF, PNG, or JPEG attachment.");

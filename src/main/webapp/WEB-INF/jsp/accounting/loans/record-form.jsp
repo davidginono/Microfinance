@@ -13,7 +13,7 @@
 <spring:message code="simpleGroup.addExtraGuarantor" var="recordingAddExtraGuarantorLabel" />
 <spring:message code="applications.documents" var="recordingDocumentsLabel" />
 <spring:message code="recording.attachmentsTab" text="${recordingDocumentsLabel}" var="recordingAttachmentsLabel" />
-<div class="recording-application-evidence" data-recording-evidence data-root="<c:url value='/finance/loan-recording/evidence'/>" data-error="<spring:message code='applications.error.details'/>" data-upload-limit="<spring:message code='recording.attachmentLimit' text='${recordingAttachmentHelp}' htmlEscape='true'/>" data-select-placeholder="<c:out value='${chooseLabel}' />">
+<div class="recording-application-evidence" data-recording-evidence data-root="<c:url value='/finance/loan-recording/evidence'/>" data-validate-url="<c:url value='/finance/loan-recording/validate-step'/>" data-validation-unavailable="<spring:message code='recording.validation.unavailable' htmlEscape='true'/>" data-error="<spring:message code='applications.error.details'/>" data-upload-limit="<spring:message code='recording.attachmentLimit' text='${recordingAttachmentHelp}' htmlEscape='true'/>" data-select-placeholder="<c:out value='${chooseLabel}' />">
 <nav class="recording-wizard-nav" data-recording-steps aria-label="<spring:message code='applications.title'/>" hidden>
 <ol>
 <c:forEach items="${['loan','guarantors','collateral','attachments']}" var="step" varStatus="status">
@@ -68,6 +68,7 @@
 <c:if test="${empty recordForm.applicationId}"><%@ include file="charges-form.jspf" %></c:if>
 <c:if test="${not empty recordForm.applicationId}"><section class="accounting-section" data-intake-fees hidden><h2><spring:message code="applications.quote"/></h2><dl class="erp-detail-facts"><c:forEach items="${['applicationFee','processingFee','insuranceFee','totalDeductions']}" var="fee"><div><dt><spring:message code="applications.quote.${fee}"/></dt><dd data-intake-fee="${fee}"></dd></div></c:forEach></dl></section></c:if>
 <c:if test="${not empty recordForm.topUpSourceLoanId}"><section class="accounting-section"><h2><spring:message code="recording.topUp.agreement" /></h2><label for="topUpEvidence"><spring:message code="recording.topUp.agreement" /><form:input path="evidence" id="topUpEvidence" cssClass="aws-control" required="required" maxlength="500" /></label></section></c:if>
+<p class="erp-field-error" data-recording-step-error role="alert" tabindex="-1" hidden></p>
 </section>
 <%@ include file="recording-evidence-panels.jspf" %>
 </div>
