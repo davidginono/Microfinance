@@ -64,6 +64,8 @@ public final class LoanRecordingDtos {
         private BigDecimal income;
         private BigDecimal expenses;
         private BigDecimal otherDebt;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private BigDecimal monthlyOutsideDebt;
         private String informationSource = "DECLARED";
         private String guarantors = "";
         private String collateral = "";

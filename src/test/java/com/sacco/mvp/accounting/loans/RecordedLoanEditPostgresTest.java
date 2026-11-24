@@ -15,6 +15,15 @@ class RecordedLoanEditPostgresTest {
     @BeforeAll void start(){fixture.start();}
     @BeforeEach void setup(){fixture.fixture();}
     @AfterAll void stop(){fixture.stop();}
+    @Test void individualOutsideDebtRequiresAnExplicitAmountAndSurvivesEdits(){
+        var service=fixture.service;var form=fixture.form();form.setMonthlyOutsideDebt(null);
+        assertThatThrownBy(()->service.save(fixture.actor,form)).hasMessage("recording.error.outsideDebt");
+        form.setMonthlyOutsideDebt(BigDecimal.ZERO);var id=service.save(fixture.actor,form);
+        var edit=service.editForm(fixture.actor,id);assertThat(edit.getMonthlyOutsideDebt()).isZero();
+        edit.setMonthlyOutsideDebt(new BigDecimal("175.25"));service.edit(fixture.actor,id,edit,List.of());
+        assertThat(service.editForm(fixture.actor,id).getMonthlyOutsideDebt()).isEqualByComparingTo("175.25");
+        assertThat(service.detail(fixture.actor,id).otherDebt()).isEqualByComparingTo("175.25");
+    }
     @Test void revisesTermsAndChargesWithTheSameIdentityAndPermanentBeforeEvidence(){
         fixture.chargePolicy("SEPARATE");var id=fixture.chargedLoan();var service=fixture.service;var jdbc=fixture.jdbc;
         var number=service.detail(fixture.actor,id).loan().number();

@@ -45,7 +45,7 @@ class LoanRecordingProfileTest {
         when(products.findByIdAndSaccoIdAndActiveTrue(product,"institution")).thenReturn(Optional.of(p));
         when(requirements.activeForProduct(product)).thenReturn(List.of());
         when(onboarding.loanProfile(actor,client)).thenReturn(new LoanProfile(revision,new BigDecimal("2500000.50"),new BigDecimal("500000.25"),
-            BigDecimal.ZERO,"Recorded shop","Retail","Business","Shop sales",""));
+            new BigDecimal("50000"),"Recorded shop","Retail","Business","Shop sales",""));
     }
     RecordForm form() {
         var f=new RecordForm();f.setClientId(client);f.setProductId(product);f.setPurpose("Buy shop stock");
@@ -53,8 +53,9 @@ class LoanRecordingProfileTest {
     }
     @Test void recordedProfileReplacesForgedValuesAndOnePurposeSatisfiesTheProductSchema() {
         var f=form();f.setIncome(new BigDecimal("999999999.00"));f.setOtherDebt(new BigDecimal("1.00"));f.setExpenses(new BigDecimal("999999999.00"));
+        f.setMonthlyOutsideDebt(new BigDecimal("123.45"));
         evidence.applyClientProfile(actor,f);evidence.prepare(actor,f,List.of());
-        assertThat(f.getIncome()).isEqualByComparingTo("2500000.50");assertThat(f.getOtherDebt()).isZero();assertThat(f.getExpenses()).isEqualByComparingTo("500000.25");
+        assertThat(f.getIncome()).isEqualByComparingTo("2500000.50");assertThat(f.getOtherDebt()).isEqualByComparingTo("123.45");assertThat(f.getExpenses()).isEqualByComparingTo("500000.25");
         assertThat(f.getApplicationDetails().getClientProfile().revisionId()).isEqualTo(revision);
         assertThat(f.getApplicationDetails().getFields()).isEmpty();assertThat(f.getBusiness()).isEqualTo("Recorded shop / Retail");
         assertThat(evidence.product(actor,product).fields()).extracting("name").containsExactly("projectLocation");
@@ -79,7 +80,7 @@ class LoanRecordingProfileTest {
     @Test void employmentUsesTheEmployerRecordedInTheProfile() {
         when(onboarding.loanProfile(actor,client)).thenReturn(new LoanProfile(revision,new BigDecimal("2000000"),BigDecimal.ZERO,
             BigDecimal.ZERO,"","","Employment","Salary","Recorded employer"));
-        var f=form();evidence.applyClientProfile(actor,f);evidence.prepare(actor,f,List.of());
+        var f=form();f.setMonthlyOutsideDebt(BigDecimal.ZERO);evidence.applyClientProfile(actor,f);evidence.prepare(actor,f,List.of());
         assertThat(f.getBusiness()).isEqualTo("Recorded employer");assertThat(f.getExpenses()).isZero();
         assertThat(f.getApplicationDetails().getClientProfile().employerName()).isEqualTo("Recorded employer");
     }
@@ -101,6 +102,8 @@ class LoanRecordingProfileTest {
         assertThat(profile.monthlyExpenses()).isNull();
         assertThat(profile.monthlyIncome()).isEqualByComparingTo("1000.00");
         assertThat(json.readTree(json.writeValueAsString(profile)).has("monthlyExpenses")).isFalse();
+        var historicalProfile=json.readValue(legacy,com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.Profile.class);
+        assertThat(historicalProfile.getMonthlyIncome()).isEqualByComparingTo("1000.00");
     }
     @Test void removedProfileQuestionsCannotBePostedAsDynamicOverrides() {
         var f=form();evidence.applyClientProfile(actor,f);f.getApplicationDetails().getFields().put("incomeSource","Forged source");

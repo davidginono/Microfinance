@@ -79,7 +79,7 @@ class LoanGroupApprovalPostgresTest {
     }
     @BeforeEach void fixture(){s.fixture();first=reviewer(Position.ACCOUNTANT);second=reviewer(Position.ACCOUNTANT);manager=reviewer(Position.MANAGER);rule(0,2);loan=s.record();}
     RecordForm individual(){
-        var registration=new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.CreateForm();var profile=registration.getProfile();profile.setFirstName("Individual");profile.setLastName("Borrower");profile.setPhone("+255712"+String.format("%06d",++s.phone));profile.setMonthlyIncome(new java.math.BigDecimal("2000000.00"));profile.setMonthlyExpenses(new java.math.BigDecimal("500000.00"));profile.setMonthlyDebtRepayments(java.math.BigDecimal.ZERO);profile.setActivity("Synthetic business");
+        var registration=new com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.CreateForm();var profile=registration.getProfile();profile.setFirstName("Individual");profile.setLastName("Borrower");profile.setPhone("+255712"+String.format("%06d",++s.phone));profile.setMonthlyIncome(new java.math.BigDecimal("2000000.00"));profile.setMonthlyExpenses(new java.math.BigDecimal("500000.00"));profile.setActivity("Synthetic business");
         f.client=f.context.getBean(com.sacco.mvp.clients.onboarding.service.OnboardingService.class).create(f.actor,registration);return f.form();
     }
     AppUserPrincipal reviewer(Position role){

@@ -342,13 +342,14 @@ public class LoanRecordingService {
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public UUID saveGroup(AppUserPrincipal a,RecordForm input,List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement){
         authorize(a,"CREATE");check(input!=null&&"GROUP".equals(input.getLoanFor()),"request");
-        var f=json.convertValue(input,RecordForm.class);f.setGroupAgreementChecksum(null);f.setGroupRequestHash(null);validateRecord(f,true);validateFiles(files);
+        var f=json.convertValue(input,RecordForm.class);f.setGroupAgreementChecksum(null);f.setGroupRequestHash(null);f.setMonthlyOutsideDebt(null);validateRecord(f,true);validateFiles(files);
         var fingerprints=new ArrayList<String>();
         try{for(var file:files)if(!file.isEmpty())fingerprints.add("ATTACHMENT/"+file.getOriginalFilename()+"/"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file.getBytes())));
             if(agreement!=null&&!agreement.isEmpty()){check(agreement.getSize()<=10*1024*1024,"attachments");fingerprints.add("AGREEMENT/"+agreement.getOriginalFilename()+"/"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(agreement.getBytes())));}
         }catch(java.io.IOException|java.security.NoSuchAlgorithmException e){throw new IllegalArgumentException("simpleGroup.error.document",e);}
         f.setGroupRequestHash(simpleGroups.fingerprint(a,f,fingerprints));var prior=simpleGroups.completedRetry(a,f);if(prior.isPresent())return prior.get();
-        var recovered=simpleGroups.draftFiles(a,f,files,agreement);var paper=simpleGroups.validatePaper(a,recovered.agreement());f.setGroupAgreementChecksum(paper.checksum());
+        var recovered=simpleGroups.draftFiles(a,f,files,agreement);var paper=simpleGroups.validatePaper(a,recovered.agreement());
+        if(paper!=null)f.setGroupAgreementChecksum(paper.checksum());
         var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);tx.setTimeout(30);
         return tx.execute(status->{var retry=simpleGroups.retry(a,f);if(retry.isPresent())return retry.get();
             var p=product(a,f);var prepared=simpleGroups.prepare(a,f,p,calculate(f,p),true);UUID draft=f.getApplicationId();int version=f.getExpectedVersion();f.setApplicationId(null);
@@ -360,7 +361,13 @@ public class LoanRecordingService {
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot,LoanApplication editing){
         validateFiles(files);
-        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);if(borrowerParty==null)evidence.applyClientProfile(a,f);if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
+        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);
+        if(borrowerParty==null){
+            var outsideDebt=f.getMonthlyOutsideDebt();
+            check(outsideDebt!=null&&outsideDebt.signum()>=0&&outsideDebt.scale()<=2&&outsideDebt.compareTo(new BigDecimal("9999999999999999.99"))<=0,"outsideDebt");
+            evidence.applyClientProfile(a,f);
+        }
+        if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
         com.sacco.mvp.domain.LoanApplication existingDraft=null;
         if(f.getApplicationId()!=null){
             var current=records.groupLoan(a,f.getApplicationId(),true);
@@ -378,7 +385,7 @@ public class LoanRecordingService {
             check(product.isApplicationWithActiveLoanAllowed(),"sharedActiveLoan");
             if(product.getMaximumActiveLoans()!=null)check(shared.active()+loans.countBySaccoIdAndApplicantMemberIdAndStatusIn(a.getSaccoId(),f.getClientId(),List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF))<=product.getMaximumActiveLoans(),"sharedActiveLoan");
             if(product.isAffordabilityCheckRequired()){
-                var disposable=f.getIncome().subtract(f.getExpenses()).subtract(f.getOtherDebt().max(shared.monthlyPayment()));
+                var disposable=f.getIncome().subtract(f.getExpenses()).subtract(f.getOtherDebt()).subtract(shared.monthlyPayment());
                 check(disposable.signum()>0&&LoanAmortizationCalculator.monthlyEquivalent(calculation.maximumInstallment(),product.getResolvedRepaymentFrequency()).compareTo(disposable.multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,java.math.RoundingMode.DOWN))<=0,"sharedAffordability");
             }
         }

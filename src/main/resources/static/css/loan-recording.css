@@ -73,11 +73,16 @@ fieldset.recording-evidence-panel{min-width:0;margin:0}
 .simple-group-debt-clients { min-height: 6rem; height: auto; max-width: 100%; }
 
 .loan-form-grid > [data-simple-group-fields] { grid-column: 1 / -1; min-width: 0; }
+[data-simple-group-fields]:not([hidden]) { display: grid; gap: 16px; }
 [data-group-roster] { overflow-wrap: anywhere; }
 
-
-[data-group-debt-list]{display:grid;gap:20px;margin:16px 0}
-[data-group-debt]{padding:16px;border:1px solid #d5dbdb;align-items:end}
+[data-group-debts] > summary { cursor: pointer; }
+.group-debt-content { display: grid; gap: 12px; margin-top: 8px; }
+.group-debt-content > p { margin: 0; }
+[data-group-debt-list] { display: grid; gap: 12px; }
+[data-group-debt-list]:empty { display: none; }
+[data-add-group-debt] { justify-self: start; }
+[data-group-debt] { padding: 12px; border: 1px solid #d5dbdb; align-items: end; min-width: 0; }
 [data-group-debt]>.erp-form-row-action{justify-self:start}
 
 [data-group-agreement-upload]{margin-bottom:20px;min-width:0}

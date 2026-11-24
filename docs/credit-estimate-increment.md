@@ -18,7 +18,7 @@ Implementation date: 2026-10-01. This closes calculation and input-trust gaps, n
 
 ## Staff recording uses the client profile (2026-11-12)
 
-The loan form keeps one loan purpose. Monthly income, monthly expenses and monthly debt repayments are recorded on the client profile. New individual loan records and staff drafts copy those figures and the business/income-source details on the server from the latest recorded profile revision in the current institution and branch. A later profile draft does not replace recorded facts. The loan snapshot retains its source revision and declared values; later profile edits do not rewrite existing loans or establish independent verification. Missing required figures remain unavailable and block the required assessment. Historical loan fields remain readable for compatibility.
+The loan form keeps one loan purpose. Monthly income, monthly expenses and business and income-source details come from the latest recorded client profile in the current institution and branch. Staff declare monthly outside debt on the loan application. Individual records take one total, including an explicit zero when there is no outside debt. Group records itemize each debt and identify the borrowers liable for it. The loan snapshot retains its source profile revision and application figures. Later profile edits do not rewrite existing loans or establish independent verification. Missing required figures block assessment. Historical loan fields remain readable for compatibility.
 
 ## Compatibility And Limits
 

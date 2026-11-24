@@ -73,7 +73,6 @@
 <div class="kyc-profile-grid">
 <label class="kyc-field"><span><spring:message code="kyc.field.monthlyIncome"/></span><form:input path="profile.monthlyIncome" type="number" data-amount-input="true" cssClass="aws-control" min="0" step="0.01" max="9999999999999999.99"/><form:errors path="profile.monthlyIncome" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.monthlyExpenses"/></span><form:input path="profile.monthlyExpenses" type="number" data-amount-input="true" cssClass="aws-control" min="0" step="0.01" max="9999999999999999.99"/><form:errors path="profile.monthlyExpenses" cssClass="field-error"/></label>
-<label class="kyc-field"><span><spring:message code="kyc.field.monthlyDebtRepayments"/></span><form:input path="profile.monthlyDebtRepayments" type="number" data-amount-input="true" cssClass="aws-control" min="0" step="0.01" max="9999999999999999.99"/><form:errors path="profile.monthlyDebtRepayments" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.employerName"/></span><form:input path="profile.employerName" type="text" cssClass="aws-control" maxlength="255"/><form:errors path="profile.employerName" cssClass="field-error"/></label>
 <fieldset class="kyc-income-choices">
     <legend><spring:message code="kyc.field.activity"/></legend>
@@ -86,5 +85,5 @@
 </fieldset>
 <label class="kyc-field"><span><spring:message code="kyc.field.otherIncomeSources"/></span><form:input path="profile.otherIncomeSources" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.otherIncomeSources" cssClass="field-error"/></label>
 <label class="kyc-field"><span><spring:message code="kyc.field.activityAddress"/></span><form:input path="profile.activityAddress" data-profile-required="${formKind eq 'self'}" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.activityAddress" cssClass="field-error"/></label>
-<label class="kyc-field"><span><spring:message code="kyc.field.sourceOfFunds"/></span><form:input path="profile.sourceOfFunds" data-profile-required="${formKind eq 'self'}" type="text" cssClass="aws-control"  maxlength="1000"/><form:errors path="profile.sourceOfFunds" cssClass="field-error"/></label>
+<label class="kyc-field"><span><spring:message code="kyc.field.sourceOfFunds"/></span><form:select path="profile.sourceOfFunds" data-profile-required="${formKind eq 'self'}" cssClass="aws-control"><form:option value=""><spring:message code="voucher.choose"/></form:option><c:forEach items="${['Salary','Business','Allowance','Investment']}" var="source"><form:option value="${source}"><spring:message code="kyc.funds.${source}"/></form:option></c:forEach></form:select><form:errors path="profile.sourceOfFunds" cssClass="field-error"/></label>
 </div></section>

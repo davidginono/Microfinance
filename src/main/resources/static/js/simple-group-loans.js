@@ -35,7 +35,7 @@
             }
             function toggle() {
                 var group=kind.value==='GROUP';
-                form.querySelectorAll('[data-individual-loan]').forEach(function (node) {node.hidden=group;node.querySelectorAll('input,select,textarea').forEach(function (field) {field.disabled=group;});});
+                form.querySelectorAll('[data-individual-loan]').forEach(function (node) {node.hidden=group;node.querySelectorAll('input,select,textarea').forEach(function (field) {field.disabled=group || (field.name==='clientId' && !!form.elements.topUpSourceLoanId);});});
                 panel.hidden=!group;panel.querySelectorAll('input,select,textarea,button').forEach(function (field) {field.disabled=!group;});
                 form.querySelectorAll('[data-group-guarantee], [data-group-confirmation], [data-group-agreement-upload]').forEach(function(node){node.hidden=!group;node.querySelectorAll('input,button').forEach(function(field){field.disabled=!group;});});
                 form.querySelectorAll('[data-repeat-list="guarantors"] [name$=".fullName"]').forEach(function(field){field.closest('.loan-form-grid > div').hidden=group;field.disabled=group;});

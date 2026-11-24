@@ -27,7 +27,7 @@ public class OnboardingService {
     public static final Set<String> IDENTITY_TYPES=Set.of("NATIONAL_ID","PASSPORT","VOTER_ID","DRIVING_LICENCE","OTHER");
     public static final Set<String> DOCUMENT_CATEGORIES=Set.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT","PROFILE_PHOTO","SPOUSE_PHOTO");
     public static final Set<String> PHOTO_CATEGORIES=Set.of("PROFILE_PHOTO","SPOUSE_PHOTO");
-    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","monthlyIncome","monthlyExpenses","monthlyDebtRepayments","employerName","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
+    public static final String[] PERSONAL_FIELDS={"identityType","issuingCountry","identityNumber","birthDate","identityExpiresOn","identityNoExpiry","address","activity","incomeActivities","activityAddress","sourceOfFunds","gender","maritalStatus","dependants","familiarName","groupId","postalAddress","city","ward","villageStreet","nearbyPlace","hasBusiness","businessName","businessTin","businessType","businessLocation","businessWard","businessCity","businessLicence","otherIncomeSources","dailySales","dailyExpenditure","monthlyIncome","monthlyExpenses","employerName","spouseName","spouseRelationship","spousePhone","spouseWork","spouseWorkLocation","bankName","bankAccountName","bankAccountNumber","employeeNumber"};
     private final OnboardingRepository records;
     private final com.sacco.mvp.grouplending.service.GroupLendingService groups;
     private final GeneralLedgerService access;
@@ -143,7 +143,9 @@ public class OnboardingService {
         return client;
     }
     @Transactional(readOnly=true) public ProfileForm profileForm(AppUserPrincipal a,UUID id) {
-        authorize(a,"UPDATE");var c=records.client(a,id,today());var f=new ProfileForm();f.setExpectedSequence(c.sequence());var latest=records.latest(a,id);latest.ifPresent(r->f.setProfile(r.profile()));identityFields(f.getProfile(),c);f.getProfile().setEmployeeNumber(registration.employeeNumber(a,id));return f;
+        authorize(a,"UPDATE");var c=records.client(a,id,today());var f=new ProfileForm();f.setExpectedSequence(c.sequence());var latest=records.latest(a,id);latest.ifPresent(r->f.setProfile(r.profile()));
+        f.getProfile().setSourceOfFunds(Objects.toString(fundsChoice(f.getProfile().getSourceOfFunds()),""));
+        identityFields(f.getProfile(),c);f.getProfile().setEmployeeNumber(registration.employeeNumber(a,id));return f;
     }
 
     @Transactional(readOnly=true) public List<GroupChoice> groups(AppUserPrincipal a,UUID client,String search,int page) {
@@ -170,6 +172,12 @@ public class OnboardingService {
 
         check(c.sequence()==f.getExpectedSequence(),"changed");
         check(f.getProfile()!=null,"profile");var p=json.readValue(json.writeValueAsString(f.getProfile()),Profile.class);
+        String funds=fundsChoice(p.getSourceOfFunds());check(funds!=null,"sourceOfFunds");
+        if(funds.isEmpty()&&c.sequence()>0){
+            funds=records.latest(a,client).map(r->r.profile().getSourceOfFunds())
+                .filter(previous->fundsChoice(previous)==null).orElse("");
+        }
+        p.setSourceOfFunds(funds);
         if(!p.getFirstName().isBlank()||!p.getLastName().isBlank()) {
             names(p);String fullName=java.util.stream.Stream.of(p.getFirstName(),p.getMiddleName(),p.getLastName()).filter(v->!v.isBlank()).map(String::strip).collect(java.util.stream.Collectors.joining(" "));
             try{registration.correctProvisionalContact(a,client,fullName,p.getPhone(),p.getEmail());}catch(IllegalStateException e){throw invalid("registration");}
@@ -244,7 +252,7 @@ public class OnboardingService {
         var fields=new LinkedHashMap<String,String>();fields.put("employerName",p.getEmployerName());fields.put("familiarName",p.getFamiliarName());fields.put("postalAddress",p.getPostalAddress());fields.put("city",p.getCity());fields.put("ward",p.getWard());fields.put("villageStreet",p.getVillageStreet());fields.put("nearbyPlace",p.getNearbyPlace());fields.put("businessName",p.getBusinessName());fields.put("businessType",p.getBusinessType());fields.put("businessLocation",p.getBusinessLocation());fields.put("businessWard",p.getBusinessWard());fields.put("businessCity",p.getBusinessCity());fields.put("spouseName",p.getSpouseName());fields.put("spouseRelationship",p.getSpouseRelationship());fields.put("spouseWork",p.getSpouseWork());fields.put("spouseWorkLocation",p.getSpouseWorkLocation());fields.put("bankName",p.getBankName());fields.put("bankAccountName",p.getBankAccountName());
         fields.forEach((field,value)->text(value,255,field,false));text(p.getBusinessTin(),50,"businessTin",false);text(p.getBusinessLicence(),100,"businessLicence",false);text(p.getOtherIncomeSources(),1000,"otherIncomeSources",false);
         text(p.getBankAccountNumber(),80,"bankAccountNumber",false);check(p.getBankAccountNumber().isBlank()||p.getBankAccountNumber().matches("[A-Za-z0-9 /._-]+"),"bankAccountNumber");
-        money(p.getDailySales(),"dailySales");money(p.getDailyExpenditure(),"dailyExpenditure");money(p.getMonthlyIncome(),"monthlyIncome");money(p.getMonthlyExpenses(),"monthlyExpenses");money(p.getMonthlyDebtRepayments(),"monthlyDebtRepayments");text(p.getSpousePhone(),32,"spousePhone",false);
+        money(p.getDailySales(),"dailySales");money(p.getDailyExpenditure(),"dailyExpenditure");money(p.getMonthlyIncome(),"monthlyIncome");money(p.getMonthlyExpenses(),"monthlyExpenses");text(p.getSpousePhone(),32,"spousePhone",false);
         if(!p.getSpousePhone().isBlank())try{p.setSpousePhone(TanzaniaPhoneNumber.normalizeRequired(p.getSpousePhone()));}catch(IllegalStateException e){throw invalid("spousePhone");}
         text(p.getIdentityType(),30,"identityType",false);check(p.getIdentityType().isEmpty()||IDENTITY_TYPES.contains(p.getIdentityType()),"identityType");
         text(p.getIssuingCountry(),2,"issuingCountry",false);check(p.getIssuingCountry().isEmpty()||Arrays.asList(Locale.getISOCountries()).contains(p.getIssuingCountry()),"issuingCountry");
@@ -258,6 +266,16 @@ public class OnboardingService {
         text(p.getRetentionReference(),500,"retentionReference",false);text(p.getLegalHoldReference(),500,"legalHoldReference",false);
     }
     private void money(java.math.BigDecimal value,String field) {check(value==null||value.signum()>=0&&value.scale()<=2&&value.compareTo(new java.math.BigDecimal("9999999999999999.99"))<=0,field);}
+    private static String fundsChoice(String value){
+        if(value==null||value.isBlank())return "";
+        return switch(value.strip().toLowerCase(Locale.ROOT)){
+            case "salary"->"Salary";
+            case "business"->"Business";
+            case "allowance"->"Allowance";
+            case "investment"->"Investment";
+            default->null;
+        };
+    }
     private Download prepare(MultipartFile f) {
         check(f!=null&&!f.isEmpty()&&f.getSize()<=DocumentForm.MAX_FILE_BYTES,"file");
         try {

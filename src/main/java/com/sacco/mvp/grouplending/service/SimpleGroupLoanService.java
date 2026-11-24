@@ -38,6 +38,7 @@ public class SimpleGroupLoanService {
     private UUID persistDraft(AppUserPrincipal a,RecordForm f){access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(f!=null&&"GROUP".equals(f.getLoanFor())&&f.getRequestKey()!=null&&f.getGroupApplication()!=null&&f.getGroupApplication().getGroupId()!=null,"request");validateDraft(f);records.setup(a,f.getGroupApplication().getGroupId(),true);check(records.active(a,f.getGroupApplication().getGroupId()),"inactive");return records.draft(a,f.getApplicationId(),f.getRequestKey(),f.getExpectedVersion(),f.getGroupApplication().getGroupId(),json.writeValueAsString(f),clock.now());}
     @Transactional public UUID saveDraft(AppUserPrincipal a,RecordForm f,List<MultipartFile> files,MultipartFile agreement){
         access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(f!=null&&f.getGroupApplication()!=null&&f.getGroupApplication().getGroupId()!=null,"request");records.setup(a,f.getGroupApplication().getGroupId(),true);var stored=f.getApplicationId()==null?new ArrayList<DraftFile>():new ArrayList<>(Arrays.asList(json.readValue(records.draftFiles(a,f.getApplicationId()),DraftFile[].class)));
+        f.setMonthlyOutsideDebt(null);
         if(f.getApplicationId()!=null&&!sameMaterial(readForm(records.draft(a,f.getApplicationId(),true).data()),f))stored.removeIf(x->x.agreement()||"GUARANTOR_CONSENT".equals(x.purpose()));
         if(f.getGroupApplication().isRemoveAgreement())stored.removeIf(DraftFile::agreement);
         appendFiles(stored,f,files,agreement);f.setGroupRequestHash(draftFileHash(stored));UUID id=persistDraft(a,f);records.draftFiles(a,id,json.writeValueAsString(stored));event(a,id,"GROUP_DRAFT_SAVED");return id;
@@ -52,11 +53,18 @@ public class SimpleGroupLoanService {
     }
     @Transactional(readOnly=true) public DraftFiles draftFiles(AppUserPrincipal a,RecordForm f,List<MultipartFile> files,MultipartFile agreement){
         access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");if(f.getApplicationId()==null)return new DraftFiles(files,agreement);
-        var previous=records.draft(a,f.getApplicationId(),false);if((agreement==null||agreement.isEmpty())&&!sameMaterial(readForm(previous.data()),f))throw new IllegalArgumentException("simpleGroup.error.freshAgreement");
+        var previous=records.draft(a,f.getApplicationId(),false);
+        boolean changed=!sameMaterial(readForm(previous.data()),f);
         var stored=Arrays.asList(json.readValue(records.draftFiles(a,f.getApplicationId()),DraftFile[].class));var result=new ArrayList<MultipartFile>();var details=f.getApplicationDetails();
         if(details==null){details=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ApplicationDetails();f.setApplicationDetails(details);}
         var names=new ArrayList<String>();var types=new ArrayList<String>();var requirements=new ArrayList<String>();
-        for(var upload:stored)if(upload.agreement()){if(!f.getGroupApplication().isRemoveAgreement()&&(agreement==null||agreement.isEmpty()))agreement=new SavedFile(upload);}else{result.add(new SavedFile(upload));names.add(upload.title());types.add(upload.purpose());requirements.add(upload.requirement());}
+        for(var upload:stored)if(upload.agreement()){
+            if(!f.getGroupApplication().isRemoveAgreement()&&(agreement==null||agreement.isEmpty())){
+                check(!changed,"freshAgreement");agreement=new SavedFile(upload);
+            }
+        }else if(!changed||!"GUARANTOR_CONSENT".equals(upload.purpose())){
+            result.add(new SavedFile(upload));names.add(upload.title());types.add(upload.purpose());requirements.add(upload.requirement());
+        }
         result.addAll(files);names.addAll(details.getDocumentNames());types.addAll(details.getDocumentTypes());requirements.addAll(details.getRequiredAttachmentIds());details.setDocumentNames(names);details.setDocumentTypes(types);details.setRequiredAttachmentIds(requirements);
         check(result.size()<=10,"document");return new DraftFiles(result,agreement);
     }
@@ -111,30 +119,39 @@ public class SimpleGroupLoanService {
             var locks=new HashSet<UUID>(memberIds);guarantees.forEach(x->locks.add(x.getClientId()));records.lockClients(a,locks.stream().sorted().toList());
         }
         var rows=records.profiles(a,s.groupId(),clock.today());check(rows.size()==s.people().size(),"members");
+        var profiles=new HashMap<UUID,Profile>();
+        var issues=new ArrayList<ProfileBudgetIssue>();
+        for(var row:rows){
+            var profile=row.get("revision")==null||row.get("profile")==null?null:json.readValue(row.get("profile").toString(),Profile.class);
+            boolean incomeMissing=profile==null||!validMoney(profile.getMonthlyIncome(),true);
+            boolean expensesMissing=profile==null||!validMoney(profile.getMonthlyExpenses(),false);
+            if(incomeMissing||expensesMissing)issues.add(new ProfileBudgetIssue(Objects.toString(row.get("full_name")),incomeMissing,expensesMissing));
+            else profiles.put((UUID)row.get("id"),profile);
+        }
+        if(!issues.isEmpty())throw new ProfileBudgetException(issues);
         if(submitting)check(g.getSignedOn()!=null&&!g.getSignedOn().isAfter(clock.today())&&!g.getSignedOn().isBefore(f.getApplicationDate()),"signatures");
-        check(g.getDebts()!=null&&g.getDebts().size()<=50,"budget");
+        check(g.getDebts()!=null&&g.getDebts().size()<=50,"outsideDebts");
         var externalByClient=new HashMap<UUID,BigDecimal>();var debtReferences=new HashSet<String>();BigDecimal externalDebt=BigDecimal.ZERO;
         for(var obligation:g.getDebts()){
-            check(obligation!=null,"budget");text(obligation.getReference(),200);money(obligation.getMonthlyPayment(),true);
-            check(debtReferences.add(obligation.getReference().strip().toLowerCase(Locale.ROOT))&&obligation.getClientIds()!=null&&!obligation.getClientIds().isEmpty()&&obligation.getClientIds().size()<=50,"budget");
-            var named=new HashSet<>(obligation.getClientIds());check(named.size()==obligation.getClientIds().size()&&memberIds.containsAll(named),"budget");
+            check(obligation!=null&&validText(obligation.getReference(),200)&&validMoney(obligation.getMonthlyPayment(),true),"outsideDebts");
+            check(debtReferences.add(obligation.getReference().strip().toLowerCase(Locale.ROOT))&&obligation.getClientIds()!=null&&!obligation.getClientIds().isEmpty()&&obligation.getClientIds().size()<=50,"outsideDebts");
+            var named=new HashSet<>(obligation.getClientIds());check(named.size()==obligation.getClientIds().size()&&memberIds.containsAll(named),"outsideDebts");
             for(var id:named)externalByClient.merge(id,obligation.getMonthlyPayment(),BigDecimal::add);externalDebt=externalDebt.add(obligation.getMonthlyPayment());
         }
-        var assessments=new ArrayList<Assessment>();BigDecimal capacity=BigDecimal.ZERO,income=BigDecimal.ZERO,expenses=BigDecimal.ZERO,debt=BigDecimal.ZERO;
-        if(f.getApplicationDetails()==null)f.setApplicationDetails(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ApplicationDetails());
+        var assessments=new ArrayList<Assessment>();BigDecimal income=BigDecimal.ZERO,expenses=BigDecimal.ZERO;
         f.getApplicationDetails().getGroupClientValues().clear();
-        var sources=new HashSet<String>();var ids=s.people().stream().map(Person::id).toList();var exposures=records.exposures(a,ids);
+        var sources=new HashSet<String>();var exposures=records.exposures(a,memberIds);
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
+        var ratio=product.getResolvedMaxRepaymentToDisposableIncomeRatio();check(ratio!=null&&ratio.signum()>0&&ratio.compareTo(BigDecimal.ONE)<=0,"budget");
         for(var row:rows){
-            UUID id=(UUID)row.get("id");check(row.get("revision")!=null&&row.get("profile")!=null,"budget");
-            var profile=json.readValue(row.get("profile").toString(),Profile.class);
+            UUID id=(UUID)row.get("id");var profile=profiles.get(id);
             if(row.get("kyc")!=null)throw new IllegalArgumentException(row.get("kyc").toString());
             var e=exposures.get(id);check(e!=null&&e.missingHistory()==0&&e.pendingApplications()==0,"history");
             check(e.activeLoans()==0||(product.isApplicationWithActiveLoanAllowed()&&(product.getMaximumActiveLoans()==null||e.activeLoans()<product.getMaximumActiveLoans())),"activeLoans");
             check(policy.applicantDefaultLimit()==null||e.riskLoans()<policy.applicantDefaultLimit(),"history");
-            BigDecimal i=profile.getMonthlyIncome(),x=profile.getMonthlyExpenses(),d=profile.getMonthlyDebtRepayments();money(i,true);money(x,false);money(d,false);
-            check(d.subtract(e.monthlyDebt().setScale(2,RoundingMode.UP)).max(BigDecimal.ZERO).compareTo(externalByClient.getOrDefault(id,BigDecimal.ZERO))==0,"debts");
-            BigDecimal disposable=i.subtract(x).subtract(d.max(e.monthlyDebt().setScale(2,RoundingMode.UP)));check(disposable.signum()>0,"budget");
+            BigDecimal i=profile.getMonthlyIncome(),x=profile.getMonthlyExpenses(),internal=e.monthlyDebt().setScale(2,RoundingMode.UP);
+            BigDecimal d=internal.add(externalByClient.getOrDefault(id,BigDecimal.ZERO));check(validMoney(d,false),"outsideDebts");
+            check(i.subtract(x).subtract(d).signum()>0,"borrowerAffordability");
             var values=new LinkedHashMap<String,String>();values.put("monthlyIncome",i.toPlainString());values.put("monthlyExpenses",x.toPlainString());values.put("otherDebtRepayments",d.toPlainString());
             values.put("businessOrEmploymentType",profile.getActivity());values.put("businessOrEmployerName","Employment".equals(profile.getActivity())?profile.getEmployerName():profile.getBusinessName());values.put("incomeSource",profile.getSourceOfFunds());
             f.getApplicationDetails().getGroupClientValues().add(values);
@@ -143,28 +160,27 @@ public class SimpleGroupLoanService {
             String budgetEvidence="CLIENT_PROFILE:"+row.get("revision");
             if(source.isBlank())source=budgetEvidence;
             if(submitting){text(source,200);check(sources.add(source.strip().toLowerCase(Locale.ROOT)),"incomeSource");}
-            var ratio=product.getResolvedMaxRepaymentToDisposableIncomeRatio();check(ratio!=null&&ratio.signum()>0&&ratio.compareTo(BigDecimal.ONE)<=0,"budget");
-            capacity=capacity.add(disposable.multiply(ratio).setScale(2,RoundingMode.DOWN));income=income.add(i);expenses=expenses.add(x);debt=debt.add(d);
-            assessments.add(new Assessment(id,(UUID)row.get("revision"),Objects.toString(row.get("member_no")),Objects.toString(row.get("full_name")),i,x,d,source.strip(),budgetEvidence));
+            income=income.add(i);expenses=expenses.add(x);
+            assessments.add(new Assessment(id,(UUID)row.get("revision"),Objects.toString(row.get("member_no")),Objects.toString(row.get("full_name")),i,x,d,internal,source.strip(),budgetEvidence));
         }
-        debt=records.monthlyDebt(a,s.groupId()).add(externalDebt);
-        capacity=income.subtract(expenses).subtract(debt).multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,RoundingMode.DOWN);
+        var internalDebt=records.monthlyDebt(a,s.groupId()).setScale(2,RoundingMode.UP);var debt=internalDebt.add(externalDebt);
+        check(validMoney(debt,false),"outsideDebts");
+        var capacity=income.subtract(expenses).subtract(debt).multiply(ratio).setScale(2,RoundingMode.DOWN);
         BigDecimal monthly=LoanAmortizationCalculator.monthlyEquivalent(quote.maximumInstallment(),product.getResolvedRepaymentFrequency());check(capacity.signum()>0&&monthly.compareTo(capacity)<=0,"affordability");
-        if(submitting){check(g.isChecked(),"signatures");
-
-        }
+        if(submitting)check(g.isChecked(),"signatures");
         f.setIncome(income);f.setExpenses(expenses);f.setOtherDebt(debt);f.setBusiness(s.name());f.setInformationSource(submitting&&assessments.stream().allMatch(x->x.source().startsWith("CLIENT_DOCUMENT:"))?"DOCUMENTED":"DECLARED");
         String destination=json.writeValueAsString(Map.of("available",true,"destinationType",s.destinationType(),"provider",s.provider(),"accountHolderName",s.holder(),"accountIdentifier",s.identifier(),"sourceLabel","SIGNED_GROUP_INSTRUCTION"));
-        return new Prepared(submitting?records.party(a,s.groupId()):null,s,assessments,capacity,destination);
+        return new Prepared(submitting?records.party(a,s.groupId()):null,s,assessments,capacity,internalDebt,destination);
     }
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED) public SignedPaper validatePaper(AppUserPrincipal a,MultipartFile file){
-        access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(file!=null&&!file.isEmpty()&&file.getSize()<=10*1024*1024,"document");check(paperValidation.tryAcquire(),"documentBusy");
+        access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");if(file==null||file.isEmpty())return null;
+        check(file.getSize()<=10*1024*1024,"document");check(paperValidation.tryAcquire(),"documentBusy");
         try{byte[] body=file.getBytes();check(body.length>=5&&new String(body,0,5,java.nio.charset.StandardCharsets.US_ASCII).equals("%PDF-"),"document");GroupAgreementDocumentValidation.pages(body);String filename=Objects.toString(file.getOriginalFilename(),"group-agreement.pdf").replace('\\','/');filename=filename.substring(filename.lastIndexOf('/')+1);text(filename,200);return new SignedPaper(filename,body,HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(body)));}
         catch(java.io.IOException|java.security.NoSuchAlgorithmException|IllegalArgumentException e){throw new IllegalArgumentException("simpleGroup.error.document",e);}finally{paperValidation.release();}
     }
     @Transactional public void record(AppUserPrincipal a,UUID loan,Prepared p,RecordForm f,SignedPaper paper){
-        access.requireActor(a,"LOAN_RECORDING_CREATE");byte[] body=paper.body();String filename=paper.filename();
-            String snapshot=json.writeValueAsString(Map.of("version","STAFF_GROUP_V1","setup",p.setup(),"assessments",p.assessments(),"destination",p.destination(),"capacity",p.capacity()));
+        access.requireActor(a,"LOAN_RECORDING_CREATE");byte[] body=paper==null?null:paper.body();String filename=paper==null?null:paper.filename();
+            String snapshot=json.writeValueAsString(Map.of("version","STAFF_GROUP_V1","debtBasis","LOAN_APPLICATION","internalDebt",p.internalDebt(),"outsideDebts",f.getGroupApplication().getDebts(),"setup",p.setup(),"assessments",p.assessments(),"destination",p.destination(),"capacity",p.capacity()));
             if(records.simple(a,loan)){check(records.sameContract(a,loan,snapshot,body),"changed");return;}
             records.contract(a,loan,p,f.getGroupApplication(),f.getGroupRequestHash(),snapshot,body,filename,clock.now());event(a,loan,"GROUP_LOAN_RECORDED");
     }
@@ -175,7 +191,7 @@ public class SimpleGroupLoanService {
         access.requireActor(a,"LOAN_RECORDING_VIEW");return readContract(a,loan);
     }
     @Transactional(readOnly=true) public Optional<Contract> fundingContract(AppUserPrincipal a,UUID loan){access.requireActor(a,"DISBURSEMENT_QUEUE_VIEW");return readContract(a,loan);}
-    private Optional<Contract> readContract(AppUserPrincipal a,UUID loan){return records.contract(a,loan).map(c->{var tree=json.readTree(c.name());var s=json.treeToValue(tree.get("setup"),Setup.class);return new Contract(loan,c.groupId(),s.name(),s.leader(),s.holder()+" · "+s.provider()+" · "+s.identifier(),c.reference(),c.language(),records.borrowers(a,loan));});}
+    private Optional<Contract> readContract(AppUserPrincipal a,UUID loan){return records.contract(a,loan).map(c->{var tree=json.readTree(c.name());var s=json.treeToValue(tree.get("setup"),Setup.class);return new Contract(loan,c.groupId(),s.name(),s.leader(),s.holder()+" · "+s.provider()+" · "+s.identifier(),c.reference(),c.language(),c.agreementAvailable(),records.borrowers(a,loan));});}
     @Transactional public byte[] document(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_DOCUMENTS_VIEW");access.requireActor(a,"LOAN_DOCUMENTS_EXPORT");access.requireActor(a,"LOAN_RECORDING_VIEW");var body=records.document(a,loan);event(a,loan,"GROUP_AGREEMENT_EXPORTED");return body;}
     @Transactional public byte[] fundingDocument(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_DOCUMENTS_VIEW");access.requireActor(a,"LOAN_DOCUMENTS_EXPORT");access.requireActor(a,"DISBURSEMENT_QUEUE_VIEW");var body=records.document(a,loan);event(a,loan,"GROUP_AGREEMENT_EXPORTED");return body;}
     @Transactional public boolean fund(AppUserPrincipal a,UUID loan,UUID posting,UUID journal,LocalDate day){
@@ -194,7 +210,14 @@ public class SimpleGroupLoanService {
     }
     @Transactional(readOnly=true) public boolean guaranteesReady(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_RECORDING_VIEW");return records.guaranteesReady(a,loan);}
     private void event(AppUserPrincipal a,UUID id,String action){audit.logEvent("GROUP_LENDING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"GROUP",id.toString(),a.getSaccoId(),a.getStationId(),Map.of());}
-    private static void money(BigDecimal n,boolean positive){check(n!=null&&n.scale()<=2&&n.precision()-n.scale()<=16&&(positive?n.signum()>0:n.signum()>=0),"budget");}
+    public record ProfileBudgetIssue(String client,boolean incomeMissing,boolean expensesMissing) {}
+    public static final class ProfileBudgetException extends IllegalArgumentException {
+        private final List<ProfileBudgetIssue> issues;
+        private ProfileBudgetException(List<ProfileBudgetIssue> issues){super("simpleGroup.error.profileBudget");this.issues=List.copyOf(issues);}
+        public List<ProfileBudgetIssue> issues(){return issues;}
+    }
+    private static boolean validMoney(BigDecimal n,boolean positive){return n!=null&&n.scale()<=2&&n.precision()-n.scale()<=16&&(positive?n.signum()>0:n.signum()>=0);}
+    private static void money(BigDecimal n,boolean positive){check(validMoney(n,positive),"budget");}
     private static void validateDraft(RecordForm f){
         f.setFirstPaymentDate(null);
         check(f.getGroupApplication().getDebts()!=null&&f.getGroupApplication().getDebts().size()<=50,"request");
@@ -203,6 +226,7 @@ public class SimpleGroupLoanService {
         if(f.getPrincipal()!=null)money(f.getPrincipal(),true);
         var details=f.getApplicationDetails();if(details!=null){check(details.getFields()!=null&&details.getFields().size()<=100&&details.getGuarantors()!=null&&details.getGuarantors().size()<=20&&details.getCollateral()!=null&&details.getCollateral().size()<=20,"request");check(details.getFields().values().stream().allMatch(v->v!=null&&v.length()<=1000),"request");}
     }
-    private static void text(String s,int max){check(s!=null&&!s.isBlank()&&s.length()<=max&&s.codePoints().noneMatch(Character::isISOControl),"request");}
+    private static boolean validText(String s,int max){return s!=null&&!s.isBlank()&&s.length()<=max&&s.codePoints().noneMatch(Character::isISOControl);}
+    private static void text(String s,int max){check(validText(s,max),"request");}
     private static void check(boolean ok,String error){if(!ok)throw new IllegalArgumentException("simpleGroup.error."+error);}
 }

@@ -35,7 +35,7 @@ class ClientOnboardingPostgresTest {
     ProfileForm profile(UUID client,String identity) {
         var form=new ProfileForm();form.setExpectedSequence(service.client(f.actor,client).sequence());var p=form.getProfile();
         p.setIdentityType("NATIONAL_ID");p.setIssuingCountry("TZ");p.setIdentityNumber(identity);p.setBirthDate(day.minusYears(30));p.setIdentityExpiresOn(day.plusYears(1));
-        p.setAddress("Synthetic checked residence");p.setActivity("Synthetic shop");p.setActivityAddress("Synthetic market");p.setSourceOfFunds("Synthetic shop sales");p.setNoticeVersion("Synthetic approved notice 1");p.setLawfulBasis("CONSENT");p.setConsentReference("Synthetic signed notice and purpose-specific consent");p.setConsentOn(day);p.setRetentionReference("Synthetic approved retention schedule");p.setRetentionReviewOn(day.plusYears(2));return form;
+        p.setAddress("Synthetic checked residence");p.setActivity("Synthetic shop");p.setActivityAddress("Synthetic market");p.setSourceOfFunds("Business");p.setNoticeVersion("Synthetic approved notice 1");p.setLawfulBasis("CONSENT");p.setConsentReference("Synthetic signed notice and purpose-specific consent");p.setConsentOn(day);p.setRetentionReference("Synthetic approved retention schedule");p.setRetentionReviewOn(day.plusYears(2));return form;
     }
     MockMultipartFile image(){return new MockMultipartFile("file","identity.png","image/png",image);}
     UUID draft(UUID client,String identity){return service.save(f.actor,client,profile(client,identity));}
@@ -55,14 +55,13 @@ class ClientOnboardingPostgresTest {
         form.getProfile().setActivity("Employment");form.getProfile().setEmployerName("Synthetic employer");
         form.getProfile().setMonthlyIncome(new java.math.BigDecimal("2500000.50"));
         form.getProfile().setMonthlyExpenses(new java.math.BigDecimal("500000.25"));
-        form.getProfile().setMonthlyDebtRepayments(java.math.BigDecimal.ZERO);
         UUID revision=service.save(f.actor,f.client,form);
         var pending=service.profileForm(f.actor,f.client);pending.setAction("DRAFT");
         pending.getProfile().setMonthlyIncome(new java.math.BigDecimal("9000000.00"));
         pending.getProfile().setMonthlyExpenses(new java.math.BigDecimal("900000.00"));service.save(f.actor,f.client,pending);
         var source=service.loanProfile(f.actor,f.client);
         assertThat(source.revisionId()).isEqualTo(revision);assertThat(source.employerName()).isEqualTo("Synthetic employer");
-        assertThat(source.monthlyIncome()).isEqualByComparingTo("2500000.50");assertThat(source.monthlyDebtRepayments()).isZero();
+        assertThat(source.monthlyIncome()).isEqualByComparingTo("2500000.50");assertThat(source.monthlyDebtRepayments()).isNull();
         assertThat(source.monthlyExpenses()).isEqualByComparingTo("500000.25");
         assertThatThrownBy(()->service.loanProfile(f.operator("B2"),f.client)).isInstanceOf(AccessDeniedException.class);
     }
@@ -72,8 +71,8 @@ class ClientOnboardingPostgresTest {
         assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyIncome");
         form.getProfile().setMonthlyIncome(null);form.getProfile().setMonthlyExpenses(new java.math.BigDecimal("1.001"));
         assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyExpenses");
-        form.getProfile().setMonthlyExpenses(null);form.getProfile().setMonthlyDebtRepayments(new java.math.BigDecimal("-1"));
-        assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyDebtRepayments");
+        form.getProfile().setMonthlyExpenses(null);form.getProfile().setSourceOfFunds("Unsupported");
+        assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.sourceOfFunds");
     }
     @Test void recordedProfilesStayUnverifiedWithoutCreatingReviewDecisionsOrLoginAccess() {
         var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());form.setAction("RECORDED");

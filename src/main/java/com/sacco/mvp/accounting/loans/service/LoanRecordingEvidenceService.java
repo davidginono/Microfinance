@@ -28,7 +28,7 @@ public class LoanRecordingEvidenceService {
 
     public void applyClientProfile(AppUserPrincipal actor,RecordForm form) {
         var profile=onboarding.loanProfile(actor,form.getClientId());
-        form.setIncome(profile.monthlyIncome());form.setExpenses(profile.monthlyExpenses());form.setOtherDebt(profile.monthlyDebtRepayments());
+        form.setIncome(profile.monthlyIncome());form.setExpenses(profile.monthlyExpenses());form.setOtherDebt(form.getMonthlyOutsideDebt());
         form.setBusiness(java.util.stream.Stream.of(profile.businessName(),profile.employerName(),profile.businessType())
             .filter(value->value!=null&&!value.isBlank()).collect(java.util.stream.Collectors.joining(" / ")));
         form.setInformationSource(profile.revisionId()==null?"UNAVAILABLE":"DECLARED");
@@ -165,7 +165,7 @@ public class LoanRecordingEvidenceService {
         form.setRequestKey(draft.getRequestKey());form.setApplicationId(id);form.setExpectedVersion(draft.getExpectedVersion());
         form.setClientId(draft.getClientId());form.setProductId(draft.getProductId());form.setLoanMode("CONFIGURED");
         form.setPrincipal(draft.getAmount());form.setApplicationDate(draft.getApplicationDate());form.setTenureUnit(draft.getTenureUnit());form.setTenureValue(draft.getTenureValue());
-        form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(draft.getExpenses());form.setOtherDebt(draft.getOtherDebt());
+        form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(draft.getExpenses());form.setOtherDebt(form.getMonthlyOutsideDebt());
         var details=form.getApplicationDetails()==null?new ApplicationDetails():form.getApplicationDetails();
         details.setUseOfFunds(draft.getUseOfFunds());
         details.setGuarantors(draft.getGuarantors());
