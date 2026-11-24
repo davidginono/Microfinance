@@ -207,6 +207,13 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public Page<Posting> register(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);var rows=records.posts(a,kind,f,26,f.page()*25);return new Page<>(rows.stream().limit(25).toList(),f.page(),rows.size()>25);}
     @Transactional(readOnly=true)
+    public Page<LedgerClient> clientLedgers(AppUserPrincipal actor,String search,int page){
+        authorize(actor,"VIEW");
+        check(search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
+        var rows=records.clientLedgers(actor,search,page,clock.today());
+        return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
+    @Transactional(readOnly=true)
     public List<Choice> choices(AppUserPrincipal a,String category,String search,int page){authorize(a,"VIEW");check(search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");return switch(category){
         case "clients"->records.clients(a,search,page);case "ledger-clients"->records.ledgerClients(a,search,page);case "products"->records.products(a,search,page);
         case "filter-products"->records.filterProducts(a,search,page);

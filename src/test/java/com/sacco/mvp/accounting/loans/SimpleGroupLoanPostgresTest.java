@@ -112,6 +112,11 @@ class SimpleGroupLoanPostgresTest {
     @Test void fivePeopleCreateOneLoanWithoutRulesAuthoritiesOrPersonalShares(){
         assertThat(service.choices(f.actor,"Five borrowers",0)).singleElement().satisfies(choice->assertThat(choice.label()).isEqualTo("Five borrowers"));
         UUID loan=record();
+        assertThat(f.service.clientLedgers(f.actor,"Five borrowers",0).rows()).singleElement().satisfies(row->{
+            assertThat(row.number()).startsWith("GRP-");
+            assertThat(row.name()).isEqualTo("Five borrowers");
+            assertThat(row.portfolioStatus()).isEqualTo("NOT_FUNDED");
+        });
         var agreement=f.jdbc.queryForMap("select reference,language,filename from staff_group_loan where loan_id=?",loan);
         assertThat(agreement.get("reference")).isNull();assertThat(agreement.get("language")).isNull();assertThat(agreement.get("filename")).isEqualTo("synthetic-signed-group.pdf");
         assertThat(f.jdbc.queryForObject("select count(*) from staff_group_borrower where loan_id=?",Integer.class,loan)).isEqualTo(5);

@@ -431,6 +431,48 @@ public class LoanRecordingRepository {
             where l.borrower_party_id=b.party_id and r.sacco_id=b.sacco_id and r.station_id=b.group_station_id)
         """;
     public List<Choice> ledgerClients(AppUserPrincipal a,String search,int page){return jdbc.query("select m.id,m.member_no||' - '||m.full_name label,m.kind from ("+LEDGER_BORROWERS+") m where strpos(lower(m.member_no||' '||m.full_name),?)>0 order by "+com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-clients-1",Map.of("client","m.member_no||' - '||m.full_name"),"m.id","m.member_no,m.id")+" limit 26 offset ?",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("kind")),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
+    public List<LedgerClient> clientLedgers(AppUserPrincipal actor,String search,int page,LocalDate today){
+        String order=com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-clients-1",
+            Map.of("client","m.member_no","name","m.full_name","status","portfolio.status"),"m.id","m.member_no,m.id");
+        boolean sortByStatus=order.startsWith("portfolio.status ");
+        String orderedPage=" order by "+order+" limit 26 offset ?";
+        String institution=actor.getSaccoId(), branch=actor.getStationId();
+        var args=new ArrayList<Object>(List.of(institution,branch,institution,branch,institution,branch,search.toLowerCase(Locale.ROOT)));
+        if(!sortByStatus)args.add(page*25);
+        args.add(today);args.add(institution);args.add(branch);
+        if(sortByStatus)args.add(page*25);
+        return jdbc.query("""
+            with borrowers as materialized (
+                select m.id,m.member_no,m.full_name from (%s) m
+                where strpos(lower(m.member_no||' '||m.full_name),?)>0%s
+            )
+            select m.id,m.member_no,m.full_name,portfolio.status
+            from borrowers m
+            cross join lateral (
+                select case
+                    when bool_or(l.loan_application_id is not null and (
+                        a.status in ('PAR','DEFAULTED') or (a.status='DISBURSED' and exists(
+                            select 1 from loan_ledger_installments i where i.loan_application_id=l.loan_application_id
+                              and i.due_date<? and i.principal-i.principal_paid+i.interest-i.interest_paid-i.interest_excluded-i.interest_waived>0
+                        )))) then 'OVERDUE'
+                    when bool_or(l.loan_application_id is null and a.status in ('DISBURSED','PAR','DEFAULTED','PAID','WRITTEN_OFF'))
+                        then 'CHECK_RECORDS'
+                    when bool_or(a.status='DISBURSED') then 'ACTIVE'
+                    when bool_or(a.status='WRITTEN_OFF') then 'WRITTEN_OFF'
+                    when bool_or(a.status not in ('DISBURSED','PAR','DEFAULTED','PAID','WRITTEN_OFF','DISBURSEMENT_REVERSED','WITHDRAWN','REJECTED')
+                        and right(a.status,9)<>'_REJECTED') then 'NOT_FUNDED'
+                    when bool_or(a.status='PAID') then 'PAID_OFF'
+                    else 'NO_ACTIVE_LOANS'
+                end status
+                from loan_applications a
+                join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id
+                left join loan_ledgers l on l.loan_application_id=a.id and l.sacco_id=a.sacco_id and l.station_id=a.station_id
+                where a.borrower_party_id=m.id and a.sacco_id=? and a.station_id=?
+            ) portfolio
+            """.formatted(LEDGER_BORROWERS,sortByStatus?"":orderedPage)+(sortByStatus?orderedPage:" order by "+order),
+            (row,n)->new LedgerClient(row.getObject("id",UUID.class),row.getString("member_no"),row.getString("full_name"),row.getString("status")),
+            args.toArray());
+    }
     public Optional<Choice> ledgerClient(AppUserPrincipal a, UUID id) {
         return statementClient(a, id).map(client -> new Choice(id, client.number()+" - "+client.name(), client.kind()));
     }

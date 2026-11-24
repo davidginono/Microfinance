@@ -157,6 +157,7 @@ public final class LoanRecordingDtos {
         }
     }
     public record Page<T>(List<T> rows, int page, boolean hasNext) {}
+    public record LedgerClient(UUID id, String number, String name, String portfolioStatus) {}
     public record LoanRow(UUID id, String number, UUID clientId, String client, String clientNumber,
         String product, LocalDate applicationDate, BigDecimal requestedPrincipal, BigDecimal principal,
         String status, BigDecimal outstandingPrincipal, BigDecimal dueInterest, BigDecimal arrears,

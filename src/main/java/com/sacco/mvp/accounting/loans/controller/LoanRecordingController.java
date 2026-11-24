@@ -263,7 +263,13 @@ public class LoanRecordingController {
         postingModel(a,id,0,model);model.addAttribute("reverseKey",requestKey);model.addAttribute("reason",reason);model.addAttribute("today",effectiveDate);return "accounting/loans/posting";
     }
     @GetMapping("/loan-recording/choices/{category}") @ResponseBody public List<Choice> choices(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String category,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){return service.choices(a,category,search,page);}
-    @GetMapping("/client-ledgers") public String clients(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page,Model model){model.addAttribute("clients",service.choices(a,"ledger-clients",search,page));model.addAttribute("search",search);model.addAttribute("page",page);return "accounting/loans/clients";}
+    @GetMapping("/client-ledgers")
+    public String clients(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,
+                          @RequestParam(defaultValue="0") int page,Model model){
+        model.addAttribute("clients",service.clientLedgers(actor,search,page));
+        model.addAttribute("search",search);
+        return "accounting/loans/clients";
+    }
     @GetMapping("/client-ledgers/{id}")
     public String statement(@AuthenticationPrincipal AppUserPrincipal actor, @PathVariable UUID id,
         @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="0") int movementPage,

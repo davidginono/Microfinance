@@ -1448,6 +1448,51 @@ class LoanRecordingPostgresTest {
         assertThat(service.choices(actor,"ledger-clients","",0)).extracting(Choice::id).contains(client);
         assertThatThrownBy(()->service.save(actor,form())).hasMessage("recording.error.client");
     }
+    @Test void clientLedgerStatusUsesScopedRecordedLoansAndPostedInstallments(){
+        String number=client.toString();
+        assertThat(service.clientLedgers(actor,number,0).rows()).containsExactly(
+            new LedgerClient(client,number,"Synthetic client","NO_ACTIVE_LOANS"));
+        var loan=service.save(actor,form());
+        assertThat(service.clientLedgers(actor,number,0).rows()).extracting(LedgerClient::portfolioStatus)
+            .containsExactly("NOT_FUNDED");
+        service.disburse(actor,post(loan,"1000.00","D-LEDGER-STATUS"));
+        var clock=context.getBean(ApplicationClock.class);
+        when(clock.today()).thenReturn(form().getFirstPaymentDate());
+        assertThat(service.clientLedgers(actor,number,0).rows()).extracting(LedgerClient::portfolioStatus)
+            .containsExactly("ACTIVE");
+        when(clock.today()).thenReturn(TODAY);
+        assertThat(service.clientLedgers(actor,number,0).rows()).extracting(LedgerClient::portfolioStatus)
+            .containsExactly("OVERDUE");
+        jdbc.update("update members set station_id='B2' where id=?",client);
+        assertThat(service.clientLedgers(operator("B2"),number,0).rows()).extracting(LedgerClient::portfolioStatus)
+            .containsExactly("NO_ACTIVE_LOANS");
+        assertThat(service.clientLedgers(actor,number,0).rows()).extracting(LedgerClient::portfolioStatus)
+            .containsExactly("OVERDUE");
+    }
+    @Test void clientLedgerStatusSortPrecedesPagination(){
+        jdbc.update("update members set member_no='PORTFOLIO-ZZZ' where id=?",client);
+        disbursed("D-LEDGER-SORT");
+        jdbc.update("""
+            insert into members(id,sacco_id,station_id,member_no,full_name,status,position,is_member,password_hash,created_at)
+            select gen_random_uuid(),?,'B1','PORTFOLIO-'||s,'Synthetic client','ACTIVE','MEMBER',true,'test-only',now()
+            from generate_series(10,34) s
+            """,institution);
+        assertThat(service.clientLedgers(actor,"PORTFOLIO-",0).rows()).extracting(LedgerClient::id).doesNotContain(client);
+        var request=new org.springframework.mock.web.MockHttpServletRequest("GET","/finance/client-ledgers");
+        request.addParameter("tableSort[accounting-loans-clients-1]","status");
+        request.addParameter("tableDirection[accounting-loans-clients-1]","desc");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+            new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            var result=service.clientLedgers(actor,"PORTFOLIO-",0);
+            assertThat(result.hasNext()).isTrue();
+            assertThat(result.rows()).hasSize(25);
+            assertThat(result.rows().getFirst().id()).isEqualTo(client);
+            assertThat(result.rows().getFirst().portfolioStatus()).isEqualTo("OVERDUE");
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
+    }
     @Test void fractionalPrincipalSettlesExactlyAfterMultipleRoundedInstalments(){
         var f=form();f.setPrincipal(new BigDecimal("1000.01"));f.setRequestedPrincipal(new BigDecimal("1000.01"));
         f.setMonths(3);f.setApplicationDate(LocalDate.of(2026,7,1));f.setFirstPaymentDate(LocalDate.of(2026,8,1));
