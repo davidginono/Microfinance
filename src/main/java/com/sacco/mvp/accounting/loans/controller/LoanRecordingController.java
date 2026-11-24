@@ -64,6 +64,10 @@ public class LoanRecordingController {
             if(!action.equals("save"))throw new IllegalArgumentException("recording.error.request");UUID id="GROUP".equals(recordForm.getLoanFor())?service.saveGroup(a,recordForm,attachments==null?List.of():attachments,groupAgreement):service.save(a,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
         }catch(SimpleGroupLoanService.ProfileIncomeException e){
             errors.rejectValue("groupApplication.groupId",e.getMessage(),new Object[]{String.join(", ",e.clients())},null);
+        }catch(SimpleGroupLoanService.GroupCreditHistoryException e){
+            errors.addError(new org.springframework.validation.FieldError(errors.getObjectName(),"groupApplication.groupId",
+                recordForm.getGroupApplication().getGroupId(),false,null,null,
+                creditHistoryMessage(e,org.springframework.context.i18n.LocaleContextHolder.getLocale())));
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
         catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,recordForm,error(e));}
         catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
@@ -130,6 +134,8 @@ public class LoanRecordingController {
             return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
         }catch(SimpleGroupLoanService.ProfileIncomeException e){
             return invalidStep(List.of(Map.of("field","groupApplication.groupId","message",messages.getMessage(e.getMessage(),new Object[]{String.join(", ",e.clients())},locale))));
+        }catch(SimpleGroupLoanService.GroupCreditHistoryException e){
+            return invalidStep(List.of(Map.of("field","groupApplication.groupId","message",creditHistoryMessage(e,locale))));
         }catch(LoanRecordingEvidenceService.FieldValidation e){
             return invalidStep(List.of(Map.of("field",e.field(),"message",label(e.getMessage(),locale))));
         }catch(IllegalArgumentException|IllegalStateException e){
@@ -140,6 +146,14 @@ public class LoanRecordingController {
 
     private ResponseEntity<?> invalidStep(List<Map<String,String>> errors){
         return ResponseEntity.unprocessableContent().cacheControl(CacheControl.noStore()).body(Map.of("errors",errors));
+    }
+
+    private String creditHistoryMessage(SimpleGroupLoanService.GroupCreditHistoryException error,Locale locale){
+        var details=new ArrayList<String>();
+        if(!error.missingHistory().isEmpty())details.add(messages.getMessage("simpleGroup.error.historyMissing",new Object[]{String.join(", ",error.missingHistory())},locale));
+        if(!error.pendingApplications().isEmpty())details.add(messages.getMessage("simpleGroup.error.historyPending",new Object[]{String.join(", ",error.pendingApplications())},locale));
+        if(!error.restrictedHistory().isEmpty())details.add(messages.getMessage("simpleGroup.error.historyRestricted",new Object[]{String.join(", ",error.restrictedHistory())},locale));
+        return String.join(" ",details);
     }
 
     private String recordStep(String field){

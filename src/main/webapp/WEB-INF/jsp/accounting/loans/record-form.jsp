@@ -81,7 +81,7 @@
 </spring:hasBindErrors>
 <div class="accounting-actions loan-form-actions" data-form-actions><a class="app-btn btn-neutral" href="<c:url value="${empty editingLoanId ? '/finance/loan-records' : '/finance/loan-records/'.concat(editingLoanId)}" />"><spring:message code="common.cancel" /></a><c:if test="${empty editingLoanId and empty recordForm.topUpSourceLoanId}"><sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><button type="submit" class="app-btn btn-neutral" name="action" value="draft" formnovalidate data-recording-draft><spring:message code="applications.save"/></button></sec:authorize></c:if><button type="button" class="app-btn btn-neutral" data-recording-previous hidden><spring:message code="common.previous" /></button>
 <button type="button" class="app-btn btn-launch" data-recording-next hidden><spring:message code="common.next" /></button>
-<button type="submit" class="app-btn btn-launch" name="action" value="save" data-recording-submit><spring:message code="${not empty editingLoanId ? 'kyc.saveChanges' : empty recordForm.applicationId ? 'recording.save' : 'applications.submit'}" /></button></div>
+<button type="submit" class="app-btn btn-launch" name="action" value="save" data-recording-submit><spring:message code="${not empty editingLoanId ? 'kyc.saveChanges' : not empty recordForm.topUpSourceLoanId ? 'recording.save' : 'applications.submit'}" /></button></div>
 </form:form>
 <c:if test="${not empty savedApplicationDocuments}">
 <c:forEach items="${savedApplicationDocuments}" var="file" varStatus="index">

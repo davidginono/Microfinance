@@ -103,17 +103,19 @@
         const visible = proxy(control);
         visible.focus({preventScroll:true}); visible.scrollIntoView?.({block:'center', behavior:'instant'});
     }
-    function focusFirst(form) {
+    function focusFirst(form, scope) {
         const control = Array.from(form.elements).find(el => states.has(el) && !el.disabled && !states.get(el).error.hidden
-            && !el.closest('[hidden]:not([data-validation-step]),.hidden'));
+            && (!scope || scope.contains(el)) && !el.closest('[hidden]:not([data-validation-step]),.hidden'));
         if (!control) return false;
         reveal(control); return true;
     }
-    function applyServerErrors(form, messages) {
-        for (const [control, state] of states) if (control.form === form && state.server) clear(control);
+    function applyServerErrors(form, messages, scope) {
+        for (const [control, state] of states)
+            if (control.form === form && state.server && (!scope || scope.contains(control))) clear(control);
         const unbound = [];
         for (const message of messages) {
-            const control = Array.from(form.elements).find(field => field.name === message.dataset.fieldErrorFor && field.type !== 'hidden' && !field.disabled);
+            const control = Array.from(form.elements).find(field => field.name === message.dataset.fieldErrorFor && field.type !== 'hidden' && !field.disabled
+                && (!scope || (scope.contains(field) && !field.closest('[hidden]:not([data-validation-step]),.hidden'))));
             if (!control) {unbound.push(message.textContent.trim()); continue;}
             const error = message.cloneNode(true);
             error.removeAttribute('id');

@@ -92,6 +92,29 @@ class LoanRecordingMvcTest {
         verify(service,never()).save(any(),any(),any());
         verify(service,never()).saveGroup(any(),any(),any(),any());
     }
+    @Test void loanStepReportsEachCreditHistoryBlockerAgainstTheGroupField() throws Exception {
+        var failure=new com.sacco.mvp.grouplending.service.SimpleGroupLoanService.GroupCreditHistoryException(
+            List.of("Asha Test"),List.of("Juma Test"),List.of("Neema Test"));
+        doThrow(failure).when(service).validateStep(eq(actor),any(),eq("loan"),any(),any());
+        mvc.perform(post("/finance/loan-recording/validate-step").with(user(actor)).with(csrf())
+                .locale(Locale.ENGLISH).param("step","loan").param("loanFor","GROUP"))
+            .andExpect(status().is(422))
+            .andExpect(jsonPath("$.errors[0].field").value("groupApplication.groupId"))
+            .andExpect(jsonPath("$.errors[0].message",org.hamcrest.Matchers.allOf(
+                org.hamcrest.Matchers.containsString("Debt records are incomplete for Asha Test"),
+                org.hamcrest.Matchers.containsString("An application is still open for Juma Test"),
+                org.hamcrest.Matchers.containsString("Neema Test reached the limit"))));
+        verify(service,never()).saveGroup(any(),any(),any(),any());
+    }
+    @Test void groupSubmissionCanRecordDirectlyWithoutADraft() throws Exception {
+        var loan=UUID.randomUUID();
+        when(service.saveGroup(eq(actor),any(),eq(List.of()),isNull())).thenReturn(loan);
+        mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf())
+                .param("action","save").param("loanFor","GROUP").param("applicationId",""))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/"+loan));
+        verify(service).saveGroup(eq(actor),argThat(form->form.getApplicationId()==null),eq(List.of()),isNull());
+        verify(simpleGroups,never()).saveDraft(any(),any(),any(),any());
+    }
     @Test void chargeQuoteBindsTheEditedRateAndReturnsOnlyChargeValues() throws Exception {
         when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",new BigDecimal("0.12"),"FLAT_RATE","MONTHLY",new BigDecimal("176.67"),new BigDecimal("60.00"),List.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(1,null,new BigDecimal("1000.00"),new BigDecimal("60.00"),new BigDecimal("1060.00"),new BigDecimal("1060.00"),new BigDecimal("0.00"))),"MONTHS",6));
         var term=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term(UUID.randomUUID(),"PROCESSING","PRINCIPAL_RATE",new BigDecimal("0.0075"),new BigDecimal("7.50"),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.SEPARATE,UUID.randomUUID(),UUID.randomUUID(),"Recorded charge entry","","");

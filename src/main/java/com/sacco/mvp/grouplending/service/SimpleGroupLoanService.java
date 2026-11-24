@@ -146,12 +146,24 @@ public class SimpleGroupLoanService {
         var sources=new HashSet<String>();var exposures=records.exposures(a,memberIds);
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
         var ratio=product.getResolvedMaxRepaymentToDisposableIncomeRatio();check(ratio!=null&&ratio.signum()>0&&ratio.compareTo(BigDecimal.ONE)<=0,"budget");
+        var missingHistory=new ArrayList<String>();
+        var pendingApplications=new ArrayList<String>();
+        var restrictedHistory=new ArrayList<String>();
+        for(var row:rows){
+            if(row.get("kyc")!=null)throw new IllegalArgumentException(row.get("kyc").toString());
+            var exposure=exposures.get((UUID)row.get("id"));
+            var client=Objects.toString(row.get("full_name"));
+            if(exposure==null || exposure.missingHistory()>0)missingHistory.add(client);
+            if(exposure==null)continue;
+            if(exposure.pendingApplications()>0)pendingApplications.add(client);
+            if(policy.applicantDefaultLimit()!=null && exposure.riskLoans()>=policy.applicantDefaultLimit())restrictedHistory.add(client);
+        }
+        if(!missingHistory.isEmpty() || !pendingApplications.isEmpty() || !restrictedHistory.isEmpty())
+            throw new GroupCreditHistoryException(missingHistory,pendingApplications,restrictedHistory);
         for(var row:rows){
             UUID id=(UUID)row.get("id");var profile=profiles.get(id);
-            if(row.get("kyc")!=null)throw new IllegalArgumentException(row.get("kyc").toString());
-            var e=exposures.get(id);check(e!=null&&e.missingHistory()==0&&e.pendingApplications()==0,"history");
+            var e=exposures.get(id);
             check(e.activeLoans()==0||(product.isApplicationWithActiveLoanAllowed()&&(product.getMaximumActiveLoans()==null||e.activeLoans()<product.getMaximumActiveLoans())),"activeLoans");
-            check(policy.applicantDefaultLimit()==null||e.riskLoans()<policy.applicantDefaultLimit(),"history");
             BigDecimal i=profile.getMonthlyIncome(),internal=e.monthlyDebt().setScale(2,RoundingMode.UP);
             BigDecimal d=internal.add(externalByClient.getOrDefault(id,BigDecimal.ZERO));check(validMoney(d,false),"outsideDebts");
             var values=new LinkedHashMap<String,String>();values.put("monthlyIncome",i.toPlainString());values.put("otherDebtRepayments",d.toPlainString());
@@ -270,6 +282,22 @@ public class SimpleGroupLoanService {
         private final List<String> clients;
         private ProfileIncomeException(List<String> clients){super("simpleGroup.error.profileIncome");this.clients=List.copyOf(clients);}
         public List<String> clients(){return clients;}
+    }
+    public static final class GroupCreditHistoryException extends IllegalArgumentException {
+        private final List<String> missingHistory;
+        private final List<String> pendingApplications;
+        private final List<String> restrictedHistory;
+
+        public GroupCreditHistoryException(List<String> missingHistory,List<String> pendingApplications,List<String> restrictedHistory){
+            super("simpleGroup.error.history");
+            this.missingHistory=List.copyOf(missingHistory);
+            this.pendingApplications=List.copyOf(pendingApplications);
+            this.restrictedHistory=List.copyOf(restrictedHistory);
+        }
+
+        public List<String> missingHistory(){return missingHistory;}
+        public List<String> pendingApplications(){return pendingApplications;}
+        public List<String> restrictedHistory(){return restrictedHistory;}
     }
     private static boolean validMoney(BigDecimal n,boolean positive){return n!=null&&n.scale()<=2&&n.precision()-n.scale()<=16&&(positive?n.signum()>0:n.signum()>=0);}
     private static void money(BigDecimal n,boolean positive){check(validMoney(n,positive),"budget");}

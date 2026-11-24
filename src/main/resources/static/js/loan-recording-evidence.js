@@ -43,7 +43,8 @@
 
         async function checkStep(index, signal) {
             sectionError(index, '');
-            const invalid = [...panels[index].querySelectorAll('input,select,textarea')]
+            const panel = panels[index];
+            const invalid = [...panel.querySelectorAll('input,select,textarea')]
                 .filter(control => control.willValidate && !control.validity.valid);
             if (invalid.length) {
                 show(index, false);
@@ -62,7 +63,10 @@
                     signal:AbortSignal.any([signal, AbortSignal.timeout(20000)]),
                     headers:{Accept:'application/json'}, credentials:'same-origin', cache:'no-store'});
                 if (signal.aborted) return false;
-                if (response.status === 204 && !response.redirected) return true;
+                if (response.status === 204 && !response.redirected) {
+                    window.FormValidation?.applyServerErrors(form, [], panel);
+                    return true;
+                }
                 if (response.status !== 422) throw new Error('Validation request failed');
                 const {errors} = await response.json();
                 if (signal.aborted) return false;
@@ -73,8 +77,8 @@
                     return node;
                 });
                 show(index, false);
-                const unbound = window.FormValidation.applyServerErrors(form, messages);
-                const focused = window.FormValidation.focusFirst(form);
+                const unbound = window.FormValidation.applyServerErrors(form, messages, panel);
+                const focused = window.FormValidation.focusFirst(form, panel);
                 if (unbound.length) sectionError(index, unbound.join(' '), !focused);
                 return false;
             } catch (failure) {

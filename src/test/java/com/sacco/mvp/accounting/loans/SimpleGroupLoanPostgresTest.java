@@ -54,6 +54,16 @@ class SimpleGroupLoanPostgresTest {
         return onboarding.attach(f.actor,client,document,file);
     }
     UUID record(){return f.service.saveGroup(f.actor,application(),List.of(),paper());}
+    @Test void loanStepNamesGroupMembersWithAnOpenApplication(){
+        record();
+        var names=service.setup(f.actor,group).people().stream().map(Person::name).toList();
+        assertThatThrownBy(()->f.service.validateStep(f.actor,application(),"loan",List.of(),null))
+            .isInstanceOfSatisfying(SimpleGroupLoanService.GroupCreditHistoryException.class,error->{
+                assertThat(error.pendingApplications()).containsExactlyInAnyOrderElementsOf(names);
+                assertThat(error.missingHistory()).isEmpty();
+                assertThat(error.restrictedHistory()).isEmpty();
+            });
+    }
     UUID fund(){UUID loan=record();var post=f.post(loan,"5000000.00","D-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY);post.setFirstPaymentDate(DAY.plusDays(1));f.service.disburse(f.actor,post);return loan;}
     void nextDay(){var day=DAY.plusDays(2);var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(day);when(clock.now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
     Posting pay(UUID loan,String amount,String payer){var post=f.post(loan,amount,"P-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY.plusDays(2));post.setSharedPayer(payer);return f.service.repay(f.actor,post);}
