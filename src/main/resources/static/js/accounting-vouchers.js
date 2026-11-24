@@ -24,6 +24,9 @@ window.VoucherSelect.cleanClone(template);
 const field=(row,suffix)=>row.querySelector('input[name$=".'+suffix+'"]');
 const moneyOnly=new Set(['CASH','BANK','MOBILE_MONEY']),pickers=new WeakMap();
 const loanMode=()=>form.querySelector('[data-receipt-purpose]')?.value==='LOAN_REPAYMENT';
+const clientChoice=form.querySelector('[data-voucher-client]');
+const payerField=form.querySelector('[data-loan-payer]'),payerInput=payerField?.querySelector('input');
+let payerClientId=form.elements.clientId.value;
 const equityMode=()=>form.elements.namedItem('equity')?.value==='true';
 const activityPicker=form.querySelector('[data-voucher-activities]');
 const activityList=activityPicker?.querySelector('[data-voucher-activity-list]');
@@ -95,6 +98,12 @@ function update(){
  form.querySelectorAll('[data-equity-only]').forEach(el=>{el.hidden=!equityMode();el.querySelectorAll('[data-equity-control]').forEach(control=>{control.disabled=!equityMode();control.required=equityMode();});});
  form.querySelectorAll('[data-loan-only]').forEach(el=>{el.hidden=!loan;el.querySelectorAll('input,button,select').forEach(c=>c.disabled=!loan);});
  form.querySelectorAll('[data-other-only]').forEach(el=>{el.hidden=loan;if(el.matches('select')){el.disabled=loan;const wrapper=el.closest('.neo-select');if(wrapper)wrapper.hidden=loan;}el.querySelectorAll('input,button,select').forEach(c=>c.disabled=loan);});
+ if(payerField){
+  const required=loan&&clientChoice.dataset.payerRequired==='true';
+  payerField.hidden=!required;
+  payerInput.disabled=!required;
+  payerInput.required=required;
+ }
  form.querySelector('[name="reference"]').maxLength=loan?80:160;
  const all=[...rows.children];
  all.forEach((r,i)=>{r.querySelector('[data-row-number]').textContent=i+1;r.querySelectorAll('[name]').forEach(el=>{el.name=el.name.replace(/rows\[\d+\]/,'rows['+i+']');el.removeAttribute('id');});r.querySelectorAll('[data-account-for]').forEach(b=>b.dataset.accountFor=b.dataset.accountFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelectorAll('[data-choice-for]').forEach(b=>b.dataset.choiceFor=b.dataset.choiceFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelector('[data-remove-row]').disabled=all.length===1;const mapped=!!field(r,'transactionId').value;const choices=r.querySelector('[data-configured-transactions]');if(choices)choices.hidden=loan||!configured;const mapping=r.querySelector('[data-mapping]');mapping.disabled=loan||!configured;r.querySelectorAll('[data-manual-accounts]').forEach(el=>{el.hidden=loan||mapped||configured||form.dataset.newVoucher==='true';el.querySelectorAll('input,button,select').forEach(c=>c.disabled=loan||mapped||configured||form.dataset.newVoucher==='true');});r.querySelectorAll('[data-loan-choice="loans"]').forEach(b=>b.disabled=!loan||!form.elements.clientId.value);});
@@ -105,6 +114,7 @@ function update(){
    for(const side of ['debit','credit']){const account=field(r,side+'AccountId');if(account)account.value='';}
   }
   const entries=[...r.querySelectorAll('[data-split-entry]')],split=entries.length>0;
+  field(r,'description').required=!loan;
   const rowAmount=field(r,'amount'),amountLabel=r.querySelector('[data-transaction-amount]');
   rowAmount.type=direct?'hidden':'number';rowAmount.required=!direct;rowAmount.dataset.amountInput=direct?'false':'true';if(amountLabel)amountLabel.hidden=direct;
   if(!direct)window.AmountInputs?.refresh(rowAmount);
@@ -174,7 +184,16 @@ function bindChoices(){
     if(extraActivity||type&&!['OTHER','LOAN_REPAYMENT','EQUITY'].includes(item.id)){addActivity(item,text);return;}
     if(type){form.dataset.newVoucher='false';form.elements.receiptPurpose.value=item.id==='LOAN_REPAYMENT'?'LOAN_REPAYMENT':'OTHER';form.elements.equity.value=String(item.id==='EQUITY');form.elements.receiptPurpose.dispatchEvent(new Event('change',{bubbles:true}));return;}
     if(mapping){row.querySelectorAll('[data-split-entry]').forEach(e=>e.remove());field(row,'transactionId').value=item.transactionId;field(row,'templateKey').value=item.templateKey;field(row,'component').value=item.component;const label=row.querySelector('[data-mapping-label]');label.textContent=text;label.dataset.activityId=item.activity.id;if(!field(row,'description').value)field(row,'description').value=item.transactionName;}
-    else{holder.querySelector('[data-account-label]').textContent=text;if(select.hasAttribute('data-voucher-client')){rows.querySelectorAll('input[name$=".loanId"]').forEach(input=>{input.value='';input.parentElement.querySelector('[data-account-label]').textContent='';});rows.querySelectorAll('[data-loan-choice="loans"]').forEach(loan=>pickers.get(loan)?.reset());}}
+    else{
+     holder.querySelector('[data-account-label]').textContent=text;
+     if(select===clientChoice){
+      if(payerInput&&payerClientId!==item.id)payerInput.value='';
+      payerClientId=item.id;
+      clientChoice.dataset.payerRequired=String(item.purpose==='ORGANIZATION'||item.purpose==='JOINT_GROUP');
+      rows.querySelectorAll('input[name$=".loanId"]').forEach(input=>{input.value='';input.parentElement.querySelector('[data-account-label]').textContent='';});
+      rows.querySelectorAll('[data-loan-choice="loans"]').forEach(loan=>pickers.get(loan)?.reset());
+     }
+    }
     form.dispatchEvent(new Event('input',{bubbles:true}));
    }
   }));
@@ -182,7 +201,16 @@ function bindChoices(){
 }
 form.addEventListener('click',e=>{
  const remove=e.target.closest('[data-remove-activity]');if(remove){removeActivity(remove);return;}
- const clearClient=e.target.closest('[data-client-clear]');if(clearClient&&!loanMode()){form.elements.clientId.value='';clearClient.closest('.voucher-account-choice').querySelector('[data-account-label]').textContent='';pickers.get(form.querySelector('[data-voucher-client]'))?.reset();form.dispatchEvent(new Event('input',{bubbles:true}));return;}
+ const clearClient=e.target.closest('[data-client-clear]');
+ if(clearClient&&!loanMode()){
+  form.elements.clientId.value='';
+  if(payerInput)payerInput.value='';
+  payerClientId='';
+  delete clientChoice.dataset.payerRequired;
+  clearClient.closest('.voucher-account-choice').querySelector('[data-account-label]').textContent='';
+  pickers.get(clientChoice)?.reset();
+  form.dispatchEvent(new Event('input',{bubbles:true}));return;
+ }
  const addEntry=e.target.closest('[data-add-entry]');if(addEntry&&!addEntry.disabled){
   const row=addEntry.closest('[data-voucher-row]'),list=row.querySelector('[data-split-list]');
   if(list.children.length<50)addPosting(row,addEntry.dataset.addEntry);

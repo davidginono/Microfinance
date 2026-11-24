@@ -150,7 +150,9 @@ public class VoucherController {
             model.addAttribute("canLoanReceipt",loanReceipts.available(actor,"POST")&&loanReceipts.available(actor,"VIEW"));
             if(repayment){
                 model.addAttribute("repaymentPolicy",loanReceipts.defaults(actor,form));
-                model.addAttribute("loanLabels",loanReceipts.selected(actor,form));
+                var selected=loanReceipts.selected(actor,form);
+                model.addAttribute("loanLabels",selected.labels());
+                model.addAttribute("loanPayerRequired",selected.payerRequired());
             }
         }
     }

@@ -8,7 +8,7 @@ const splitControls=`<div data-manual-accounts data-split-editor><div data-split
 const response=data=>({ok:true,redirected:false,json:async()=>data});
 async function setup(approval=false,fetcher,activityTypes=false,numbering=false,fresh=false,direct=false){
  const row=approval?`<tr data-editor-line><td><input type="checkbox" data-line-select></td><td data-line-number>1${hidden('rows[0].transactionId')}${hidden('rows[0].templateKey')}${hidden('rows[0].component','TOTAL')}</td><td><input name="rows[0].description"></td><td>${account('rows[0].debitAccountId','data-account-pick aria-label="Debit account"',true)}</td><td><input name="rows[0].amount" value="1.00"></td></tr>`:`<fieldset data-voucher-row><legend data-row-number>1</legend>${hidden('rows[0].transactionId')}${hidden('rows[0].templateKey')}${hidden('rows[0].component','TOTAL')}<span data-configured-transactions>${select('data-mapping data-other-only aria-label="Transaction"','Choose transaction')}</span><span data-mapping-label></span><div data-loan-only>${account('rows[0].loanId','data-loan-choice="loans" data-choice-for="rows[0].loanId" aria-label="Loan"')}</div>${hidden('rows[0].debitAccountId')}${hidden('rows[0].creditAccountId')}<input name="rows[0].description"><label data-transaction-amount><input name="rows[0].amount" value="1.00"></label>${splitControls}<button type="button" data-remove-row>Remove</button></fieldset>`;
- const html=approval?`<form data-approval-editor data-lookup-error="Lookup failed" data-client-url="/finance/approval/id/clients" data-account-url="/finance/approval/id/accounts">${account('clientId','data-client-pick aria-label="Client"',true)}<button data-editor-submit>Submit</button><button type="button" data-line-add>Add</button><table><tbody data-editor-lines>${row}</tbody></table></form>`:`<form data-voucher-form data-kind="RECEIPT" data-balance-error="Balance the transaction" data-debit-label="Debit" data-credit-label="Credit" data-amount-label="Amount (TZS)" data-remove-entry-label="Remove entry" data-choose-account="Choose an account" data-base="/finance/vouchers/receipts" data-lookup-error="Lookup failed"><select data-receipt-purpose name="receiptPurpose"><option>OTHER</option><option>LOAN_REPAYMENT</option></select><input name="reference"><input name="interestAccountId">${account('clientId','data-voucher-client data-choice-for="clientId" aria-label="Client"')}${account('moneyAccountId','data-account-for="moneyAccountId" data-money-only aria-label="Money account"')}<div data-voucher-rows>${row}</div><span data-row-status></span><button type="button" data-add-row>Add</button><output data-live-total></output></form>`;
+ const html=approval?`<form data-approval-editor data-lookup-error="Lookup failed" data-client-url="/finance/approval/id/clients" data-account-url="/finance/approval/id/accounts">${account('clientId','data-client-pick aria-label="Client"',true)}<button data-editor-submit>Submit</button><button type="button" data-line-add>Add</button><table><tbody data-editor-lines>${row}</tbody></table></form>`:`<form data-voucher-form data-kind="RECEIPT" data-balance-error="Balance the transaction" data-debit-label="Debit" data-credit-label="Credit" data-amount-label="Amount (TZS)" data-remove-entry-label="Remove entry" data-choose-account="Choose an account" data-base="/finance/vouchers/receipts" data-lookup-error="Lookup failed"><select data-receipt-purpose name="receiptPurpose"><option>OTHER</option><option>LOAN_REPAYMENT</option></select><input name="reference"><input name="interestAccountId"><label data-other-only>Received from<input name="party" required></label><label data-loan-payer hidden>Received from<input name="loanPayer" disabled></label>${account('clientId','data-voucher-client data-choice-for="clientId" aria-label="Client"')}${account('moneyAccountId','data-account-for="moneyAccountId" data-money-only aria-label="Money account"')}<div data-voucher-rows>${row}</div><span data-row-status></span><button type="button" data-add-row>Add</button><output data-live-total></output></form>`;
  const dom=new JSDOM(`<body data-select-search="Search options" data-select-no-matches="No matches" data-select-load-more="Load more" data-shell-select="Choose" data-shell-no-options="No options" data-shell-loading="Loading">${html}</body>`,{url:'http://localhost',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document,calls=[];
  if(!approval)d.querySelector('form').insertAdjacentHTML('afterbegin',hidden('equity','false')+'<label data-equity-only hidden><select name="equityChoice" data-equity-control><option value="">Choose type</option><option value="CONTRIBUTION">Capital added</option><option value="3:f82c2471-0267-4cc1-ba10-730c78ef5eb2">Profit set aside for operations</option></select></label><label data-equity-only hidden><textarea name="equityReason" data-equity-control></textarea></label>');
  if(numbering){const form=d.querySelector('form');Object.assign(form.dataset,{numberLoading:'Loading voucher number',numberError:'Could not generate voucher number',numberCsrfHeader:'X-CSRF-TOKEN',numberCsrfToken:'synthetic-token'});form.insertAdjacentHTML('beforeend',hidden('requestKey','synthetic-key')+'<input name="effectiveDate" type="date" value="2026-10-20"><span data-voucher-number><span class="voucher-number-spinner"></span><span data-voucher-number-value></span></span><button type="button" data-retry-voucher-number hidden>Retry</button>');}
@@ -63,6 +63,40 @@ for(const approval of [false,true])test(`${approval?'approval':'ordinary'} vouch
   if(approval)assert.equal(d.querySelector('[data-editor-submit]').disabled,true);
   else{const purpose=d.querySelector('[data-receipt-purpose]');purpose.value='LOAN_REPAYMENT';purpose.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[name=clientId]').value,'client-1');await open(control);assert.match(calls.at(-1),/\/loan-choices\/clients\?/);w.refreshEnhancedSelects();purpose.value='OTHER';purpose.dispatchEvent(new w.Event('change'));}
   d.querySelector('[data-client-clear]').click();assert.equal(d.querySelector('[name=clientId]').value,'');assert.equal(control.value,'');
+ }finally{dom.window.close();}
+});
+test('repayment hides Received from for individuals and makes row descriptions optional',async()=>{
+ const clients=[
+  {id:'individual',label:'Individual client',purpose:'PERSON'},
+  {id:'organization',label:'Organization client',purpose:'ORGANIZATION'},
+  {id:'group',label:'Joint group',purpose:'JOINT_GROUP'}
+ ];
+ const {dom,d,open,options}=await setup(false,url=>response(url.pathname.endsWith('/loan-choices/clients')?clients:[]),true);
+ try{
+  const form=d.querySelector('form'),activity=d.querySelector('[data-voucher-type]'),client=d.querySelector('[data-voucher-client]');
+  const party=form.elements.party,payer=form.elements.loanPayer,description=form.elements['rows[0].description'];
+  assert.equal(party.closest('label').hidden,false);
+  assert.equal(description.required,true);
+  await open(activity);options().find(o=>o.textContent==='Loan repayment').click();
+  assert.equal(party.closest('label').hidden,true);
+  assert.equal(party.disabled,true);
+  assert.equal(payer.closest('label').hidden,true);
+  assert.equal(payer.disabled,true);
+  assert.equal(description.required,false);
+  assert.equal(description.checkValidity(),true);
+  await open(client);options().find(o=>o.textContent==='Organization client').click();
+  assert.equal(payer.closest('label').hidden,false);
+  assert.equal(payer.required,true);
+  payer.value='Synthetic representative';
+  await open(client);options().find(o=>o.textContent==='Joint group').click();
+  assert.equal(payer.value,'');
+  assert.equal(payer.required,true);
+  await open(client);options().find(o=>o.textContent==='Individual client').click();
+  assert.equal(payer.closest('label').hidden,true);
+  assert.equal(payer.disabled,true);
+  await open(activity);options().find(o=>o.textContent==='Manual entry').click();
+  assert.equal(party.closest('label').hidden,false);
+  assert.equal(description.required,true);
  }finally{dom.window.close();}
 });
 test('client changes invalidate loan choices, and new voucher rows bind their own dropdowns',async()=>{

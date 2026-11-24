@@ -752,10 +752,16 @@ class LoanRecordingPostgresTest {
     }
     @Test void unifiedReceiptPostsAllLoansOnceAndRetainsHistoricalReceipts(){
         var first=disbursed("D-GROUP-1");var second=disbursed("D-GROUP-2");var f=receiptForm(first,second);
+        f.getRows().getFirst().setDescription("X".repeat(501));
+        assertThatThrownBy(()->receiptService().preview(actor,f)).hasMessage("voucher.error.text");
+        f.getRows().getFirst().setDescription("");
+        assertThat(receiptService().selected(actor,f).payerRequired()).isFalse();
         var preview=receiptService().preview(actor,f);assertThat(preview).hasSize(2);assertThat(preview.getFirst().principal()).isEqualByComparingTo("100.00");
+        assertThat(preview.getFirst().description()).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=?",Integer.class,institution)).isZero();
         var reserved=context.getBean(com.sacco.mvp.accounting.service.VoucherService.class).reserveNumber(actor,com.sacco.mvp.accounting.dto.VoucherDtos.Type.RECEIPT,TODAY,f.getRequestKey());
         var saved=receiptService().post(actor,f);assertThat(saved.header().total()).isEqualByComparingTo("240.00");assertThat(saved.rows()).hasSize(2);
+        assertThat(saved.rows().getFirst().description()).isEmpty();
         assertThat(saved.header().number()).isEqualTo(reserved.number());
         assertThat(jdbc.queryForObject("select consumed_at is not null from accounting_voucher_number_reservation where request_key=?",Boolean.class,f.getRequestKey())).isTrue();
         assertThat(receiptService().post(actor,f).header().id()).isEqualTo(saved.header().id());

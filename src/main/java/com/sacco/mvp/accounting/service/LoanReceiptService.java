@@ -46,23 +46,33 @@ public class LoanReceiptService {
     public boolean canReverse(AppUserPrincipal a,LoanReceipt receipt){return receipt.group()==null&&!hasSharedBenefits(receipt)&&!loans.jointGroupReceipt(a,receipt.header().clientId())?available(a,"REVERSE"):groups.available(a,"REVERSE")&&available(a,"REVERSE");}
     @Transactional(readOnly=true)
     public List<Choice> choices(AppUserPrincipal a,String category,UUID client,String search,int page){authorize(a,"POST");return category.equals("loans")?loans.repaymentLoans(a,client,search,page):loans.choices(a,switch(category){case "clients"->"ledger-clients";case "interest"->"interest";default->throw new Invalid("","filter");},search,page);}
+    public record Selected(Map<UUID,String> labels, boolean payerRequired) {}
     @Transactional(readOnly=true)
-    public Map<UUID,String> selected(AppUserPrincipal a,Form f){authorize(a,"POST");var labels=new HashMap<UUID,String>();if(f.getRows()==null || f.getRows().size()>50)return labels;
-        if(f.getClientId()!=null)labels.put(f.getClientId(),loans.receiptClient(a,f.getClientId()).label());
+    public Selected selected(AppUserPrincipal a,Form f){
+        authorize(a,"POST");
+        var labels=new HashMap<UUID,String>();
+        var client=f.getClientId()==null?null:loans.receiptClient(a,f.getClientId());
+        if(client!=null)labels.put(client.id(),client.label());
+        boolean payerRequired=client!=null && requiresPayer(client.purpose());
+        if(f.getRows()==null || f.getRows().size()>50)return new Selected(labels,payerRequired);
         if(f.getInterestAccountId()!=null)labels.put(f.getInterestAccountId(),loans.receiptInterestAccount(a,f.getInterestAccountId()).label());
         var ids=f.getRows().stream().filter(Objects::nonNull).map(RowForm::getLoanId).filter(Objects::nonNull).distinct().toList();
-        for(var loan:loans.receiptLoans(a,ids,f.getEffectiveDate()==null?clock.today():f.getEffectiveDate()))labels.put(loan.id(),loan.number()+" - "+loan.product());return labels;}
+        for(var loan:loans.receiptLoans(a,ids,f.getEffectiveDate()==null?clock.today():f.getEffectiveDate()))labels.put(loan.id(),loan.number()+" - "+loan.product());
+        return new Selected(labels,payerRequired);
+    }
     @Transactional(readOnly=true)
-    public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);var rows=new ArrayList<LoanReceiptRow>();var allocations=loans.receiptPreview(a,f);requirePayer(a,f);var names=selected(a,f);int n=0;
+    public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);var rows=new ArrayList<LoanReceiptRow>();var allocations=loans.receiptPreview(a,f);var selection=selected(a,f);requirePayer(f,selection.payerRequired());var names=selection.labels();int n=0;
         for(var row:f.getRows()){var p=allocations.get(n++);rows.add(new LoanReceiptRow(n,null,row.getLoanId(),names.get(row.getLoanId()),row.getDescription(),row.getAmount(),p.principal(),p.interest(),p.principalBalance(),"","","",reference(f,n)).withRecoveredFees(p.feesRecovered()));}return loans.sharedReceiptRows(a,rows,true,f.getLoanPayer());}
     @Transactional
     public LoanReceipt post(AppUserPrincipal a,Form f){
         authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);String hash=hash(f);vouchers.lockRequest(a.getSaccoId(),a.getStationId(),f.getRequestKey());var retry=receipts.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return find(a,retry.get()).orElseThrow();
         check(vouchers.byRequest(a.getSaccoId(),a.getStationId(),f.getRequestKey()).isEmpty(),"","retry");
         // Lock all loan sources in deterministic order before invoking their owning posting use case.
-        loans.lockReceiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).sorted().toList(),f.getClientId());requirePayer(a,f);
+        loans.lockReceiptLoans(a,f.getRows().stream().map(RowForm::getLoanId).sorted().toList(),f.getClientId());
+        String borrowerKind=loans.receiptClient(a,f.getClientId()).purpose();
+        requirePayer(f,requiresPayer(borrowerKind));
         var result=new ArrayList<LoanReceiptRow>();var client=loans.receiptLoan(a,f.getRows().getFirst().getLoanId());int n=0;
-        boolean sharedBorrower="JOINT_GROUP".equals(loans.receiptClient(a,f.getClientId()).purpose());
+        boolean sharedBorrower="JOINT_GROUP".equals(borrowerKind);
         for(var row:f.getRows()){var request=command(f,row,++n);if(sharedBorrower)request.setSharedPayer(f.getLoanPayer());var p=loans.repay(a,request);result.add(new LoanReceiptRow(n,p.id(),p.loanId(),p.loanNumber(),row.getDescription(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
         var v=header(a,f,client.client(),total(result),null);receipts.insert(a,v,f.getRequestKey(),f.getClientId(),client.clientNumber(),hash,result,f.getLoanPayer());ordinary.consumeNumber(a,Type.RECEIPT,f.getRequestKey());event(a,v);return find(a,v.id()).orElseThrow();
     }
@@ -89,9 +99,10 @@ public class LoanReceiptService {
     private static String reference(Form f,int n){return f.getReference().strip()+"/"+n;}
     private BigDecimal total(List<LoanReceiptRow> rows){var total=rows.stream().map(LoanReceiptRow::amount).reduce(new BigDecimal("0.00"),BigDecimal::add);check(total.precision()<=18,"","amount");return total;}
     private void validate(Form f){check(f!=null && "LOAN_REPAYMENT".equals(f.getReceiptPurpose()) && f.selectedActivityIds().isEmpty() && !f.isEquity() && f.getEquityMovement()==null && f.getEquityRow()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()) && f.getRequestKey()!=null,"","request");check(f.getClientId()!=null,"clientId","loanClient");check(f.getMoneyAccountId()!=null,"moneyAccountId","moneyAccount");check(f.getEffectiveDate()!=null && !f.getEffectiveDate().isAfter(clock.today()),"effectiveDate","date");text(f.getReference(),80,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");if(f.getLoanPayer()!=null)text(f.getLoanPayer(),160,false,"loanPayer");check(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");var ids=new HashSet<UUID>();
-        for(int n=0;n<f.getRows().size();n++){var r=f.getRows().get(n);String field="rows["+n+"]";check(r!=null && r.getLoanId()!=null && ids.add(r.getLoanId()),field+".loanId","loanRow");check(r.getTransactionId()==null && r.getDebitAccountId()==null && r.getCreditAccountId()==null,"","request");text(r.getDescription(),500,true,field+".description");var v=r.getAmount();check(v!=null && v.signum()>0 && v.scale()<=2 && v.precision()-v.scale()<=16,field+".amount","amount");}
+        for(int n=0;n<f.getRows().size();n++){var r=f.getRows().get(n);String field="rows["+n+"]";check(r!=null && r.getLoanId()!=null && ids.add(r.getLoanId()),field+".loanId","loanRow");check(r.getTransactionId()==null && r.getDebitAccountId()==null && r.getCreditAccountId()==null,"","request");text(r.getDescription(),500,false,field+".description");var v=r.getAmount();check(v!=null && v.signum()>0 && v.scale()<=2 && v.precision()-v.scale()<=16,field+".amount","amount");}
     }
-    private void requirePayer(AppUserPrincipal a,Form f){String kind=loans.receiptClient(a,f.getClientId()).purpose();if("ORGANIZATION".equals(kind)||"JOINT_GROUP".equals(kind))text(f.getLoanPayer(),160,true,"loanPayer");}
+    private static boolean requiresPayer(String kind){return "ORGANIZATION".equals(kind)||"JOINT_GROUP".equals(kind);}
+    private static void requirePayer(Form f,boolean required){if(required)text(f.getLoanPayer(),160,true,"loanPayer");}
     private static void text(String s,int max,boolean required,String field){check(s!=null && s.length()<=max && (!required || !s.isBlank()) && s.chars().noneMatch(c->c<32 && c!='\n' && c!='\r' && c!='\t'),field,"text");}
     private static void check(boolean value,String field,String key){if(!value)throw new Invalid(field,key);}
     private String hash(Object source){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(json.writeValueAsString(source).getBytes(StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException ex){throw new IllegalStateException(ex);}}

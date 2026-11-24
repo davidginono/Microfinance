@@ -161,13 +161,15 @@ class VoucherMvcTest {
  }
  Voucher voucher(){return new Voucher(id,"RV-2026-00000001",Type.RECEIPT,LocalDate.of(2026,10,8),"Payer","REF","","",UUID.randomUUID(),new BigDecimal("3.03"),2,UUID.randomUUID(),actor.getMemberId(),"Accountant",OffsetDateTime.now(),null,null,"Institution","Branch",List.of());}
  @Test void loanReceiptUsesRepaymentUseCaseAndNotGenericJournalPosting()throws Exception{
-  var receipt=new LoanReceipt(voucher(),"C100",List.of());when(receipts.post(eq(actor),any())).thenReturn(receipt);when(receipts.selected(eq(actor),any())).thenReturn(Map.of());
-  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("clientId",UUID.randomUUID().toString()).param("rows[0].loanId",UUID.randomUUID().toString()).param("rows[0].amount","120.00").param("rows[0].description","Repayment")).andExpect(redirectedUrl("/finance/vouchers/receipts")).andExpect(flash().attribute("successMessageCode","voucher.posted"));
-  verify(receipts).post(eq(actor),argThat(f->f.getClientId()!=null && f.getRows().getFirst().getLoanId()!=null));verify(service,never()).post(any(),any(),any());
+  var receipt=new LoanReceipt(voucher(),"C100",List.of());when(receipts.post(eq(actor),any())).thenReturn(receipt);
+  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("clientId",UUID.randomUUID().toString()).param("rows[0].loanId",UUID.randomUUID().toString()).param("rows[0].amount","120.00")).andExpect(redirectedUrl("/finance/vouchers/receipts")).andExpect(flash().attribute("successMessageCode","voucher.posted"));
+  verify(receipts).post(eq(actor),argThat(f->f.getClientId()!=null && f.getRows().getFirst().getLoanId()!=null
+      && f.getRows().getFirst().getDescription().isEmpty()));verify(service,never()).post(any(),any(),any());
  }
  @Test void loanPreviewAndErrorsPreserveTheConditionalForm()throws Exception{
-  when(receipts.preview(eq(actor),any())).thenThrow(new IllegalArgumentException("repayment.error.advance"));when(receipts.selected(eq(actor),any())).thenReturn(Map.of());
-  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("action","preview").param("rows[0].amount","9999.00")).andExpect(view().name("accounting/vouchers/form")).andExpect(model().attributeHasErrors("voucherForm"));
+  when(receipts.preview(eq(actor),any())).thenThrow(new IllegalArgumentException("repayment.error.advance"));when(receipts.selected(eq(actor),any())).thenReturn(new LoanReceiptService.Selected(Map.of(),true));
+  mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("receiptPurpose","LOAN_REPAYMENT").param("action","preview").param("rows[0].amount","9999.00")).andExpect(view().name("accounting/vouchers/form"))
+   .andExpect(model().attributeHasErrors("voucherForm")).andExpect(model().attribute("loanPayerRequired",true));
   verify(receipts,never()).post(any(),any());verify(service,never()).preview(any(),any(),any());
  }
  @Test void loanPdfAndPrintUseProtectedCombinedDocument()throws Exception{
