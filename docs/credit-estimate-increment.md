@@ -18,9 +18,9 @@ Implementation date: 2026-10-01. This closes calculation and input-trust gaps, n
 
 ## Staff recording uses the client profile (2026-11-12)
 
-The loan form keeps one loan purpose. Monthly income and business and income-source details come from the latest recorded client profile in the current institution and branch. Group records itemize outside debts and identify the borrowers liable for them. Individual loan recording uses known in-system obligations where available. The loan snapshot retains its source profile revision and application figures. Later profile edits do not rewrite existing loans or establish independent verification. Historical expenses remain in the frozen evidence.
+The loan form keeps one loan purpose. Monthly income and business and income-source details come from the latest recorded client profile in the current institution and branch. Group records itemize outside debts and identify the clients who owe them. Individual loan recording uses known in-system obligations where available. The loan snapshot retains its source profile revision and application figures. Later profile edits do not rewrite existing loans or establish independent verification. Historical expenses remain in the frozen evidence.
 
-The institution’s standard borrower application must still describe expenses and assets and capture outstanding loans. Staff can retain that application using the existing document and review workflow. [Bank of Tanzania regulations, sections 38–39](https://www.bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Regulations/sw/2020021122490967551.pdf)
+The institution’s standard loan application for clients must still describe expenses and assets and capture outstanding loans. Staff can retain that application using the existing document and review workflow. [Bank of Tanzania regulations, sections 38–39](https://www.bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Regulations/sw/2020021122490967551.pdf)
 
 ## Compatibility And Limits
 
@@ -41,7 +41,7 @@ Still open before unrestricted live lending:
 
 The [BoT 2026 submission guidance](https://www.bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Guidelines/en/2026092118400398.pdf), Form 1 lending-policy checklist, specifies reducing-balance interest and assessment of repayment ability. It informs the target policy; it does not prescribe this application's exact 52/12 calculation convention.
 
-The [2019 Tier 2 regulations](https://www.bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Regulations/en/2020021122490967551.pdf), regulations 38-39, require borrower financial information and contractual pricing/schedule disclosures. A calculated estimate is not a substitute for the accepted agreement or the verification of those declarations.
+The [2019 Tier 2 regulations](https://www.bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Regulations/en/2020021122490967551.pdf), regulations 38-39, require clients’ financial information and contractual pricing/schedule disclosures. A calculated estimate is not a substitute for the accepted agreement or the verification of those declarations.
 
 The [2024 fees guidelines](https://bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Guidelines/en/2024071716375097.pdf) require review of the management fee, prohibited charges and actual third-party/insurance costs. This increment does not approve existing fees or add charges.
 

@@ -7,13 +7,13 @@ This increment replaces the former individual/shared/organization group-originat
 1. Open Groups, create a group, and register clients through the shared client form or add existing scoped clients. Registration creates a real membership record and never creates client credentials.
 2. Choose one active client as leader. Record the checked group bank/mobile-money account and its evidence reference.
 3. Open Record loan and choose Individual or Group. Group borrowing includes the complete current eligible roster, with a minimum of two and maximum of 50 clients. Unavailable or out-of-branch members prevent submission.
-4. Enter one total amount and the existing configured/customised terms. The server takes monthly income from each client's latest recorded profile and names borrowers whose income is missing or invalid. It retains the profile revision and uses current, unexpired activity evidence where available. Configured identity, product-document, collateral and independent approval checks still apply.
+4. Enter one total amount and the existing configured/customised terms. The server takes monthly income from each client's latest recorded profile and names clients whose income is missing or invalid. It retains the profile revision and uses current, unexpired activity evidence where available. Configured identity, product-document, collateral and independent approval checks still apply.
 5. Record each outside debt once with its evidence reference, monthly payment and all clients who owe it. The group repayment limit uses combined income less the group's known debt payments. Each outside debt and each in-system loan are counted once. Weekly payments use the calculator's monthly conversion and conservative cent rounding.
-6. Record one signing date for all borrowers. At the end of Collateral, confirm the signed agreement, income evidence, outside debts and group payment details. The signed agreement PDF is optional at recording, review and funding. Separately required guarantors must be registered clients outside the borrowing roster, with signed consent and checked capacity. Group members share responsibility under the joint contract.
+6. Record one signing date for all clients in the group. At the end of Collateral, confirm the signed agreement, income evidence, outside debts and group payment details. The signed agreement PDF is optional at recording, review and funding. Separately required guarantors must be registered clients outside the borrowing roster, with signed consent and checked capacity. Group members share responsibility under the joint contract.
 7. Save a draft or record the application. Drafts retain uploads and require renewed confirmation. Material changes invalidate retained agreement and consent evidence. Recording freezes the roster, leader, account, assessments, terms and any uploaded signed PDF. Normal configured staff review follows. Approval moves no money.
 8. The authorized funding action posts one parent loan to the existing ledger and journals, using the frozen group destination and ordinary payment evidence requirements. Authorized funding staff enter the first instalment date, which must follow the disbursement date and is then fixed. Previously recorded contracts retain their frozen first date. Record all repayments against that Loan ID and name the actual payer.
 
-The leader is the contact. The joint group is the borrower identity. There are no member principal shares, member loan accounts or extra receivables.
+The leader is the contact. The loan is recorded under the joint group. There are no member principal shares, member loan accounts or extra receivables.
 
 ## Five-client example
 
@@ -23,13 +23,13 @@ The existing arrears calculation continues to classify an uncovered due payment.
 
 ## Storage, scope and history
 
-V157 adds immutable STAFF_GROUP_V1 contracts, named borrower/profile revisions, signed external guarantees, funding links, explicit withdrawals and scoped drafts. Server-side roster resolution, expected group revisions, request fingerprints, sorted client capacity locks and database guards protect submission and posting. Existing explicit claims are checked live; none are assigned by this migration. Group-account changes are audited and affect future contracts only.
+V157 adds immutable STAFF_GROUP_V1 contracts, client names and profile revisions, signed external guarantees, funding links, explicit withdrawals and scoped drafts. Server-side roster resolution, expected group revisions, request fingerprints, sorted client capacity locks and database guards protect submission and posting. Existing explicit claims are checked live; none are assigned by this migration. Group-account changes are audited and affect future contracts only.
 
-Each borrower carries the full joint obligation for later credit/guarantee assessments. The accounting ledger and portfolio reports still count the actual loan once. The report contact view contains one row per loan, using the frozen group name/leader. Balances and accounting totals continue to come from posted financial sources, with missing history retained as unknown.
+Each client carries the full joint obligation for later credit/guarantee assessments. The accounting ledger and portfolio reports still count the actual loan once. The report contact view contains one row per loan, using the frozen group name/leader. Balances and accounting totals continue to come from posted financial sources, with missing history retained as unknown.
 
 Legacy unfunded applications are left in their recorded states but cannot submit, approve or receive new funding. Staff may explicitly withdraw them from loan details and recreate them through the new form. No automatic conversion, repricing or status rewrite occurs. Existing funded loans retain repayment, early-settlement, attribution and independent-correction behavior. Their original group PDFs are available through ordinary loan details/history, subject to document and historical coverage evidence claims. Historical organization PDF readers and shared monetary allocators remain only to service those contracts. Old tables and enum/claim identifiers remain protected compatibility data.
 
-Payment corrections on funded loans do not restart application assessment or approval. They retain the original contract and linked reversal rules, including when a borrower's later assignment changes.
+Payment corrections on funded loans do not restart application assessment or approval. They retain the original contract and linked reversal rules, including when a client's later assignment changes.
 
 ## Verification and deployment
 
@@ -45,7 +45,7 @@ Browser checks used a separate synthetic database and actual staff sessions. Eng
 
 An earlier broader run also passed the credit-control, prepayment, reconciliation and payroll-feedback database suites. That run was stopped during the all-page JSP sweep; it is not reported as a full-suite pass. The affected-page sweep and relevant tests above are the completed verification scope. No throughput measurement or capacity claim was made.
 
-Group form simplification: all borrowers retain individual frozen profile and evidence links, with one staff-entered agreement signing date copied to each borrower. Existing signatures and contract snapshots are unchanged. Old drafts reuse a common date only if every stored borrower date agrees. Evidence is resolved again within branch scope on recording, so expired or removed files cannot be accepted through hidden form values. Matching document checksums retain the shared-income duplicate check.
+Group form simplification: all clients retain individual frozen profile and evidence links, with one staff-entered agreement signing date copied to each client. Existing signatures and contract snapshots are unchanged. Old drafts reuse a common date only if every stored client date agrees. Evidence is resolved again within branch scope on recording, so expired or removed files cannot be accepted through hidden form values. Matching document checksums retain the shared-income duplicate check.
 
 13 November 2026: Compact recording resolves the complete roster on the server, retains the common agreement signing date, and removes per-person recording inputs. V159 allows a new group loan with no first payment date to receive that date exactly once in the authorized funding transaction. It preserves historical contracts and does not reprice approved terms, waive independent evidence/KYC checks, or post money during recording.
 

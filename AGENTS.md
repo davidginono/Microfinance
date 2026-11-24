@@ -25,7 +25,7 @@ This file gives coding agents project-specific guidance for working in `Microfin
 
 ## Microfinance Domain
 
-- Use `Institution` for the tenant, `Branch` for its operating location, and `Client` or `Borrower` for the person borrowing.
+- Use `Institution` for the tenant, `Branch` for its operating location, and `Client` for people applying for or receiving loans. Use `Mteja` and `Wateja` in Kiswahili.
 - Preserve existing implementation identifiers unless a migration is explicitly requested:
   - `sacco_id` / `saccoId` = institution / tenant
   - `station_id` / `stationId` = branch
