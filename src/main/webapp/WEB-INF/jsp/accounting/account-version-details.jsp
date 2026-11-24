@@ -4,7 +4,19 @@
 <%@ include file="account-version-shell.jspf" %>
 <template data-resource-details-page></template>
 <c:set var="v" value="${details.version}" />
-<div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><spring:message code="coav.details" /></h1></div>
+<div class="erp-page-header erp-detail-header" data-aws-page-header>
+ <h1 class="erp-page-title"><spring:message code="coav.details" /></h1>
+ <c:choose>
+  <c:when test="${details.actions.contains('REVISE')}">
+   <div class="accounting-actions" data-aws-action-pin="true"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/versions/${v.id}/revise' />"><spring:message code="coav.newVersion" /></a></div>
+  </c:when>
+  <c:when test="${v.state=='APPROVED' or v.state=='BASELINE'}">
+   <sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')">
+    <div class="accounting-actions" data-aws-action-pin="true"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/${v.accountId}/versions/new' />"><spring:message code="coav.newVersion" /></a></div>
+   </sec:authorize>
+  </c:when>
+ </c:choose>
+</div>
 <div class="accounting-workspace accounting-resource-workspace coav-details">
  <section class="accounting-form erp-resource-section">
   <h2><c:out value="${v.proposed.name}" /></h2>
@@ -28,11 +40,9 @@
   </dl>
   <c:if test="${v.mode=='AUTOMATIC'}"><p><spring:message code="coav.automaticEvidence" /></p></c:if>
   <c:if test="${v.state=='PENDING' or v.state=='DRAFT'}"><p><spring:message code="coav.pendingHelp" /></p></c:if>
-  <div class="accounting-actions">
-   <c:if test="${details.actions.contains('EDIT')}"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/versions/${v.id}/edit' />"><spring:message code="coav.editDraft" /></a></c:if>
-   <c:if test="${v.state=='APPROVED' or v.state=='BASELINE'}"><sec:authorize access="@access.has(principal, 'ACCOUNTING_ACCOUNTS_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/${v.accountId}/versions/new' />"><spring:message code="coav.newVersion" /></a></sec:authorize></c:if>
-   <c:if test="${details.actions.contains('REVISE')}"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/versions/${v.id}/revise' />"><spring:message code="coav.newVersion" /></a></c:if>
-  </div>
+  <c:if test="${details.actions.contains('EDIT')}">
+   <div class="accounting-actions"><a class="app-btn btn-neutral" href="<c:url value='/finance/accounts/versions/${v.id}/edit' />"><spring:message code="coav.editDraft" /></a></div>
+  </c:if>
   <c:if test="${details.actions.contains('APPROVE') or details.actions.contains('REJECT') or details.actions.contains('WITHDRAW')}">
    <form method="post" action="<c:url value='/finance/accounts/versions/${v.id}/action' />" class="accounting-create-form">
     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="revision" value="${v.revision}" />
