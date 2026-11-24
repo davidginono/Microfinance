@@ -46,12 +46,15 @@ public class SimpleGroupLoanRepository {
             """,(r,n)->new Person(r.getObject(1,UUID.class),r.getString(2),r.getString(3)),group,a.getSaccoId(),a.getStationId());
         return new Setup(group,s.version(),s.name(),s.leaderId(),s.leader(),s.destinationType(),s.provider(),s.holder(),s.identifier(),s.evidence(),people);
     }
-    public Map<UUID,Exposure> exposures(AppUserPrincipal a,List<UUID> clients){
+    public Map<UUID,Exposure> exposures(AppUserPrincipal a,List<UUID> clients,UUID replacing){
         if(clients.isEmpty() || clients.size()>50)throw new IllegalArgumentException("group.error.members");
-        var args=new ArrayList<Object>(clients);args.add(a.getSaccoId());args.add(a.getStationId());args.add(a.getSaccoId());args.add(a.getStationId());args.add(a.getSaccoId());args.add(a.getStationId());args.addAll(clients);
+        var args=new ArrayList<Object>(clients);
+        args.add(a.getSaccoId());args.add(a.getStationId());args.add(replacing);
+        args.add(a.getSaccoId());args.add(a.getStationId());
+        args.add(a.getSaccoId());args.add(a.getStationId());args.add(replacing);args.addAll(clients);
         var rows=jdbc.query("with selected(client) as (values "+String.join(",",Collections.nCopies(clients.size(),"(?::uuid)"))+") , "+"""
             scoped as not materialized (select id,applicant_member_id,status,repayment_frequency,installment_amount,amount,financial_snapshot from loan_applications
-              where sacco_id=? and station_id=?),
+              where sacco_id=? and station_id=? and id is distinct from ?::uuid),
             debt as (select l.applicant_member_id client,count(*) active_loans,
               count(*) filter(where l.amount is null or l.amount<=0 or l.installment_amount is null or l.installment_amount<=0 or l.repayment_frequency not in ('MONTHLY','WEEKLY') or l.repayment_frequency is null) missing_debt,
               sum(case when l.repayment_frequency='WEEKLY' then ceil(greatest(l.installment_amount,coalesce((l.financial_snapshot->>'maximumInstallmentAmount')::numeric,l.installment_amount))*5200/12)/100 else greatest(l.installment_amount,coalesce((l.financial_snapshot->>'maximumInstallmentAmount')::numeric,l.installment_amount)) end) monthly_debt
@@ -69,7 +72,7 @@ public class SimpleGroupLoanRepository {
               from lending_shared_credit_obligation o join scoped l on l.id=o.loan_id join selected s on s.client=o.client_id group by o.client_id),
             off_branch_shared as (select o.client,count(*) missing from (select client_id client,sacco_id,station_id from lending_shared_credit_obligation union all select client_id,sacco_id,station_id from lending_group_personal_commitment union all select applicant_member_id,sacco_id,station_id from loan_applications where applicant_member_id is not null and status in('DISBURSED','PAR','DEFAULTED','WRITTEN_OFF','RECORDED','SUBMITTED','READY_FOR_DISBURSEMENT')) o join selected s on s.client=o.client
               where o.sacco_id=? and o.station_id<>? group by o.client),
-            liabilities as (select g.guarantor_id client,g.amount_cap cap from lending_guarantor_commitment g where g.sacco_id=? and g.station_id=? and g.guarantor_id in (
+            liabilities as (select g.guarantor_id client,g.amount_cap cap from lending_guarantor_commitment g where g.sacco_id=? and g.station_id=? and g.loan_id is distinct from ?::uuid and g.guarantor_id in (
             """+String.join(",",Collections.nCopies(clients.size(),"?"))+"""
             )),
             guarantees as (select client,sum(cap) reserved,count(*) guarantee_count,count(*) filter(where cap is null) missing_cap from liabilities group by client)
@@ -135,6 +138,43 @@ public class SimpleGroupLoanRepository {
             values(?,?,?,?,?,?,?::jsonb,?,?,?,?,(select loan_group_terms(l) from loan_applications l where id=?),?)
             """,loan,p.setup().groupId(),a.getSaccoId(),a.getStationId(),p.setup().leaderId(),p.setup().version(),snapshot,
             filename,pdf,a.getMemberId(),now,loan,requestHash);
+        insertBorrowers(loan,p,f);
+    }
+    public void reviseContract(AppUserPrincipal a,UUID loan,Prepared p,ApplicationForm f,String snapshot,
+                               SignedPaper paper,boolean keepAgreement,OffsetDateTime now) {
+        int updated=jdbc.update("""
+            update staff_group_loan c set leader_id=?,group_version=?,snapshot=?::jsonb,
+                filename=case when ? then c.filename else ? end,body=case when ? then c.body else ?::bytea end,
+                recorded_at=?,terms_hash=(select loan_group_terms(l) from loan_applications l where l.id=c.loan_id)
+            where loan_id=? and sacco_id=? and station_id=? and group_id=?
+            """,p.setup().leaderId(),p.setup().version(),snapshot,keepAgreement,paper==null?null:paper.filename(),
+            keepAgreement,paper==null?null:paper.body(),now,loan,a.getSaccoId(),a.getStationId(),p.setup().groupId());
+        if(updated!=1)throw new IllegalArgumentException("simpleGroup.error.changed");
+        jdbc.update("delete from staff_group_guarantor where loan_id=?",loan);
+        jdbc.update("delete from staff_group_borrower where loan_id=?",loan);
+        insertBorrowers(loan,p,f);
+    }
+    public boolean signedEvidenceStillMatches(AppUserPrincipal a,UUID loan,String snapshot) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+            select exists(select 1 from loan_applications l join staff_group_loan c on c.loan_id=l.id
+            join loan_record_edit e on e.loan_id=l.id and e.transaction_id=txid_current()
+            where l.id=? and l.sacco_id=? and l.station_id=?
+             and (c.snapshot->'setup')=(?::jsonb->'setup')
+             and loan_group_canonical(l.payment_details_snapshot::jsonb)=loan_group_canonical((e.before_snapshot->'loan'->>'payment_details_snapshot')::jsonb)
+             and not exists(select 1 from unnest(array['productId','loanMode','applicationDate','principal','purpose','repaymentFrequency',
+                 'tenureUnit','tenureValue','months','interestEntry','interestBasis','interestPercent','interestAmount',
+                 'customApplicationCharge','customProcessingCharge','customProcessingBasis','customProcessingPercent',
+                 'customInsuranceBasis','customInsurancePercent','insurancePremium','insuranceEvidence','collateral']) as keys(key)
+                 where loan_group_canonical(l.form_data::jsonb->key)
+                  is distinct from loan_group_canonical((e.before_snapshot->'loan'->>'form_data')::jsonb->key))
+             and l.form_data::jsonb#>'{groupApplication,signedOn}' is not distinct from (e.before_snapshot->'loan'->>'form_data')::jsonb#>'{groupApplication,signedOn}'
+             and l.form_data::jsonb#>'{groupApplication,debts}' is not distinct from (e.before_snapshot->'loan'->>'form_data')::jsonb#>'{groupApplication,debts}'
+             and l.form_data::jsonb#>'{applicationDetails,guarantors}' is not distinct from (e.before_snapshot->'loan'->>'form_data')::jsonb#>'{applicationDetails,guarantors}'
+             and l.form_data::jsonb#>'{applicationDetails,collateral}' is not distinct from (e.before_snapshot->'loan'->>'form_data')::jsonb#>'{applicationDetails,collateral}'
+             and (l.financial_snapshot::jsonb-'recordedCharges')= ((e.before_snapshot->'loan'->>'financial_snapshot')::jsonb-'recordedCharges'))
+            """,Boolean.class,loan,a.getSaccoId(),a.getStationId(),snapshot));
+    }
+    private void insertBorrowers(UUID loan,Prepared p,ApplicationForm f) {
         var rows=new ArrayList<Object[]>();for(var person:p.assessments())rows.add(new Object[]{loan,person.clientId(),person.number(),person.name(),f.getSignedOn(),person.income(),person.debt(),person.source(),person.evidence(),person.profileRevision()});
         jdbc.batchUpdate("insert into staff_group_borrower(loan_id,client_id,client_number,client_name,signed_on,income,debt,income_source,evidence,profile_revision) values(?,?,?,?,?,?,?,?,?,?)",rows);
     }

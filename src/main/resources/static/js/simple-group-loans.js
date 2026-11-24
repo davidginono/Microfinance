@@ -60,7 +60,9 @@
                 } catch (failure) {if(failure.name!=='AbortError'&&sequence===request)error.hidden=false;}
                 finally {if(sequence===request)panel.removeAttribute('aria-busy');}
             }
-            form.addEventListener('change',toggle);kind.addEventListener('change',toggle);select.addEventListener('change',load);form.querySelector('[data-group-retry]').addEventListener('click',load);toggle();numberDebts();if(debts.children.length)form.querySelector('[data-group-debts]').open=true;
+            form.addEventListener('change',toggle);kind.addEventListener('change',toggle);
+            if(error){select.addEventListener('change',load);form.querySelector('[data-group-retry]').addEventListener('click',load);}
+            toggle();numberDebts();if(debts.children.length)form.querySelector('[data-group-debts]').open=true;
         });
     }
     if(window.WorkspaceNavigation)window.WorkspaceNavigation.onReady(initialize);else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){initialize(document);});else initialize(document);

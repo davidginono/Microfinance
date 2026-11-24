@@ -105,6 +105,9 @@ public class SimpleGroupLoanService {
         authorize(a,"VIEW");access.requireActor(a,"LOAN_RECORDING_CREATE");check(search!=null&&search.length()<=100&&page>=0&&page<=10000,"request");return records.choices(a,search,page);
     }
     @Transactional public Prepared prepare(AppUserPrincipal a,RecordForm f,LoanProductSetting product,LoanAmortizationCalculator.Result quote,boolean submitting){
+        return prepare(a,f,product,quote,submitting,null);
+    }
+    @Transactional public Prepared prepare(AppUserPrincipal a,RecordForm f,LoanProductSetting product,LoanAmortizationCalculator.Result quote,boolean submitting,UUID replacing){
         authorize(a,"VIEW");access.requireActor(a,"LOAN_RECORDING_CREATE");
         var g=f.getGroupApplication();check(g!=null&&g.getGroupId()!=null&&f.getClientId()==null&&f.getTopUpSourceLoanId()==null,"request");
         var s=records.setup(a,g.getGroupId(),submitting);check(s.version()==g.getExpectedVersion(),"changed");
@@ -143,7 +146,7 @@ public class SimpleGroupLoanService {
         }
         var assessments=new ArrayList<Assessment>();BigDecimal income=BigDecimal.ZERO;
         f.getApplicationDetails().getGroupClientValues().clear();
-        var sources=new HashSet<String>();var exposures=records.exposures(a,memberIds);
+        var sources=new HashSet<String>();var exposures=records.exposures(a,memberIds,replacing);
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
         var ratio=product.getResolvedMaxRepaymentToDisposableIncomeRatio();check(ratio!=null&&ratio.signum()>0&&ratio.compareTo(BigDecimal.ONE)<=0,"budget");
         var missingHistory=new ArrayList<String>();
@@ -194,9 +197,24 @@ public class SimpleGroupLoanService {
     }
     @Transactional public void record(AppUserPrincipal a,UUID loan,Prepared p,RecordForm f,SignedPaper paper){
         access.requireActor(a,"LOAN_RECORDING_CREATE");byte[] body=paper==null?null:paper.body();String filename=paper==null?null:paper.filename();
-            String snapshot=json.writeValueAsString(Map.of("version","STAFF_GROUP_V1","debtBasis","LOAN_APPLICATION","internalDebt",p.internalDebt(),"outsideDebts",f.getGroupApplication().getDebts(),"setup",p.setup(),"assessments",p.assessments(),"destination",p.destination(),"capacity",p.capacity()));
-            if(records.simple(a,loan)){check(records.sameContract(a,loan,snapshot,body),"changed");return;}
-            records.contract(a,loan,p,f.getGroupApplication(),f.getGroupRequestHash(),snapshot,body,filename,clock.now());event(a,loan,"GROUP_LOAN_RECORDED");
+        String snapshot=contractSnapshot(p,f);
+        if(records.simple(a,loan)){check(records.sameContract(a,loan,snapshot,body),"changed");return;}
+        records.contract(a,loan,p,f.getGroupApplication(),f.getGroupRequestHash(),snapshot,body,filename,clock.now());event(a,loan,"GROUP_LOAN_RECORDED");
+    }
+    @Transactional public void revise(AppUserPrincipal a,UUID loan,Prepared p,RecordForm f,SignedPaper paper,boolean keepAgreement,boolean keepConsent){
+        access.requireActor(a,"LOAN_RECORDING_CREATE");
+        String snapshot=contractSnapshot(p,f);
+        if((keepAgreement || keepConsent) && !records.signedEvidenceStillMatches(a,loan,snapshot)){
+            if(keepAgreement)throw new IllegalArgumentException("simpleGroup.error.freshAgreement");
+            throw new IllegalArgumentException("recording.error.guarantorConsentAttachment");
+        }
+        records.reviseContract(a,loan,p,f.getGroupApplication(),snapshot,paper,keepAgreement,clock.now());
+        recordGuarantors(a,loan,f);
+        event(a,loan,"GROUP_LOAN_REVISED");
+    }
+    private String contractSnapshot(Prepared p,RecordForm f){
+        return json.writeValueAsString(Map.of("version","STAFF_GROUP_V1","debtBasis","LOAN_APPLICATION","internalDebt",p.internalDebt(),
+            "outsideDebts",f.getGroupApplication().getDebts(),"setup",p.setup(),"assessments",p.assessments(),"destination",p.destination(),"capacity",p.capacity()));
     }
     @Transactional(readOnly=true) public boolean partyContract(AppUserPrincipal a,UUID party){access.requireActor(a,"LOAN_RECORDING_VIEW");return records.partyContract(a,party);}
     @Transactional(readOnly=true) public boolean simple(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_RECORDING_VIEW");return records.simple(a,loan);}
@@ -219,7 +237,7 @@ public class SimpleGroupLoanService {
         var ids=people.stream().map(Guarantor::getClientId).toList();
         ids.stream().sorted().forEach(id->records.lockGuarantor(a,id));
         var cap=records.totalPayable(loan);
-        validateGuarantorCapacity(a,f,people,cap);
+        validateGuarantorCapacity(a,f,people,cap,loan);
         people.forEach(g->records.guarantor(loan,g,cap));
     }
 
@@ -229,11 +247,11 @@ public class SimpleGroupLoanService {
     }
 
     @Transactional(readOnly=true)
-    public void validateGuarantors(AppUserPrincipal a,RecordForm f,BigDecimal cap) {
+    public void validateGuarantors(AppUserPrincipal a,RecordForm f,BigDecimal cap,UUID replacing) {
         if(f.getApplicationDetails().getGuarantors().isEmpty())return;
         var s=setup(a,f.getGroupApplication().getGroupId());
         var people=resolveGuarantors(a,f,s.people().stream().map(Person::id).toList());
-        validateGuarantorCapacity(a,f,people,cap);
+        validateGuarantorCapacity(a,f,people,cap,replacing);
     }
 
     private List<Guarantor> resolveGuarantors(AppUserPrincipal a,RecordForm f,List<UUID> members) {
@@ -253,8 +271,8 @@ public class SimpleGroupLoanService {
         return people;
     }
 
-    private void validateGuarantorCapacity(AppUserPrincipal a,RecordForm f,List<Guarantor> people,BigDecimal cap) {
-        var exposures=records.exposures(a,people.stream().map(Guarantor::getClientId).toList());
+    private void validateGuarantorCapacity(AppUserPrincipal a,RecordForm f,List<Guarantor> people,BigDecimal cap,UUID replacing) {
+        var exposures=records.exposures(a,people.stream().map(Guarantor::getClientId).toList(),replacing);
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
         for(int index=0;index<people.size();index++){
             var g=people.get(index);

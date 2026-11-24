@@ -13,7 +13,8 @@
 <spring:message code="simpleGroup.addExtraGuarantor" var="recordingAddExtraGuarantorLabel" />
 <spring:message code="applications.documents" var="recordingDocumentsLabel" />
 <spring:message code="recording.attachmentsTab" text="${recordingDocumentsLabel}" var="recordingAttachmentsLabel" />
-<div class="recording-application-evidence" data-recording-evidence data-root="<c:url value='/finance/loan-recording/evidence'/>" data-validate-url="<c:url value='/finance/loan-recording/validate-step'/>" data-validation-unavailable="<spring:message code='recording.validation.unavailable' htmlEscape='true'/>" data-error="<spring:message code='applications.error.details'/>" data-upload-limit="<spring:message code='recording.attachmentLimit' text='${recordingAttachmentHelp}' htmlEscape='true'/>" data-select-placeholder="<c:out value='${chooseLabel}' />">
+<c:url var="recordingValidationUrl" value="${empty editingLoanId ? '/finance/loan-recording/validate-step' : '/finance/loan-records/'.concat(editingLoanId).concat('/edit/validate-step')}" />
+<div class="recording-application-evidence" data-recording-evidence data-root="<c:url value='/finance/loan-recording/evidence'/>" data-validate-url="<c:out value='${recordingValidationUrl}' />" data-validation-unavailable="<spring:message code='recording.validation.unavailable' htmlEscape='true'/>" data-error="<spring:message code='applications.error.details'/>" data-upload-limit="<spring:message code='recording.attachmentLimit' text='${recordingAttachmentHelp}' htmlEscape='true'/>" data-select-placeholder="<c:out value='${chooseLabel}' />">
 <nav class="recording-wizard-nav" data-recording-steps aria-label="<spring:message code='applications.title'/>" hidden>
 <ol>
 <c:forEach items="${['loan','guarantors','collateral','attachments']}" var="step" varStatus="status">

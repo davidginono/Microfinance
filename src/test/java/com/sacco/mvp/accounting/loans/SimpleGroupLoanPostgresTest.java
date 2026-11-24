@@ -54,6 +54,48 @@ class SimpleGroupLoanPostgresTest {
         return onboarding.attach(f.actor,client,document,file);
     }
     UUID record(){return f.service.saveGroup(f.actor,application(),List.of(),paper());}
+    @Test void recordedGroupCorrectionKeepsTheLoanAndCanBeSentForReview(){
+        var original=application();
+        UUID loan=f.service.saveGroup(f.actor,original,List.of(),null);
+        var stale=f.service.editForm(f.actor,loan);
+        var correction=f.service.editForm(f.actor,loan);
+        assertThat(correction.getGroupApplication().isChecked()).isFalse();
+        correction.setPrincipal(new BigDecimal("4500000.00"));
+        correction.getGroupApplication().setChecked(true);
+        f.service.validateStep(f.actor,correction,"loan",List.of(),null,loan);
+        assertThat(f.service.editGroup(f.actor,loan,correction,List.of(),null)).isEqualTo(loan);
+        assertThat(f.service.editGroup(f.actor,loan,correction,List.of(),null)).isEqualTo(loan);
+        assertThat(f.service.saveGroup(f.actor,original,List.of(),null)).isEqualTo(loan);
+        assertThat(f.service.editForm(f.actor,loan).getPrincipal()).isEqualByComparingTo("4500000.00");
+        assertThat(f.jdbc.queryForObject("select count(*) from loan_record_edit where loan_id=?",Integer.class,loan)).isEqualTo(1);
+        assertThat(f.jdbc.queryForObject("select before_snapshot#>>'{loan,amount}' from loan_record_edit where loan_id=?",BigDecimal.class,loan))
+            .isEqualByComparingTo("5000000.00");
+        stale.getGroupApplication().setChecked(true);
+        assertThatThrownBy(()->f.service.editGroup(f.actor,loan,stale,List.of(),null)).hasMessage("loanGroups.error.changed");
+        f.approve(loan);
+        assertThat(f.service.editable(f.actor,loan)).isFalse();
+        assertThatThrownBy(()->f.service.editForm(f.actor,loan)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    }
+    @Test void originalSignedAgreementSurvivesCorrectionsAndMustMatchChangedTerms() throws Exception {
+        var signed=paper();
+        UUID loan=f.service.saveGroup(f.actor,application(),List.of(),signed);
+        var notes=f.service.editForm(f.actor,loan);
+        notes.setNotes("Corrected internal note");
+        notes.getGroupApplication().setChecked(true);
+        f.service.editGroup(f.actor,loan,notes,List.of(),null);
+        assertThat(service.document(f.actor,loan)).isEqualTo(signed.getBytes());
+
+        var changes=f.service.editForm(f.actor,loan);
+        changes.setPrincipal(new BigDecimal("4800000.00"));
+        changes.getGroupApplication().setChecked(true);
+        assertThatThrownBy(()->f.service.editGroup(f.actor,loan,changes,List.of(),null)).hasMessage("simpleGroup.error.freshAgreement");
+        assertThat(f.service.editForm(f.actor,loan).getPrincipal()).isEqualByComparingTo("5000000.00");
+        changes.getGroupApplication().setRemoveAgreement(true);
+        f.service.editGroup(f.actor,loan,changes,List.of(),null);
+        assertThat(service.contract(f.actor,loan).orElseThrow().agreementAvailable()).isFalse();
+        assertThat(f.jdbc.queryForObject("select before_group_agreement from loan_record_edit where loan_id=? order by expected_version desc limit 1",byte[].class,loan))
+            .isEqualTo(signed.getBytes());
+    }
     @Test void loanStepNamesGroupMembersWithAnOpenApplication(){
         record();
         var names=service.setup(f.actor,group).people().stream().map(Person::name).toList();

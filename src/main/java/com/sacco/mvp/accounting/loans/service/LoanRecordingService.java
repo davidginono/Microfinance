@@ -317,11 +317,22 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public void validateStep(AppUserPrincipal actor,RecordForm form,String step,List<org.springframework.web.multipart.MultipartFile> files,
                              org.springframework.web.multipart.MultipartFile agreement) {
+        validateStep(actor,form,step,files,agreement,null);
+    }
+
+    @Transactional(readOnly=true)
+    public void validateStep(AppUserPrincipal actor,RecordForm form,String step,List<org.springframework.web.multipart.MultipartFile> files,
+                             org.springframework.web.multipart.MultipartFile agreement,UUID editingId) {
         authorize(actor,"CREATE");
         if(form.getApplicationDetails()==null)form.setApplicationDetails(new ApplicationDetails());
         boolean group="GROUP".equals(form.getLoanFor());
+        if(editingId!=null){
+            authorize(actor,"VIEW");
+            requireEditable(actor,editingId);
+            if(group)requireSameGroupEdit(actor,editingId,form);
+        }
         switch(step){
-            case "loan" -> validateLoanStep(actor,form,group);
+            case "loan" -> validateLoanStep(actor,form,group,editingId);
             case "guarantors" -> evidence.validateGuarantors(actor,form);
             case "collateral" -> {
                 evidence.validateCollateral(form.getApplicationDetails());
@@ -329,19 +340,19 @@ public class LoanRecordingService {
                 if(group && !form.getGroupApplication().isChecked())
                     throw new FieldValidation("groupApplication.checked","simpleGroup.error.signatures");
             }
-            case "attachments" -> validateRecordingUploads(actor,form,group,files,agreement);
+            case "attachments" -> validateRecordingUploads(actor,form,group,files,agreement,editingId);
             default -> throw new IllegalArgumentException("recording.error.request");
         }
     }
 
-    private void validateLoanStep(AppUserPrincipal actor,RecordForm form,boolean group) {
+    private void validateLoanStep(AppUserPrincipal actor,RecordForm form,boolean group,UUID editingId) {
         validateRecord(form,group);
         var selected=product(actor,form);
         var calculation=calculate(form,selected);
         if(group){
             if(form.getGroupApplication().getGroupId()==null)throw new FieldValidation("groupApplication.groupId","recording.validation.chooseGroup");
             simpleGroups.validateSigningDate(form);
-            var prepared=simpleGroups.prepare(actor,form,selected,calculation,false);
+            var prepared=simpleGroups.prepare(actor,form,selected,calculation,false,editingId);
             var sources=new HashSet<String>();
             if(prepared.assessments().stream().anyMatch(row->row.source().length()>200 || !sources.add(row.source().toLowerCase(Locale.ROOT))))
                 throw new IllegalArgumentException("simpleGroup.error.incomeSource");
@@ -366,7 +377,8 @@ public class LoanRecordingService {
     }
 
     private void validateRecordingUploads(AppUserPrincipal actor,RecordForm form,boolean group,
-                                          List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement) {
+                                          List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement,
+                                          UUID editingId) {
         validateFiles(files);
         var uploads=evidence.documentUploads(form,files);
         attachments.validateUploads(files);
@@ -378,19 +390,27 @@ public class LoanRecordingService {
                 try{uploads=evidence.documentUploads(form,recovered.files());}
                 catch(FieldValidation e){throw new IllegalArgumentException("recording.error.attachments",e);}
             }
-            validateGroupConsent(form,uploads);
+            boolean savedConsent=editingId!=null && hasGroupConsent(loans.findById(editingId).orElseThrow().getAttachmentsJson());
+            validateGroupConsent(form,uploads,savedConsent);
             if(!form.getApplicationDetails().getGuarantors().isEmpty()){
                 var selected=product(actor,form);
                 var plan=charges.validateRecordingQuote(actor,form,selected,false);
                 var cap=calculate(form,selected).totalRepayment().add(plan.total());
-                simpleGroups.validateGuarantors(actor,form,cap);
+                simpleGroups.validateGuarantors(actor,form,cap,editingId);
             }
         }
     }
 
-    private void validateGroupConsent(RecordForm form,List<LoanAttachmentService.NamedUpload> uploads) {
+    private boolean hasGroupConsent(String savedFiles){
+        return attachments.parse(savedFiles).stream().anyMatch(file->"GUARANTOR_CONSENT".equals(file.get("documentPurpose"))
+            && !Boolean.TRUE.equals(file.get("superseded")));
+    }
+    private boolean hasNewGroupConsent(List<LoanAttachmentService.NamedUpload> uploads){
+        return uploads!=null && uploads.stream().anyMatch(upload->"GUARANTOR_CONSENT".equals(upload.purpose()));
+    }
+    private void validateGroupConsent(RecordForm form,List<LoanAttachmentService.NamedUpload> uploads,boolean savedConsent) {
         if(form.getApplicationDetails()!=null && !form.getApplicationDetails().getGuarantors().isEmpty())
-            check(uploads!=null && uploads.stream().anyMatch(upload->"GUARANTOR_CONSENT".equals(upload.purpose())),"guarantorConsentAttachment");
+            check(savedConsent || hasNewGroupConsent(uploads),"guarantorConsentAttachment");
     }
     @Transactional
     public UUID save(AppUserPrincipal a,RecordForm f){return save(a,f,List.of());}
@@ -406,18 +426,76 @@ public class LoanRecordingService {
         authorize(a,"CREATE");authorize(a,"VIEW");requireEditable(a,id);
         var loan=loans.findById(id).orElseThrow();var form=read(records.record(a,id,false).get("metadata").toString(),RecordForm.class);
         form.setApplicationId(null);form.setExpectedVersion(loan.getVersion());form.setRequestKey(UUID.randomUUID());
+        if("GROUP".equals(form.getLoanFor())){
+            var group=form.getGroupApplication();
+            group.setExpectedVersion(simpleGroups.setup(a,group.getGroupId()).version());
+            group.setChecked(false);
+            group.setRemoveAgreement(false);
+            if(group.getSignedOn()==null){
+                var dates=simpleGroups.contract(a,id).orElseThrow().borrowers().stream().map(b->b.signedOn()).distinct().toList();
+                if(dates.size()==1)group.setSignedOn(dates.getFirst());
+            }
+        }
         if(form.getApplicationDetails()!=null){form.getApplicationDetails().setDocumentNames(new ArrayList<>());form.getApplicationDetails().setDocumentTypes(new ArrayList<>());form.getApplicationDetails().setRequiredAttachmentIds(new ArrayList<>());}
         return form;
     }
-    private void requireEditable(AppUserPrincipal a,UUID id){if(!records.editable(a,id))throw new AccessDeniedException("Only the recorder may edit an individual loan before its first review");}
+    private void requireEditable(AppUserPrincipal a,UUID id){if(!records.editable(a,id))throw new AccessDeniedException("Only the recorder may edit this loan before its first review");}
+    private RecordForm requireSameGroupEdit(AppUserPrincipal a,UUID id,RecordForm form){
+        var original=read(records.record(a,id,false).get("metadata").toString(),RecordForm.class);
+        check("GROUP".equals(original.getLoanFor()) && form.getApplicationId()==null && form.getGroupApplication()!=null
+            && Objects.equals(original.getGroupApplication().getGroupId(),form.getGroupApplication().getGroupId()),"state");
+        return original;
+    }
     @Transactional
     public UUID edit(AppUserPrincipal a,UUID id,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files){
         authorize(a,"CREATE");authorize(a,"VIEW");validateFiles(files);check(f.getApplicationId()==null&&"INDIVIDUAL".equals(f.getLoanFor()),"state");
         String payload=uploadHash(f,files);records.lockRequest(a,f.getRequestKey());var retry=records.editRetry(a,id,f.getRequestKey(),payload);if(retry.isPresent())return retry.get();
         records.groupLoan(a,id,true);requireEditable(a,id);var previous=loans.findById(id).orElseThrow();if(!Objects.equals(previous.getVersion(),f.getExpectedVersion()))throw new IllegalArgumentException("loanGroups.error.changed");
-        check(Objects.equals(previous.getTopUpSourceLoanId(),f.getTopUpSourceLoanId()),"state");
+        check(previous.getApplicantMemberId()!=null && Objects.equals(previous.getTopUpSourceLoanId(),f.getTopUpSourceLoanId()),"state");
         records.beginEdit(a,id,f,payload);charges.clearUnpostedForEdit(a,id);
-        return saveInternal(a,f,files,null,null,previous);
+        return saveInternal(a,f,files,null,null,previous,false);
+    }
+    @Transactional(propagation=Propagation.NOT_SUPPORTED)
+    public UUID editGroup(AppUserPrincipal actor,UUID id,RecordForm input,List<org.springframework.web.multipart.MultipartFile> files,
+                          org.springframework.web.multipart.MultipartFile agreement){
+        authorize(actor,"CREATE");authorize(actor,"VIEW");
+        check(input!=null && "GROUP".equals(input.getLoanFor()) && input.getApplicationId()==null,"state");
+        var form=json.convertValue(input,RecordForm.class);
+        form.setGroupRequestHash(null);
+        form.setGroupAgreementChecksum(null);
+        validateRecord(form,true);
+        validateFiles(files);
+        var paper=simpleGroups.validatePaper(actor,agreement);
+        if(paper!=null)form.setGroupAgreementChecksum(paper.checksum());
+        String payload=hash(Map.of("formAndUploads",uploadHash(form,files),"agreementName",paper==null?"":paper.filename()));
+        var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);
+        tx.setTimeout(30);
+        return tx.execute(status->{
+            records.lockRequest(actor,form.getRequestKey());
+            var retry=records.editRetry(actor,id,form.getRequestKey(),payload);
+            if(retry.isPresent())return retry.get();
+            records.groupLoan(actor,id,true);
+            requireEditable(actor,id);
+            var previous=loans.findById(id).orElseThrow();
+            if(!Objects.equals(previous.getVersion(),form.getExpectedVersion()))throw new IllegalArgumentException("loanGroups.error.changed");
+            var original=requireSameGroupEdit(actor,id,form);
+            boolean keepAgreement=original.getGroupAgreementChecksum()!=null && (paper==null
+                ? !form.getGroupApplication().isRemoveAgreement()
+                : original.getGroupAgreementChecksum().equals(paper.checksum()));
+            if(keepAgreement)form.setGroupAgreementChecksum(original.getGroupAgreementChecksum());
+            form.setGroupRequestHash(original.getGroupRequestHash());
+            form.getGroupApplication().setRemoveAgreement(false);
+            var product=product(actor,form);
+            var prepared=simpleGroups.prepare(actor,form,product,calculate(form,product),true,id);
+            check(previous.getBorrowerPartyId().equals(prepared.party()),"state");
+            boolean keepConsent=!form.getApplicationDetails().getGuarantors().isEmpty()
+                && hasGroupConsent(previous.getAttachmentsJson()) && !hasNewGroupConsent(evidence.documentUploads(form,files));
+            records.beginEdit(actor,id,form,payload);
+            charges.clearUnpostedForEdit(actor,id);
+            saveInternal(actor,form,files,prepared.party(),prepared.destination(),previous,keepConsent);
+            simpleGroups.revise(actor,id,prepared,form,paper,keepAgreement,keepConsent);
+            return id;
+        });
     }
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public UUID saveGroup(AppUserPrincipal a,RecordForm input,List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement){
@@ -437,11 +515,12 @@ public class LoanRecordingService {
             if(draft!=null){f.setApplicationId(draft);f.setExpectedVersion(version);simpleGroups.consumeDraft(a,f);}return id;});
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
-        return saveInternal(a,f,files,borrowerParty,payoutSnapshot,null);
+        return saveInternal(a,f,files,borrowerParty,payoutSnapshot,null,false);
     }
-    private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot,LoanApplication editing){
+    private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot,LoanApplication editing,boolean keepGroupConsent){
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);
+        if(editing!=null && "GROUP".equals(f.getLoanFor()))f.setFirstPaymentDate(editing.getFirstRepaymentDate());
         f.setExpenses(null);
         if(borrowerParty==null){
             f.setOtherDebt(null);
@@ -457,7 +536,7 @@ public class LoanRecordingService {
         }
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
-        if("GROUP".equals(f.getLoanFor()))validateGroupConsent(f,namedUploads);
+        if("GROUP".equals(f.getLoanFor()))validateGroupConsent(f,namedUploads,keepGroupConsent);
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
         if(borrowerParty==null)validateIndividualAffordability(a,f,product,calculation,shared);
         var chargePlan=charges.recordingQuote(a,f,product,borrowerParty==null);
@@ -513,7 +592,7 @@ public class LoanRecordingService {
         String retained=existing==null?null:existing.getAttachmentsJson();
         if(editing!=null){
             if(!Objects.equals(editing.getApplicantMemberId(),f.getClientId()))retained=null;
-            else {var priorFiles=attachments.parse(retained);priorFiles.stream().filter(file->"GUARANTOR_CONSENT".equals(file.get("documentPurpose"))).forEach(file->file.put("superseded",true));retained=write(priorFiles);}
+            else if(!keepGroupConsent){var priorFiles=attachments.parse(retained);priorFiles.stream().filter(file->"GUARANTOR_CONSENT".equals(file.get("documentPurpose"))).forEach(file->file.put("superseded",true));retained=write(priorFiles);}
         }
         loan.setAttachmentsJson(namedUploads==null?attachments.store(loan.getId(),files,retained):attachments.storeNamed(loan.getId(),namedUploads,retained));
         loan=loans.saveAndFlush(loan);UUID id=loan.getId();

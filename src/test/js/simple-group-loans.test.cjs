@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {JSDOM} = require('jsdom');
 const source = fs.readFileSync('src/main/resources/static/js/simple-group-loans.js','utf8');
-function setup() {
+function setup({editing=false}={}) {
   const dom = new JSDOM(`<form data-simple-group data-group-root="/finance/loan-recording/groups">
     <select name="loanFor"><option>GROUP</option><option>INDIVIDUAL</option></select><div data-individual-loan><input name="clientId"></div>
     <div data-simple-group-fields><select id="simple-group"><option value="">Choose</option><option value="g1">Group 1</option><option value="g2">Group 2</option></select>
@@ -14,6 +14,14 @@ function setup() {
     <section id="recording-panel-attachments"><div data-group-agreement-upload><input type="hidden" name="groupApplication.removeAgreement" value="false"><label><input type="file" name="groupAgreement" data-error="Choose a PDF up to 10 MB"></label><p data-group-agreement-error hidden></p><div data-group-agreement-selected></div><template data-group-agreement-template><div><span data-group-agreement-name></span><span data-group-agreement-size></span><button type="button" data-remove-group-agreement data-remove-label="Remove"><svg><path d="M6 6l12 12M18 6L6 18"/></svg></button></div></template></div><input type="file" name="attachments" multiple></section>
     <button type="button" data-recording-draft>Save draft</button></form>`,{runScripts:'outside-only'});
   const w=dom.window, form=w.document.querySelector('form');
+  if(editing){
+    const fixedGroup=w.document.createElement('input');
+    Object.assign(fixedGroup,{type:'hidden',id:'simple-group',name:'groupApplication.groupId',value:'g1'});
+    form.querySelector('#simple-group').replaceWith(fixedGroup);
+    form.querySelector('[data-group-load-error]').remove();
+    form.elements['groupApplication.expectedVersion'].value='7';
+    form.querySelector('[data-group-agreement-selected]').insertAdjacentHTML('afterend','<div data-group-agreement-saved><button type="button" data-remove-group-agreement>Remove saved agreement</button></div>');
+  }
   const context={setup:{version:7,leader:'Asha',holder:'Group',provider:'Bank',identifier:'123',people:[{id:'c1',number:'C1',name:'Asha'},{id:'c2',number:'C2',name:'Juma'}]},borrowers:{c1:{incomeEvidenceMissing:false,missingProfileFields:[]},c2:{incomeEvidenceMissing:true,missingProfileFields:['monthlyExpenses']}}};
   w.WorkspaceNavigation={onReady:fn=>fn(w.document)};w.fetch=async()=>({ok:true,json:async()=>context});w.eval(source);
   const agreement=form.elements.groupAgreement;let selectedFiles=[];
@@ -24,6 +32,17 @@ function setup() {
   async function load(){select.value='g1';select.dispatchEvent(new w.Event('change',{bubbles:true}));await new Promise(resolve=>setTimeout(resolve,0));}
   return {dom,w,form,select,context,load,choose};
 }
+test('editing a recorded group initializes debt and saved agreement controls with the group fixed',()=>{
+  const s=setup({editing:true});
+  s.form.querySelector('[data-add-group-debt]').click();
+  assert.equal(s.form.querySelectorAll('[data-group-debt-list] [data-group-debt]').length,1);
+  assert.equal(s.form.elements['groupApplication.groupId'].value,'g1');
+  assert.equal(s.form.elements['groupApplication.expectedVersion'].value,'7');
+  s.form.querySelector('[data-group-agreement-saved] button').click();
+  assert.equal(s.form.elements['groupApplication.removeAgreement'].value,'true');
+  assert.equal(s.form.querySelector('[data-group-agreement-saved]').hidden,true);
+  s.dom.window.close();
+});
 test('group selection keeps names, financial details and income references out of recording',async()=>{
   const s=setup();await s.load();
   assert.equal(s.form.querySelectorAll('.simple-group-borrower,[name*=".signers["]').length,0);

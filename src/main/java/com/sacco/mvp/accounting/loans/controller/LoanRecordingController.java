@@ -65,9 +65,7 @@ public class LoanRecordingController {
         }catch(SimpleGroupLoanService.ProfileIncomeException e){
             errors.rejectValue("groupApplication.groupId",e.getMessage(),new Object[]{String.join(", ",e.clients())},null);
         }catch(SimpleGroupLoanService.GroupCreditHistoryException e){
-            errors.addError(new org.springframework.validation.FieldError(errors.getObjectName(),"groupApplication.groupId",
-                recordForm.getGroupApplication().getGroupId(),false,null,null,
-                creditHistoryMessage(e,org.springframework.context.i18n.LocaleContextHolder.getLocale())));
+            rejectGroupHistory(errors,recordForm,e);
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
         catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,recordForm,error(e));}
         catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
@@ -78,9 +76,17 @@ public class LoanRecordingController {
     @GetMapping("/loan-records/{id}/edit") public String edit(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model model){
         var form=service.editForm(a,id);model.addAttribute("recordForm",form);editContext(a,id,form,model);return "accounting/loans/record-form";
     }
-    @PostMapping("/loan-records/{id}/edit") public String update(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute RecordForm recordForm,BindingResult errors,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,Model model,RedirectAttributes flash){
+    @PostMapping("/loan-records/{id}/edit") public String update(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@ModelAttribute RecordForm recordForm,BindingResult errors,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,@RequestParam(required=false) org.springframework.web.multipart.MultipartFile groupAgreement,Model model,RedirectAttributes flash){
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
-            service.edit(a,id,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("loanEditSaved",true);return "redirect:/finance/loan-records/"+id;
+            var files=attachments==null?List.<org.springframework.web.multipart.MultipartFile>of():attachments;
+            if("GROUP".equals(recordForm.getLoanFor()))service.editGroup(a,id,recordForm,files,groupAgreement);
+            else service.edit(a,id,recordForm,files);
+            flash.addFlashAttribute("loanEditSaved",true);
+            return "redirect:/finance/loan-records/"+id;
+        }catch(SimpleGroupLoanService.ProfileIncomeException e){
+            errors.rejectValue("groupApplication.groupId",e.getMessage(),new Object[]{String.join(", ",e.clients())},null);
+        }catch(SimpleGroupLoanService.GroupCreditHistoryException e){
+            rejectGroupHistory(errors,recordForm,e);
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
         catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,recordForm,error(e));}
         catch(org.springframework.dao.OptimisticLockingFailureException e){errors.reject("loanGroups.error.changed");}
@@ -88,7 +94,19 @@ public class LoanRecordingController {
         editContext(a,id,recordForm,model);return "accounting/loans/record-form";
     }
     private void editContext(AppUserPrincipal a,UUID id,RecordForm form,Model model){
-        model.addAttribute("editingLoanId",id);model.addAttribute("recordedAttachments",service.attachments(a,id));recordProductContext(a,form,model);
+        model.addAttribute("editingLoanId",id);
+        model.addAttribute("recordedAttachments",service.attachments(a,id));
+        if("GROUP".equals(form.getLoanFor())){
+            var contract=simpleGroups.contract(a,id).orElseThrow(()->new org.springframework.security.access.AccessDeniedException("Group loan unavailable"));
+            form.getGroupApplication().setGroupId(contract.groupId());
+            model.addAttribute("recordedGroupAgreement",contract.agreementAvailable());
+        }
+        recordProductContext(a,form,model);
+    }
+    private void rejectGroupHistory(BindingResult errors,RecordForm form,SimpleGroupLoanService.GroupCreditHistoryException error){
+        errors.addError(new org.springframework.validation.FieldError(errors.getObjectName(),"groupApplication.groupId",
+            form.getGroupApplication().getGroupId(),false,null,null,
+            creditHistoryMessage(error,org.springframework.context.i18n.LocaleContextHolder.getLocale())));
     }
     private String recordField(RecordForm form,String key){
         return switch(key){
@@ -120,17 +138,20 @@ public class LoanRecordingController {
         else errors.rejectValue(field,key);
     }
 
-    @PostMapping("/loan-recording/validate-step") @ResponseBody
+    @PostMapping({"/loan-recording/validate-step","/loan-records/{editId}/edit/validate-step"}) @ResponseBody
     public ResponseEntity<?> validateStep(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute RecordForm recordForm,
             BindingResult binding,@RequestParam String step,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,
-            @RequestParam(required=false) org.springframework.web.multipart.MultipartFile groupAgreement,Locale locale){
+            @RequestParam(required=false) org.springframework.web.multipart.MultipartFile groupAgreement,
+            @PathVariable(required=false) UUID editId,Locale locale){
         service.authorize(actor,"CREATE");
         if(!Set.of("loan","guarantors","collateral","attachments").contains(step))return ResponseEntity.badRequest().build();
         var errors=binding.getFieldErrors().stream().filter(field->step.equals(recordStep(field.getField())))
             .map(field->Map.of("field",field.getField(),"message",label("recording.validation.invalidValue",locale))).toList();
         if(!errors.isEmpty())return invalidStep(errors);
         try{
-            service.validateStep(actor,recordForm,step,attachments==null?List.of():attachments,groupAgreement);
+            var files=attachments==null?List.<org.springframework.web.multipart.MultipartFile>of():attachments;
+            if(editId==null)service.validateStep(actor,recordForm,step,files,groupAgreement);
+            else service.validateStep(actor,recordForm,step,files,groupAgreement,editId);
             return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
         }catch(SimpleGroupLoanService.ProfileIncomeException e){
             return invalidStep(List.of(Map.of("field","groupApplication.groupId","message",messages.getMessage(e.getMessage(),new Object[]{String.join(", ",e.clients())},locale))));

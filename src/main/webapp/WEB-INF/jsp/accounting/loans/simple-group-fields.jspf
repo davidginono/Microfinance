@@ -1,11 +1,17 @@
 <%@ page pageEncoding="UTF-8" %>
 <div data-simple-group-fields ${recordForm.loanFor!='GROUP'?'hidden':''}>
+<c:choose><c:when test="${not empty editingLoanId and recordForm.loanFor=='GROUP'}">
+<form:hidden path="groupApplication.groupId" id="simple-group" />
+<div><span><spring:message code="simpleGroup.group" /></span> <strong><c:out value="${groupSetup.name}" /></strong>
+<form:errors path="groupApplication.groupId" cssClass="coa-error" htmlEscape="true" /></div>
+</c:when><c:otherwise>
 <c:url value="/finance/loan-recording/groups" var="simpleGroupsUrl" />
 <div data-loan-choice data-choice-url="${simpleGroupsUrl}"><label for="simple-group"><spring:message code="simpleGroup.group" /></label>
 <form:select path="groupApplication.groupId" id="simple-group" cssClass="aws-control" data-choice-select="true" data-searchable="true" required="required" disabled="${recordForm.loanFor!='GROUP'}"><option value=""><spring:message code="voucher.choose" /></option><c:if test="${not empty groupSetup}"><form:option value="${groupSetup.groupId}"><c:out value="${groupSetup.name}" /></form:option></c:if></form:select><%@ include file="choice-search.jspf" %><form:errors path="groupApplication.groupId" cssClass="coa-error" htmlEscape="true" /></div>
 <noscript><button type="submit" name="action" value="groupLoad" formnovalidate class="app-btn btn-neutral"><spring:message code="simpleGroup.load" /></button></noscript>
-<form:hidden path="groupApplication.expectedVersion" />
 <div data-group-load-error role="alert" hidden><spring:message code="simpleGroup.error.load" /><button type="button" class="app-btn btn-neutral" data-group-retry><spring:message code="simpleGroup.retry" text="Retry" /></button></div>
+</c:otherwise></c:choose>
+<form:hidden path="groupApplication.expectedVersion" />
 <details data-group-debts><summary><spring:message code="simpleGroup.otherDebts" /></summary>
 <div class="group-debt-content">
 <p class="loan-field-hint"><spring:message code="simpleGroup.debtHelp" /></p><div data-group-debt-list>

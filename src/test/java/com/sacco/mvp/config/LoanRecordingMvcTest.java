@@ -115,6 +115,19 @@ class LoanRecordingMvcTest {
         verify(service).saveGroup(eq(actor),argThat(form->form.getApplicationId()==null),eq(List.of()),isNull());
         verify(simpleGroups,never()).saveDraft(any(),any(),any(),any());
     }
+    @Test void recordedGroupEditUsesTheScopedLoanAndRequiresCsrf() throws Exception {
+        var loan=UUID.randomUUID();
+        String path="/finance/loan-records/"+loan+"/edit";
+        mvc.perform(multipart(path).with(user(actor)).param("loanFor","GROUP")).andExpect(status().isForbidden());
+        mvc.perform(post(path+"/validate-step").with(user(actor)).with(csrf()).param("step","loan").param("loanFor","GROUP"))
+            .andExpect(status().isNoContent());
+        verify(service).validateStep(eq(actor),any(),eq("loan"),eq(List.of()),isNull(),eq(loan));
+        mvc.perform(multipart(path).with(user(actor)).with(csrf()).param("loanFor","GROUP").param("principal","4500000.00"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/"+loan))
+            .andExpect(flash().attribute("loanEditSaved",true));
+        verify(service).editGroup(eq(actor),eq(loan),argThat(form->new BigDecimal("4500000.00").equals(form.getPrincipal())),eq(List.of()),isNull());
+        verify(service,never()).saveGroup(any(),any(),any(),any());
+    }
     @Test void chargeQuoteBindsTheEditedRateAndReturnsOnlyChargeValues() throws Exception {
         when(service.interestQuote(any(),any())).thenReturn(new LoanRecordingService.Quote("Customised loan",new BigDecimal("0.12"),"FLAT_RATE","MONTHLY",new BigDecimal("176.67"),new BigDecimal("60.00"),List.of(new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.ScheduleRow(1,null,new BigDecimal("1000.00"),new BigDecimal("60.00"),new BigDecimal("1060.00"),new BigDecimal("1060.00"),new BigDecimal("0.00"))),"MONTHS",6));
         var term=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term(UUID.randomUUID(),"PROCESSING","PRINCIPAL_RATE",new BigDecimal("0.0075"),new BigDecimal("7.50"),com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.SEPARATE,UUID.randomUUID(),UUID.randomUUID(),"Recorded charge entry","","");
