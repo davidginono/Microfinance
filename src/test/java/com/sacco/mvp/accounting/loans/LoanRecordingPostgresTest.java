@@ -990,7 +990,22 @@ class LoanRecordingPostgresTest {
         processBatch(batch,true);var result=batches().get(actor,batch);assertThat(result.batch().state()).isEqualTo("COMPLETED");assertThat(result.posted()).isEqualTo(2);assertThat(result.postedTotal()).isEqualByComparingTo("360.00");
         var worker=context.getBean(com.sacco.mvp.accounting.batch.service.ReceiptBatchWorkerService.class);assertThat(worker.claim()).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where sacco_id=? and allocation_policy_id is not null",Integer.class,institution)).isEqualTo(3);
-        var saved=batches().items(actor,batch,0,"").rows().getFirst();assertThat(receiptService().find(actor,saved.receiptId()).orElseThrow().rows()).hasSize(2);
+        var saved=batches().items(actor,batch,0,"").rows().getFirst();
+        var receipt=receiptService().find(actor,saved.receiptId()).orElseThrow();
+        assertThat(receipt.header().reference()).isEqualTo("Daily collections / 1");
+        assertThat(receipt.rows()).extracting(row->row.reference()).containsExactly("Daily collections / 1 / 1","Daily collections / 1 / 2");
+        var fromRegister=receiptService().list(actor,new com.sacco.mvp.accounting.dto.VoucherDtos.Filter(
+            "Daily collections",null,null,"","reference_asc",0,25)).rows();
+        assertThat(fromRegister).extracting(row->row.reference()).containsExactlyInAnyOrder("Daily collections / 1","Daily collections / 2");
+        assertThat(service.posting(actor,receipt.rows().getFirst().postingId()).reference()).isEqualTo("Daily collections / 1 / 1");
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var reportFilter=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            TODAY.minusMonths(1),TODAY,context.getBean(ApplicationClock.class).now(),null,null,client,"",0);
+        var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,reportFilter,false);
+        assertThat(daily.rows()).extracting(row->row.get("documentReference")).contains("Daily collections / 1","Daily collections / 2");
+        var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,reportFilter,false);
+        assertThat(cashbook.rows()).extracting(row->row.get("reference")).contains("Daily collections / 1","Daily collections / 2");
+        assertThat(jdbc.queryForObject("select reference from accountant_loan_receipt where id=?",String.class,saved.receiptId())).isEqualTo("BATCH/"+saved.id());
         assertThatThrownBy(()->jdbc.update("update receipt_batch_item set receipt_id=null where id=?",saved.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
     @Test void receiptBatchStagesOutstandingFeesAndPostsChargeOnlyRows(){
@@ -1023,6 +1038,11 @@ class LoanRecordingPostgresTest {
         assertThat(service.chargeSummary(actor,loan).balance().outstanding()).isZero();
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("990.00");
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,loan)).isEqualTo(2);
+        var last=batches().items(actor,batch,0,"").rows().getLast();
+        var reversal=receiptService().reverse(operator("B1"),last.receiptId(),UUID.randomUUID(),TODAY,"Correct batch receipt");
+        assertThat(reversal.header().reference()).isEqualTo("Fees and principal / 3");
+        assertThat(reversal.rows().getFirst().reference()).isEqualTo("Fees and principal / 3 / 1");
+        assertThat(jdbc.queryForObject("select reference from accountant_loan_receipt where id=?",String.class,reversal.header().id())).isEqualTo("BATCH/"+last.id());
     }
     @Test void spreadsheetImportIsScopedAtomicAndUsesTheExistingBatchWorker() {
         seedHistoricalPolicy();

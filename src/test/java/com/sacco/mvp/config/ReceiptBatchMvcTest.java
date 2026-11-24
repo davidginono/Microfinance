@@ -58,6 +58,18 @@ class ReceiptBatchMvcTest {
         var b=new Batch(batch,"I1","B1",actor.getMemberId(),"Collections",7,"POSTING",false,null,OffsetDateTime.now());when(batches.get(actor,batch)).thenReturn(new Summary(b,2,0,2,0,new BigDecimal("3.03"),BigDecimal.ZERO));
         mvc.perform(post("/finance/batches/receipts/"+batch+"/post?version=6").with(user(actor)).with(csrf())).andExpect(status().isOk()).andExpect(jsonPath("$.remainingTotal").value("3.03")).andExpect(header().string("Cache-Control","no-store"));verify(batches).start(actor,batch,6,true);
     }
+    @Test void completedPostingReturnsToTheBatchRegisterWithASuccessNotice()throws Exception{
+        String path="/finance/batches/receipts/"+batch;
+        var completed=new Batch(batch,"I1","B1",actor.getMemberId(),"Collections",1,"COMPLETED",false,null,null);
+        var partial=new Batch(batch,"I1","B1",actor.getMemberId(),"Collections",1,"PARTIAL",false,null,null);
+        when(batches.get(actor,batch)).thenReturn(
+            new Summary(completed,2,2,0,0,BigDecimal.TEN,BigDecimal.TEN),
+            new Summary(partial,2,1,0,1,BigDecimal.TEN,BigDecimal.ONE));
+        mvc.perform(get(path+"/posted").with(user(actor))).andExpect(redirectedUrl("/finance/batches/receipts"))
+            .andExpect(flash().attribute("successMessageCode","batch.postSuccess"));
+        mvc.perform(get(path+"/posted").with(user(actor))).andExpect(redirectedUrl(path))
+            .andExpect(flash().attributeCount(0));
+    }
     @Test void validationErrorsAreLocalisedAndDoNotExposeExceptions()throws Exception{
         doThrow(new IllegalArgumentException("batch.error.changed")).when(batches).start(actor,batch,0,true);
         mvc.perform(post("/finance/batches/receipts/"+batch+"/post?version=0").with(user(actor)).with(csrf()).locale(Locale.forLanguageTag("sw"))).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("batch.error.changed")).andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("imebadilika")));

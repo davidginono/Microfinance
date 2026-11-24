@@ -54,6 +54,10 @@ function initializeReceiptBatches() {
     if(!editor)return;
     const id = editor.dataset.receiptBatch, url = base + '/' + id, body = editor.querySelector('[data-batch-rows]'), tableRegion = editor.querySelector('[data-resource-table]');
     let summary, page = 0, filter = '', hasNext = false, canEdit = false, loadedBusy = false, loading = false, removing = false;
+    let activeAction, selectedReceipt, awaitingPost = false, leaving = false;
+    const actionButtons = Object.fromEntries(['validate','post','stop'].map(name=>[name,editor.querySelector('[data-batch-'+name+']')]));
+    const spinners = new Map(), viewReceipt = tableRegion.querySelector('[data-batch-view]');
+    const selectionStatus = tableRegion.querySelector('[data-batch-selection]');
     const rows = new Map(), dirty = new Set(), pending = new Set(), balanceRequests = new WeakMap();let cleanups = [], lastFocus;
     const busy = () => ['VALIDATING','POSTING'].includes(summary?.batch.state);
     const editable = () => canEdit && !busy() && summary?.batch.state !== 'COMPLETED';
@@ -62,10 +66,10 @@ function initializeReceiptBatches() {
     const button = (label, action, cls = 'app-btn btn-neutral') => {const b = el('button',label,cls);b.type = 'button';b.addEventListener('click',action);return b;};
     function selectControl(value, label, category, client, change, issue, auto = false) {
         const s = el('select',null,'aws-control');s.setAttribute('aria-label',label);s.add(new Option(t('choose'),''));
-        if(value?.id){s.add(new Option(value.label || value.id,value.id));s.value = value.id;}
+        if(value?.id){s.add(new Option(value.label || '—',value.id));s.value = value.id;}
         queueMicrotask(()=>{if(s.isConnected && !s.disabled)cleanups.push(picker(s,category,client,change,issue,auto));});return s;
     }
-    function focusReceipt(item,loan = false){requestAnimationFrame(()=>{const tr = body.querySelector('[data-item="' + item.id + '"]');tr?.scrollIntoView({block:'nearest'});const s = tr?.querySelector(loan?'td:nth-child(3) select':'td:first-child select');(s?.closest('.neo-select')?.querySelector('button') || s)?.focus();});}
+    function focusReceipt(item,loan = false){requestAnimationFrame(()=>{const tr = body.querySelector('[data-item="' + item.id + '"]');tr?.scrollIntoView({block:'nearest'});const s = tr?.querySelector(loan?'td:nth-child(4) select':'td:nth-child(2) select');(s?.closest('.neo-select')?.querySelector('button') || s)?.focus();});}
     function saveStatus(){const node = editor.querySelector('[data-save-status]');node.textContent = removing || pending.size?t('saving'):dirty.size?t('unsaved'):t('savedStatus');}
     function syncField(binding){
         const controls = [binding.control,binding.control.closest('.neo-select')?.querySelector('button'),binding.control.closest('.erp-date-control')?.querySelector('[data-date-display]'),binding.control.closest('.erp-amount-control')?.querySelector('[data-amount-display]')].filter(Boolean);
@@ -184,7 +188,33 @@ function initializeReceiptBatches() {
         }catch(error){showIssue(item,error.message,false,error.code);}
         finally{pending.delete(item.id);trigger.disabled=false;saveStatus();controls();}
     }
-    function paintStatus(item){if(!item.status)return;const state=el('span',t('state.' + item.state));state.dataset.resourceStatus=item.state;item.status.replaceChildren(state,item.referenceIssue);if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}}
+    function paintStatus(item){if(!item.status)return;const state=el('span',t('state.' + item.state));state.dataset.resourceStatus=item.state;item.status.replaceChildren(state,item.referenceIssue);}
+    function selectReceipt(item){
+        selectedReceipt = item?.state === 'POSTED' && item.receiptId ? item : null;
+        for(const input of body.querySelectorAll('[data-batch-select]')){
+            const row = input.closest('tr');
+            input.checked = !!selectedReceipt && row.dataset.item === selectedReceipt.id;
+            row.classList.toggle('resource-table-selected',input.checked);
+        }
+        viewReceipt.disabled = !selectedReceipt || loading;
+        selectionStatus.textContent = selectedReceipt ? [t('selected'), selectedReceipt.clientLabel].filter(Boolean).join(' ') : '';
+    }
+    body.addEventListener('change',event=>{
+        const input = event.target;
+        if(input.matches('[data-batch-select]'))selectReceipt(input.checked ? rows.get(input.closest('tr').dataset.item) : null);
+    });
+    body.addEventListener('click',event=>{
+        if(!event.target.closest('input,button,a,select,textarea,label,summary')){
+            event.target.closest('tr')?.querySelector('[data-batch-select]:not(:disabled)')?.click();
+        }
+    });
+    tableRegion.addEventListener('resource-table:reset',()=>selectReceipt(null));
+    viewReceipt.addEventListener('click',()=>{
+        if(viewReceipt.disabled || !selectedReceipt)return;
+        const destination = root + '/finance/vouchers/receipts/' + encodeURIComponent(selectedReceipt.receiptId);
+        if(window.WorkspaceNavigation)window.WorkspaceNavigation.navigate(destination);
+        else window.location.assign(destination);
+    });
     function paintBalance(target,balance,totalLabel = 'totalLoanOutstanding'){
         balanceRequests.delete(target);
         let select = target.querySelector('.batch-balance');
@@ -251,6 +281,12 @@ function initializeReceiptBatches() {
     }
     function renderItem(item) {
         const tr = el('tr',null,'batch-row');tr.dataset.item = item.id;
+        const cell = el('td',null,'resource-table-selection'), select = el('input',null,'resource-table-select');
+        select.type = 'checkbox';
+        select.dataset.batchSelect = '';
+        select.disabled = item.state !== 'POSTED' || !item.receiptId;
+        select.setAttribute('aria-label',t('select') + (item.clientLabel ? ' ' + item.clientLabel : ''));
+        cell.append(select);tr.append(cell);
         const legacy = item.form.rows.length !== 1;
         item.fields = [];item.balance = el('div');
         const cells = ['client','date','loan','balances','amount','receivingAccount','evidence','status'].map(label=>{const td = el('td');td.dataset.label = t(label);tr.append(td);return td;});
@@ -267,7 +303,7 @@ function initializeReceiptBatches() {
         const date = input('date',item.form.effectiveDate,t('date'),()=>{item.form.effectiveDate = date.value || null;mark(item,true);});date.max = editor.dataset.today;cells[1].append(date);bindField(item,'date',date,cells[1]);
         cells[3].append(item.balance);
         if(legacy){
-            const labels = item.form.rows.map(row=>item.labels?.[row.loanId] || row.loanId).filter(Boolean).join(', ');
+            const labels = item.form.rows.map(row=>item.labels?.[row.loanId]).filter(Boolean).join(', ');
             const list = el('span',labels || '—','batch-loan-list');list.title = labels;cells[2].append(list);
             item.balance.textContent = '—';
             cells[4].append(el('strong',item.total == null?'—':money(item.total)));
@@ -290,27 +326,45 @@ function initializeReceiptBatches() {
             mark(item);
         },message=>showIssue(item,message,false,'','account'));cells[5].append(receiving);bindField(item,'account',receiving,cells[5]);
         const evidence = input('text',item.form.evidence,t('evidence'),()=>{item.form.evidence = evidence.value;mark(item);});evidence.maxLength = 500;cells[6].append(evidence);bindField(item,'evidence',evidence,cells[6]);
-        if(legacy || !canRemove(item))tr.querySelectorAll('input,select').forEach(n=>n.disabled = true);
+        if(legacy || !canRemove(item))tr.querySelectorAll('input:not([data-batch-select]),select').forEach(n=>n.disabled = true);
         paintReceiptBalance(item);body.append(tr);showIssue(item,item.failureKey?item.failureMessage || t('error.failed'):'',false,item.failureKey);
     }
-    function rerender(){cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',null,'batch-empty-cell');td.colSpan = 8;td.append(el('span',t('empty'),'batch-empty-message'));tr.append(td);body.append(tr);}}
+    function rerender(){selectReceipt(null);cleanups.forEach(fn=>fn());cleanups = [];body.replaceChildren();for(const item of rows.values())renderItem(item);if(!rows.size){const tr = el('tr'), td = el('td',null,'batch-empty-cell');td.colSpan = 9;td.append(el('span',t('empty'),'batch-empty-message'));tr.append(td);body.append(tr);}}
+    function spin(name,waiting){
+        if(waiting && !spinners.has(name))spinners.set(name,window.AppLoading?.action(actionButtons[name]));
+        if(!waiting && spinners.has(name)){spinners.get(name)?.();spinners.delete(name);}
+    }
     function controls(){
-        const updating = loading || removing;
+        const updating = loading || removing || !!activeAction || leaving;
+        viewReceipt.disabled = updating || !selectedReceipt;
         const spreadsheet = editor.querySelector('[data-batch-spreadsheet]');
         if (spreadsheet) spreadsheet.hidden = removing || !editable();
         if(editor.dataset.payrollSealed === 'true')editor.querySelectorAll('[data-default-date],[data-default-account]').forEach(n=>{n.disabled = true;n.closest('label').hidden = true;});
         editor.querySelector('[data-batch-add]').disabled = updating || !editable() || editor.dataset.payrollSealed === 'true';
         editor.querySelector('[data-batch-save]').disabled = updating || !editable() || editor.dataset.payrollSealed === 'true' || (!dirty.size && !pending.size);
-        editor.querySelector('[data-batch-validate]').disabled = updating || !editable() || !summary || summary.receipts === summary.posted || pending.size>0;
-        editor.querySelector('[data-batch-post]').disabled = updating || !editable() || dirty.size>0 || pending.size>0 || summary?.batch.state !== 'READY';
+        actionButtons.validate.disabled = updating || !editable() || !summary || summary.receipts === summary.posted || pending.size>0;
+        actionButtons.post.disabled = updating || !editable() || dirty.size>0 || pending.size>0 || summary?.batch.state !== 'READY';
         editor.querySelector('[data-batch-filter]').disabled = removing;
         for(const item of rows.values())if(item.removeButton)item.removeButton.disabled = updating || !canRemove(item);
-        const stop = editor.querySelector('[data-batch-stop]');stop.hidden = !busy() || !canEdit;stop.disabled = !!summary?.batch.cancelRequested;
-        window.ResourceTable.setPage(tableRegion,{page,hasNext,loading:updating});
+        const stop = actionButtons.stop;
+        stop.hidden = !busy() || !canEdit;
+        stop.disabled = updating || !!summary?.batch.cancelRequested;
+        spin('validate',activeAction === 'validate' || summary?.batch.state === 'VALIDATING');
+        spin('post',activeAction === 'post' || summary?.batch.state === 'POSTING' || leaving);
+        spin('stop',activeAction === 'stop' || (busy() && summary?.batch.cancelRequested));
+        window.ResourceTable.setPage(tableRegion,{page,hasNext,loading:loading || removing});
+    }
+    function finishPosting(){
+        if(!awaitingPost || summary.batch.state === 'POSTING')return;
+        awaitingPost = false;
+        if(!editor.isConnected || summary.batch.state !== 'COMPLETED')return;
+        leaving = true;
+        editor.querySelector('[data-batch-completed]').click();
     }
     async function refreshSummary(){summary = await api(url + '/summary');canEdit = editor.dataset.canEdit === 'true';
+        finishPosting();if(leaving)return;
         const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed]]){const fact = el('div'),valueNode=el('dd');if(label==='status'){const state=el('span',String(value));state.dataset.resourceStatus=summary.batch.state;valueNode.append(state);}else valueNode.textContent=String(value);fact.append(el('dt',t(label)),valueNode);area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
-    async function load(){if(loading)return;loading = true;try{controls();await flush();await refreshSummary();const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){body.querySelector('[data-batch-loading]')?.replaceWith(document.createTextNode(t('error.failed')));globalError(error.message);}finally{loading = false;controls();}}
+    async function load(){if(loading || leaving)return;loading = true;selectReceipt(null);try{controls();await flush();await refreshSummary();if(leaving)return;const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){body.querySelector('[data-batch-loading]')?.replaceWith(document.createTextNode(t('error.failed')));globalError(error.message);}finally{loading = false;controls();}}
     editor.querySelector('[data-default-account]').addEventListener('change',event=>{
         const account = event.target;if(!editable() || editor.dataset.payrollSealed === 'true' || !account.value)return;
         if(removing)return;
@@ -322,21 +376,39 @@ function initializeReceiptBatches() {
     tableRegion.addEventListener('resource-table:refresh',event=>{event.preventDefault();if(removing)return;if(!dirty.size && !pending.size){load();return;}openConfirm(t('reloadTitle'),t('reloadMessage'),t('reload'),async()=>{for(const item of rows.values()){item.discarding = true;clearTimeout(item.timer);}await Promise.allSettled([...rows.values()].map(item=>item.saving).filter(Boolean));dirty.clear();await load();});});
     tableRegion.addEventListener('resource-table:page',async event=>{if(loading || removing)return;try{await flush();page = event.detail.page;await load();}catch(error){globalError(error.message);}});
     editor.querySelector('[data-batch-filter]').addEventListener('change',async event=>{try{await flush();filter = event.target.value;page = 0;await load();}catch(error){globalError(error.message);}});
-    async function action(kind,version){await flush();if(kind !== 'post')await refreshSummary();await api(url + '/' + kind + (kind === 'stop'?'':'?version=' + (version ?? summary.batch.version)),'POST');await load();}
-    editor.querySelector('[data-batch-validate]').addEventListener('click',()=>action('validate').catch(error=>globalError(error.message)));
-    editor.querySelector('[data-batch-stop]').addEventListener('click',()=>action('stop').catch(error=>globalError(error.message)));
+    async function action(kind,version){
+        if(activeAction || leaving)return;
+        activeAction = kind;
+        controls();
+        try{
+            await flush();
+            if(kind !== 'post')await refreshSummary();
+            summary = await api(url + '/' + kind + (kind === 'stop'?'':'?version=' + (version ?? summary.batch.version)),'POST');
+            if(kind === 'post')awaitingPost = true;
+            finishPosting();
+            await load();
+        }finally{activeAction = null;controls();}
+    }
+    actionButtons.validate.addEventListener('click',()=>action('validate').catch(error=>globalError(error.message)));
+    actionButtons.stop.addEventListener('click',()=>action('stop').catch(error=>globalError(error.message)));
     const modal = document.querySelector('[data-batch-confirm]');document.body.append(modal);const dialog = modal.querySelector('[role="dialog"]');let priorOverflow,reviewedVersion,confirmedAction,modalBusy = false;
     const close = () => {if(modalBusy)return;modal.hidden = true;modal.classList.remove('is-open');document.body.style.overflow = priorOverflow;lastFocus?.focus();};
     const openConfirm = (title,message,actionText,action) => {confirmedAction = action;lastFocus = document.activeElement;priorOverflow = document.body.style.overflow;document.body.style.overflow = 'hidden';modal.hidden = false;modal.classList.add('is-open');modal.querySelector('#batch-confirm-title').textContent = title;modal.querySelector('[data-confirm-message]').textContent = message;modal.querySelector('[data-confirm-post]').textContent = actionText;modal.querySelector('.app-modal-actions [data-confirm-cancel]').focus();};
     modal.querySelectorAll('[data-confirm-cancel]').forEach(b=>b.addEventListener('click',close));
-    editor.querySelector('[data-batch-post]').addEventListener('click',()=>{reviewedVersion = summary.batch.version;openConfirm(t('postTitle'),t('postMessage') + ' ' + (summary.receipts-summary.posted) + ' · ' + money(summary.remainingTotal) + ' TZS',t('postConfirm'),()=>action('post',reviewedVersion));});
-    modal.querySelector('[data-confirm-post]').addEventListener('click',async event=>{event.target.disabled = true;modalBusy = true;modal.querySelectorAll('[data-confirm-cancel]').forEach(b=>b.disabled = true);try{await confirmedAction();}catch(error){globalError(error.message);}finally{modalBusy = false;event.target.disabled = false;modal.querySelectorAll('[data-confirm-cancel]').forEach(b=>b.disabled = false);close();}});
+    actionButtons.post.addEventListener('click',()=>{reviewedVersion = summary.batch.version;openConfirm(t('postTitle'),t('postMessage') + ' ' + (summary.receipts-summary.posted) + ' · ' + money(summary.remainingTotal) + ' TZS',t('postConfirm'),()=>action('post',reviewedVersion));});
+    modal.querySelector('[data-confirm-post]').addEventListener('click',async event=>{
+        const button = event.currentTarget;
+        button.disabled = true;modalBusy = true;modal.querySelectorAll('[data-confirm-cancel]').forEach(b=>b.disabled = true);
+        const finish = window.AppLoading?.action(button);
+        try{await confirmedAction();}catch(error){globalError(error.message);}
+        finally{finish?.();modalBusy = false;button.disabled = false;modal.querySelectorAll('[data-confirm-cancel]').forEach(b=>b.disabled = false);close();}
+    });
     modal.addEventListener('keydown',event=>{if(modalBusy && (event.key === 'Escape' || event.key === 'Tab')){event.preventDefault();dialog.focus();return;}if(event.key === 'Escape'){event.preventDefault();close();}if(event.key === 'Tab'){const buttons = [...dialog.querySelectorAll('button:not([disabled])')],first = buttons[0],last = buttons.at(-1);if(event.shiftKey && document.activeElement === first){event.preventDefault();last.focus();}else if(!event.shiftKey && document.activeElement === last){event.preventDefault();first.focus();}}});
     editor.addEventListener('keydown',event=>{if(event.key === 'Enter' && event.target.matches('input,select'))event.preventDefault();if(event.altKey && event.key.toLowerCase() === 'n'){event.preventDefault();editor.querySelector('[data-batch-add]').click();}});
     window.addEventListener('beforeunload',event=>{if(dirty.size || pending.size || removing){event.preventDefault();event.returnValue = '';}});
     document.addEventListener('click',event=>{const a = event.target.closest('a[href]');if(!a || a.target === '_blank' || (!dirty.size && !pending.size && !removing) || event.ctrlKey || event.metaKey)return;event.preventDefault();if(!removing)flush().then(()=>a.click()).catch(error=>globalError(error.message));});
     document.addEventListener('workspace:before-navigate',event=>{if(dirty.size || pending.size || removing){event.preventDefault();if(!removing)flush().then(event.detail.resume).catch(error=>globalError(error.message));}});
-    const poll = setInterval(async()=>{if(loading || removing || dirty.size || pending.size || document.hidden)return;try{await refreshSummary();if(!removing && (busy() || loadedBusy))await load();}catch(error){globalError(error.message);}},2500);
+    const poll = setInterval(async()=>{if(!editor.isConnected){clearInterval(poll);return;}if(loading || removing || activeAction || leaving || dirty.size || pending.size || document.hidden)return;try{await refreshSummary();if(!removing && !leaving && (busy() || loadedBusy))await load();}catch(error){globalError(error.message);}},2500);
     window.addEventListener('pagehide',()=>{clearInterval(poll);cleanups.forEach(fn=>fn());rows.forEach(item=>clearTimeout(item.timer));});
     load();
 }

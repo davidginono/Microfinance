@@ -25,7 +25,8 @@ async function renderPdf(blob, document, signal, objectUrls) {
         void loading.destroy().catch(() => {});
     };
     signal.addEventListener('abort', cancel, {once: true});
-    const canvas = document.createElement('canvas');
+    // PDF.js registers embedded fonts in the active document. Its canvas must use those fonts.
+    const canvas = window.document.createElement('canvas');
     const style = document.createElement('style');
     style.textContent = 'html,body{margin:0;padding:0} img{display:block;break-inside:avoid} img+img{break-before:page}';
     const blankFooter = '@bottom-left{content:"";width:100%;height:1px}';

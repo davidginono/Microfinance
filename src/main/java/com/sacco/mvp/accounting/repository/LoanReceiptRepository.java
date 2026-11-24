@@ -10,19 +10,23 @@ import java.sql.*;
 import java.time.*;
 import java.util.*;
 
+import static com.sacco.mvp.accounting.batch.repository.ReceiptBatchReferenceSql.*;
+
 @Repository @RequiredArgsConstructor
 public class LoanReceiptRepository {
     private final JdbcTemplate jdbc;
     private static final String HEAD="""
-        select r.*,null::uuid journal_id,'RECEIPT' type,i.sacco_name institution_name,
+        select r.*,%s display_reference,null::uuid journal_id,'RECEIPT' type,i.sacco_name institution_name,
         coalesce(nullif(s.address_location,''),r.station_id) branch_name,
         (select x.id from accountant_loan_receipt x where x.reverses_id=r.id) reversed_by
         from accountant_loan_receipt r join registered_saccos i on i.sacco_id=r.sacco_id
         join sacco_stations s on s.sacco_id=r.sacco_id and s.station_id=r.station_id
-        """;
+        """.formatted(RECEIPT_REFERENCE)+RECEIPT_JOINS;
     private static final String LEGACY="""
         select p.id,p.sacco_id,p.station_id,t.receipt_reference number,'RECEIPT' type,p.effective_date,
-        m.full_name party,m.member_no client_number,p.reference,p.notes description,p.evidence,p.money_account_id,
+        m.full_name party,m.member_no client_number,
+        case when %s is null then p.reference else t.receipt_reference end reference,
+        p.notes description,p.evidence,p.money_account_id,
         p.amount total,1 transaction_count,null::uuid journal_id,p.actor_id posted_by,u.full_name posted_by_name,
         p.recorded_at posted_at,p.reverses_id,(select x.id from accountant_loan_post x where x.reverses_id=p.id) reversed_by,
         i.sacco_name institution_name,coalesce(nullif(s.address_location,''),p.station_id) branch_name,
@@ -34,11 +38,11 @@ public class LoanReceiptRepository {
         where p.sacco_id=? and p.station_id=? and p.id=? and p.kind in ('PAYMENT','REVERSAL')
         and not exists(select 1 from accountant_loan_receipt_row x where x.posting_id=p.id)
         and not exists(select 1 from lending_group_receipt_loan x where x.posting_id=p.id)
-        """;
-    public Optional<LoanReceipt> legacy(AppUserPrincipal a,UUID id){return jdbc.query(LEGACY,(r,n)->new LoanReceipt(header(r),r.getString("client_number"),List.of(row(r))),a.getSaccoId(),a.getStationId(),id).stream().findFirst();}
+        """.formatted(POST_ITEM_ID);
+    public Optional<LoanReceipt> legacy(AppUserPrincipal a,UUID id){return jdbc.query(LEGACY,(r,n)->new LoanReceipt(header(r),r.getString("client_number"),List.of(row(r,"reference"))),a.getSaccoId(),a.getStationId(),id).stream().findFirst();}
     public Optional<LoanReceipt> find(AppUserPrincipal a,UUID id,boolean lock){
         return jdbc.query(HEAD+" where r.sacco_id=? and r.station_id=? and r.id=?"+(lock?" for update of r":""),
-            (r,n)->new LoanReceipt(header(r),r.getString("client_number"),List.of(),null,r.getString("payer_name")),a.getSaccoId(),a.getStationId(),id).stream().findFirst();
+            (r,n)->new LoanReceipt(header(r,lock?"reference":"display_reference"),r.getString("client_number"),List.of(),null,r.getString("payer_name")),a.getSaccoId(),a.getStationId(),id).stream().findFirst();
     }
     public Optional<UUID> retry(AppUserPrincipal a,UUID key,String hash){
         var rows=jdbc.queryForList("select id,payload_hash,posted_by from accountant_loan_receipt where sacco_id=? and station_id=? and request_key=?",a.getSaccoId(),a.getStationId(),key);
@@ -47,10 +51,14 @@ public class LoanReceiptRepository {
         return Optional.of((UUID)r.get("id"));
     }
     public List<LoanReceiptRow> rows(AppUserPrincipal a,UUID id){return jdbc.query("""
-        select x.line_no,x.description,p.*,p.id posting_id,l.loan_id loan_number,coalesce((select t.receivable_account_name from loan_charge_event e join loan_charge_term t on t.id=e.term_id where e.posting_id=p.id limit 1),'') charge_account from accountant_loan_receipt_row x
+        select x.line_no,x.description,p.*,p.id posting_id,l.loan_id loan_number,
+        case when %s is null then p.reference else (%s)||' / '||x.line_no end display_reference,
+        coalesce((select t.receivable_account_name from loan_charge_event e join loan_charge_term t on t.id=e.term_id where e.posting_id=p.id limit 1),'') charge_account from accountant_loan_receipt_row x
         join accountant_loan_post p on p.id=x.posting_id join loan_applications l on l.id=p.loan_id
+        join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=x.sacco_id and r.station_id=x.station_id
+        %s
         where x.receipt_id=? and x.sacco_id=? and x.station_id=? order by x.line_no limit 50
-        """,(r,n)->row(r),id,a.getSaccoId(),a.getStationId());}
+        """.formatted(RECEIPT_ITEM_ID,RECEIPT_REFERENCE,RECEIPT_JOINS),(r,n)->row(r,"display_reference"),id,a.getSaccoId(),a.getStationId());}
     public void insert(AppUserPrincipal a,Voucher v,UUID requestKey,UUID client,String clientNumber,String hash,List<LoanReceiptRow> rows,String payer){
         jdbc.update("""
             insert into accountant_loan_receipt(id,sacco_id,station_id,number,request_key,payload_hash,effective_date,borrower_party_id,client_id,party,client_number,
@@ -68,10 +76,12 @@ public class LoanReceiptRepository {
               select id,sacco_id,station_id,number,request_key,effective_date,party,reference,description,evidence,money_account_id,
               total,transaction_count,journal_id,posted_by,posted_at,reverses_id,client_id as borrower_party_id,client_number from accounting_voucher where type='RECEIPT' and sacco_id=? and station_id=?
               union all
-              select id,sacco_id,station_id,number,request_key,effective_date,party,reference,description,evidence,money_account_id,
-              total,transaction_count,null::uuid,posted_by,posted_at,reverses_id,borrower_party_id,client_number from accountant_loan_receipt r where sacco_id=? and station_id=? and ? and (? or not exists(select 1 from loan_borrower_party b where b.id=r.borrower_party_id and b.kind='JOINT_GROUP'))
+              select r.id,r.sacco_id,r.station_id,r.number,r.request_key,r.effective_date,r.party,%s,r.description,r.evidence,r.money_account_id,
+              r.total,r.transaction_count,null::uuid,r.posted_by,r.posted_at,r.reverses_id,r.borrower_party_id,r.client_number
+              from accountant_loan_receipt r %s
+              where r.sacco_id=? and r.station_id=? and ? and (? or not exists(select 1 from loan_borrower_party party where party.id=r.borrower_party_id and party.kind='JOINT_GROUP'))
               union all
-              select p.id,p.sacco_id,p.station_id,t.receipt_reference,p.request_key,p.effective_date,m.full_name,p.reference,p.notes,p.evidence,p.money_account_id,
+              select p.id,p.sacco_id,p.station_id,t.receipt_reference,p.request_key,p.effective_date,m.full_name,case when %s is null then p.reference else t.receipt_reference end,p.notes,p.evidence,p.money_account_id,
               p.amount,1,null::uuid,p.actor_id,p.recorded_at,p.reverses_id,l.borrower_party_id,m.member_no from accountant_loan_post p
               join loan_repayment_transactions t on t.id=p.transaction_id join loan_applications l on l.id=p.loan_id join loan_borrower_directory m on m.party_id=l.borrower_party_id and m.sacco_id=l.sacco_id
               where p.sacco_id=? and p.station_id=? and ? and (? or m.kind<>'JOINT_GROUP') and p.kind in ('PAYMENT','REVERSAL')
@@ -90,8 +100,9 @@ public class LoanReceiptRepository {
             where (?='' or strpos(lower(v.number||' '||v.party||' '||v.reference),?)>0)
             and (?::date is null or v.effective_date>=?::date) and (?::date is null or v.effective_date<=?::date)
             and (?='' or (case when v.reverses_id is not null then 'REVERSAL' when v.reversed_by is not null then 'REVERSED' else 'POSTED' end)=?)
-            """+" order by "+order+" limit ? offset ?",(r,n)->header(r),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeGroups,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
+            """.formatted(RECEIPT_REFERENCE,RECEIPT_JOINS,POST_ITEM_ID)+" order by "+order+" limit ? offset ?",(r,n)->header(r),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeLoans,includeGroups,a.getSaccoId(),a.getStationId(),includeGroups,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
-    private LoanReceiptRow row(ResultSet r)throws SQLException{return new LoanReceiptRow(r.getInt("line_no"),r.getObject("posting_id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("description"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getBigDecimal("principal_balance"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("reference"),r.getBigDecimal("amount").subtract(r.getBigDecimal("principal_amount")).subtract(r.getBigDecimal("interest_amount")).signum()>0?r.getString("charge_account"):"");}
-    private Voucher header(ResultSet r)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.RECEIPT,r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("borrower_party_id",UUID.class),r.getString("client_number"));}
+    private LoanReceiptRow row(ResultSet r,String referenceColumn)throws SQLException{return new LoanReceiptRow(r.getInt("line_no"),r.getObject("posting_id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("description"),r.getBigDecimal("amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getBigDecimal("principal_balance"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString(referenceColumn),r.getBigDecimal("amount").subtract(r.getBigDecimal("principal_amount")).subtract(r.getBigDecimal("interest_amount")).signum()>0?r.getString("charge_account"):"");}
+    private Voucher header(ResultSet r)throws SQLException{return header(r,"reference");}
+    private Voucher header(ResultSet r,String referenceColumn)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.RECEIPT,r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString(referenceColumn),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("borrower_party_id",UUID.class),r.getString("client_number"));}
 }

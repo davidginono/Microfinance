@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 import java.sql.*;
 import java.util.*;
 
+import static com.sacco.mvp.accounting.batch.repository.ReceiptBatchReferenceSql.*;
+
 /** Scoped posted sources; envelopes never add a second loan collection. */
 @Repository @RequiredArgsConstructor
 public class ManagementReportRepository {
@@ -273,7 +275,7 @@ public class ManagementReportRepository {
           left join gl_activity ac on ac.id=tc.activity_id and ac.sacco_id=tc.sacco_id
           where v.sacco_id=:institution and v.station_id=:branch and v.type='RECEIPT' and v.posted_at<=:cutoff and v.effective_date between :from and :through
           union all
-          select r.id,r.sacco_id,r.station_id,r.effective_date,r.posted_at,r.number,r.reference,r.party,r.money_account_id,r.posted_by,r.borrower_party_id,
+          select r.id,r.sacco_id,r.station_id,r.effective_date,r.posted_at,r.number,%s,r.party,r.money_account_id,r.posted_by,r.borrower_party_id,
             x.line_no*3+part.n,x.description,null::text,null::text,'@loan',part.component,a.loan_id,r.client_number,m.phone,
             case when r.reverses_id is null then 0 else part.amount end,
             case when r.reverses_id is null then part.amount else 0 end
@@ -283,9 +285,11 @@ public class ManagementReportRepository {
           cross join lateral (values (0,'PRINCIPAL',p.principal_amount),(1,'INTEREST',p.interest_amount),(2,'CHARGES',p.charge_amount)) part(n,component,amount)
           join gl_journal j on j.id=p.journal_id and j.sacco_id=p.sacco_id and j.station_id=p.station_id and j.state='POSTED' and j.posted_at<=:cutoff
           join loan_borrower_contact m on m.loan_id=a.id and m.id=r.borrower_party_id and m.sacco_id=r.sacco_id and m.station_id=r.station_id
+          %s
           where r.sacco_id=:institution and r.station_id=:branch and r.posted_at<=:cutoff and r.effective_date between :from and :through and part.amount>0
           union all
-          select p.id,p.sacco_id,p.station_id,p.effective_date,p.recorded_at,p.reference,p.reference,m.full_name,p.money_account_id,p.actor_id,m.id,
+          select p.id,p.sacco_id,p.station_id,p.effective_date,p.recorded_at,case when %s is null then p.reference else a.loan_id end,
+            case when %s is null then p.reference else a.loan_id end,m.full_name,p.money_account_id,p.actor_id,m.id,
             part.n,p.notes,null::text,null::text,'@loan',part.component,a.loan_id,m.member_no,m.phone,
             case when p.kind='REVERSAL' then part.amount else 0 end,case when p.kind='PAYMENT' then part.amount else 0 end
           from accountant_loan_post p join loan_applications a on a.id=p.loan_id and a.sacco_id=p.sacco_id and a.station_id=p.station_id
@@ -304,12 +308,13 @@ public class ManagementReportRepository {
           where (not :bounded or b.id in(select id from cash_range))
             and (cast(:clientId as uuid) is null or r.client_id=:clientId)
         )
-        """;
+        """.formatted(RECEIPT_REFERENCE,RECEIPT_JOINS,POST_ITEM_ID,POST_ITEM_ID);
     private static final String CASH=CASH_RANGE+"""
         report_rows as (
           select b.code||' | '||b.name as "groupName",j.effective_date::text||j.posted_at::text||l.id::text as "rowOrder",
             j.effective_date as date,coalesce(v.client_number,r.client_number,m.member_no) as "clientNumber",coalesce(v.party,r.party,m.full_name,'') as name,
-            coalesce(nullif(v.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as particulars,coalesce(v.reference,r.reference,p.reference,j.source_reference) as reference,
+            coalesce(nullif(v.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as particulars,
+            coalesce(v.reference,(%s),case when %s is null then p.reference else a.loan_id end,j.source_reference) as reference,
             l.debit as "moneyIn",l.credit as "moneyOut",
             case when q.kind='DISBURSEMENT_REVERSAL' then q.amount when p.id is not null then case when l.debit>0 then p.principal_amount else 0 end else null end as "principalIn",
             case when p.id is not null then case when l.credit>0 then p.principal_amount else 0 end else null end as "principalOut",
@@ -325,12 +330,13 @@ public class ManagementReportRepository {
           left join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=j.sacco_id and m.station_id=j.station_id
           left join accountant_loan_receipt_row x on x.posting_id=p.id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
+          %s
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
             and j.effective_date between :from and :through
             and (b.id in(select id from cash_range) or (not :bounded and b.purpose in ('CASH','BANK','MOBILE_MONEY')))
             and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.borrower_party_id,m.id)=:clientId)
         )
-        """;
+        """.formatted(RECEIPT_REFERENCE,POST_ITEM_ID,RECEIPT_JOINS);
     private static final String CLIENT_JOINS="""
         join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch
         join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id

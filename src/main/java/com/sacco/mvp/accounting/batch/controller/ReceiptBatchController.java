@@ -18,6 +18,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.*;
 
 @Controller @RequiredArgsConstructor @RequestMapping("/finance/batches/receipts")
@@ -34,6 +35,14 @@ public class ReceiptBatchController {
     @GetMapping("/new") public String createForm(@AuthenticationPrincipal AppUserPrincipal a){batches.authorize(a,true);return "accounting/batches/new";}
     @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam String title){return "redirect:/finance/batches/receipts/"+batches.create(a,title);}
     @GetMapping("/{id}") public String editor(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){m.addAttribute("summary",batches.get(a,id));m.addAttribute("payrollLinked",batches.payrollLinked(a,id));m.addAttribute("today",clock.today());return "accounting/batches/editor";}
+    @GetMapping("/{id}/posted")
+    public String posted(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash){
+        var summary = batches.get(actor,id);
+        if(!"COMPLETED".equals(summary.batch().state()) || !actor.getMemberId().equals(summary.batch().owner()))
+            return "redirect:/finance/batches/receipts/"+id;
+        flash.addFlashAttribute("successMessageCode","batch.postSuccess");
+        return "redirect:/finance/batches/receipts";
+    }
     @GetMapping("/{id}/summary") @ResponseBody public Summary summary(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id){return batches.get(a,id);}
     @GetMapping("/{id}/items") @ResponseBody public Page<Item> items(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="")String state,Locale locale){var result=batches.items(a,id,page,state);return new Page<>(result.rows().stream().map(i->i.withFailureMessage(i.failureKey()==null?"":messages.getMessage(i.failureKey(),null,messages.getMessage("batch.error.failed",null,locale),locale))).toList(),result.page(),result.hasNext());}
     @PutMapping("/{id}/items/{item}") @ResponseBody public Item save(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID item,@RequestBody SaveItem form){return batches.save(a,id,item,form);}

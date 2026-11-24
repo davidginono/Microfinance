@@ -645,7 +645,7 @@ public class LoanRecordingService {
         return new LoanExport(detail,rows.stream().filter(p->!Set.of("DISBURSEMENT","CHARGE_ASSESS","CHARGE_UNDO").contains(p.kind())).toList(),charges.quotedTerms(a,id));
     }
     @Transactional(readOnly=true) public List<JournalLine> postingLines(AppUserPrincipal a,UUID id){authorize(a,"EXPORT");var posting=records.posting(a,id);return records.journalLines(a,posting.journalId());}
-    @Transactional(readOnly=true) public Posting posting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.posting(a,id);}
+    @Transactional(readOnly=true) public Posting posting(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.displayedPosting(a,id);}
     @Transactional(readOnly=true) public UUID disbursementCorrection(AppUserPrincipal a,UUID id){authorize(a,"VIEW");return records.disbursementCorrection(a,id);}
     @Transactional(readOnly=true) public Optional<Page<ScheduleRow>> actualRepaymentSchedule(AppUserPrincipal actor,UUID loanId,int page){
         authorize(actor,"VIEW");check(page>=0 && page<24,"filter");records.record(actor,loanId,false);

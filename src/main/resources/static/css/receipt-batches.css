@@ -14,14 +14,15 @@
 .batch-grid th { position:sticky; top:0; z-index:2; background:#fafafa; }
 .batch-grid td { vertical-align:top; text-align:left; min-width:0; }
 .batch-grid :is(.aws-control,.neo-select) { width:100%; min-width:0; }
-.batch-grid > thead > tr > th:nth-child(1) { width:230px; }
-.batch-grid > thead > tr > th:nth-child(2) { width:164px; }
-.batch-grid > thead > tr > th:nth-child(3) { width:205px; }
-.batch-grid > thead > tr > th:nth-child(4) { width:240px; }
-.batch-grid > thead > tr > th:nth-child(5) { width:160px; }
-.batch-grid > thead > tr > th:nth-child(6) { width:180px; }
-.batch-grid > thead > tr > th:nth-child(7) { width:220px; }
-.batch-grid > thead > tr > th:nth-child(8) { width:155px; }
+.batch-grid > thead > tr > th:nth-child(1) { width:42px; }
+.batch-grid > thead > tr > th:nth-child(2) { width:230px; }
+.batch-grid > thead > tr > th:nth-child(3) { width:164px; }
+.batch-grid > thead > tr > th:nth-child(4) { width:205px; }
+.batch-grid > thead > tr > th:nth-child(5) { width:240px; }
+.batch-grid > thead > tr > th:nth-child(6) { width:160px; }
+.batch-grid > thead > tr > th:nth-child(7) { width:180px; }
+.batch-grid > thead > tr > th:nth-child(8) { width:220px; }
+.batch-grid > thead > tr > th:nth-child(9) { width:155px; }
 .batch-client { display:flex; align-items:center; gap:6px; }
 .batch-client > .neo-select,.batch-client > select { min-width:0; flex:1; }
 .batch-remove { flex:0 0 auto; }

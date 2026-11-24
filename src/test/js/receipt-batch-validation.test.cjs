@@ -5,28 +5,29 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/receipt-batches.js','utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const settle=async()=>{for(let n=0;n<6;n++)await tick();};
-async function setup(estimate,patch={},realWidgets=false){
-  const messages=Object.fromEntries(readFileSync('src/main/resources/messages_en.properties','utf8').split(/\r?\n/).filter(line=>/^batch\.(?:field\.|(?:balances|viewBalances|totalLoanOutstanding|principalOutstanding|interestDue|chargesOutstanding)=)/.test(line)).map(line=>{const split=line.indexOf('=');return [line.slice(6,split),line.slice(split+1)];}));Object.assign(messages,{saveFailed:'Could not save draft.',checking:'Checking receipt...',client:'Client',status:'Status','state.DRAFT':'Draft',receipts:'Receipts',total:'Total',posted:'Posted',ready:'Ready',failed:'Needs attention',remaining:'Remaining'});
+async function setup(estimate,patch={},realWidgets=false,initialState='DRAFT'){
+  const messages=Object.fromEntries(readFileSync('src/main/resources/messages_en.properties','utf8').split(/\r?\n/).filter(line=>/^batch\.(?:field\.|(?:balances|viewBalances|totalLoanOutstanding|principalOutstanding|interestDue|chargesOutstanding)=)/.test(line)).map(line=>{const split=line.indexOf('=');return [line.slice(6,split),line.slice(split+1)];}));Object.assign(messages,{saveFailed:'Could not save draft.',checking:'Checking receipt...',client:'Client',status:'Status','state.DRAFT':'Draft',receipts:'Receipts',total:'Total',posted:'Posted',ready:'Ready',failed:'Needs attention',remaining:'Remaining',select:'Select',selected:'Selected','state.POSTED':'Posted','state.READY':'Ready','state.POSTING':'Posting','state.COMPLETED':'Completed'});
   const dom=new JSDOM(`<body><h1>Repayment 1</h1><main data-receipt-batch="batch" data-can-edit="true" data-today="2026-10-19">
     <section class="erp-resource-section"><h2>Batch details</h2><dl class="erp-detail-facts" data-batch-summary></dl></section><div data-batch-error hidden></div>
-    <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2>Receipts</h2><div class="accounting-actions"><button data-batch-refresh data-aws-table-refresh>Refresh</button><button data-batch-add></button><button data-batch-save></button></div></div><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
+    <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external" data-table-selection="single"><div class="app-table-titlebar"><h2>Receipts</h2><div class="accounting-actions"><button data-batch-refresh data-aws-table-refresh>Refresh</button><button data-table-command data-batch-view disabled>View</button><button data-batch-add></button><button data-batch-save></button></div></div><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
     <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label>Date<input data-default-date value="2026-10-19"></label><label>Account<select data-default-account data-batch-choice="money"></select></label><label>Show<select data-batch-filter></select></label></div>
-    <div class="erp-table-scroll batch-grid-scroll"><table class="erp-table" data-table-sort-mode="none"><thead><tr>${Array.from({length:8},(_,i)=>`<th data-table-identifier>Column ${i}</th>`).join('')}</tr></thead><tbody data-batch-rows></tbody></table></div></section><span data-batch-progress></span>
+    <span data-batch-selection></span><div class="erp-table-scroll batch-grid-scroll"><table class="erp-table" data-table-sort-mode="none"><thead><tr>${Array.from({length:9},(_,i)=>`<th data-table-identifier>Column ${i}</th>`).join('')}</tr></thead><tbody data-batch-rows></tbody></table></div></section><span data-batch-progress></span><a hidden data-batch-completed href="/finance/batches/receipts/batch/posted"></a>
     <div data-batch-confirm hidden><div role="dialog"><h2 id="batch-confirm-title"></h2><p data-confirm-message></p><div class="app-modal-actions"><button data-confirm-cancel></button><button data-confirm-post></button></div></div></div>
     <div data-batch-messages>${Object.entries(messages).map(([key,value])=>`<span data-message="${key}">${value}</span>`).join('')}</div>
-  </main></body>`,{url:'http://localhost/finance/batches/receipts/batch',runScripts:'outside-only'});
-  const w=dom.window,d=w.document;let autosave;
+  </main></body>`,{url:'http://localhost/finance/batches/receipts/batch',runScripts:'outside-only',pretendToBeVisual:true});
+  const w=dom.window,d=w.document;let autosave, poll;
   w.structuredClone=structuredClone;w.HTMLElement.prototype.scrollIntoView=function(){};
   const nativeTimeout=w.setTimeout.bind(w),nativeClear=w.clearTimeout.bind(w);
-  w.setTimeout=(fn,ms)=>ms===800?(autosave=fn,-1):nativeTimeout(fn,ms);w.clearTimeout=id=>id===-1?(autosave=undefined):nativeClear(id);w.setInterval=()=>0;
+  w.setTimeout=(fn,ms)=>ms===800?(autosave=fn,-1):nativeTimeout(fn,ms);w.clearTimeout=id=>id===-1?(autosave=undefined):nativeClear(id);w.setInterval=fn=>{poll=fn;return 0;};
   w.ResourceTable={setPage(){}};w.AppSearch={bind(){return {cancel(){}};}};
   w.NeoSelect={search(){return {input:d.createElement('input'),more:d.createElement('button'),setLoading(){}};}};
+  w.eval(readFileSync('src/main/resources/static/js/ui-loading.js','utf8'));
   if(realWidgets){w.requestAnimationFrame=fn=>nativeTimeout(fn,0);w.cancelAnimationFrame=nativeClear;d.body.append(d.querySelector('[data-batch-confirm]'));for(const file of ['live-search','select-enhancer','resource-table'])w.eval(readFileSync('src/main/resources/static/js/'+file+'.js','utf8'));}
   const item={id:'receipt',lineNo:1,version:0,state:'FAILED',clientLabel:'Client One',labels:{loan:'1'},failureKey:'voucher.error.date',failureMessage:'Choose a valid payment date.',form:{clientId:'client',effectiveDate:'2026-10-19',moneyAccountId:'cash',reference:'RV-009',rows:[{loanId:'loan',amount:'500.00',description:''}]}};
   Object.assign(item,patch);
   const response=(data,ok=true)=>({ok,redirected:false,headers:{get:()=> 'application/json'},json:async()=>data});
   w.fetch=async(url,options)=>{
-    if(url.endsWith('/summary'))return response({batch:{state:'DRAFT',version:0},receipts:1,posted:0,ready:0,failed:1,total:'500.00'});
+    if(url.endsWith('/summary'))return response({batch:{state:initialState,version:0},receipts:1,posted:0,ready:0,failed:1,total:'500.00',remainingTotal:'500.00'});
     if(url.includes('/items?'))return response({rows:[structuredClone(item)],hasNext:false});
     if(options?.method==='PUT')return response({...item,version:1});
     if(url.endsWith('/estimate'))return estimate(response);
@@ -35,7 +36,7 @@ async function setup(estimate,patch={},realWidgets=false){
     throw Error('Unexpected request '+url);
   };
   w.eval(readFileSync('src/main/resources/static/js/date-controls.js','utf8'));w.eval(source);if(d.readyState!=='complete')await new Promise(resolve=>w.addEventListener('load',resolve,{once:true}));await settle();
-  return {dom,w,d,async edit(value){const input=d.querySelector('input[type="number"]');input.value=value;input.dispatchEvent(new w.Event('input'));},async save(){const callback=autosave;autosave=undefined;callback();await settle();}};
+  return {dom,w,d,poll,response,async edit(value){const input=d.querySelector('input[type="number"]');input.value=value;input.dispatchEvent(new w.Event('input'));},async save(){const callback=autosave;autosave=undefined;callback();await settle();}};
 }
 const visible=d=>[...d.querySelectorAll('.batch-field-error:not([hidden])')];
 
@@ -48,6 +49,87 @@ test('batch editor initializes its real account selector and loads summary and r
     assert.equal(d.querySelector('[data-batch-confirm]').parentElement,d.body);
     assert.equal(d.querySelector('[data-batch-add]').disabled,false);
   }finally{dom.window.close();}
+});
+
+test('posted receipts use the selected row View action and show plain status',async()=>{
+  const {w,d}=await setup(()=>{},{state:'POSTED',receiptId:'posted-receipt',failureKey:null},true,'COMPLETED');
+  try {
+    const row=d.querySelector('.batch-row'), checkbox=row.querySelector('[data-batch-select]');
+    const view=d.querySelector('[data-batch-view]');
+    const destinations=[];
+    w.WorkspaceNavigation={navigate:url=>destinations.push(url)};
+    assert.equal(row.lastElementChild.textContent,'Posted');
+    assert.equal(row.lastElementChild.querySelector('a'),null);
+    assert.equal(view.disabled,true);
+    row.lastElementChild.click();
+    assert.equal(checkbox.checked,true);
+    assert.equal(row.classList.contains('resource-table-selected'),true);
+    assert.equal(view.disabled,false);
+    view.click();
+    assert.deepEqual(destinations,['/finance/vouchers/receipts/posted-receipt']);
+    d.querySelector('[data-resource-table]').dispatchEvent(new w.CustomEvent('resource-table:reset'));
+    assert.equal(view.disabled,true);
+    assert.equal(checkbox.checked,false);
+  }finally{w.close();}
+});
+
+test('posting shows progress and returns to the register only after completed posting',async()=>{
+  for(const outcome of ['COMPLETED','PARTIAL']){
+    const {w,d,poll,response}=await setup(()=>{},{state:'READY',failureKey:null},true,'READY');
+    try{
+      const post=d.querySelector('[data-batch-post]'), confirm=d.querySelector('[data-confirm-post]');
+      const original=w.fetch, states=state=>({batch:{state,version:1},receipts:1,posted:state==='COMPLETED'?1:0,ready:1,failed:0,total:'500.00',remainingTotal:'500.00'});
+      let finishPost, state='POSTING', redirects=0;
+      w.fetch=(url,options)=>{
+        if(url.endsWith('/post?version=0'))return new Promise(resolve=>{finishPost=()=>resolve(response(states(state)));});
+        if(url.endsWith('/summary'))return Promise.resolve(response(states(state)));
+        return original(url,options);
+      };
+      d.querySelector('[data-batch-completed]').addEventListener('click',event=>{event.preventDefault();redirects++;});
+      post.click();confirm.click();await settle();
+      assert.equal(confirm.classList.contains('is-action-loading'),true);
+      assert.equal(post.classList.contains('is-action-loading'),true);
+      finishPost();await settle();
+      assert.equal(confirm.classList.contains('is-action-loading'),false);
+      assert.equal(post.classList.contains('is-action-loading'),true);
+      assert.equal(redirects,0);
+      state=outcome;await poll();await poll();
+      assert.equal(redirects,outcome==='COMPLETED'?1:0);
+      if(outcome==='PARTIAL')assert.equal(post.classList.contains('is-action-loading'),false);
+    }finally{w.close();}
+  }
+});
+
+test('validate and stop show progress until the worker leaves its running state',async()=>{
+  const {w,d,poll,response}=await setup(()=>{},{},true);
+  try{
+    const validate=d.querySelector('[data-batch-validate]'), stop=d.querySelector('[data-batch-stop]');
+    const original=w.fetch, stages={};
+    let state='DRAFT', cancelRequested=false;
+    const summary=()=>({batch:{state,version:0,cancelRequested},receipts:1,posted:0,ready:0,failed:0,total:'500.00'});
+    w.fetch=(url,options)=>{
+      if(url.endsWith('/validate?version=0') || url.endsWith('/stop')){
+        const command=url.includes('/validate?')?'validate':'stop';
+        return new Promise(resolve=>{stages[command]=()=>resolve(response(summary()));});
+      }
+      if(url.endsWith('/summary'))return Promise.resolve(response(summary()));
+      return original(url,options);
+    };
+    validate.click();await settle();
+    assert.equal(validate.classList.contains('is-action-loading'),true);
+    state='VALIDATING';stages.validate();await settle();
+    assert.equal(validate.classList.contains('is-action-loading'),true);
+    assert.equal(stop.disabled,false);
+    stop.click();await settle();
+    assert.equal(stop.classList.contains('is-action-loading'),true);
+    cancelRequested=true;stages.stop();await settle();
+    assert.equal(stop.classList.contains('is-action-loading'),true);
+    assert.equal(stop.disabled,true);
+    state='CANCELLED';await poll();
+    assert.equal(validate.classList.contains('is-action-loading'),false);
+    assert.equal(stop.classList.contains('is-action-loading'),false);
+    assert.equal(stop.hidden,true);
+  }finally{w.close();}
 });
 
 test('confirmation still opens and cancels after the shared shell mounts its modal on the body',async()=>{
@@ -96,7 +178,7 @@ test('the balance dropdown shows only unpaid amounts and preserves the compact r
     select.dispatchEvent(new w.Event('change',{bubbles:true}));
     assert.equal(select.selectedOptions[0].textContent,'View balances');
     assert.equal(d.querySelector('input[type="number"]').value,'50.00');
-    assert.equal(d.querySelector('.batch-row').cells.length,8);
+    assert.equal(d.querySelector('.batch-row').cells.length,9);
   }finally{dom.window.close();}
 });
 test('missing loan balances remain unavailable after the payment date changes',async()=>{
@@ -196,9 +278,10 @@ test('older multi-loan receipts show their stored total and status without an ed
   const {dom,d}=await setup(()=>{},{failureKey:'voucher.error.amount',failureMessage:'Enter the missing amount.',form,total:'500.00',labels:{loan:'LN-001',loan2:'LN-002'}});try{
     assert.equal(d.querySelector('[data-batch-rows]').rows.length,1);
     assert.equal(d.querySelector('.batch-loan-list').textContent,'LN-001, LN-002');
-    assert.equal(d.querySelector('.batch-row').cells[4].textContent,'500.00');
+    assert.equal(d.querySelector('.batch-row').cells[5].textContent,'500.00');
     assert.equal(d.querySelector('input[type="number"]'),null);
     assert.equal(d.querySelector('.batch-row select').disabled,true);
+    assert.equal(d.querySelector('[data-batch-view]').disabled,true);
     assert.equal(visible(d)[0].textContent,'Enter the missing amount.');
     assert.equal(d.querySelector('.batch-remove').disabled,false);
   }finally{dom.window.close();}
