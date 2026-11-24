@@ -8,6 +8,8 @@
         event.preventDefault();event.stopImmediatePropagation();
         const url=new URL(form.action,location.href);
         new FormData(form).forEach((value,name)=>{if(typeof value==='string')url.searchParams.set(name,value);});
+        url.searchParams.delete('cutoff');
+        url.searchParams.delete('page');
         window.WorkspaceNavigation.navigate(url.href);
     },true);
     document.addEventListener('resource-table:refresh',event=>{

@@ -4,9 +4,9 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const {JSDOM}=require('jsdom');
 
-for(const activity of ['activity-a','UNASSIGNED'])test('report generation and refresh preserve the selected activity without carrying an old cutoff or page',()=>{
+for(const activity of ['activity-a','UNASSIGNED'])test(`report generation and refresh preserve ${activity} and reset the cutoff and page`,()=>{
   const dom=new JSDOM(`<form action="/reports/financial/sl-gl-reconciliation" data-reconciliation-query>
-    <input name="run" value="true"><input name="cutoff" value="old-cutoff">
+    <input name="run" value="true"><input name="cutoff" value="old-cutoff"><input name="page" value="3">
     <input name="from" value="2026-10-01"><input name="through" value="2026-10-19">
     <select name="activityId"><option value="${activity}" selected>Configured activity</option></select>
   </form><section data-resource-table="sl-gl-reconciliation"></section>`,{url:'http://localhost/reports/financial/sl-gl-reconciliation'});

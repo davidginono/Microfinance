@@ -265,20 +265,22 @@ test('Charges finishes loading on success, failure and cached-page restoration',
   }finally{dom.window.close();}
 });
 
-test('the recording wizard validates each step and preserves fields and uploads', () => {
+const recordingStepError = '<p data-recording-step-error role="alert" tabindex="-1" hidden></p>';
+
+test('the recording wizard validates each step and preserves fields and uploads', async () => {
   const source = require('node:fs').readFileSync('src/main/resources/static/js/loan-recording-evidence.js','utf8');
-  const dom = new JSDOM(`<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId">
-    <div data-recording-evidence>
+  const dom = new JSDOM(`<form><input type="hidden" name="_csrf" value="test-token"><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId">
+    <div data-recording-evidence data-validate-url="/finance/loan-recording/validate-step">
       <nav data-recording-steps hidden>
-        <button type="button" data-recording-step-button aria-controls="loan">Loan details</button>
-        <button type="button" data-recording-step-button aria-controls="guarantors">Guarantors</button>
-        <button type="button" data-recording-step-button aria-controls="collateral">Collateral</button>
-        <button type="button" data-recording-step-button aria-controls="documents">Attachments</button>
+        <button type="button" data-recording-step-button aria-controls="recording-panel-loan">Loan details</button>
+        <button type="button" data-recording-step-button aria-controls="recording-panel-guarantors">Guarantors</button>
+        <button type="button" data-recording-step-button aria-controls="recording-panel-collateral">Collateral</button>
+        <button type="button" data-recording-step-button aria-controls="recording-panel-attachments">Attachments</button>
       </nav>
-      <section id="loan" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Loan details</h2><input name="purpose" required><div data-evidence-fields></div></section>
-      <section id="guarantors" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Guarantors</h2></section>
-      <section id="collateral" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Collateral</h2><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button></section>
-      <section id="documents" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Attachments</h2><input type="file" name="attachments"><div data-evidence-documents></div></section>
+      <section id="recording-panel-loan" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Loan details</h2><input name="purpose" required><div data-evidence-fields></div>${recordingStepError}</section>
+      <section id="recording-panel-guarantors" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Guarantors</h2>${recordingStepError}</section>
+      <section id="recording-panel-collateral" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Collateral</h2><div data-repeat-list="collateral"></div><button type="button" data-add-row="collateral">Add</button>${recordingStepError}</section>
+      <section id="recording-panel-attachments" data-validation-step><h2 tabindex="-1" data-recording-step-heading>Attachments</h2><input type="file" name="attachments"><div data-evidence-documents></div>${recordingStepError}</section>
       <template data-row-template="collateral"><div data-repeat-row><div><label>Item</label><input data-field="itemName" required><input data-field="description"></div><div class="recording-row-photos"><label class="attachment-dropzone"><input type="file" data-row-photos><span class="attachment-dropzone-help">Choose a photo</span></label><div data-row-photo-list></div></div><div class="recording-item-actions"><button type="button" data-remove-row>Remove</button></div></div></template>
       <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames"></label><label><select data-document-field="documentTypes"><option>OTHER</option><option>COLLATERAL_PHOTO</option></select></label><label><select data-document-field="requiredAttachmentIds"><option value=""></option></select></label><button type="button" data-remove-upload>Remove</button></div></template>
       <div data-evidence-error hidden></div><div data-evidence-requirements></div>
@@ -290,9 +292,16 @@ test('the recording wizard validates each step and preserves fields and uploads'
     const previous = d.querySelector('[data-recording-previous]');
     const save = d.querySelector('[data-recording-submit]');
     const input = d.querySelector('[type="file"]');
+    const panel = step => d.getElementById('recording-panel-' + step);
+    const settle = () => new Promise(resolve => setImmediate(resolve));
+    const requests = [];
     Object.defineProperty(input,'files',{value:[],writable:true});
     w.DataTransfer = class {files=[]; items={add:file=>this.files.push(file)};};
     w.WorkspaceNavigation = {onReady:callback=>callback()};
+    w.fetch = async (url, options) => {
+      requests.push({url, ...options});
+      return {status:204};
+    };
     w.eval(source);
     assert.equal(steps[0].getAttribute('aria-current'),'step');
     assert.equal(steps[1].disabled,true);
@@ -301,17 +310,22 @@ test('the recording wizard validates each step and preserves fields and uploads'
     let invalid = false;
     purpose.addEventListener('invalid', () => {invalid = true;});
     next.click();
+    await settle();
     assert.equal(invalid,true);
-    assert.equal(d.getElementById('loan').hidden,false);
+    assert.equal(panel('loan').hidden,false);
+    assert.equal(requests.length,0);
     purpose.value = 'Business stock';
     purpose.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    await settle();
     assert.equal(steps[1].getAttribute('aria-current'),'step');
     next.click();
+    await settle();
     assert.equal(steps[2].getAttribute('aria-current'),'step');
     assert.equal(d.querySelectorAll('[data-repeat-row]').length,1);
     assert.equal(d.querySelector('[data-field]').name,'');
     assert.equal(d.querySelector('[data-field]').required,false);
     next.click();
+    await settle();
     assert.equal(steps[3].getAttribute('aria-current'),'step');
     previous.click();
     assert.ok(d.querySelector('[data-repeat-row] .recording-item-actions [data-add-row]'));
@@ -326,6 +340,7 @@ test('the recording wizard validates each step and preserves fields and uploads'
     assert.equal(d.querySelector('[data-field]').name,'applicationDetails.collateral[0].itemName');
     assert.equal(d.querySelector('[data-field]').required,true);
     next.click();
+    await settle();
     assert.equal(steps[3].getAttribute('aria-current'),'step');
     assert.equal(save.hidden,false);
     assert.equal(next.hidden,true);
@@ -341,19 +356,28 @@ test('the recording wizard validates each step and preserves fields and uploads'
     assert.equal(title.name,'applicationDetails.documentNames[0]');
     assert.equal(title.value,'Signed form');
     previous.click();
-    assert.equal(d.getElementById('documents').hidden,true);
+    assert.equal(panel('attachments').hidden,true);
     assert.equal(d.querySelector('[data-field]').value,'Bicycle');
-    assert.equal(d.activeElement,d.querySelector('#collateral h2'));
+    assert.equal(d.activeElement,panel('collateral').querySelector('h2'));
     steps[0].click();
-    assert.equal(d.getElementById('loan').hidden,false);
+    assert.equal(panel('loan').hidden,false);
     assert.equal(purpose.value,'Business stock');
-    d.getElementById('documents').dispatchEvent(new w.Event('validation:reveal'));
+    panel('attachments').dispatchEvent(new w.Event('validation:reveal'));
     assert.equal(steps[3].getAttribute('aria-current'),'step');
     assert.deepEqual(Array.from(input.files,file=>file.name),['second.pdf']);
     let submitter;
-    save.form.addEventListener('submit', event => {event.preventDefault(); submitter = event.submitter;});
+    save.form.addEventListener('submit', event => {
+      if (!event.defaultPrevented) submitter = event.submitter;
+      event.preventDefault();
+    });
     title.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    assert.equal(submitter,undefined);
+    await settle();
     assert.equal(submitter,save);
+    assert.deepEqual(requests.map(({body}) => body.get('step')),['loan','guarantors','collateral','collateral','attachments']);
+    assert.ok(requests.every(({url, method, body}) => url === '/finance/loan-recording/validate-step' && method === 'POST' && body.get('_csrf') === 'test-token'));
+    assert.ok(requests.at(-1).body instanceof w.FormData);
+    assert.equal(requests.at(-1).body.get(title.name),'Signed form');
     const photoPicker = d.querySelector('[data-row-photos]');
     Object.defineProperty(photoPicker,'files',{value:[],writable:true});
     photoPicker.files = [new w.File(['photo'],'bike.png',{type:'image/png'})];
@@ -391,7 +415,13 @@ test('the recording wizard validates each step and preserves fields and uploads'
 test('typed guarantor names label photos and survive item reindexing', () => {
   const source = require('node:fs').readFileSync('src/main/resources/static/js/loan-recording-evidence.js','utf8');
   const row = '<div data-repeat-row><div><label>Name</label><input data-field="fullName" required></div><div class="recording-row-photos"><label class="attachment-dropzone"><input type="file" data-row-photos><span class="attachment-dropzone-help">Photo required</span></label></div><div class="recording-item-actions"><button type="button" data-remove-row>Remove</button></div><div data-row-photo-list></div></div>';
-  const dom = new JSDOM('<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId"><div data-recording-evidence><nav data-recording-steps><button type="button" data-recording-step-button aria-controls="guarantors">Guarantors</button></nav><section id="guarantors"><h2 data-recording-step-heading>Guarantors</h2><div data-repeat-list="guarantors"></div><button type="button" data-add-row="guarantors">Add</button></section><template data-row-template="guarantors">'+row+'</template><input type="file" name="attachments"><div data-evidence-documents></div><template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames" required></label><label><select data-document-field="documentTypes"><option>GUARANTOR_PHOTO</option></select></label><label><select data-document-field="requiredAttachmentIds"><option value=""></option></select></label><button type="button" data-remove-upload data-remove-label="Remove"></button></div></template><div data-evidence-error></div><div data-evidence-requirements></div><div data-evidence-fields></div></div><button type="button" data-recording-previous>Previous</button><button type="button" data-recording-next>Next</button><button type="submit" data-recording-submit>Save</button></form>',{runScripts:'outside-only'});
+  const dom = new JSDOM(`<form><select name="clientId"></select><input name="loanMode" value="CUSTOM"><input name="productId">
+    <div data-recording-evidence><nav data-recording-steps><button type="button" data-recording-step-button aria-controls="recording-panel-guarantors">Guarantors</button></nav>
+      <section id="recording-panel-guarantors" data-validation-step><h2 data-recording-step-heading>Guarantors</h2><div data-repeat-list="guarantors"></div><button type="button" data-add-row="guarantors">Add</button>${recordingStepError}</section>
+      <template data-row-template="guarantors">${row}</template><input type="file" name="attachments"><div data-evidence-documents></div>
+      <template data-evidence-document-template><div><span data-evidence-filename></span><label><input data-document-field="documentNames" required></label><label><select data-document-field="documentTypes"><option>GUARANTOR_PHOTO</option></select></label><label><select data-document-field="requiredAttachmentIds"><option value=""></option></select></label><button type="button" data-remove-upload data-remove-label="Remove"></button></div></template>
+      <div data-evidence-error></div><div data-evidence-requirements></div><div data-evidence-fields></div>
+    </div><button type="button" data-recording-previous>Previous</button><button type="button" data-recording-next>Next</button><button type="submit" data-recording-submit>Save</button></form>`,{runScripts:'outside-only'});
   try {
     const w=dom.window,d=w.document,files=d.querySelector('[name=attachments]');
     Object.defineProperty(files,'files',{value:[],writable:true});
