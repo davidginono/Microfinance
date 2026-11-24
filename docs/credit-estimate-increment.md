@@ -11,14 +11,16 @@ Implementation date: 2026-10-01. This closes calculation and input-trust gaps, n
 - Flat-rate compatibility estimates, when the product explicitly selects them, apply the annual rate proportionally to the tenure. Explicit historical flat-interest amounts remain authoritative for legacy schedule generation. Flat-product availability still needs the approved-policy review below.
 - Quotes record `DECIMAL_PERIODIC_V1`, tenure, frequency, payment count, regular payment, maximum payment, totals, and nominal rate. Disbursement checks those assessed amounts, tenure, and frequency; changes require reassessment instead of silently creating different terms.
 - Monthly affordability uses the largest scheduled payment, including the final rounding adjustment. A weekly payment is normalized by `52 / 12`, rounded upward; it is not compared directly with monthly disposable income.
-- When affordability is required, income must be positive, expenses and debt repayments must be explicitly declared and nonnegative, and the repayment must be positive and valid. Missing, malformed, negative, or fractional-cent values do not silently become a favourable zero. Explicit zero expenses/debt are valid.
+- When affordability is required, recorded income must be positive. The repayment comparison uses income after known debt payments and the existing product limit. Group recording uses the combined group figures. Explicitly declared group debt payments must be positive and use valid monetary precision.
 - Assessment snapshots identify declarations as `DECLARED_NOT_VERIFIED`. Additional workflow metadata cannot overwrite assessment facts. Passing arithmetic is not evidence verification or credit approval.
 - Monthly dates are anchored to the original first repayment date rather than repeatedly advancing from a shortened February date.
 - The calculator rejects unsupported payment counts, invalid amounts/rates/dates, and overrides that create negative principal or settle before the last scheduled payment. The schedule is bounded to 600 payments.
 
 ## Staff recording uses the client profile (2026-11-12)
 
-The loan form keeps one loan purpose. Monthly income, monthly expenses and business and income-source details come from the latest recorded client profile in the current institution and branch. Staff declare monthly outside debt on the loan application. Individual records take one total, including an explicit zero when there is no outside debt. Group records itemize each debt and identify the borrowers liable for it. The loan snapshot retains its source profile revision and application figures. Later profile edits do not rewrite existing loans or establish independent verification. Missing required figures block assessment. Historical loan fields remain readable for compatibility.
+The loan form keeps one loan purpose. Monthly income and business and income-source details come from the latest recorded client profile in the current institution and branch. Group records itemize outside debts and identify the borrowers liable for them. Individual loan recording uses known in-system obligations where available. The loan snapshot retains its source profile revision and application figures. Later profile edits do not rewrite existing loans or establish independent verification. Historical expenses remain in the frozen evidence.
+
+The institution’s standard borrower application must still describe expenses and assets and capture outstanding loans. Staff can retain that application using the existing document and review workflow. [Bank of Tanzania regulations, sections 38–39](https://www.bot.go.tz/Publications/Acts%2C%20Regulations%2C%20Circulars%2C%20Guidelines/Regulations/sw/2020021122490967551.pdf)
 
 ## Compatibility And Limits
 

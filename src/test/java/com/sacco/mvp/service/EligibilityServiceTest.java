@@ -43,7 +43,7 @@ class EligibilityServiceTest {
         var id=UUID.randomUUID();var product=product("S1").maxRepaymentToDisposableIncomeRatio(new BigDecimal("0.4")).build();
         when(sharedCredit.summary("S1",id,null)).thenReturn(new com.sacco.mvp.grouplending.dto.SharedCreditExposure(1,0,0,0,new BigDecimal("500.00"),new BigDecimal("200.00")));
         var form=Map.<String,Object>of("monthlyIncome",new BigDecimal("1000"),"monthlyExpenses",new BigDecimal("100"),"otherDebtRepayments",BigDecimal.ZERO);
-        var quote=Map.<String,Object>of("monthlyRepaymentAmount",new BigDecimal("300"));
+        var quote=Map.<String,Object>of("monthlyRepaymentAmount",new BigDecimal("330"));
         var result=eligibilityService.check("S1",id,product,new BigDecimal("1000"),form,quote);assertThat(result.eligible()).isFalse();assertThat(result.otherDebtRepayments()).isEqualByComparingTo("200");
         var declared=new java.util.HashMap<>(form);declared.put("otherDebtRepayments",new BigDecimal("250"));
         assertThat(eligibilityService.check("S1",id,product,new BigDecimal("1000"),declared,quote).otherDebtRepayments()).isEqualByComparingTo("250");
@@ -58,7 +58,7 @@ class EligibilityServiceTest {
     }
 
     @Test
-    void checksRepaymentAgainstDisposableIncome() {
+    void checksRepaymentAgainstIncomeAfterDebt() {
         String saccoId = "CIRCLE-1001";
         UUID memberId = UUID.randomUUID();
         LoanProductSetting product = product(saccoId)
@@ -90,12 +90,12 @@ class EligibilityServiceTest {
                 "monthlyExpenses", new BigDecimal("300000.00"),
                 "otherDebtRepayments", new BigDecimal("100000.00")
             ),
-            Map.of("monthlyRepaymentAmount", new BigDecimal("260000.00"))
+            Map.of("monthlyRepaymentAmount", new BigDecimal("380000.00"))
         );
 
         assertThat(ok.eligible()).isTrue();
-        assertThat(ok.savings()).isEqualByComparingTo("600000.00");
-        assertThat(ok.maxAllowed()).isEqualByComparingTo("240000.00");
+        assertThat(ok.savings()).isEqualByComparingTo("900000.00");
+        assertThat(ok.maxAllowed()).isEqualByComparingTo("360000.00");
         assertThat(ok.activeExposure()).isEqualByComparingTo("250000.00");
         assertThat(notOk.eligible()).isFalse();
         assertThat(notOk.reason()).contains("affordable limit");
@@ -144,7 +144,7 @@ class EligibilityServiceTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"monthlyIncome", "monthlyExpenses", "otherDebtRepayments"})
+    @ValueSource(strings = {"monthlyIncome", "otherDebtRepayments"})
     void missingCashFlowMustBeDeclaredExplicitly(String field) {
         var form = new java.util.LinkedHashMap<String, Object>(cashFlow());
         form.remove(field);
@@ -153,11 +153,10 @@ class EligibilityServiceTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"-100.00", "invalid", "-0.001"})
-    void negativeOrMalformedExpensesCannotIncreaseAffordability(String expenses) {
+    void legacyExpensesAreIgnored(String expenses) {
         var form = new java.util.LinkedHashMap<String, Object>(cashFlow());
         form.put("monthlyExpenses", expenses);
-        form.put("expenses", "0.00");
-        assertThat(assess(form, Map.of("monthlyRepaymentAmount", "100.00")).eligible()).isFalse();
+        assertThat(assess(form, Map.of("monthlyRepaymentAmount", "100.00")).eligible()).isTrue();
     }
 
     @Test
@@ -188,7 +187,7 @@ class EligibilityServiceTest {
     }
 
     private Map<String, Object> cashFlow() {
-        return Map.of("monthlyIncome", "1000000.00", "monthlyExpenses", "300000.00", "otherDebtRepayments", "100000.00");
+        return Map.of("monthlyIncome", "1000000.00", "otherDebtRepayments", "100000.00");
     }
 
     private LoanProductSetting.LoanProductSettingBuilder product(String saccoId) {

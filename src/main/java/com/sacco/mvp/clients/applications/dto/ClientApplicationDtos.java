@@ -8,6 +8,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 
 public final class ClientApplicationDtos {
     private ClientApplicationDtos() {}
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"expenses"})
     @Data public static class Form {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.RecordForm recordingDraft;
@@ -16,7 +17,7 @@ public final class ClientApplicationDtos {
         private String command="DRAFT",tenureUnit="MONTHS",purpose="",business="",useOfFunds="";
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate applicationDate;
         private Integer tenureValue;
-        private BigDecimal amount,income,expenses,otherDebt;
+        private BigDecimal amount,income,otherDebt;
         private List<Guarantor> guarantors=new ArrayList<>();
         private List<Collateral> collateral=new ArrayList<>();
         private Map<String,String> fields=new LinkedHashMap<>();

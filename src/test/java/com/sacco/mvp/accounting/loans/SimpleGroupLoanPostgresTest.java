@@ -34,15 +34,15 @@ class SimpleGroupLoanPostgresTest {
         for(var name:List.of("Asha","Juma","Neema","Peter","Rehema"))clients.add(client(name,true));
         configure("GROUP-ACCOUNT-1");
     }
-    UUID client(String name,boolean expenses){
+    UUID client(String name,boolean incomeRecorded){
         var c=new CreateForm();c.getProfile().setFirstName(name);c.getProfile().setLastName("Test");c.getProfile().setPhone("+255712"+String.format("%06d",++phone));
-        c.getProfile().setMonthlyIncome(new BigDecimal("2000000.00"));c.getProfile().setMonthlyExpenses(expenses?new BigDecimal("500000.00"):null);
+        if(incomeRecorded)c.getProfile().setMonthlyIncome(new BigDecimal("2000000.00"));
         c.getProfile().setActivity("Business");c.getProfile().setBusinessName(name+" shop");c.getProfile().setSourceOfFunds("Business");c.setEnrollGroupId(group);
         return f.context.getBean(OnboardingService.class).create(f.actor,c);
     }
     void configure(String account){var current=service.setup(f.actor,group);var setup=new SetupForm();setup.setExpectedVersion(current.version());setup.setLeaderId(current.people().getFirst().id());setup.setDestinationType("BANK_ACCOUNT");setup.setProvider("Synthetic bank");setup.setHolder("Five borrowers group");setup.setIdentifier(account);setup.setEvidence("Checked signed group bank instruction");setup.setChecked(true);service.configure(f.actor,group,setup);}
     RecordForm application(){
-        var form=f.form();form.setLoanFor("GROUP");form.setClientId(null);form.setMonthlyOutsideDebt(null);form.setApplicationDate(DAY);form.setPrincipal(new BigDecimal("5000000.00"));form.setTenureValue(10);
+        var form=f.form();form.setLoanFor("GROUP");form.setClientId(null);form.setApplicationDate(DAY);form.setPrincipal(new BigDecimal("5000000.00"));form.setTenureValue(10);
         var application=form.getGroupApplication();var setup=service.setup(f.actor,group);application.setGroupId(group);application.setExpectedVersion(setup.version());application.setChecked(true);application.setSignedOn(DAY);
         return form;
     }
@@ -101,16 +101,20 @@ class SimpleGroupLoanPostgresTest {
     @Test void exactRetriesReuseTheLoanAndChangedRetriesAreRejected(){var form=application();var paper=paper();UUID first=f.service.saveGroup(f.actor,form,List.of(),paper);assertThat(f.service.saveGroup(f.actor,form,List.of(),paper)).isEqualTo(first);form.setPrincipal(new BigDecimal("4000000.00"));assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),paper)).hasMessage("simpleGroup.error.changed");}
     @Test void missingAgreementConfirmationCannotCreateAContract(){var form=application();form.getGroupApplication().setChecked(false);assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),paper())).hasMessage("simpleGroup.error.signatures");assertThat(f.jdbc.queryForObject("select count(*) from staff_group_loan where sacco_id=?",Integer.class,f.institution)).isZero();}
     @Test void changedRosterRequiresFreshEvidence(){var form=application();client("Extra",true);assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),paper())).hasMessage("simpleGroup.error.changed");}
-    @Test void allBorrowersWithIncompleteBudgetsAreNamed(){
-        client("MissingExpenses",false);var client=client("MissingBoth",false);
-        var onboarding=f.context.getBean(OnboardingService.class);var profile=onboarding.profileForm(f.actor,client);
-        profile.getProfile().setMonthlyIncome(null);profile.setAction("RECORDED");onboarding.save(f.actor,client,profile);
+    @Test void allBorrowersWithMissingIncomeAreNamed(){
+        client("Unrecorded",false);client("Missing",false);
         assertThatThrownBy(()->f.service.saveGroup(f.actor,application(),List.of(),null))
-            .isInstanceOfSatisfying(SimpleGroupLoanService.ProfileBudgetException.class,error->{
-                assertThat(error.issues()).hasSize(2);
-                assertThat(error.issues()).anyMatch(issue->issue.client().equals("MISSINGEXPENSES TEST")&&!issue.incomeMissing()&&issue.expensesMissing());
-                assertThat(error.issues()).anyMatch(issue->issue.client().equals("MISSINGBOTH TEST")&&issue.incomeMissing()&&issue.expensesMissing());
-            });
+            .isInstanceOfSatisfying(SimpleGroupLoanService.ProfileIncomeException.class,error->
+                assertThat(error.clients()).containsExactlyInAnyOrder("UNRECORDED TEST","MISSING TEST"));
+    }
+    @Test void aBorrowerDebtAboveTheirIncomeDoesNotBlockAnAffordableGroup(){
+        var form=application();var debt=new ExternalDebt();debt.setReference("Outside loan");
+        debt.setMonthlyPayment(new BigDecimal("2100000.00"));debt.setClientIds(List.of(clients.getFirst()));
+        form.getGroupApplication().getDebts().add(debt);
+        var loan=f.service.saveGroup(f.actor,form,List.of(),null);
+        assertThat(f.jdbc.queryForObject("select count(*) from staff_group_borrower where loan_id=? and expenses is null",Integer.class,loan)).isEqualTo(5);
+        assertThat(f.jdbc.queryForObject("select (form_data->>'otherDebt')::numeric from loan_applications where id=?",BigDecimal.class,loan))
+            .isEqualByComparingTo("2100000.00");
     }
     @Test void oneGroupInstalmentReceivesFourHundredThousandThenAnotherHundredThousand(){
         UUID loan=fund();nextDay();assertThat(f.service.detail(f.actor,loan).loan().arrears()).isEqualByComparingTo("500000.00");

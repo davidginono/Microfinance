@@ -49,7 +49,7 @@ public final class OnboardingDtos {
         private String postalAddress="", city="", ward="", villageStreet="", nearbyPlace="";
         private Boolean hasBusiness;
         private String businessName="", businessType="", businessTin="", businessLicence="", businessLocation="", businessWard="", businessCity="", otherIncomeSources="";
-        private java.math.BigDecimal dailySales, dailyExpenditure, monthlyIncome, monthlyExpenses;
+        private java.math.BigDecimal dailySales, dailyExpenditure, monthlyIncome;
         private String spouseName="", spouseRelationship="", spousePhone="", spouseWork="", spouseWorkLocation="";
         private String bankName="", bankAccountName="", bankAccountNumber="";
         private String employeeNumber;

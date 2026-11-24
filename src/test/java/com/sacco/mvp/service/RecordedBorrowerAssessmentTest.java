@@ -14,10 +14,10 @@ class RecordedBorrowerAssessmentTest {
             {"business":"Organization <QA>","income":9999999999999999.99,"expenses":1000.23,"otherDebt":0.00,
              "informationSource":"DOCUMENTED","evidence":"Recorded supporting documents","productId":"ignored-view-property"}
             """));
-        assertThat(value.income().toPlainString()).isEqualTo("9999999999999999.99");assertThat(value.expenses().toPlainString()).isEqualTo("1000.23");assertThat(value.otherDebt().toPlainString()).isEqualTo("0.00");assertThat(value.informationSource()).isEqualTo("DOCUMENTED");assertThat(value.business()).isEqualTo("Organization <QA>");
+        assertThat(value.income().toPlainString()).isEqualTo("9999999999999999.99");assertThat(value.otherDebt().toPlainString()).isEqualTo("0.00");assertThat(value.informationSource()).isEqualTo("DOCUMENTED");assertThat(value.business()).isEqualTo("Organization <QA>");
     }
     @Test void missingAmountsStayUnavailableRatherThanBecomingZero(){
-        var value=presentation.recordedBorrowerAssessment(loan("{\"income\":123.45}"));assertThat(value.expenses()).isNull();assertThat(value.otherDebt()).isNull();assertThat(value.informationSource()).isEqualTo("UNAVAILABLE");
+        var value=presentation.recordedBorrowerAssessment(loan("{\"income\":123.45}"));assertThat(value.otherDebt()).isNull();assertThat(value.informationSource()).isEqualTo("UNAVAILABLE");
     }
     @Test void personalOrUnrecordedLoansCannotProduceAnOrganizationAssessment(){
         var personal=loan("{\"income\":1000}");personal.setApplicantMemberId(UUID.randomUUID());assertThat(presentation.recordedBorrowerAssessment(personal)).isNull();

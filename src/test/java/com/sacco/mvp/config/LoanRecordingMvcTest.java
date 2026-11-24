@@ -100,7 +100,7 @@ class LoanRecordingMvcTest {
     @Test void multipartRecordingPassesDocumentsAndRetainsValuesOnInvalidInput() throws Exception {
         var id=UUID.randomUUID();when(service.save(any(),any(),any())).thenReturn(id);var file=new MockMultipartFile("attachments","proof.pdf","application/pdf","%PDF synthetic".getBytes());
         mvc.perform(multipart("/finance/loan-records").file(file).with(user(actor)).with(csrf()).param("principal","1000.00").param("loanMode","CUSTOM").param("tenureValue","10").param("tenureUnit","DAYS").param("monthlyOutsideDebt","75.25"))
-            .andExpect(redirectedUrl("/finance/loan-records/"+id));verify(service).save(eq(actor),argThat(f->Integer.valueOf(10).equals(f.getTenureValue()) && new java.math.BigDecimal("75.25").equals(f.getMonthlyOutsideDebt())),argThat(files->files.size()==1 && "proof.pdf".equals(files.getFirst().getOriginalFilename())));
+            .andExpect(redirectedUrl("/finance/loan-records/"+id));verify(service).save(eq(actor),argThat(f->Integer.valueOf(10).equals(f.getTenureValue()) && f.getOtherDebt()==null),argThat(files->files.size()==1 && "proof.pdf".equals(files.getFirst().getOriginalFilename())));
         mvc.perform(multipart("/finance/loan-records").with(user(actor)).with(csrf()).param("principal","invalid").param("purpose","Business stock"))
             .andExpect(view().name("accounting/loans/record-form")).andExpect(model().attributeHasFieldErrors("recordForm","principal"));
     }

@@ -342,7 +342,7 @@ public class LoanRecordingService {
     @Transactional(propagation=Propagation.NOT_SUPPORTED)
     public UUID saveGroup(AppUserPrincipal a,RecordForm input,List<org.springframework.web.multipart.MultipartFile> files,org.springframework.web.multipart.MultipartFile agreement){
         authorize(a,"CREATE");check(input!=null&&"GROUP".equals(input.getLoanFor()),"request");
-        var f=json.convertValue(input,RecordForm.class);f.setGroupAgreementChecksum(null);f.setGroupRequestHash(null);f.setMonthlyOutsideDebt(null);validateRecord(f,true);validateFiles(files);
+        var f=json.convertValue(input,RecordForm.class);f.setGroupAgreementChecksum(null);f.setGroupRequestHash(null);validateRecord(f,true);validateFiles(files);
         var fingerprints=new ArrayList<String>();
         try{for(var file:files)if(!file.isEmpty())fingerprints.add("ATTACHMENT/"+file.getOriginalFilename()+"/"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(file.getBytes())));
             if(agreement!=null&&!agreement.isEmpty()){check(agreement.getSize()<=10*1024*1024,"attachments");fingerprints.add("AGREEMENT/"+agreement.getOriginalFilename()+"/"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(agreement.getBytes())));}
@@ -362,9 +362,9 @@ public class LoanRecordingService {
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot,LoanApplication editing){
         validateFiles(files);
         authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);
+        f.setExpenses(null);
         if(borrowerParty==null){
-            var outsideDebt=f.getMonthlyOutsideDebt();
-            check(outsideDebt!=null&&outsideDebt.signum()>=0&&outsideDebt.scale()<=2&&outsideDebt.compareTo(new BigDecimal("9999999999999999.99"))<=0,"outsideDebt");
+            f.setOtherDebt(null);
             evidence.applyClientProfile(a,f);
         }
         if(f.getApplicationDetails()!=null){f.getApplicationDetails().setFieldLabels(new LinkedHashMap<>());f.getApplicationDetails().setLoanOfficerId(null);f.getApplicationDetails().setLoanOfficerLabel("");}String hash=borrowerParty==null?uploadHash(f,files):hash(Map.of("form",f,"borrowerParty",borrowerParty,"payout",payoutSnapshot));records.lockRequest(a,f.getRequestKey());if(records.intakeRequest(a,f.getRequestKey()))throw new IllegalArgumentException("applications.error.retry");var previous=records.recordRequest(a,f.getRequestKey(),hash);if(previous.isPresent())return previous.get();
@@ -378,15 +378,15 @@ public class LoanRecordingService {
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
         check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
         if(borrowerParty==null && product.isAffordabilityCheckRequired()) {
-            check(f.getIncome()!=null && f.getIncome().signum()>0 && f.getExpenses()!=null && f.getOtherDebt()!=null,"clientCashFlow");
+            check(f.getIncome()!=null && f.getIncome().signum()>0,"clientCashFlow");
         }
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
         if(shared.active()>0){
             check(product.isApplicationWithActiveLoanAllowed(),"sharedActiveLoan");
             if(product.getMaximumActiveLoans()!=null)check(shared.active()+loans.countBySaccoIdAndApplicantMemberIdAndStatusIn(a.getSaccoId(),f.getClientId(),List.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED,LoanStatus.WRITTEN_OFF))<=product.getMaximumActiveLoans(),"sharedActiveLoan");
             if(product.isAffordabilityCheckRequired()){
-                var disposable=f.getIncome().subtract(f.getExpenses()).subtract(f.getOtherDebt()).subtract(shared.monthlyPayment());
-                check(disposable.signum()>0&&LoanAmortizationCalculator.monthlyEquivalent(calculation.maximumInstallment(),product.getResolvedRepaymentFrequency()).compareTo(disposable.multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,java.math.RoundingMode.DOWN))<=0,"sharedAffordability");
+                var incomeAfterKnownDebt=f.getIncome().subtract(shared.monthlyPayment());
+                check(incomeAfterKnownDebt.signum()>0&&LoanAmortizationCalculator.monthlyEquivalent(calculation.maximumInstallment(),product.getResolvedRepaymentFrequency()).compareTo(incomeAfterKnownDebt.multiply(product.getResolvedMaxRepaymentToDisposableIncomeRatio()).setScale(2,java.math.RoundingMode.DOWN))<=0,"sharedAffordability");
             }
         }
         var chargePlan=charges.recordingQuote(a,f,product,borrowerParty==null);
@@ -454,7 +454,7 @@ public class LoanRecordingService {
             ?scheduleRows(calc,null)
             :datedSchedule(calc,loan);
         return new Detail(records.loan(a,id,clock.today()),record.get("sacco_name").toString(),record.get("branch_name").toString(),record.get("actor_name").toString(),time(record.get("recorded_at")),
-            f.getPurpose(),f.getBusiness(),f.getIncome(),f.getExpenses(),f.getOtherDebt(),f.getInformationSource(),f.getGuarantors(),f.getCollateral(),f.getEvidence(),f.getNotes(),
+            f.getPurpose(),f.getBusiness(),f.getIncome(),f.getOtherDebt(),f.getInformationSource(),f.getGuarantors(),f.getCollateral(),f.getEvidence(),f.getNotes(),
             new BigDecimal(snapshot.get("interestRate").toString()),snapshot.get("interestMethod").toString(),snapshot.get("repaymentFrequency").toString(),loan.getTenorMonths(),loan.getFirstRepaymentDate(),calc.installment(),calc.totalInterest(),schedule,tenure(f).unit(),tenure(f).value(),f.getInterestBasis(),f.getLoanMode(),f.getInterestEntry());
     }
     @Transactional(readOnly=true)
@@ -771,7 +771,7 @@ public class LoanRecordingService {
     private void validateRecord(RecordForm f,boolean organization){if(f!=null&&organization)f.setFirstPaymentDate(null);check(f!=null && f.getRequestKey()!=null && (organization?f.getClientId()==null:f.getClientId()!=null) && ("CUSTOM".equals(f.getLoanMode()) || f.getProductId()!=null) && Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"request");money(f.getPrincipal());f.setRequestedPrincipal(f.getPrincipal());f.setMonths(tenure(f).compatibilityMonths());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
         if("CONFIGURED".equals(f.getLoanMode())){f.setInterestEntry("PERCENTAGE");f.setInterestBasis("ANNUAL");f.setInterestPercent(null);f.setInterestAmount(null);}
         check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
-        check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getExpenses(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
+        check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}
     private void validatePost(PostForm f){check(f!=null && f.getRequestKey()!=null && f.getLoanId()!=null,"request");money(f.getAmount());check(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(clock.today()),"date");text(f.getReference(),100,true);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);}
     static void filter(Filter f,boolean posting){check(f!=null && f.search()!=null && f.search().length()<=100 && f.page()>=0 && f.page()<=10000 && com.sacco.mvp.accounting.dto.RegisterSort.valid(f.sort(),posting?Set.of("number","product","client","loanFor","date","amount","reference","status"):Set.of("number","product","client","loanFor","date","amount","balance","status")),"filter");check(f.from()==null || f.through()==null || !f.from().isAfter(f.through()),"date");check((posting?Set.of("","POSTED","REVERSED","REVERSAL"):Set.of("","DRAFT","SUBMITTED","AWAITING_GUARANTORS","ALL_GUARANTORS_APPROVED","READY_FOR_MANAGER","AWAITING_LOAN_OFFICER","AWAITING_CHAIRPERSON","AWAITING_BOARD","AWAITING_CREDIT_COMMITTEE","AWAITING_ACCOUNTANT","READY_FOR_DISBURSEMENT","MANAGER_REJECTED","LOAN_OFFICER_REJECTED","CHAIRPERSON_REJECTED","BOARD_REJECTED","CREDIT_COMMITTEE_REJECTED","ACCOUNTANT_REJECTED","REJECTED","RECORDED","WITHDRAWN","DISBURSED","PAR","DEFAULTED","PAID","WRITTEN_OFF","DISBURSEMENT_REVERSED")).contains(f.status()),"filter");}
     private void kind(String kind){check(Set.of("DISBURSEMENT","PAYMENT","REVERSAL").contains(kind),"filter");}

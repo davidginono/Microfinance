@@ -24,6 +24,7 @@ public final class LoanRecordingDtos {
     public record GroupReview(GroupRequest request,List<GroupStep> steps,List<GroupDecision> decisions,int step,boolean canApprove,boolean canReject,boolean canSubmit) {}
     public record ChargeField(String code,String percentage,String amount) {}
     public record ChargeQuote(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Plan plan,List<ChargeField> fields) {}
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"monthlyOutsideDebt"})
     @Data public static class RecordForm {
         private String loanFor="INDIVIDUAL";
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
@@ -62,10 +63,9 @@ public final class LoanRecordingDtos {
         private String purpose = "";
         private String business = "";
         private BigDecimal income;
+        // Keep the legacy null property for recorded request fingerprints.
         private BigDecimal expenses;
         private BigDecimal otherDebt;
-        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-        private BigDecimal monthlyOutsideDebt;
         private String informationSource = "DECLARED";
         private String guarantors = "";
         private String collateral = "";
@@ -182,12 +182,12 @@ public final class LoanRecordingDtos {
     }
     public record StatementMovement(Posting posting, BigDecimal outstandingInterest) {}
     public record Detail(LoanRow loan, String institution, String branch, String recordedBy, OffsetDateTime recordedAt,
-        String purpose, String business, BigDecimal income, BigDecimal expenses, BigDecimal otherDebt,
+        String purpose, String business, BigDecimal income, BigDecimal otherDebt,
         String informationSource, String guarantors, String collateral, String evidence, String notes,
         BigDecimal rate, String method, String frequency, int months, LocalDate firstPaymentDate,
         BigDecimal installment, BigDecimal contractualInterest, List<ScheduleRow> schedule,
         String tenureUnit,int tenureValue,String interestBasis,String loanMode,String interestEntry) {
-        public Detail(LoanRow loan,String institution,String branch,String recordedBy,OffsetDateTime recordedAt,String purpose,String business,BigDecimal income,BigDecimal expenses,BigDecimal otherDebt,String informationSource,String guarantors,String collateral,String evidence,String notes,BigDecimal rate,String method,String frequency,int months,LocalDate firstPaymentDate,BigDecimal installment,BigDecimal contractualInterest,List<ScheduleRow> schedule){this(loan,institution,branch,recordedBy,recordedAt,purpose,business,income,expenses,otherDebt,informationSource,guarantors,collateral,evidence,notes,rate,method,frequency,months,firstPaymentDate,installment,contractualInterest,schedule,"MONTHS",months,"ANNUAL","CONFIGURED","PERCENTAGE");}
+        public Detail(LoanRow loan,String institution,String branch,String recordedBy,OffsetDateTime recordedAt,String purpose,String business,BigDecimal income,BigDecimal otherDebt,String informationSource,String guarantors,String collateral,String evidence,String notes,BigDecimal rate,String method,String frequency,int months,LocalDate firstPaymentDate,BigDecimal installment,BigDecimal contractualInterest,List<ScheduleRow> schedule){this(loan,institution,branch,recordedBy,recordedAt,purpose,business,income,otherDebt,informationSource,guarantors,collateral,evidence,notes,rate,method,frequency,months,firstPaymentDate,installment,contractualInterest,schedule,"MONTHS",months,"ANNUAL","CONFIGURED","PERCENTAGE");}
     }
     public record ScheduleRow(int number, LocalDate date, BigDecimal principal, BigDecimal interest, BigDecimal amount,
                               BigDecimal beginningBalance, BigDecimal endingBalance) {

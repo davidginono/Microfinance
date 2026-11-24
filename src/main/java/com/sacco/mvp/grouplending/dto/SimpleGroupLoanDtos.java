@@ -32,12 +32,12 @@ public final class SimpleGroupLoanDtos {
     public record Person(UUID id,String number,String name) {}
     public record Setup(UUID groupId,int version,String name,UUID leaderId,String leader,
         String destinationType,String provider,String holder,String identifier,String evidence,List<Person> people) {}
-    public record Assessment(UUID clientId,UUID profileRevision,String number,String name,BigDecimal income,BigDecimal expenses,
+    public record Assessment(UUID clientId,UUID profileRevision,String number,String name,BigDecimal income,
         BigDecimal debt,BigDecimal internalDebt,String source,String evidence) {}
     public record Prepared(UUID party,Setup setup,List<Assessment> assessments,BigDecimal capacity,BigDecimal internalDebt,String destination) {}
     public record Contract(UUID loanId,UUID groupId,String name,String leader,String destination,String reference,
         String language,boolean agreementAvailable,List<Borrower> borrowers) {}
-    public record Borrower(UUID id,String number,String name,LocalDate signedOn,BigDecimal income,BigDecimal expenses,BigDecimal debt,String evidence) {}
+    public record Borrower(UUID id,String number,String name,LocalDate signedOn,BigDecimal income,BigDecimal debt,String evidence) {}
     public record Draft(UUID id,int version,String data) {}
     public record DraftSummary(UUID id,String actor,java.time.OffsetDateTime updated,BigDecimal amount) {}
     public record DraftFile(String filename,String contentType,byte[] bytes,String title,String purpose,String requirement,boolean agreement) {}

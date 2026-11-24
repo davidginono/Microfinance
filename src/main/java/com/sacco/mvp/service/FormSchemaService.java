@@ -87,6 +87,19 @@ public class FormSchemaService {
         }
     }
 
+    public String withoutFields(String schemaJson, Set<String> excluded) {
+        var schema = objectMapper.readTree(schemaJson);
+        if (schema.path("properties") instanceof tools.jackson.databind.node.ObjectNode properties) {
+            for (String field : excluded) properties.remove(field);
+        }
+        if (schema.path("required") instanceof tools.jackson.databind.node.ArrayNode required) {
+            for (int index = required.size() - 1; index >= 0; index--) {
+                if (excluded.contains(required.get(index).asString())) required.remove(index);
+            }
+        }
+        return objectMapper.writeValueAsString(schema);
+    }
+
     public void validateAgainstSchema(String schemaJson, Map<String, Object> formData) {
         try {
             JsonNode schemaNode = objectMapper.readTree(schemaJson);

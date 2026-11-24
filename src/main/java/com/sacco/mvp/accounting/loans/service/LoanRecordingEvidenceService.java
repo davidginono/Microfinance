@@ -28,7 +28,7 @@ public class LoanRecordingEvidenceService {
 
     public void applyClientProfile(AppUserPrincipal actor,RecordForm form) {
         var profile=onboarding.loanProfile(actor,form.getClientId());
-        form.setIncome(profile.monthlyIncome());form.setExpenses(profile.monthlyExpenses());form.setOtherDebt(form.getMonthlyOutsideDebt());
+        form.setIncome(profile.monthlyIncome());form.setExpenses(null);form.setOtherDebt(null);
         form.setBusiness(java.util.stream.Stream.of(profile.businessName(),profile.employerName(),profile.businessType())
             .filter(value->value!=null&&!value.isBlank()).collect(java.util.stream.Collectors.joining(" / ")));
         form.setInformationSource(profile.revisionId()==null?"UNAVAILABLE":"DECLARED");
@@ -98,7 +98,9 @@ public class LoanRecordingEvidenceService {
         var required=new HashMap<UUID,com.sacco.mvp.domain.LoanProductRequiredAttachment>();definitions.forEach(d->required.put(d.getId(),d));
         if("CONFIGURED".equals(form.getLoanMode())) {
             var product=schemas.getSchema(actor.getSaccoId(),form.getProductId(),null);
-            var formFields=schemas.toFormModel(product.getLoanType(),product.getFormSchema()).getFields();
+            boolean group="GROUP".equals(form.getLoanFor());
+            var schema=schemas.withoutFields(product.getFormSchema(),group?Set.of("monthlyExpenses"):Set.of("monthlyExpenses","otherDebtRepayments"));
+            var formFields=schemas.toFormModel(product.getLoanType(),schema).getFields();
             formFields.forEach(field->details.getFieldLabels().put(field.getName(),field.getLabelKey()));
             Set<String> allowed=formFields.stream()
                 .map(com.sacco.mvp.service.dto.FormField::getName).collect(java.util.stream.Collectors.toSet());
@@ -119,25 +121,24 @@ public class LoanRecordingEvidenceService {
                 values.put("incomeSource",profile.incomeSource());
             }
             if(form.getIncome()!=null)values.put("monthlyIncome",form.getIncome().toPlainString());
-            if(form.getExpenses()!=null)values.put("monthlyExpenses",form.getExpenses().toPlainString());
             if(form.getOtherDebt()!=null)values.put("otherDebtRepayments",form.getOtherDebt().toPlainString());
             values.put("collateralDescription",details.getCollateral().isEmpty()?form.getCollateral():details.getCollateral().stream()
                 .map(asset->asset.getItemName()+": "+asset.getDescription()).collect(java.util.stream.Collectors.joining("; ")));
             if(!details.getCollateral().isEmpty() && details.getCollateral().stream().allMatch(asset->asset.getEstimatedValue()!=null))
                 values.put("collateralEstimatedValue",details.getCollateral().stream().map(ClientApplicationDtos.Collateral::getEstimatedValue).reduce(BigDecimal.ZERO,BigDecimal::add).toPlainString());
             values.keySet().retainAll(allowed);
-            for(var field:formFields)if(!"GROUP".equals(form.getLoanFor()) && field.isRequired() && Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments",
+            for(var field:formFields)if(!group && field.isRequired() && Set.of("monthlyIncome",
                 "businessOrEmployerName","businessOrEmploymentType","incomeSource").contains(field.getName())) {
                 checkField(values.get(field.getName())!=null&&!values.get(field.getName()).isBlank(),"clientId",
-                    Set.of("monthlyIncome","monthlyExpenses","otherDebtRepayments").contains(field.getName())?"clientCashFlow":"clientBusiness");
+                    "monthlyIncome".equals(field.getName())?"clientCashFlow":"clientBusiness");
             }
-            if("GROUP".equals(form.getLoanFor())) {
+            if(group) {
                 check(!details.getGroupClientValues().isEmpty(),"clientCashFlow");
                 for(var person:details.getGroupClientValues()){
                     var individual=new LinkedHashMap<>(values);individual.putAll(person);individual.keySet().retainAll(allowed);
-                    schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(individual,product.getFormSchema()));
+                    schemas.validateAgainstSchema(schema,schemas.extractFormData(individual,schema));
                 }
-            } else schemas.validateAgainstSchema(product.getFormSchema(),schemas.extractFormData(values,product.getFormSchema()));
+            } else schemas.validateAgainstSchema(schema,schemas.extractFormData(values,schema));
         } else check(details.getFields().isEmpty(),"details");
         if(details.getDocumentNames().isEmpty() && details.getDocumentTypes().isEmpty() && details.getRequiredAttachmentIds().isEmpty())return null;
         check(files.size()<=10,"attachments");
@@ -165,7 +166,7 @@ public class LoanRecordingEvidenceService {
         form.setRequestKey(draft.getRequestKey());form.setApplicationId(id);form.setExpectedVersion(draft.getExpectedVersion());
         form.setClientId(draft.getClientId());form.setProductId(draft.getProductId());form.setLoanMode("CONFIGURED");
         form.setPrincipal(draft.getAmount());form.setApplicationDate(draft.getApplicationDate());form.setTenureUnit(draft.getTenureUnit());form.setTenureValue(draft.getTenureValue());
-        form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(draft.getExpenses());form.setOtherDebt(form.getMonthlyOutsideDebt());
+        form.setPurpose(draft.getPurpose());form.setBusiness(draft.getBusiness());form.setIncome(draft.getIncome());form.setExpenses(null);form.setOtherDebt(null);
         var details=form.getApplicationDetails()==null?new ApplicationDetails():form.getApplicationDetails();
         details.setUseOfFunds(draft.getUseOfFunds());
         details.setGuarantors(draft.getGuarantors());
@@ -217,7 +218,7 @@ public class LoanRecordingEvidenceService {
         draft.setRequestKey(form.getRequestKey());draft.setClientId(form.getClientId());draft.setProductId(form.getProductId());
         draft.setAmount(form.getPrincipal());draft.setApplicationDate(form.getApplicationDate());
         draft.setTenureUnit(form.getTenureUnit());draft.setTenureValue(form.getTenureValue());draft.setPurpose(form.getPurpose());
-        draft.setBusiness(form.getBusiness());draft.setIncome(form.getIncome());draft.setExpenses(form.getExpenses());draft.setOtherDebt(form.getOtherDebt());
+        draft.setBusiness(form.getBusiness());draft.setIncome(form.getIncome());
         var details=form.getApplicationDetails();
         if(details!=null) {
             draft.setUseOfFunds(details.getUseOfFunds());

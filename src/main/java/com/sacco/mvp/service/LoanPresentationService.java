@@ -116,7 +116,7 @@ public class LoanPresentationService {
             if(value==null)return null;
             String source=value.informationSource();
             if(source==null || !Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(source))
-                return new LoanBorrowerAssessment(value.business(),value.income(),value.expenses(),value.otherDebt(),"UNAVAILABLE",value.evidence());
+                return new LoanBorrowerAssessment(value.business(),value.income(),value.otherDebt(),"UNAVAILABLE",value.evidence());
             return value;
         }catch(tools.jackson.core.JacksonException e){return null;}
     }

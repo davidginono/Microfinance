@@ -55,8 +55,8 @@ public class CreditControlService {
     @Transactional(readOnly=true) public Page<Assessment> assessments(AppUserPrincipal a,UUID id,int page){guarantee(a,id);query("",page);return page(records.assessments(a,id,page),page);}
     @Transactional(timeout=15) public UUID assess(AppUserPrincipal a,UUID request,AssessmentForm f){
         authorize(a,"GUARANTOR_CAPACITY","CREATE");String hash=hash(List.of(request,f));var old=retry(a,"lending_guarantor_assessment",f.getRequestKey(),hash);if(old.isPresent())return old.get();
-        money(f.getIncome(),true,"income");money(f.getExpenses(),false,"expenses");money(f.getOtherDebt(),false,"otherDebt");money(f.getCapacity(),false,"capacity");
-        check(f.getIncome().subtract(f.getExpenses()).subtract(f.getOtherDebt()).signum()>0,"cashFlow");date(f.getAssessedOn(),"assessedOn");check(f.getValidThrough()!=null&&!f.getValidThrough().isBefore(clock.today())&&!f.getValidThrough().isBefore(f.getAssessedOn()),"validThrough");
+        money(f.getIncome(),true,"income");money(f.getOtherDebt(),false,"otherDebt");money(f.getCapacity(),false,"capacity");
+        check(f.getIncome().subtract(f.getOtherDebt()).signum()>0,"cashFlow");date(f.getAssessedOn(),"assessedOn");check(f.getValidThrough()!=null&&!f.getValidThrough().isBefore(clock.today())&&!f.getValidThrough().isBefore(f.getAssessedOn()),"validThrough");
         text(f.getEvidence(),1000,"evidence");text(f.getPolicyReference(),500,"reference");check(f.isVerified(),"verified");
         var g=records.guarantee(a,request,clock.today(),true);check(g.subject()!=null&&!g.subject().equals("CLIENT/"+a.getMemberId()),"independent");check(Set.of("PENDING","APPROVED").contains(g.status()),"state");
         UUID id=UUID.randomUUID();records.assessment(a,id,g,f,hash,clock.now());event(a,id,"GUARANTOR_ASSESSED");return id;

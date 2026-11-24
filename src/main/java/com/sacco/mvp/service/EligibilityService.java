@@ -74,52 +74,48 @@ public class EligibilityService {
         Map<String, ?> safeFinancialSnapshot = financialSnapshot == null ? Map.of() : financialSnapshot;
 
         BigDecimal incomeInput = readMoney(safeFormData, "monthlyIncome", "income", "declaredMonthlyIncome");
-        BigDecimal expensesInput = readMoney(safeFormData, "monthlyExpenses", "expenses", "declaredMonthlyExpenses");
         BigDecimal debtInput = readMoney(safeFormData, "otherDebtRepayments", "monthlyDebtRepayments", "debtRepayments");
         var shared=sharedCredit.summary(saccoId,memberId,null);
         BigDecimal monthlyIncome = money(incomeInput);
-        BigDecimal monthlyExpenses = money(expensesInput);
         BigDecimal otherDebtRepayments = money(debtInput).max(shared.monthlyPayment());
         BigDecimal collateralValue = readMoney(safeFormData, "collateralEstimatedValue", "collateralValue");
         String collateralDescription = readText(safeFormData, "collateralDescription", "securityDescription");
         BigDecimal repaymentInput = monthlyRepayment(safeFinancialSnapshot);
         BigDecimal repayment = money(repaymentInput);
-        BigDecimal disposableIncome = monthlyIncome.subtract(monthlyExpenses).subtract(otherDebtRepayments)
+        BigDecimal incomeAfterDebt = monthlyIncome.subtract(otherDebtRepayments)
             .setScale(2, RoundingMode.HALF_UP);
         BigDecimal ratio = product.getResolvedMaxRepaymentToDisposableIncomeRatio();
         if (ratio == null || ratio.compareTo(BigDecimal.ZERO) <= 0) {
             ratio = DEFAULT_RATIO;
         }
-        BigDecimal maxAffordableRepayment = disposableIncome.multiply(ratio).setScale(2, RoundingMode.DOWN);
+        BigDecimal maxAffordableRepayment = incomeAfterDebt.multiply(ratio).setScale(2, RoundingMode.DOWN);
         BigDecimal activeExposure = shared.known()?loanAnalyticsService.activeLoanAmount(memberId, saccoId, null):null;
-        BigDecimal repaymentBurdenRatio = disposableIncome.compareTo(BigDecimal.ZERO) <= 0
+        BigDecimal repaymentBurdenRatio = incomeAfterDebt.compareTo(BigDecimal.ZERO) <= 0
             ? BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP)
-            : repayment.divide(disposableIncome, 4, RoundingMode.HALF_UP);
+            : repayment.divide(incomeAfterDebt, 4, RoundingMode.HALF_UP);
 
         boolean amountProvided = safeAmount.compareTo(BigDecimal.ZERO) > 0;
         boolean cashFlowValid = incomeInput != null && incomeInput.signum() > 0
-            && expensesInput != null && expensesInput.signum() >= 0
             && debtInput != null && debtInput.signum() >= 0;
         boolean affordabilityOk = !product.isAffordabilityCheckRequired()
             || (cashFlowValid && repaymentInput != null && repaymentInput.signum() > 0
-                && disposableIncome.compareTo(BigDecimal.ZERO) > 0
+                && incomeAfterDebt.compareTo(BigDecimal.ZERO) > 0
                 && repayment.compareTo(maxAffordableRepayment) <= 0);
         boolean collateralOk = !product.isCollateralRequired()
             || (!collateralDescription.isBlank()
                 && collateralValue != null && collateralValue.signum() >= 0
                 && collateralValue.compareTo(minCollateralValue(product, safeAmount)) >= 0);
         boolean eligible = amountProvided && affordabilityOk && collateralOk && shared.known();
-        String reason = !shared.known()?sharedCredit.message("sharedCreditHistory"):reason(product, amountProvided, cashFlowValid, repaymentInput, monthlyIncome, disposableIncome, repayment,
+        String reason = !shared.known()?sharedCredit.message("sharedCreditHistory"):reason(product, amountProvided, cashFlowValid, repaymentInput, monthlyIncome, incomeAfterDebt, repayment,
             maxAffordableRepayment, collateralDescription, collateralValue, safeAmount);
 
         return new EligibilityResult(
             eligible,
             ratio,
-            disposableIncome,
+            incomeAfterDebt,
             maxAffordableRepayment,
             product.isAffordabilityCheckRequired(),
             monthlyIncome,
-            monthlyExpenses,
             otherDebtRepayments,
             repayment,
             repaymentBurdenRatio,
@@ -139,9 +135,8 @@ public class EligibilityService {
         snapshot.put("eligible", result.eligible());
         snapshot.put("reason", result.reason());
         snapshot.put("monthlyIncome", result.monthlyIncome());
-        snapshot.put("monthlyExpenses", result.monthlyExpenses());
         snapshot.put("otherDebtRepayments", result.otherDebtRepayments());
-        snapshot.put("disposableIncome", result.disposableIncome());
+        snapshot.put("incomeAfterDebt", result.incomeAfterDebt());
         snapshot.put("repaymentAmount", result.repaymentAmount());
         snapshot.put("maxAffordableRepayment", result.maxAffordableRepayment());
         snapshot.put("repaymentBurdenRatio", result.repaymentBurdenRatio());
@@ -181,7 +176,7 @@ public class EligibilityService {
                           boolean cashFlowValid,
                           BigDecimal repaymentInput,
                           BigDecimal monthlyIncome,
-                          BigDecimal disposableIncome,
+                          BigDecimal incomeAfterDebt,
                           BigDecimal repayment,
                           BigDecimal maxAffordableRepayment,
                           String collateralDescription,
@@ -191,7 +186,7 @@ public class EligibilityService {
             return "Enter a positive loan amount before calculating the credit assessment.";
         }
         if (product.isAffordabilityCheckRequired() && !cashFlowValid) {
-            return "Enter valid monthly income, expenses, and debt repayments. Expenses and debts must be zero or greater.";
+            return "Enter valid monthly income and debt payments.";
         }
         if (product.isAffordabilityCheckRequired() && (repaymentInput == null || repaymentInput.signum() <= 0)) {
             return "Calculate a positive repayment amount with a valid repayment frequency before assessing affordability.";
@@ -199,11 +194,11 @@ public class EligibilityService {
         if (product.isAffordabilityCheckRequired() && amountProvided && monthlyIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return "Enter monthly income before calculating the credit assessment.";
         }
-        if (product.isAffordabilityCheckRequired() && amountProvided && disposableIncome.compareTo(BigDecimal.ZERO) <= 0) {
-            return "Disposable income is not enough for this loan.";
+        if (product.isAffordabilityCheckRequired() && amountProvided && incomeAfterDebt.compareTo(BigDecimal.ZERO) <= 0) {
+            return "Monthly income after debt payments is too low for this loan.";
         }
         if (product.isAffordabilityCheckRequired() && amountProvided && repayment.compareTo(maxAffordableRepayment) > 0) {
-            return "Repayment is above the affordable limit for the declared income and expenses.";
+            return "Repayment is above the affordable limit for the declared income and debt payments.";
         }
         if (product.isCollateralRequired() && collateralDescription.isBlank()) {
             return "Collateral details are required for this loan product.";
@@ -285,7 +280,6 @@ public class EligibilityService {
         BigDecimal maxAllowed,
         boolean savingsLimitCheckRequired,
         BigDecimal monthlyIncome,
-        BigDecimal monthlyExpenses,
         BigDecimal otherDebtRepayments,
         BigDecimal repaymentAmount,
         BigDecimal repaymentBurdenRatio,
@@ -304,7 +298,6 @@ public class EligibilityService {
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP),
@@ -313,7 +306,7 @@ public class EligibilityService {
             );
         }
 
-        public BigDecimal disposableIncome() {
+        public BigDecimal incomeAfterDebt() {
             return savings;
         }
 

@@ -54,24 +54,21 @@ class ClientOnboardingPostgresTest {
         var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());form.setAction("RECORDED");
         form.getProfile().setActivity("Employment");form.getProfile().setEmployerName("Synthetic employer");
         form.getProfile().setMonthlyIncome(new java.math.BigDecimal("2500000.50"));
-        form.getProfile().setMonthlyExpenses(new java.math.BigDecimal("500000.25"));
         UUID revision=service.save(f.actor,f.client,form);
         var pending=service.profileForm(f.actor,f.client);pending.setAction("DRAFT");
         pending.getProfile().setMonthlyIncome(new java.math.BigDecimal("9000000.00"));
-        pending.getProfile().setMonthlyExpenses(new java.math.BigDecimal("900000.00"));service.save(f.actor,f.client,pending);
+        service.save(f.actor,f.client,pending);
         var source=service.loanProfile(f.actor,f.client);
         assertThat(source.revisionId()).isEqualTo(revision);assertThat(source.employerName()).isEqualTo("Synthetic employer");
         assertThat(source.monthlyIncome()).isEqualByComparingTo("2500000.50");assertThat(source.monthlyDebtRepayments()).isNull();
-        assertThat(source.monthlyExpenses()).isEqualByComparingTo("500000.25");
+        assertThat(source.monthlyExpenses()).isNull();
         assertThatThrownBy(()->service.loanProfile(f.operator("B2"),f.client)).isInstanceOf(AccessDeniedException.class);
     }
     @Test void profileCashFlowRejectsInvalidMoney() {
         var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());
         form.getProfile().setMonthlyIncome(new java.math.BigDecimal("1.001"));
         assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyIncome");
-        form.getProfile().setMonthlyIncome(null);form.getProfile().setMonthlyExpenses(new java.math.BigDecimal("1.001"));
-        assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.monthlyExpenses");
-        form.getProfile().setMonthlyExpenses(null);form.getProfile().setSourceOfFunds("Unsupported");
+        form.getProfile().setMonthlyIncome(null);form.getProfile().setSourceOfFunds("Unsupported");
         assertThatThrownBy(()->service.save(f.actor,f.client,form)).hasMessage("kyc.error.sourceOfFunds");
     }
     @Test void recordedProfilesStayUnverifiedWithoutCreatingReviewDecisionsOrLoginAccess() {

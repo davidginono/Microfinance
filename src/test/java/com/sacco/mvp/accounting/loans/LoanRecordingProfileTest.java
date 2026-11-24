@@ -53,9 +53,8 @@ class LoanRecordingProfileTest {
     }
     @Test void recordedProfileReplacesForgedValuesAndOnePurposeSatisfiesTheProductSchema() {
         var f=form();f.setIncome(new BigDecimal("999999999.00"));f.setOtherDebt(new BigDecimal("1.00"));f.setExpenses(new BigDecimal("999999999.00"));
-        f.setMonthlyOutsideDebt(new BigDecimal("123.45"));
         evidence.applyClientProfile(actor,f);evidence.prepare(actor,f,List.of());
-        assertThat(f.getIncome()).isEqualByComparingTo("2500000.50");assertThat(f.getOtherDebt()).isEqualByComparingTo("123.45");assertThat(f.getExpenses()).isEqualByComparingTo("500000.25");
+        assertThat(f.getIncome()).isEqualByComparingTo("2500000.50");assertThat(f.getOtherDebt()).isNull();assertThat(f.getExpenses()).isNull();
         assertThat(f.getApplicationDetails().getClientProfile().revisionId()).isEqualTo(revision);
         assertThat(f.getApplicationDetails().getFields()).isEmpty();assertThat(f.getBusiness()).isEqualTo("Recorded shop / Retail");
         assertThat(evidence.product(actor,product).fields()).extracting("name").containsExactly("projectLocation");
@@ -68,20 +67,12 @@ class LoanRecordingProfileTest {
             LoanRecordingEvidenceService.FieldValidation.class,error->{assertThat(error.field()).isEqualTo("clientId");
                 assertThat(error).hasMessage("recording.error.clientCashFlow");});
     }
-    @Test void missingProfileExpensesCannotBeReplacedByLoanFormValues() {
-        when(onboarding.loanProfile(actor,client)).thenReturn(new LoanProfile(revision,new BigDecimal("2500000.50"),
-            null,BigDecimal.ZERO,"Recorded shop","Retail","Business","Shop sales",""));
-        var f=form();f.setExpenses(BigDecimal.ZERO);evidence.applyClientProfile(actor,f);
-        assertThat(f.getExpenses()).isNull();
-        assertThatThrownBy(()->evidence.prepare(actor,f,List.of())).isInstanceOfSatisfying(
-            LoanRecordingEvidenceService.FieldValidation.class,error->{assertThat(error.field()).isEqualTo("clientId");
-                assertThat(error).hasMessage("recording.error.clientCashFlow");});
-    }
+
     @Test void employmentUsesTheEmployerRecordedInTheProfile() {
         when(onboarding.loanProfile(actor,client)).thenReturn(new LoanProfile(revision,new BigDecimal("2000000"),BigDecimal.ZERO,
             BigDecimal.ZERO,"","","Employment","Salary","Recorded employer"));
-        var f=form();f.setMonthlyOutsideDebt(BigDecimal.ZERO);evidence.applyClientProfile(actor,f);evidence.prepare(actor,f,List.of());
-        assertThat(f.getBusiness()).isEqualTo("Recorded employer");assertThat(f.getExpenses()).isZero();
+        var f=form();evidence.applyClientProfile(actor,f);evidence.prepare(actor,f,List.of());
+        assertThat(f.getBusiness()).isEqualTo("Recorded employer");assertThat(f.getExpenses()).isNull();
         assertThat(f.getApplicationDetails().getClientProfile().employerName()).isEqualTo("Recorded employer");
     }
     @Test void savingDraftDoesNotApplyAnOldDocumentedLabelToTheProfileFigures() {

@@ -247,7 +247,6 @@ public class SaccoConfigurationService {
               "type": "object",
               "required": [
                 "monthlyIncome",
-                "monthlyExpenses",
                 "businessOrEmployerName",
                 "businessOrEmploymentType",
                 "incomeSource",
@@ -255,10 +254,6 @@ public class SaccoConfigurationService {
               ],
               "properties": {
                 "monthlyIncome": {
-                  "type": "number",
-                  "minimum": 0
-                },
-                "monthlyExpenses": {
                   "type": "number",
                   "minimum": 0
                 },

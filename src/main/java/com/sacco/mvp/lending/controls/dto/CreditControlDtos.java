@@ -18,7 +18,7 @@ public final class CreditControlDtos {
                        BigDecimal futureInterest,BigDecimal charges,BigDecimal arrears,LocalDate oldestDue,LocalDate nextDue,boolean tracked) {}
     public record Guarantee(UUID id,UUID loanId,String loanNumber,String borrower,String guarantor,String status,
                             String subject,BigDecimal liability,String capacityError) {}
-    public record Assessment(UUID id,BigDecimal income,BigDecimal expenses,BigDecimal otherDebt,BigDecimal capacity,
+    public record Assessment(UUID id,BigDecimal income,BigDecimal otherDebt,BigDecimal capacity,
                              LocalDate assessedOn,LocalDate validThrough,String evidence,String policyReference,String actor,OffsetDateTime recordedAt) {}
     public record Asset(UUID id,String code,String description,String owner,String ownerEvidence,BigDecimal value,
                         BigDecimal encumbrance,LocalDate validThrough,BigDecimal pledged,int sequence) {}
@@ -35,7 +35,7 @@ public final class CreditControlDtos {
         private Integer reminderDaysBefore,reminderEveryDays;
     }
     @Data public static class AssessmentForm {
-        private UUID requestKey=UUID.randomUUID();private BigDecimal income,expenses,otherDebt,capacity;
+        private UUID requestKey=UUID.randomUUID();private BigDecimal income,otherDebt,capacity;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate assessedOn,validThrough;
         private String evidence="",policyReference="";private boolean verified;
     }

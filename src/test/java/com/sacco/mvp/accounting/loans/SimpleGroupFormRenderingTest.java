@@ -52,7 +52,7 @@ class SimpleGroupFormRenderingTest {
                 var form=new RecordForm();form.setLoanFor("GROUP");form.getGroupApplication().setGroupId(group);form.getGroupApplication().setSignedOn(java.time.LocalDate.of(2026,11,12));
                 request.setAttribute("recordForm",form);request.setAttribute("groupSetup",new Setup(group,1,"Group",first,"Asha","BANK_ACCOUNT","Bank","Group","123","Checked",List.of(new Person(first,"C1","Asha"),new Person(second,"C2","Juma"))));
                 request.setAttribute("saveUrl","/record");
-                request.setAttribute("simpleGroup",new Contract(UUID.randomUUID(),group,"Group","Asha","Group bank","Agreement","EN",true,List.of(new Borrower(first,"C1","Asha",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,java.math.BigDecimal.ZERO,java.math.BigDecimal.ZERO,"CLIENT_PROFILE:"+UUID.randomUUID()),new Borrower(second,"C2","Juma",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,java.math.BigDecimal.ZERO,java.math.BigDecimal.ZERO,"Historical budget reference"))));
+                request.setAttribute("simpleGroup",new Contract(UUID.randomUUID(),group,"Group","Asha","Group bank","Agreement","EN",true,List.of(new Borrower(first,"C1","Asha",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,java.math.BigDecimal.ZERO,"CLIENT_PROFILE:"+UUID.randomUUID()),new Borrower(second,"C2","Juma",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,java.math.BigDecimal.ZERO,"Historical budget reference"))));
                 request.getRequestDispatcher("/form.jsp").forward(request,response);
             }
         });context.addServletMappingDecoded("/form","form");

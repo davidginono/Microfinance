@@ -13,7 +13,6 @@ import com.sacco.mvp.accounting.reports.VoucherPdfDocument.Field;
 import com.sacco.mvp.accounting.service.VoucherPdfService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.MessageSource;
-import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
@@ -41,7 +40,7 @@ public class LoanRecordingController {
     private final LoanRecordingEvidenceService evidence;
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalidRequest(IllegalArgumentException exception,Model model){model.addAttribute("recordingError",error(exception));return "accounting/loans/error";}
-    @InitBinder("recordForm") public void recordBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(50);b.setAllowedFields("groupApplication.debts[*].reference","groupApplication.debts[*].monthlyPayment","groupApplication.debts[*].clientIds[*]","groupApplication.debts[*].clientIds","loanFor","groupApplication.groupId","groupApplication.expectedVersion","groupApplication.signedOn","groupApplication.checked","groupApplication.removeAgreement","applicationId","expectedVersion","applicationDetails.declarationAccepted","applicationDetails.fields[*]","applicationDetails.guarantors[*].fullName","applicationDetails.guarantors[*].clientNumber","applicationDetails.guarantors[*].guaranteeBudget","applicationDetails.guarantors[*].guaranteeEvidence","applicationDetails.guarantors[*].signedOn","applicationDetails.guarantors[*].relationship","applicationDetails.guarantors[*].business","applicationDetails.guarantors[*].location","applicationDetails.guarantors[*].phone","applicationDetails.collateral[*].itemName","applicationDetails.collateral[*].itemNumber","applicationDetails.collateral[*].itemType","applicationDetails.collateral[*].description","applicationDetails.collateral[*].phone","applicationDetails.documentNames[*]","applicationDetails.documentTypes[*]","applicationDetails.requiredAttachmentIds[*]","requestKey","clientId","monthlyOutsideDebt","topUpSourceLoanId","productId","applicationDate","principal","months","tenureUnit","tenureValue","loanMode","interestEntry","interestBasis","interestPercent","interestAmount","customFrequency","customMethod","purpose","guarantors","collateral","evidence","customApplicationCharge","customProcessingCharge","insurancePremium","customProcessingPercent","customInsurancePercent","customProcessingBasis","customInsuranceBasis");}
+    @InitBinder("recordForm") public void recordBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(50);b.setAllowedFields("groupApplication.debts[*].reference","groupApplication.debts[*].monthlyPayment","groupApplication.debts[*].clientIds[*]","groupApplication.debts[*].clientIds","loanFor","groupApplication.groupId","groupApplication.expectedVersion","groupApplication.signedOn","groupApplication.checked","groupApplication.removeAgreement","applicationId","expectedVersion","applicationDetails.declarationAccepted","applicationDetails.fields[*]","applicationDetails.guarantors[*].fullName","applicationDetails.guarantors[*].clientNumber","applicationDetails.guarantors[*].guaranteeBudget","applicationDetails.guarantors[*].guaranteeEvidence","applicationDetails.guarantors[*].signedOn","applicationDetails.guarantors[*].relationship","applicationDetails.guarantors[*].business","applicationDetails.guarantors[*].location","applicationDetails.guarantors[*].phone","applicationDetails.collateral[*].itemName","applicationDetails.collateral[*].itemNumber","applicationDetails.collateral[*].itemType","applicationDetails.collateral[*].description","applicationDetails.collateral[*].phone","applicationDetails.documentNames[*]","applicationDetails.documentTypes[*]","applicationDetails.requiredAttachmentIds[*]","requestKey","clientId","topUpSourceLoanId","productId","applicationDate","principal","months","tenureUnit","tenureValue","loanMode","interestEntry","interestBasis","interestPercent","interestAmount","customFrequency","customMethod","purpose","guarantors","collateral","evidence","customApplicationCharge","customProcessingCharge","insurancePremium","customProcessingPercent","customInsurancePercent","customProcessingBasis","customInsuranceBasis");}
     @GetMapping({"/loan-records","/loan-disbursements","/loan-repayments"})
     public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
@@ -63,13 +62,8 @@ public class LoanRecordingController {
             if(action.equals("draft"))return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments)+"/edit";
             if(action.equals("preview")){model.addAttribute("quote",service.preview(a,recordForm));recordProductContext(a,recordForm,model);return "accounting/loans/record-form";}
             if(!action.equals("save"))throw new IllegalArgumentException("recording.error.request");UUID id="GROUP".equals(recordForm.getLoanFor())?service.saveGroup(a,recordForm,attachments==null?List.of():attachments,groupAgreement):service.save(a,recordForm,attachments==null?List.of():attachments);flash.addFlashAttribute("recordingSaved",true);return "redirect:/finance/loan-records/"+id;
-        }catch(SimpleGroupLoanService.ProfileBudgetException e){
-            var locale=LocaleContextHolder.getLocale();
-            var issues=e.issues().stream().map(issue->{
-                var key=issue.incomeMissing()?(issue.expensesMissing()?"incomeAndExpenses":"income"):"expenses";
-                return messages.getMessage("simpleGroup.profileBudget."+key,new Object[]{issue.client()},locale);
-            }).collect(java.util.stream.Collectors.joining(" · "));
-            errors.rejectValue("groupApplication.groupId",e.getMessage(),new Object[]{issues},null);
+        }catch(SimpleGroupLoanService.ProfileIncomeException e){
+            errors.rejectValue("groupApplication.groupId",e.getMessage(),new Object[]{String.join(", ",e.clients())},null);
         }catch(LoanRecordingEvidenceService.FieldValidation e){errors.rejectValue(e.field(),e.getMessage());}
         catch(IllegalArgumentException|IllegalStateException e){rejectRecordField(errors,error(e));}
         catch(DataIntegrityViolationException e){errors.reject("recording.error.duplicate");}
@@ -97,7 +91,6 @@ public class LoanRecordingController {
             case "recording.error.product","charges.error.topUpFee"->"productId";
             case "recording.error.customConfiguration","charges.error.custom"->"loanMode";
             case "recording.error.client","recording.error.clientCashFlow","recording.error.clientBusiness","applications.error.client","applications.error.verification"->"clientId";
-            case "recording.error.outsideDebt"->"monthlyOutsideDebt";
             case "recording.error.date","applications.error.date"->"applicationDate";
             case "recording.error.productLimits","recording.error.topUpCash"->"principal";
             case "applications.error.declaration"->"applicationDetails.declarationAccepted";

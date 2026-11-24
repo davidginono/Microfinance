@@ -38,7 +38,6 @@ public class SimpleGroupLoanService {
     private UUID persistDraft(AppUserPrincipal a,RecordForm f){access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(f!=null&&"GROUP".equals(f.getLoanFor())&&f.getRequestKey()!=null&&f.getGroupApplication()!=null&&f.getGroupApplication().getGroupId()!=null,"request");validateDraft(f);records.setup(a,f.getGroupApplication().getGroupId(),true);check(records.active(a,f.getGroupApplication().getGroupId()),"inactive");return records.draft(a,f.getApplicationId(),f.getRequestKey(),f.getExpectedVersion(),f.getGroupApplication().getGroupId(),json.writeValueAsString(f),clock.now());}
     @Transactional public UUID saveDraft(AppUserPrincipal a,RecordForm f,List<MultipartFile> files,MultipartFile agreement){
         access.requireActor(a,"LOAN_RECORDING_CREATE");authorize(a,"VIEW");check(f!=null&&f.getGroupApplication()!=null&&f.getGroupApplication().getGroupId()!=null,"request");records.setup(a,f.getGroupApplication().getGroupId(),true);var stored=f.getApplicationId()==null?new ArrayList<DraftFile>():new ArrayList<>(Arrays.asList(json.readValue(records.draftFiles(a,f.getApplicationId()),DraftFile[].class)));
-        f.setMonthlyOutsideDebt(null);
         if(f.getApplicationId()!=null&&!sameMaterial(readForm(records.draft(a,f.getApplicationId(),true).data()),f))stored.removeIf(x->x.agreement()||"GUARANTOR_CONSENT".equals(x.purpose()));
         if(f.getGroupApplication().isRemoveAgreement())stored.removeIf(DraftFile::agreement);
         appendFiles(stored,f,files,agreement);f.setGroupRequestHash(draftFileHash(stored));UUID id=persistDraft(a,f);records.draftFiles(a,id,json.writeValueAsString(stored));event(a,id,"GROUP_DRAFT_SAVED");return id;
@@ -120,15 +119,13 @@ public class SimpleGroupLoanService {
         }
         var rows=records.profiles(a,s.groupId(),clock.today());check(rows.size()==s.people().size(),"members");
         var profiles=new HashMap<UUID,Profile>();
-        var issues=new ArrayList<ProfileBudgetIssue>();
+        var missingIncome=new ArrayList<String>();
         for(var row:rows){
             var profile=row.get("revision")==null||row.get("profile")==null?null:json.readValue(row.get("profile").toString(),Profile.class);
-            boolean incomeMissing=profile==null||!validMoney(profile.getMonthlyIncome(),true);
-            boolean expensesMissing=profile==null||!validMoney(profile.getMonthlyExpenses(),false);
-            if(incomeMissing||expensesMissing)issues.add(new ProfileBudgetIssue(Objects.toString(row.get("full_name")),incomeMissing,expensesMissing));
+            if(profile==null||!validMoney(profile.getMonthlyIncome(),true))missingIncome.add(Objects.toString(row.get("full_name")));
             else profiles.put((UUID)row.get("id"),profile);
         }
-        if(!issues.isEmpty())throw new ProfileBudgetException(issues);
+        if(!missingIncome.isEmpty())throw new ProfileIncomeException(missingIncome);
         if(submitting)check(g.getSignedOn()!=null&&!g.getSignedOn().isAfter(clock.today())&&!g.getSignedOn().isBefore(f.getApplicationDate()),"signatures");
         check(g.getDebts()!=null&&g.getDebts().size()<=50,"outsideDebts");
         var externalByClient=new HashMap<UUID,BigDecimal>();var debtReferences=new HashSet<String>();BigDecimal externalDebt=BigDecimal.ZERO;
@@ -138,7 +135,7 @@ public class SimpleGroupLoanService {
             var named=new HashSet<>(obligation.getClientIds());check(named.size()==obligation.getClientIds().size()&&memberIds.containsAll(named),"outsideDebts");
             for(var id:named)externalByClient.merge(id,obligation.getMonthlyPayment(),BigDecimal::add);externalDebt=externalDebt.add(obligation.getMonthlyPayment());
         }
-        var assessments=new ArrayList<Assessment>();BigDecimal income=BigDecimal.ZERO,expenses=BigDecimal.ZERO;
+        var assessments=new ArrayList<Assessment>();BigDecimal income=BigDecimal.ZERO;
         f.getApplicationDetails().getGroupClientValues().clear();
         var sources=new HashSet<String>();var exposures=records.exposures(a,memberIds);
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
@@ -149,10 +146,9 @@ public class SimpleGroupLoanService {
             var e=exposures.get(id);check(e!=null&&e.missingHistory()==0&&e.pendingApplications()==0,"history");
             check(e.activeLoans()==0||(product.isApplicationWithActiveLoanAllowed()&&(product.getMaximumActiveLoans()==null||e.activeLoans()<product.getMaximumActiveLoans())),"activeLoans");
             check(policy.applicantDefaultLimit()==null||e.riskLoans()<policy.applicantDefaultLimit(),"history");
-            BigDecimal i=profile.getMonthlyIncome(),x=profile.getMonthlyExpenses(),internal=e.monthlyDebt().setScale(2,RoundingMode.UP);
+            BigDecimal i=profile.getMonthlyIncome(),internal=e.monthlyDebt().setScale(2,RoundingMode.UP);
             BigDecimal d=internal.add(externalByClient.getOrDefault(id,BigDecimal.ZERO));check(validMoney(d,false),"outsideDebts");
-            check(i.subtract(x).subtract(d).signum()>0,"borrowerAffordability");
-            var values=new LinkedHashMap<String,String>();values.put("monthlyIncome",i.toPlainString());values.put("monthlyExpenses",x.toPlainString());values.put("otherDebtRepayments",d.toPlainString());
+            var values=new LinkedHashMap<String,String>();values.put("monthlyIncome",i.toPlainString());values.put("otherDebtRepayments",d.toPlainString());
             values.put("businessOrEmploymentType",profile.getActivity());values.put("businessOrEmployerName","Employment".equals(profile.getActivity())?profile.getEmployerName():profile.getBusinessName());values.put("incomeSource",profile.getSourceOfFunds());
             f.getApplicationDetails().getGroupClientValues().add(values);
             String source=incomeDocument(row);
@@ -160,15 +156,15 @@ public class SimpleGroupLoanService {
             String budgetEvidence="CLIENT_PROFILE:"+row.get("revision");
             if(source.isBlank())source=budgetEvidence;
             if(submitting){text(source,200);check(sources.add(source.strip().toLowerCase(Locale.ROOT)),"incomeSource");}
-            income=income.add(i);expenses=expenses.add(x);
-            assessments.add(new Assessment(id,(UUID)row.get("revision"),Objects.toString(row.get("member_no")),Objects.toString(row.get("full_name")),i,x,d,internal,source.strip(),budgetEvidence));
+            income=income.add(i);
+            assessments.add(new Assessment(id,(UUID)row.get("revision"),Objects.toString(row.get("member_no")),Objects.toString(row.get("full_name")),i,d,internal,source.strip(),budgetEvidence));
         }
         var internalDebt=records.monthlyDebt(a,s.groupId()).setScale(2,RoundingMode.UP);var debt=internalDebt.add(externalDebt);
         check(validMoney(debt,false),"outsideDebts");
-        var capacity=income.subtract(expenses).subtract(debt).multiply(ratio).setScale(2,RoundingMode.DOWN);
+        var capacity=income.subtract(debt).multiply(ratio).setScale(2,RoundingMode.DOWN);
         BigDecimal monthly=LoanAmortizationCalculator.monthlyEquivalent(quote.maximumInstallment(),product.getResolvedRepaymentFrequency());check(capacity.signum()>0&&monthly.compareTo(capacity)<=0,"affordability");
         if(submitting)check(g.isChecked(),"signatures");
-        f.setIncome(income);f.setExpenses(expenses);f.setOtherDebt(debt);f.setBusiness(s.name());f.setInformationSource(submitting&&assessments.stream().allMatch(x->x.source().startsWith("CLIENT_DOCUMENT:"))?"DOCUMENTED":"DECLARED");
+        f.setIncome(income);f.setOtherDebt(debt);f.setBusiness(s.name());f.setInformationSource(submitting&&assessments.stream().allMatch(x->x.source().startsWith("CLIENT_DOCUMENT:"))?"DOCUMENTED":"DECLARED");
         String destination=json.writeValueAsString(Map.of("available",true,"destinationType",s.destinationType(),"provider",s.provider(),"accountHolderName",s.holder(),"accountIdentifier",s.identifier(),"sourceLabel","SIGNED_GROUP_INSTRUCTION"));
         return new Prepared(submitting?records.party(a,s.groupId()):null,s,assessments,capacity,internalDebt,destination);
     }
@@ -210,11 +206,10 @@ public class SimpleGroupLoanService {
     }
     @Transactional(readOnly=true) public boolean guaranteesReady(AppUserPrincipal a,UUID loan){access.requireActor(a,"LOAN_RECORDING_VIEW");return records.guaranteesReady(a,loan);}
     private void event(AppUserPrincipal a,UUID id,String action){audit.logEvent("GROUP_LENDING",id,action,a.getMemberId(),AuditEventStatus.SUCCESS,action,"GROUP",id.toString(),a.getSaccoId(),a.getStationId(),Map.of());}
-    public record ProfileBudgetIssue(String client,boolean incomeMissing,boolean expensesMissing) {}
-    public static final class ProfileBudgetException extends IllegalArgumentException {
-        private final List<ProfileBudgetIssue> issues;
-        private ProfileBudgetException(List<ProfileBudgetIssue> issues){super("simpleGroup.error.profileBudget");this.issues=List.copyOf(issues);}
-        public List<ProfileBudgetIssue> issues(){return issues;}
+    public static final class ProfileIncomeException extends IllegalArgumentException {
+        private final List<String> clients;
+        private ProfileIncomeException(List<String> clients){super("simpleGroup.error.profileIncome");this.clients=List.copyOf(clients);}
+        public List<String> clients(){return clients;}
     }
     private static boolean validMoney(BigDecimal n,boolean positive){return n!=null&&n.scale()<=2&&n.precision()-n.scale()<=16&&(positive?n.signum()>0:n.signum()>=0);}
     private static void money(BigDecimal n,boolean positive){check(validMoney(n,positive),"budget");}
