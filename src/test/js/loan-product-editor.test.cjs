@@ -3,6 +3,21 @@ const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');
 const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/webapp/WEB-INF/jsp/fragments/loan-product-editor-script.jspf','utf8').replace(/^<script>\s*/,'').replace(/\s*<\/script>\s*$/,'');
+
+test('the registry initializes and focuses the newly saved loan product',()=>{
+  const dom=new JSDOM('<body class="overflow-hidden"><table><tbody><tr tabindex="-1" data-created-loan-product-target="true"><td>New product</td></tr></tbody></table></body>',{runScripts:'outside-only'});
+  const {document}=dom.window;
+  const row=document.querySelector('[data-created-loan-product-target]');
+  let scrolled=false;
+  row.scrollIntoView=()=>{scrolled=true;};
+  try{
+    dom.window.eval(source);
+    assert.equal(document.body.classList.contains('overflow-hidden'),false);
+    assert.equal(scrolled,true);
+    assert.equal(document.activeElement,row);
+  }finally{dom.window.close();}
+});
+
 function setup(query='',error=false,guarantorDraft=''){
   const keys=['identity','eligibility','pricing','workflow','accounts','evidence'];
   const section=key=>`<section data-product-config-step="${key}"><input name="${key}" value="retained">${key==='accounts'&&error==='charge-account'?'<p role="alert">Choose charge accounts</p>':''}</section>`;

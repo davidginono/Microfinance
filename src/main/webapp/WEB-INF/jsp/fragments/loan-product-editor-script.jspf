@@ -1,11 +1,12 @@
 <script>
     (window.WorkspaceNavigation?.onReady || (callback => callback()))(() => {
+        const body = document.body;
 
         document.querySelectorAll('[data-product-modal]').forEach((modal) => {
             modal.style.position = 'fixed';
             modal.style.inset = '0';
             modal.style.zIndex = '90';
-            document.body.appendChild(modal);
+            body.appendChild(modal);
         });
 
         function loanProductDraftValues(form) {
