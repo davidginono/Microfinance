@@ -76,9 +76,8 @@ class LoanChargeAccountSummaryTest {
         verifyNoInteractions(repository);
     }
 
-    @Test void summaryAccessDoesNotAllowTheEditorOrPolicySave() {
+    @Test void summaryAccessDoesNotAllowPolicyProvisioning() {
         doThrow(new AccessDeniedException("Configure required")).when(ledger).requireActor(actor,"LOAN_PRODUCTS_CONFIGURE");
-        assertThatThrownBy(()->service.editor(actor,product,null)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->service.savePolicy(actor,new PolicyForm())).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(repository);
     }

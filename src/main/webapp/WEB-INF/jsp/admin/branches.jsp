@@ -19,7 +19,7 @@
                     <c:url value="/admin/branches/edit" var="editUrl"><c:param name="branch" value="${branch.id}" /></c:url>
                     <tr>
                         <td><sec:authorize access="@access.has(principal,'BRANCHES_UPDATE')" var="canEditBranch" />
-                            <c:choose><c:when test="${canEditBranch}"><a class="resource-table-id-link" href="<c:out value='${editUrl}' />"><c:out value="${branch.id}" /></a></c:when>
+                            <c:choose><c:when test="${canEditBranch and (register.canEditOtherBranches or branch.id eq principal.stationId)}"><a class="resource-table-id-link" href="<c:out value='${editUrl}' />"><c:out value="${branch.id}" /></a></c:when>
                             <c:otherwise><c:out value="${branch.id}" /></c:otherwise></c:choose>
                         </td>
                         <td><c:out value="${branch.location}" /></td>

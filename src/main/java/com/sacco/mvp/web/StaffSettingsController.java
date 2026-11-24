@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.Locale;
 
@@ -26,19 +25,11 @@ public class StaffSettingsController {
     private final UserSettingsService userSettingsService;
     private final MemberLocaleInterceptor memberLocaleInterceptor;
 
-    @GetMapping("/settings")
-    public String settings(@AuthenticationPrincipal AppUserPrincipal principal, Model model) {
-        model.addAttribute("staffSettingsLanguage",
-            normalizeLanguage(userSettingsService.languageOrDefault(principal.getMemberId())));
-        return "staff/settings";
-    }
-
     @PostMapping("/settings/language")
     public String updateLanguage(@AuthenticationPrincipal AppUserPrincipal principal,
                                  @RequestParam String language,
                                  @RequestParam(required = false) String returnTo,
-                                 HttpServletRequest request,
-                                 RedirectAttributes ra) {
+                                 HttpServletRequest request) {
         String savedLanguage = userSettingsService.updateLanguage(principal.getMemberId(), normalizeLanguage(language));
         memberLocaleInterceptor.cacheUserLocale(request, principal.getMemberId(), savedLanguage);
         if (returnTo != null && returnTo.length() <= 2048) {
@@ -52,11 +43,10 @@ public class StaffSettingsController {
                     return "redirect:" + returnTo;
                 }
             } catch (IllegalArgumentException invalid) {
-                // Invalid destinations return to the language settings page.
+                // Invalid destinations return to the staff dashboard.
             }
         }
-        ra.addFlashAttribute("message", "Language preference updated.");
-        return "redirect:/staff/settings";
+        return "redirect:/staff/dashboard";
     }
 
     private String normalizeLanguage(String language) {

@@ -262,14 +262,16 @@ test('focused form destinations enter with desktop navigation collapsed',async()
 
 const statementUrl=kind=>'/reports/financial/statements/example?kind='+kind;
 function statementPage(kind){
- return html('Reports Preview').replace('</head>','<script src="/js/financial-statements.js" defer></script><style>'+fs.readFileSync('src/main/resources/static/css/financial-statements.css','utf8')+'</style></head>')
+ return html('Reports Preview').replace('</head>','<script src="/js/ui-loading.js" defer></script><script src="/js/financial-statements.js" defer></script><style>'+fs.readFileSync('src/main/resources/static/css/financial-statements.css','utf8')+'</style></head>')
  .replace('</main>',`<header class="erp-page-header"><form data-fs-export class="report-page-actions" action="/reports/financial/statements/example/export"><input type="hidden" name="kind" value="${kind}"><a data-print-action href="/reports/financial/statements/example/print?kind=${kind}">Print</a><button name="format" value="PDF">PDF</button></form></header>
  <div class="fs-workspace" data-tab-loading="Loading statement" data-tab-error="Could not load statement">
- <nav class="fs-tabs">${['POSITION','INCOME','TRIAL'].map(k=>`<a data-fs-tab data-no-page-preloader="true" href="${statementUrl(k)}" ${kind===k?'aria-current="page"':''}>${k}</a>`).join('')}</nav>
+ <nav class="fs-tabs">${['POSITION','INCOME','TRIAL'].map(k=>`<a data-fs-tab="${k}" data-no-page-preloader="true" href="${statementUrl(k)}" ${kind===k?'aria-current="page"':''}>${k}</a>`).join('')}</nav>
  <div class="fs-toolbar"><details class="fs-view-settings"><summary>Settings</summary><select data-fs-font><option value="reference">Reference</option><option value="sans">Arial</option><option value="serif">Times</option><option value="mono">Courier</option></select><select data-fs-density><option value="compact">Compact</option><option value="comfortable">Comfortable</option></select><label data-fs-comparison-setting><input type="checkbox" data-fs-comparison checked>Comparison</label></details>
 </div>
- <div data-fs-report-section><article data-fs-paper data-kind="${kind}"><h2>${kind}</h2></article></div>
- <div class="fs-preview-footer"><form data-fs-save class="fs-save-report" method="post" action="/reports/financial/statements/example/save"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="kind" value="${kind}"><button>Save Draft</button></form></div></div></main>`);
+ <div data-fs-report-section data-ui-loading-region data-print-url="/reports/financial/statements/example/print?kind=${kind}" data-selection-kind="${kind==='TRIAL'?'POSITION':''}" data-line="${kind==='TRIAL'?'assets':''}">
+  <article class="fs-paper-scroll" tabindex="0" data-fs-paper data-kind="${kind}"><h2>${kind}</h2><a data-fs-drilldown data-no-page-preloader="true" href="/reports/financial/statements/example/trial?kind=POSITION&line=assets">Details</a></article>
+ </div>
+ <div class="fs-preview-footer"><form data-fs-save class="fs-save-report" method="post" action="/reports/financial/statements/example/save"><input type="hidden" name="_csrf" value="token"><input type="hidden" name="kind" value="${kind}">${["selectionKind","line","account","page"].map(name=>`<input type="hidden" name="${name}">`).join("")}<button>Save Draft</button></form></div></div></main>`);
 }
 
 test('statement tabs load only the report section while preserving workspace, tabs, settings and page actions',async()=>{
@@ -281,14 +283,36 @@ test('statement tabs load only the report section while preserving workspace, ta
   let release;const fetch=w.fetch;w.fetch=(url,options)=>new URL(url,w.location.href).searchParams.get('kind')==='INCOME'?new Promise(resolve=>{release=()=>resolve({ok:true,text:async()=>statementPage('INCOME')});}):fetch(url,options);
   tabs.querySelector('a[href*="INCOME"]').click();await until(()=>release);
   assert.equal(d.querySelector('main'),main);assert.equal(main.hasAttribute('aria-busy'),false);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
-  assert.equal(d.querySelector('[data-fs-report-section]').getAttribute('aria-busy'),'true');assert.equal(w.getComputedStyle(d.querySelector('[data-fs-paper]')).visibility,'hidden');assert.ok(d.querySelector('.fs-tab-status .app-loading-spinner'));assert.equal(d.querySelector('.fs-tab-status').textContent,'');
+  assert.equal(d.querySelector('[data-fs-report-section]').getAttribute('aria-busy'),'true');assert.equal(w.getComputedStyle(d.querySelector('[data-fs-paper]')).visibility,'hidden');assert.ok(d.querySelector('[data-ui-loading-indicator] .app-loading-spinner'));assert.equal(d.querySelector('[data-ui-loading-indicator]').textContent,'');
   release();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='INCOME');
   for(const [selector,node] of [['.fs-workspace',workspace],['.fs-tabs',tabs],['.fs-view-settings',settings],['[data-fs-font]',font],['[data-fs-save]',save],['[data-fs-export]',exportForm]])assert.equal(d.querySelector(selector),node);
   assert.equal(settings.open,true);assert.equal(save.querySelector('[name=kind]').value,'INCOME');assert.equal(save.querySelector('[name=_csrf]').value,'token');assert.equal(exportForm.querySelector('[name=kind]').value,'INCOME');assert.match(exportForm.querySelector('a').href,/kind=INCOME/);
-  assert.equal(w.location.search,'?kind=INCOME');assert.equal(d.querySelector('.fs-tabs [aria-current]').textContent,'INCOME');assert.equal(d.querySelector('.fs-tab-status'),null);
+  assert.equal(w.location.search,'?kind=INCOME');assert.equal(d.querySelector('.fs-tabs [aria-current]').textContent,'INCOME');assert.equal(d.querySelector('[data-ui-loading-indicator]'),null);
   font.value='sans';font.dispatchEvent(new w.Event('change'));assert.equal(d.querySelector('[data-fs-paper]').dataset.font,'sans');
   w.history.back();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='POSITION');assert.equal(d.querySelector('main'),main);assert.equal(font.value,'serif');
-  w.history.forward();await until(()=>release && d.querySelector('.fs-tab-status'));release();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='INCOME');assert.equal(font.value,'sans');assert.deepEqual(failures,[]);
+  w.history.forward();await until(()=>release && d.querySelector('[data-ui-loading-indicator]'));release();await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='INCOME');assert.equal(font.value,'sans');assert.deepEqual(failures,[]);
+ }finally{dom.window.close();}
+});
+
+test('Details requests a statement fragment and carries its selection into export and Save Draft',async()=>{
+ const {dom,w,d,pages,requests}=await setup();
+ try{
+  const base='/reports/financial/statements/example';
+  pages.set(statementUrl('POSITION'),statementPage('POSITION'));
+  pages.set(base+'/trial?kind=POSITION&line=assets',statementPage('TRIAL'));
+  await w.WorkspaceNavigation.visit(statementUrl('POSITION'));
+  const main=d.querySelector('main'), tabs=d.querySelector('.fs-tabs');
+  d.querySelector('[data-fs-drilldown]').click();
+  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='TRIAL');
+  const request=requests.find(entry=>entry.url.pathname===base+'/trial');
+  assert.equal(request.options.headers['X-Statement-Fragment'],'report');
+  assert.equal(d.querySelector('main'),main);
+  assert.equal(d.querySelector('.fs-tabs'),tabs);
+  assert.equal(d.querySelector('[data-fs-export] [name=line]').value,'assets');
+  assert.equal(d.querySelector('[data-fs-save] [name=selectionKind]').value,'POSITION');
+  w.history.back();
+  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='POSITION');
+  assert.equal(d.querySelector('[data-fs-export] [name=line]'),null);
  }finally{dom.window.close();}
 });
 
@@ -301,9 +325,9 @@ test('failed or superseded statement requests retain the last report and support
   d.querySelector('[data-fs-tab][href*="INCOME"]').click();await until(()=>requests.length===1);
   d.querySelector('[data-fs-tab][href*="TRIAL"]').click();await until(()=>requests.length===2);
   assert.equal(requests[0].options.signal.aborted,true);requests[0].resolve({ok:true,text:async()=>statementPage('INCOME')});requests[1].resolve({ok:false});
-  await until(()=>d.querySelector('.fs-tab-status[role=alert]'));assert.equal(d.querySelector('.fs-workspace'),workspace);assert.equal(d.querySelector('[data-fs-paper]'),original);assert.equal(w.getComputedStyle(original).visibility,'visible');assert.equal(w.location.search,'?kind=POSITION');
+  await until(()=>d.querySelector('[data-ui-loading-error][role=alert]'));assert.equal(d.querySelector('.fs-workspace'),workspace);assert.equal(d.querySelector('[data-fs-paper]'),original);assert.equal(w.getComputedStyle(original).visibility,'visible');assert.equal(w.location.search,'?kind=POSITION');
   d.querySelector('[data-fs-tab][href*="TRIAL"]').click();await until(()=>requests.length===3);requests[2].resolve({ok:true,text:async()=>statementPage('TRIAL')});
-  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='TRIAL');assert.equal(d.querySelector('[data-fs-comparison-setting]').hidden,true);assert.equal(d.querySelector('.fs-tab-status'),null);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
+  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='TRIAL');assert.equal(d.querySelector('[data-fs-comparison-setting]').hidden,true);assert.equal(d.querySelector('[data-ui-loading-indicator]'),null);assert.equal(d.querySelector('#workspace-navigation-feedback'),null);
   w.fetch=fetch;
  }finally{dom.window.close();}
 });

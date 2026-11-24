@@ -15,6 +15,7 @@ public class PettyCashNavigationAdvice {
 
     @ModelAttribute("pettyCashAvailable")
     public boolean available(@AuthenticationPrincipal AppUserPrincipal actor,HttpServletRequest request){
-        return !WebRequestClassifier.isJsonRequest(request) && pettyCash.available(actor);
+        return !WebRequestClassifier.isJsonRequest(request) && !WebRequestClassifier.isStatementReportFragment(request)
+            && pettyCash.available(actor);
     }
 }

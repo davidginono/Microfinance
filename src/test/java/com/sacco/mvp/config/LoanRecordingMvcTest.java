@@ -68,8 +68,8 @@ class LoanRecordingMvcTest {
 
     @Test void stepValidationReturnsOnlyErrorsForTheCurrentStep() throws Exception {
         var path="/finance/loan-recording/validate-step";
-        mvc.perform(post(path).with(user(actor)).param("step","guarantors")).andExpect(status().isForbidden());
-        mvc.perform(post(path).with(user(actor)).with(csrf()).param("step","guarantors")
+        mvc.perform(post(path).with(user(actor)).param("step","attachments")).andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(actor)).with(csrf()).param("step","attachments").param("loanFor","GROUP")
             .param("applicationDetails.guarantors[0].guaranteeBudget","wrong")
             .param("applicationDetails.guarantors[1].signedOn","wrong"))
             .andExpect(status().is(422)).andExpect(jsonPath("$.errors.length()").value(2))
@@ -85,8 +85,8 @@ class LoanRecordingMvcTest {
     @Test void stepValidationLocalizesAnIndexedBusinessErrorWithoutSaving() throws Exception {
         String field="applicationDetails.guarantors[1].guaranteeBudget";
         doThrow(new LoanRecordingEvidenceService.FieldValidation(field,"recording.error.amount"))
-            .when(service).validateStep(eq(actor),any(),eq("guarantors"),any(),any());
-        mvc.perform(post("/finance/loan-recording/validate-step").with(user(actor)).with(csrf()).param("step","guarantors"))
+            .when(service).validateStep(eq(actor),any(),eq("attachments"),any(),any());
+        mvc.perform(post("/finance/loan-recording/validate-step").with(user(actor)).with(csrf()).param("step","attachments").param("loanFor","GROUP"))
             .andExpect(status().is(422)).andExpect(jsonPath("$.errors[0].field").value(field))
             .andExpect(jsonPath("$.errors[0].message").isNotEmpty());
         verify(service,never()).save(any(),any(),any());
@@ -254,36 +254,15 @@ class LoanRecordingMvcTest {
         mvc.perform(post("/finance/loan-records/"+id+"/charges/assess").with(user(actor)).with(csrf()).param("requestKey",key.toString()).param("date","2026-09-01").param("evidence","Synthetic signed agreement").param("amount","1.00").param("saccoId","FOREIGN"))
             .andExpect(redirectedUrl("/finance/loan-records/"+id));verify(charges).assess(eq(actor),eq(id),argThat(f->f.getRequestKey().equals(key) && f.getDate().equals(java.time.LocalDate.of(2026,9,1)) && f.getEvidence().equals("Synthetic signed agreement")));
     }
-    @Test void chargeMappingsUseSessionScopeAndIgnoreRetiredPolicyControls() throws Exception {
-        var product=UUID.randomUUID();var charges=context.getBean(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);reset(charges);
+    @Test void formerProductChargeSetupRoutesAreGone() throws Exception {
         var admin=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.MINOR_ADMIN)
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
-        var path="/admin/settings-controls/loan-products/"+product+"/charge-accounts";
-        mvc.perform(post(path).with(user(admin))).andExpect(status().isForbidden());
-        doThrow(new org.springframework.security.access.AccessDeniedException("Missing explicit permission")).when(charges).saveAccountMappings(eq(actor),any());
-        mvc.perform(post(path).with(user(actor)).with(csrf())).andExpect(status().isForbidden());
-        mvc.perform(post(path).with(user(admin)).with(csrf()).param("productId",UUID.randomUUID().toString()).param("effectiveFrom","2026-09-01").param("enabled","true").param("managementTiming","DEDUCT").param("insuranceTiming","SEPARATE").param("saccoId","FOREIGN"))
-            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"))
-            .andExpect(flash().attribute("chargeAccountsSaved",true));
-        verify(charges).saveAccountMappings(eq(admin),argThat(f->f.getProductId().equals(product)));
-        verify(charges,never()).savePolicy(any(),any());
-    }
-    @Test void chargeMappingErrorsReturnToTheAccountsTabAndKeepAllowedValues() throws Exception {
-        var product=UUID.randomUUID();var application=UUID.randomUUID();var processing=UUID.randomUUID();
-        var charges=context.getBean(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);reset(charges);
-        var admin=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ICT_MANAGER)
-            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
-        doThrow(new IllegalArgumentException("charges.error.account")).when(charges).saveAccountMappings(eq(admin),any());
-        mvc.perform(post("/admin/settings-controls/loan-products/"+product+"/charge-accounts").with(user(admin)).with(csrf())
-            .param("applicationAccountId",application.toString()).param("processingAccountId",processing.toString()).param("policyReference","Retain this policy")
-            .param("accountingVersion","1").param("managementAccountId",UUID.randomUUID().toString()))
-            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"))
-            .andExpect(flash().attribute("chargeError","charges.error.account"));
-        verify(charges).saveAccountMappings(eq(admin),argThat(f->f.getProductId().equals(product) && f.getApplicationAccountId().equals(application)
-            && f.getProcessingAccountId().equals(processing)));
-        mvc.perform(get("/admin/settings-controls/loan-products/"+product+"/charge-accounts").with(user(admin)))
-            .andExpect(redirectedUrl("/admin/settings-controls/loan-products/"+product+"/edit?tab=accounts"));
-        verify(charges).policy(admin,product);
+            .staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),
+            EnumSet.of(UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
+        var path="/admin/settings-controls/loan-products/"+UUID.randomUUID();
+        for(String suffix:List.of("/charge-accounts","/charge-policy")){
+            mvc.perform(post(path+suffix).with(user(admin)).with(csrf())).andExpect(status().isNotFound());
+            mvc.perform(get(path+suffix).with(user(admin))).andExpect(status().isNotFound());
+        }
     }
     @Test void recordingBindsGuarantorNamesWithoutAcceptingClientLinks() throws Exception {
         var id=UUID.randomUUID();when(service.save(eq(actor),any(),any())).thenReturn(id);

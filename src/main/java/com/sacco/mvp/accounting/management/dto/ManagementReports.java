@@ -45,7 +45,7 @@ public final class ManagementReports {
             return "empty";
         }
         public String getNoteKey(){
-            if(excluded>0) return kind==Kind.DAILY_COLLECTIONS?"unlinkedReceipts":"exclusionBasis";
+            if(excluded>0) return kind==Kind.DAILY_COLLECTIONS?"unpostedTransactions":"exclusionBasis";
             if(count==0) return "";
             if(totals.values().stream().anyMatch(Objects::isNull)) return "unknownAmounts";
             return kind==Kind.CASHBOOK?"":"coverage."+kind;
@@ -120,7 +120,7 @@ public final class ManagementReports {
             case LOAN_REPAYMENT_TRANSACTIONS -> List.of(text("date",1.4f),money("openingPrincipal"),money("principalPaid"),money("interestPaid"),
                 money("payment"),money("closingPrincipal"),money("interestExcluded"));
             case DAILY_COLLECTIONS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.6f),text("documentReference",1),text("documentNumber",1),
-                text("receiptDate",1),text("transactionCode",.7f),text("transaction",1.5f),money("debit"),money("credit"),text("phone",1.2f),text("recordedBy",1));
+                text("date",1),text("postingAccount",1.4f),text("transaction",1.65f),money("debit"),money("credit"),money("moneyIn"),money("moneyOut"),text("recordedBy",1));
             case CASHBOOK -> List.of(text("date",1),text("clientNumber",.8f),text("name",1.4f),text("particulars",2),text("reference",1.2f),
                 money("moneyIn"),money("moneyOut"),money("principalIn"),money("principalOut"),money("interestIn"),money("interestOut"));
             case LOAN_PORTFOLIO -> List.of(text("clientNumber",.8f),text("loanId",1),text("name",1.8f),text("gender",.6f),money("disbursed"),

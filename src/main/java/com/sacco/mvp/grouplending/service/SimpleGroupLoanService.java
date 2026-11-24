@@ -201,9 +201,8 @@ public class SimpleGroupLoanService {
     }
     @Transactional(readOnly=true) public void payment(AppUserPrincipal a,UUID loan,String payer){if(records.simple(a,loan)){access.requireActor(a,"GROUP_LENDING_POST");text(payer,160);}}
     @Transactional(readOnly=true) public void correction(AppUserPrincipal a,UUID loan){if(records.simple(a,loan))access.requireActor(a,"GROUP_LENDING_REVERSE");}
-    @Transactional public void recordGuarantors(AppUserPrincipal a,UUID loan,RecordForm f,LoanProductSetting product){
+    @Transactional public void recordGuarantors(AppUserPrincipal a,UUID loan,RecordForm f){
         access.requireActor(a,"LOAN_RECORDING_CREATE");var people=f.getApplicationDetails().getGuarantors();
-        requireGuarantorCount(people,product);
         if(people.isEmpty())return;
         var ids=people.stream().map(Guarantor::getClientId).toList();
         ids.stream().sorted().forEach(id->records.lockGuarantor(a,id));
@@ -218,16 +217,17 @@ public class SimpleGroupLoanService {
     }
 
     @Transactional(readOnly=true)
-    public void validateGuarantors(AppUserPrincipal a,RecordForm f,LoanProductSetting product,BigDecimal cap) {
+    public void validateGuarantors(AppUserPrincipal a,RecordForm f,BigDecimal cap) {
+        if(f.getApplicationDetails().getGuarantors().isEmpty())return;
         var s=setup(a,f.getGroupApplication().getGroupId());
         var people=resolveGuarantors(a,f,s.people().stream().map(Person::id).toList());
-        requireGuarantorCount(people,product);
-        if(!people.isEmpty())validateGuarantorCapacity(a,f,people,cap);
+        validateGuarantorCapacity(a,f,people,cap);
     }
 
     private List<Guarantor> resolveGuarantors(AppUserPrincipal a,RecordForm f,List<UUID> members) {
         var people=f.getApplicationDetails().getGuarantors();
         check(people!=null&&people.size()<=20,"guarantee");
+        if(people.isEmpty())return people;
         var references=people.stream().map(g->g.getClientId()==null?Objects.toString(g.getClientNumber(),"").strip():g.getClientId().toString()).toList();
         var candidates=records.guarantorPeople(a,references);
         var selected=new HashSet<UUID>();
@@ -239,11 +239,6 @@ public class SimpleGroupLoanService {
             guarantor.setClientId(person.id());guarantor.setFullName(person.name());guarantor.setClientNumber(person.number());
         }
         return people;
-    }
-
-    private static void requireGuarantorCount(List<Guarantor> people,LoanProductSetting product) {
-        int required=Objects.requireNonNullElse(product.getGuarantorsRequired(),0);
-        if(people.size()<required)throw new FieldValidation("guarantors","recording.validation.guarantorCount");
     }
 
     private void validateGuarantorCapacity(AppUserPrincipal a,RecordForm f,List<Guarantor> people,BigDecimal cap) {

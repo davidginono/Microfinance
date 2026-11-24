@@ -1,0 +1,3 @@
+<%@ page pageEncoding="UTF-8" %>
+<c:set var="base" value="/reports/financial/statements/${run.id}" />
+<c:url value="${base}/print" var="printUrl"><c:param name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><c:param name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><c:param name="line" value="${line}" /></c:if><c:if test="${not empty account}"><c:param name="account" value="${account}" /></c:if></c:url>

@@ -25,7 +25,17 @@ class CreditControlPostgresTest {
     @BeforeAll void start(){f.start();service=f.context.getBean(CreditControlService.class);}
     @AfterAll void stop(){f.stop();}
     @BeforeEach void fixture(){f.fixture();when(f.context.getBean(ApplicationClock.class).today()).thenReturn(day);when(f.context.getBean(ApplicationClock.class).now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
-    void policy(boolean capacity,boolean collateral){var p=new PolicyForm();p.setExpectedRevision(service.policy(f.actor).revision());p.setCapacityRequired(capacity);p.setCollateralRequired(collateral);p.setVerified(true);p.setReference("Synthetic approved branch policy");service.configure(f.actor,p);}
+    void policy(boolean capacity,boolean collateral){policy(capacity,collateral,false);}
+    void policy(boolean capacity,boolean collateral,boolean reminders){
+        f.jdbc.update("""
+            insert into lending_credit_policy(id,sacco_id,station_id,revision,capacity_required,collateral_required,
+              reference,request_key,payload_hash,actor_id,recorded_at,reminders_enabled,reminder_days_before,reminder_every_days)
+            select ?,?,'B1',coalesce(max(revision),0)+1,?,?,'Synthetic saved branch policy',?,?,?,?,?,?,?
+            from lending_credit_policy where sacco_id=? and station_id='B1'
+            """,UUID.randomUUID(),f.institution,capacity,collateral,UUID.randomUUID(),"0".repeat(64),
+            f.actor.getMemberId(),f.context.getBean(ApplicationClock.class).now(),reminders,reminders?7:null,
+            reminders?1:null,f.institution);
+    }
     UUID pending(){return f.service.save(f.actor,f.form());}
     UUID request(UUID loan,UUID guarantor){var id=UUID.randomUUID();f.jdbc.update("insert into guarantor_requests(id,loan_application_id,guarantor_member_id,guarantor_source,status,created_at,version) values(?,?,?,'LMS','PENDING',now(),0)",id,loan,guarantor);return id;}
     UUID guarantor(){var id=UUID.randomUUID();f.jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,status,position,is_member,password_hash,created_at) values(?,?,'B1',?,'Synthetic guarantor','ACTIVE','MEMBER',true,'test-only',now())",id,f.institution,id.toString());return id;}
@@ -62,7 +72,8 @@ class CreditControlPostgresTest {
         assertThat(service.guarantee(f.actor,request).capacityError()).isEqualTo("credit.error.capacity");
     }
     @Test void collateralFundingValuationsPledgesAndIndependentReleasePreserveHistory(){
-        f.jdbc.update("update loan_product_settings set collateral_required=true,min_collateral_coverage_ratio=1.2 where id=?",f.product);var loan=pending();policy(false,true);
+        f.jdbc.update("update loan_product_settings set collateral_required=true,min_collateral_coverage_ratio=1.2 where id=?",f.product);var loan=pending();
+        f.jdbc.update("update loan_product_settings set collateral_required=false where id=?",f.product);
         assertThatThrownBy(()->f.service.disburse(f.actor,f.post(loan,"1000.00","D-COLLATERAL"))).hasMessage("credit.error.collateralRequired");
         UUID asset=valued("1500.00");var pledge=collateral(asset,"PLEDGE");pledge.setLoanId(loan);pledge.setAmount(new BigDecimal("1200.00"));service.collateral(f.actor,asset,pledge);
         assertThat(service.asset(f.actor,asset).pledged()).isEqualByComparingTo("1200.00");f.service.disburse(f.actor,f.post(loan,"1000.00","D-COLLATERAL"));
@@ -90,7 +101,7 @@ class CreditControlPostgresTest {
         service.followUp(f.actor,id,action(id,"CLOSE"));assertThat(f.service.detail(f.actor,loan).loan().status()).isNotEqualTo("PAID");service.followUp(f.actor,id,action(id,"REOPEN"));
     }
     @Test void instalmentRemindersAreAtomicDailyAndPausedForDisputes(){
-        policy(false,false);var settings=new PolicyForm();settings.setExpectedRevision(service.policy(f.actor).revision());settings.setReference("Synthetic approved reminder cadence");settings.setVerified(true);settings.setRemindersEnabled(true);settings.setReminderDaysBefore(7);settings.setReminderEveryDays(1);service.configure(f.actor,settings);UUID loan=f.disbursed("D-REMINDER");UUID id=service.createCase(f.actor,caseForm(loan));service.followUp(f.actor,id,action(id,"DISPUTE"));var reminders=f.context.getBean(InstalmentReminderService.class);reminders.queueBatch();assertThat(reminderCount(loan)).isZero();service.followUp(f.actor,id,action(id,"RESOLVE"));reminders.queueBatch();reminders.queueBatch();assertThat(reminderCount(loan)).isEqualTo(1);
+        policy(false,false);policy(false,false,true);UUID loan=f.disbursed("D-REMINDER");UUID id=service.createCase(f.actor,caseForm(loan));service.followUp(f.actor,id,action(id,"DISPUTE"));var reminders=f.context.getBean(InstalmentReminderService.class);reminders.queueBatch();assertThat(reminderCount(loan)).isZero();service.followUp(f.actor,id,action(id,"RESOLVE"));reminders.queueBatch();reminders.queueBatch();assertThat(reminderCount(loan)).isEqualTo(1);
         assertThat(f.jdbc.queryForObject("select count(*) from outbox_events o join lending_instalment_reminder r on r.outbox_id=o.id join loan_ledger_installments i on i.id=r.installment_id where i.loan_application_id=? and o.status='NEW'",Integer.class,loan)).isEqualTo(1);
     }
     int reminderCount(UUID loan){return f.jdbc.queryForObject("select count(*) from lending_instalment_reminder r join loan_ledger_installments i on i.id=r.installment_id where i.loan_application_id=? and r.reminder_on=?",Integer.class,loan,day);}

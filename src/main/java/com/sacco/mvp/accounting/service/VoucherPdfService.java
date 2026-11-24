@@ -47,12 +47,16 @@ public class VoucherPdfService {
         boolean receipt=v.type()==com.sacco.mvp.accounting.dto.VoucherDtos.Type.RECEIPT;
         var rows=new ArrayList<List<String>>();
         for(var t:v.transactions()){
-            String description=t.description();if(!t.transactionName().isBlank())description+="\n"+t.transactionName();
+            String description=t.description();
+            if(!t.transactionName().isBlank() && (receipt || !description.strip().equalsIgnoreCase(t.transactionName().strip())))
+                description+=(description.isBlank()?"":"\n")+t.transactionName();
             if(!"TOTAL".equals(t.component()))description+="\n"+label("library.component."+t.component(),locale);
             if(receipt){rows.add(List.of(Integer.toString(t.lineNo()),description,money(t.amount(),locale)));continue;}
+            boolean firstPosting=true;
             for(var entry:t.postings().stream().sorted(java.util.Comparator.comparingInt(e->e.account().id().equals(v.moneyAccountId())?0:1)).toList()){
                 boolean debit="DEBIT".equals(entry.side());String amount=money(entry.amount(),locale);var account=entry.account();
-                rows.add(List.of(Integer.toString(rows.size()+1),description,account.code()+" - "+account.name(),debit?amount:"",debit?"":amount));
+                rows.add(List.of(Integer.toString(rows.size()+1),firstPosting?description:"",account.code()+" - "+account.name(),debit?amount:"",debit?"":amount));
+                firstPosting=false;
             }
         }
         var moneyAccount=v.transactions().stream().flatMap(t->t.postings().stream().map(e->e.account()))

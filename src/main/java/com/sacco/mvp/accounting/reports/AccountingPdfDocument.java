@@ -294,7 +294,7 @@ public final class AccountingPdfDocument implements AutoCloseable {
     public void row(List<String> values,boolean total)throws IOException {
         if(style==Style.EQUITY && total)y-=10;
         var lines=new ArrayList<List<String>>();var points=new ArrayList<Float>();int count=1;
-        float leading=sourceLayout?(style==Style.REPAYMENT?12:13.5f):referenceRows?10:style==Style.EQUITY?12:13;
+        float leading=sourceLayout?(style==Style.REPAYMENT?12:13.5f):referenceRows?10:style==Style.EQUITY?17:13;
         PDFont rowFont=total?headingFont:bodyFont;
         for(int i=0;i<values.size();i++){
             float max=rowWidth(i),point=sourceLayout?10:referenceRows?7.5f:style==Style.EQUITY?9:numeric[i]?8:9;

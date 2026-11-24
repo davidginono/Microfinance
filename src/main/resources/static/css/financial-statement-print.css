@@ -26,7 +26,7 @@ tr{break-inside:avoid}
 .fs-print-equity .fs-equity-period{display:flex;margin:0 0 30pt;font-weight:700}
 .fs-print-equity .fs-equity-period span:first-child{width:11%;flex:none}
 .fs-print-equity th{padding-bottom:30pt}
-.fs-print-equity td{padding:1pt 6pt 1pt 0;border:0}
+.fs-print-equity td{padding:4pt 6pt 4pt 0;border:0}
 .fs-print-equity td:first-child{font-weight:700}
 .fs-print-equity .fs-print-total td{padding-top:12pt;padding-bottom:6pt}
 .fs-print-equity .fs-print-total .fs-print-amount{text-decoration:underline;text-underline-offset:2pt}

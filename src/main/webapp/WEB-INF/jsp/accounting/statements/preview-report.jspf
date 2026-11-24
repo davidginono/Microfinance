@@ -1,0 +1,25 @@
+<%@ page pageEncoding="UTF-8" %>
+ <div data-fs-report-section data-ui-loading-region
+      data-print-url="<c:out value='${printUrl}' />"
+      data-selection-kind="<c:out value='${selectionKind}' />"
+      data-line="<c:out value='${line}' />"
+      data-account="<c:out value='${account}' />"
+      data-page="<c:out value='${page}' />"
+      data-saved="${run.saved}">
+ <c:if test="${filtered}"><p class="fs-help"><spring:message code="fs.filteredTrial" /></p></c:if>
+ <section class="fs-paper-scroll" tabindex="0" aria-label="<spring:message code='fs.previewTitle' text='Reports Preview' />"><article class="fs-paper fs-${document.style}" data-fs-paper data-kind="${kind}" <c:if test="${document.style=='equity'}">style="min-width:${fn:length(document.columns)>7?fn:length(document.columns)*150:1100}px"</c:if>>
+  <c:choose><c:when test="${document.style=='equity'}">
+   <h2><c:out value="${document.title}" /></h2>
+   <p class="fs-equity-period"><span><spring:message code="fs.equity.forPeriod" /></span><span><c:out value="${equityPeriod}" /></span></p>
+  </c:when><c:otherwise>
+  <h2><c:out value="${document.title}" /></h2>
+  <div class="fs-paper-meta"><strong><c:out value="${snapshot.institutionName}" /></strong><span><c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose></span><span><spring:message code="${document.asAt?'fs.asAt':'fs.period'}" /> <c:if test="${not document.asAt}">${appTime:display(run.from)} — </c:if>${appTime:display(run.through)} · TZS</span><span><spring:message code="fs.generated" /> <c:out value="${generatedLabel}" /></span><span><spring:message code="fs.previous" />: ${appTime:display(snapshot.parameters.previousFrom())} — ${appTime:display(snapshot.parameters.previousThrough())}</span></div>
+  </c:otherwise></c:choose>
+  <c:if test="${kind=='CASH_FLOW'}"><p class="fs-method"><spring:message code="${snapshot.version>=4?'fs.indirectMethod':'fs.directMethod'}" /></p></c:if>
+  <table data-table-sort-mode="none" data-table-sort-reason="financial-statement" class="fs-table"><c:if test="${document.style=='equity'}"><colgroup><c:forEach items="${document.columns}" var="column"><col style="width:${column.weight*100}%" /></c:forEach></colgroup></c:if><thead><tr><c:forEach items="${document.columns}" var="column" varStatus="cs"><c:if test="${cs.index==document.detailsBefore}"><th class="fs-details"><spring:message code="fs.details" /></th></c:if><th class="${column.numeric?'fs-number':''} ${cs.last and (kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES')?'fs-comparison':''}"><c:out value="${column.label}" /></th></c:forEach></tr></thead>
+   <tbody><c:forEach items="${document.rows}" var="row"><tr class="${row.heading?'fs-section':''} ${row.total?'fs-total':''}"><c:forEach items="${row.cells}" var="cell" varStatus="cs"><c:if test="${cs.index==document.detailsBefore}"><td class="fs-details"><c:if test="${not empty row.details}"><a class="fs-details-button" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${row.details}' />"><spring:message code="fs.details" /><span class="sr-only"> <c:out value="${row.cells[1].text}" /></span></a></c:if></td></c:if><td class="${document.columns[cs.index].numeric?'fs-number':''} ${cell.amount!=null?'fs-amount':''} ${cs.last and (kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES')?'fs-comparison':''}"><c:choose><c:when test="${kind=='LEDGER' and cs.index==1 and not empty row.details}"><a href="<c:url value='${row.details}' />"><c:out value="${cell.text}" /></a></c:when><c:otherwise><c:out value="${cell.text}" /></c:otherwise></c:choose></td></c:forEach></tr></c:forEach><c:if test="${empty document.rows}"><tr><td colspan="20"><spring:message code="fs.noRows" /></td></tr></c:if></tbody>
+  </table>
+  <c:if test="${document.style=='equity'}"><p class="fs-equity-scope"><c:out value="${snapshot.institutionName}" /> | <c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose> | TZS</p></c:if>
+ </article></section>
+ <c:if test="${kind=='LEDGER'}"><div class="fs-pager"><c:if test="${page>0}"><a class="app-btn btn-neutral" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${base}/ledger/${account}?page=${page-1}' />"><spring:message code="fs.previousPage" /></a></c:if><span>${page+1}</span><c:if test="${hasNext}"><a class="app-btn btn-neutral" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${base}/ledger/${account}?page=${page+1}' />"><spring:message code="fs.nextPage" /></a></c:if></div></c:if>
+ </div>

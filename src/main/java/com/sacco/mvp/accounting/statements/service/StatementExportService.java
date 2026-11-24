@@ -52,8 +52,11 @@ public class StatementExportService {
                 var sheet=book.createSheet(name);boolean equity=doc.style().equals("equity");int count=doc.columns().size(),rowNo=0;
                 var normal=book.createCellStyle();var font=book.createFont();font.setFontName(switch(doc.style()){case "trial"->"Times New Roman";case "equity"->"Courier New";default->"Arial";});font.setFontHeightInPoints((short)10);normal.setFont(font);normal.setWrapText(true);normal.setVerticalAlignment(VerticalAlignment.TOP);
                 var money=book.createCellStyle();money.cloneStyleFrom(normal);money.setDataFormat(book.createDataFormat().getFormat(equity?"#,##0.00;(#,##0.00);\"\"":"#,##0.00;(#,##0.00)"));money.setAlignment(HorizontalAlignment.RIGHT);
+                var shownMoney=book.createCellStyle();shownMoney.cloneStyleFrom(money);
+                shownMoney.setDataFormat(book.createDataFormat().getFormat("#,##0.00;(#,##0.00)"));
                 var bold=book.createCellStyle();bold.cloneStyleFrom(normal);var boldFont=book.createFont();boldFont.setFontName(font.getFontName());boldFont.setFontHeightInPoints((short)10);boldFont.setBold(true);bold.setFont(boldFont);
                 var total=book.createCellStyle();total.cloneStyleFrom(money);total.setFont(boldFont);total.setBorderBottom(BorderStyle.THIN);if(equity){var totalFont=book.createFont();totalFont.setFontName(font.getFontName());totalFont.setFontHeightInPoints((short)10);totalFont.setBold(true);totalFont.setUnderline(Font.U_SINGLE);total.setFont(totalFont);}
+                var shownTotal=book.createCellStyle();shownTotal.cloneStyleFrom(total);shownTotal.setDataFormat(shownMoney.getDataFormat());
                 var title=book.createCellStyle();title.cloneStyleFrom(bold);title.setAlignment(HorizontalAlignment.CENTER);var titleFont=book.createFont();titleFont.setFontName(doc.style().equals("trial")?"Times New Roman":"Arial");titleFont.setFontHeightInPoints((short)15);titleFont.setBold(doc.style().equals("equity"));if(equity)titleFont.setColor(IndexedColors.RED.getIndex());title.setFont(titleFont);
                 if(equity){
                     normal.setWrapText(false);bold.setWrapText(false);
@@ -66,7 +69,7 @@ public class StatementExportService {
                     var tableNormal=book.createCellStyle();tableNormal.cloneStyleFrom(normal);tableNormal.setWrapText(true);normal=tableNormal;
                     var tableBold=book.createCellStyle();tableBold.cloneStyleFrom(bold);tableBold.setWrapText(true);bold=tableBold;
                 }
-                if(equity)for(var style:List.of(normal,money,bold,total)){
+                if(equity)for(var style:List.of(normal,money,bold,total,shownMoney,shownTotal)){
                     style.setBorderTop(BorderStyle.THIN);style.setBorderBottom(BorderStyle.THIN);style.setBorderLeft(BorderStyle.THIN);style.setBorderRight(BorderStyle.THIN);
                     style.setTopBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());style.setBottomBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());style.setLeftBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());style.setRightBorderColor(IndexedColors.GREY_40_PERCENT.getIndex());
                 }
@@ -81,7 +84,8 @@ public class StatementExportService {
                         var cell=row.createCell(i);
                         if(value.amount()!=null&&value.amount().precision()<=15){
                             cell.setCellValue(value.amount().doubleValue());
-                            cell.setCellStyle(r.total()?total:money);
+                            boolean visibleZero=equity && value.amount().signum()==0 && !value.text().isEmpty();
+                            cell.setCellStyle(r.total()?(visibleZero?shownTotal:total):(visibleZero?shownMoney:money));
                         }else{
                             cell.setCellValue(value.text());
                             boolean emphasized=r.total()||r.heading()||equity&&i==0;
@@ -89,7 +93,7 @@ public class StatementExportService {
                         }
                         longest=Math.max(longest,(int)Math.ceil(value.text().length()/Math.max(10f,column.weight()*160)));
                     }
-                    row.setHeightInPoints(Math.min(300,Math.max(16,longest*13)));if(r.heading())row.setHeightInPoints(Math.max(27,row.getHeightInPoints()));
+                    row.setHeightInPoints(Math.min(300,Math.max(equity?21:16,longest*13+(equity?5:0))));if(r.heading())row.setHeightInPoints(Math.max(27,row.getHeightInPoints()));
                 }
                 rowNo++;
                 if(equity){

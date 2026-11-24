@@ -22,7 +22,7 @@ public class BranchService {
     private final SaccoRegistryService registry;
     private final AuditService audit;
 
-    public record Register(Slice<BranchSummary> rows, boolean canCreate) {}
+    public record Register(Slice<BranchSummary> rows, boolean canCreate, boolean canEditOtherBranches) {}
 
     @Transactional(readOnly=true)
     public Register register(AppUserPrincipal actor,int page,String sort) {
@@ -30,6 +30,7 @@ public class BranchService {
         require(claims,UserClaim.BRANCHES_VIEW);
         if(page<0 || page>10000) throw new IllegalArgumentException("branches.error.filter");
         boolean delegated=access.hasBranchDelegation(claims);
+        boolean canCreate=claims.contains(UserClaim.BRANCHES_CREATE);
         String column=switch(sort) {
             case "id_asc","id_desc" -> "stationId";
             case "location_asc","location_desc" -> "addressLocation";
@@ -37,7 +38,7 @@ public class BranchService {
             default -> throw new IllegalArgumentException("branches.error.filter");
         };
         var direction=sort.endsWith("_desc")?org.springframework.data.domain.Sort.Direction.DESC:org.springframework.data.domain.Sort.Direction.ASC;
-        return new Register(registry.branches(actor.getSaccoId(),delegated?null:actor.getStationId(),page,column,direction),delegated);
+        return new Register(registry.branches(actor.getSaccoId(),delegated||canCreate?null:actor.getStationId(),page,column,direction),canCreate,delegated);
     }
 
     @Transactional(readOnly=true)
@@ -54,8 +55,7 @@ public class BranchService {
     public void requireCreate(AppUserPrincipal actor) {
         var claims=access.workspaceClaims(actor);
         require(claims,UserClaim.BRANCHES_VIEW);
-        require(claims,UserClaim.BRANCHES_UPDATE);
-        if(!access.hasBranchDelegation(claims)) throw new AccessDeniedException("Branch administration unavailable");
+        require(claims,UserClaim.BRANCHES_CREATE);
     }
 
     @Transactional

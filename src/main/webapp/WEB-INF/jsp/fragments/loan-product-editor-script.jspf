@@ -465,7 +465,7 @@
                     activeIndex = 0;
                 }
                 const productActions = workspace.querySelector('.product-config-actionbar');
-                if (productActions) productActions.hidden = steps[activeIndex].getAttribute('data-product-config-step') === 'workflow';
+                if (productActions) productActions.hidden = form.hasAttribute('data-product-edit-mode') && key === 'workflow';
 
                 steps.forEach((step, index) => {
                     const active = index === activeIndex;
@@ -582,6 +582,7 @@
                 ? 'workflow' : firstServerError?.closest('[data-product-config-step]')?.getAttribute('data-product-config-step');
             if (workspace.querySelector('[data-product-config-step="accounts"] [role="alert"]') || new URL(window.location.href).searchParams.get('tab') === 'accounts') initialKey = 'accounts';
             if(workspace.querySelector('[data-product-config-step="evidence"] [role="alert"]'))initialKey='evidence';
+            if(!initialKey)initialKey=workspace.querySelector('[data-product-error-tab]')?.dataset.productErrorTab;
             if (!initialKey && storageKey) {
                 try {
                     initialKey = window.sessionStorage.getItem(storageKey);

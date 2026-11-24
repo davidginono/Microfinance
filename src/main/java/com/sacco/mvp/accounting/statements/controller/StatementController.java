@@ -16,6 +16,12 @@ import java.util.*;
 
 @Controller @RequiredArgsConstructor @RequestMapping("/reports/financial/statements")
 public class StatementController {
+    private static final String FRAGMENT_HEADER = "X-Statement-Fragment";
+    private static final String PREVIEW = "accounting/statements/preview";
+
+    private static String previewView(String fragment) {
+        return "report".equals(fragment) ? PREVIEW+"-fragment" : PREVIEW;
+    }
     private final StatementService statements;
     private final StatementPresentation presentation;
     private final StatementExportService exporter;
@@ -27,17 +33,35 @@ public class StatementController {
         try{if(!List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL).contains(kind))throw new IllegalArgumentException("fs.error.selection");return "redirect:/reports/financial/statements/"+statements.generate(actor,new Parameters(from,through,institutionWide),requestKey)+"?kind="+kind;}
         catch(IllegalArgumentException failure){defaults(model);model.addAttribute("from",from);model.addAttribute("through",through);model.addAttribute("institutionWide",institutionWide);model.addAttribute("requestKey",requestKey);model.addAttribute("kind",kind);model.addAttribute("errorKey",key(failure));return "accounting/statements/configure";}
     }
-    @GetMapping("/{id}") public String preview(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind,Model model,Locale locale){
-        var run=statements.get(actor,id);context(run,model);model.addAttribute("kind",kind);model.addAttribute("document",presentation.document(run.snapshot(),kind,run.snapshot().balances(),locale));return "accounting/statements/preview";
+    @GetMapping("/{id}") public String preview(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind,@RequestHeader(name=FRAGMENT_HEADER,required=false) String fragment,Model model,Locale locale){
+        var run=statements.get(actor,id);context(run,model);model.addAttribute("kind",kind);model.addAttribute("document",presentation.document(run.snapshot(),kind,run.snapshot().balances(),locale));return previewView(fragment);
     }
-    @GetMapping("/{id}/trial") public String trial(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind,@RequestParam(required=false) String line,Model model,Locale locale){
-        var run=statements.get(actor,id);context(run,model);var accounts=statements.selected(run.snapshot(),kind,line);model.addAttribute("kind",Kind.TRIAL);model.addAttribute("selectionKind",kind);model.addAttribute("line",line);model.addAttribute("filtered",line!=null&&!line.isBlank());model.addAttribute("document",presentation.document(run.snapshot(),Kind.TRIAL,accounts,locale));return "accounting/statements/preview";
+    @GetMapping("/{id}/trial") public String trial(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind,@RequestParam(required=false) String line,@RequestHeader(name=FRAGMENT_HEADER,required=false) String fragment,Model model,Locale locale){
+        var run=statements.get(actor,id);context(run,model);var accounts=statements.selected(run.snapshot(),kind,line);model.addAttribute("kind",Kind.TRIAL);model.addAttribute("selectionKind",kind);model.addAttribute("line",line);model.addAttribute("filtered",line!=null&&!line.isBlank());model.addAttribute("document",presentation.document(run.snapshot(),Kind.TRIAL,accounts,locale));return previewView(fragment);
     }
-    @GetMapping("/{id}/ledger/{account}") public String ledger(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@PathVariable UUID account,@RequestParam(defaultValue="0") int page,Model model,Locale locale){
+    @GetMapping("/{id}/ledger/{account}") public String ledger(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@PathVariable UUID account,@RequestParam(defaultValue="0") int page,@RequestHeader(name=FRAGMENT_HEADER,required=false) String fragment,Model model,Locale locale){
         var run=statements.get(actor,id);context(run,model);var activity=statements.activity(actor,id,account,page);var b=run.snapshot().balances().stream().filter(a->a.id().equals(account)).findFirst().orElseThrow();
-        model.addAttribute("kind",Kind.LEDGER);model.addAttribute("account",account);model.addAttribute("page",page);model.addAttribute("hasNext",activity.size()>30);model.addAttribute("document",presentation.ledger(run.snapshot(),b,activity.stream().limit(30).toList(),locale));return "accounting/statements/preview";
+        model.addAttribute("kind",Kind.LEDGER);model.addAttribute("account",account);model.addAttribute("page",page);model.addAttribute("hasNext",activity.size()>30);model.addAttribute("document",presentation.ledger(run.snapshot(),b,activity.stream().limit(30).toList(),locale));return previewView(fragment);
     }
-    @PostMapping("/{id}/save") public String save(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind){statements.save(actor,id);return "redirect:/reports/financial/statements/"+id+"?kind="+kind;}
+    @PostMapping("/{id}/save")
+    public String save(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
+            @RequestParam(defaultValue="POSITION") Kind kind,@RequestParam(required=false) Kind selectionKind,
+            @RequestParam(required=false) String line,@RequestParam(required=false) UUID account,
+            @RequestParam(defaultValue="0") int page){
+        statements.save(actor,id);
+        String base="/reports/financial/statements/"+id;
+        var destination=org.springframework.web.util.UriComponentsBuilder.fromPath(base);
+        if(kind==Kind.LEDGER && account!=null){
+            destination.path("/ledger/{account}").queryParam("page",Math.max(0,page));
+            return "redirect:"+destination.buildAndExpand(account).encode().toUriString();
+        }
+        if(kind==Kind.TRIAL && selectionKind!=null){
+            destination.path("/trial").queryParam("kind",selectionKind);
+            if(line!=null&&!line.isBlank())destination.queryParam("line","{line}");
+            return "redirect:"+destination.encode().buildAndExpand(line==null?"":line).toUriString();
+        }
+        return "redirect:"+destination.queryParam("kind",kind==Kind.LEDGER?Kind.POSITION:kind).build().toUriString();
+    }
     @GetMapping("/history") public String history(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="newest") String sort,Model model){var rows=statements.history(actor,page,sort);model.addAttribute("runs",rows.stream().limit(30).toList());model.addAttribute("page",page);model.addAttribute("sort",sort);model.addAttribute("hasNext",rows.size()>30);return "accounting/statements/history";}
     @GetMapping("/{id}/export") public ResponseEntity<byte[]> export(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,@RequestParam(defaultValue="POSITION") Kind kind,@RequestParam(defaultValue="PDF") String format,@RequestParam(defaultValue="false") boolean inline,@RequestParam(defaultValue="POSITION") Kind selectionKind,@RequestParam(required=false) String line,@RequestParam(required=false) UUID account,Locale locale){
         if(!Set.of("PDF","XLSX").contains(format))throw new IllegalArgumentException("fs.error.format");var run=statements.get(actor,id);statements.exportAccess(actor,run);

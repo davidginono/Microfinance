@@ -20,29 +20,6 @@
     <div hidden data-open-product-modal="${fn:escapeXml(openProductModalKey)}"></div>
 </c:if>
 
-<c:if test="${settingsSection eq 'language'}">
-    <section class="erp-panel aws-settings-panel aws-settings-panel--compact" aria-labelledby="adminLanguageSettingsTitle">
-        <div class="aws-settings-header">
-            <h2 id="adminLanguageSettingsTitle" class="aws-settings-title"><spring:message code="admin.settings.language.title" text="Workspace Default Language" /></h2>
-        </div>
-        <form action="/admin/settings-controls/language" method="post" class="aws-settings-form">
-            <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
-            <div class="aws-settings-control-row">
-                <label class="aws-settings-field" for="adminSettingsLanguage">
-                    <spring:message code="admin.settings.language.label" text="Default language" />
-                    <select id="adminSettingsLanguage" name="defaultLanguage" class="aws-control">
-                        <option value="en" ${settings.defaultLanguage ne 'sw' ? 'selected' : ''}><spring:message code="admin.settings.language.english" text="English" /></option>
-                        <option value="sw" ${settings.defaultLanguage eq 'sw' ? 'selected' : ''}><spring:message code="admin.settings.language.swahili" text="Kiswahili" /></option>
-                    </select>
-                </label>
-            </div>
-            <div class="aws-settings-footer">
-                <button type="submit" class="app-btn btn-launch"><spring:message code="admin.settings.language.save" text="Save Language" /></button>
-            </div>
-        </form>
-    </section>
-</c:if>
-
 <c:if test="${settingsSection eq 'otp'}">
     <section class="erp-panel overflow-hidden">
         <div class="border-b border-slate-200 bg-slate-50 px-5 py-4">
@@ -294,12 +271,17 @@
 </c:if>
 
 <c:if test="${creatingLoanProduct}">
-<div class="admin-focused-form">
+<div class="product-config-workspace" data-product-config-workspace data-resource-form-page>
+    <section class="product-config-workspace-nav">
+        <%@ include file="../fragments/loan-product-config-tabs.jspf" %>
+    </section>
+    <div class="product-config-workspace-main">
                 <form id="loanProductCreateForm" action="/admin/settings-controls/loan-products"
                       method="post"
                       class="product-builder-form accounting-create-form admin-product-create"
                       data-inline-validation-form="loan-settings"
                       data-product-workflow-builder="true"
+                      data-product-config-form
                       data-tenant-loan-officer-enabled="${settings.loanOfficerReviewRequired}"
                       data-tenant-board-enabled="${settings.boardReviewRequired}">
                     <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" />
@@ -330,114 +312,22 @@
                         </div>
                     </c:if>
 
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.identity" text="Product Identity" /></h2>
-                        </div>
-                        <div class="product-builder-section-body product-identity-grid">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
-                                <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.namePlaceholder" text="e.g. School Fees Booster" />' data-product-name-field />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.status" text="Product Status" />
-                                <select name="productStatus" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                                    <option value="ACTIVE" selected><spring:message code="status.active" text="Active" /></option>
-                                    <option value="SUSPENDED"><spring:message code="status.suspended" text="Suspended" /></option>
-                                </select>
-                            </label>
-
-                            <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="common.description" text="Description" />
-                                <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to clients when choosing this product." />'></textarea>
-                            </label>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.eligibility" text="Eligibility" /></h2>
-                        </div>
-                        <div class="product-builder-section-body product-builder-grid two-up">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
-                                <input name="minimumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
-                                <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank if there is no maximum amount" />' />
-                            </label>
-
-                            <c:set var="eligibilityProduct" value="${null}" />
-                            <%@ include file="../fragments/loan-product-eligibility-fields.jspf" %>
-                            <c:set var="tenureProduct" value="${null}" /><%@ include file="../fragments/loan-tenure-fields.jspf" %>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header">
-                            <h2 class="mt-1 text-lg font-bold text-sacco-ink"><spring:message code="admin.settings.loanProducts.repaymentCharges" text="Repayment & Charges" /></h2>
-                        </div>
-                        <div class="product-builder-section-body product-builder-grid two-up">
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
-                                <input name="applicationFee" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${settings.resolvedApplicationFee}" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
-                                <input name="insurancePercent" type="number" min="0" step="0.01" required data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="1.5" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
-                                <input name="processingFeePercent" type="number" min="0" step="0.01" required data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="0" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.annualInterestPercent" text="Annual Interest %" />
-                                <input name="annualInterestPercent" type="number" min="0" step="0.01" required data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="10" />
-                            </label>
-
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                <spring:message code="admin.settings.loanProducts.amountReturnMethod" text="Interest Method" />
-                                <select name="interestMethod" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
-                                    <option value="FLAT_RATE" selected><spring:message code="admin.settings.loanProducts.flatRate" text="Flat Rate" /></option>
-                                    <option value="REDUCING_BALANCE"><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
-                                </select>
-                            </label>
-
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
-                        <div class="product-builder-section-header"><h2><spring:message code="recording.attachments" /></h2></div>
-                        <div class="product-builder-section-body">
-                            <c:set var="documentProduct" value="${null}" /><c:set var="documentRequirements" value="${null}" />
-                            <%@ include file="../fragments/loan-product-document-fields.jspf" %>
-                        </div>
-                    </section>
-
-                    <section class="product-builder-section">
+                    <%@ include file="../fragments/loan-product-config-terms.jspf" %>
+                    <section class="product-builder-section product-config-step" data-product-config-step="workflow">
                         <div class="product-builder-section-header"><h2><spring:message code="admin.settings.workflow.title" /></h2></div>
-                        <div class="product-builder-section-body">
+                        <div class="product-builder-section-body" data-product-config-panel hidden>
                             <c:set var="guarantorProduct" value="${null}" /><c:set var="guarantorFormId" value="loanProductCreateForm" />
                             <%@ include file="../fragments/loan-product-guarantor-field.jspf" %>
                             <sec:authorize access="@access.has(principal,'APPROVAL_FLOW_VIEW')"><%@ include file="../fragments/loan-product-approval-fields.jspf" %></sec:authorize>
                         </div>
                     </section>
-                    <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_CONFIGURE') and @access.has(principal,'ACCOUNTING_ACCOUNTS_UPDATE')">
-                    <section class="product-builder-section"><div class="product-builder-section-header"><h2><spring:message code="productAccounts.title" /></h2></div>
-                        <div class="product-builder-section-body product-builder-grid two-up"><c:set var="chargeFormId" value="loanProductCreateForm" /><%@ include file="../fragments/loan-product-charge-fields.jspf" %></div>
-                    </section>
-                    </sec:authorize>
-                    <div class="admin-form-actions">
+                    <%@ include file="../fragments/loan-product-config-accounts-documents.jspf" %>
+                    <div class="product-config-actionbar"><div class="product-config-save-actions">
                         <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls?section=loan' />"><spring:message code="common.cancel" /></a>
                         <button type="submit" class="app-btn btn-launch"><spring:message code="admin.settings.loanProducts.add" text="Add loan product" /></button>
-                    </div>
+                    </div></div>
                 </form>
+    </div>
 </div>
 <%@ include file="../accounting/accounting-form-support.jspf" %>
 </c:if>

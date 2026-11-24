@@ -50,7 +50,7 @@
       <c:forEach items="${['start','end']}" var="edge">
         <c:set var="choice" value="${edge=='start'?startChoice:endChoice}" />
         <label data-loan-choice data-choice-url="<c:out value='${accountLookup}' />">
-          <spring:message code="management.${edge}Account" />
+          <spring:message code="management.${edge}${kind=='DAILY_COLLECTIONS'?'Posting':''}Account" />
           <select class="aws-control" name="${edge}Account" data-choice-select data-searchable="true">
             <option value="" data-empty-option="true"><spring:message code="management.noAccountBound" /></option>
             <c:if test="${not empty choice}"><option selected value="${choice.id}"><c:out value="${choice.label}" /></option></c:if>

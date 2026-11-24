@@ -20,7 +20,7 @@ class ManagementReportTest {
         var kind=Kind.LOAN_REPAYMENT_TRANSACTIONS;
         assertThat(result(kind,0,0,Map.of()).getNoteKey()).isEmpty();
         assertThat(result(kind,0,2,Map.of()).getNoteKey()).isEqualTo("exclusionBasis");
-        assertThat(result(Kind.DAILY_COLLECTIONS,1,2,Map.of()).getNoteKey()).isEqualTo("unlinkedReceipts");
+        assertThat(result(Kind.DAILY_COLLECTIONS,1,2,Map.of()).getNoteKey()).isEqualTo("unpostedTransactions");
         assertThat(result(Kind.CASHBOOK,1,0,Map.of()).getNoteKey()).isEmpty();
         assertThat(result(kind,1,0,Collections.singletonMap("payment",null)).getNoteKey()).isEqualTo("unknownAmounts");
         assertThat(result(kind,1,0,Map.of("payment",BigDecimal.ZERO)).getNoteKey()).isEqualTo("coverage.LOAN_REPAYMENT_TRANSACTIONS");
@@ -68,7 +68,7 @@ class ManagementReportTest {
         org.mockito.Mockito.verify(guard).requireActor(actor,"FINANCIAL_REPORTS_VIEW");
         org.mockito.Mockito.verify(guard).requireActor(actor,"ACCOUNTING_JOURNALS_VIEW");
         org.mockito.Mockito.verify(guard,org.mockito.Mockito.never()).requireActor(actor,"ACCOUNTING_ACCOUNTS_CREATE");
-        org.mockito.Mockito.when(repository.accounts(actor,"",0,List.of(start,end))).thenReturn(List.of(
+        org.mockito.Mockito.when(repository.accounts(actor,"",0,List.of(start,end),false)).thenReturn(List.of(
             new Choice(start,"111003","Cash"),new Choice(end,"111001","Bank")));
         var reversed=new Parameters(DAY,DAY,NOW,start,end,null,"",0);
         assertThatThrownBy(()->service.report(actor,Kind.CASHBOOK,reversed,false)).hasMessage("management.error.range");
@@ -151,7 +151,7 @@ class ManagementReportTest {
             try(var doc=Loader.loadPDF(exporter.build(result,Locale.ENGLISH))){
                 assertThat(doc.getNumberOfPages()).as(kind.name()).isEqualTo(1);
                 String text=new PDFTextStripper().getText(doc);
-                assertThat(text).contains(kind==Kind.DAILY_COLLECTIONS?"No posted receipts":"No records","Recorded through").doesNotContain("Report parameters");
+                assertThat(text).contains(kind==Kind.DAILY_COLLECTIONS?"No posted transactions":"No records","Recorded through").doesNotContain("Report parameters");
                 if(result.isReferenceLayout())assertThat(text).contains("Page 1").doesNotContain("Grand total","0.00");
                 if(kind==Kind.DISBURSED_LOANS_AUDIT)
                     assertThat(text).contains("Institution name","Branch name").doesNotContain("Institution code","Branch code");

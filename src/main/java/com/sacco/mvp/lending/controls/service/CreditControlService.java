@@ -41,15 +41,6 @@ public class CreditControlService {
     @Transactional(readOnly=true) public List<Choice> officerChoices(AppUserPrincipal a,String search,int page){authorize(a,"COLLECTIONS","VIEW");query(search,page);return records.officers(a,search,page);}
     @Transactional(readOnly=true) public Choice officerChoice(AppUserPrincipal a,UUID id){authorize(a,"COLLECTIONS","VIEW");return id==null?null:records.officerChoice(a,id).orElse(null);}
     @Transactional(readOnly=true) public List<Choice> loanChoices(AppUserPrincipal a,String feature,String search,int page){check(Set.of("COLLATERAL","COLLECTIONS").contains(feature),"query");authorize(a,feature,"VIEW");query(search,page);return records.loanChoices(a,search,page);}
-    @Transactional(readOnly=true) public Policy policy(AppUserPrincipal a){authorize(a,"CREDIT_CONTROLS","VIEW");return records.policy(a).orElse(new Policy(null,0,false,false,"",false,null,null,false));}
-    @Transactional(timeout=15) public UUID configure(AppUserPrincipal a,PolicyForm f){
-        authorize(a,"CREDIT_CONTROLS","CONFIGURE");check(f.isVerified(),"verified");text(f.getReference(),500,"reference");
-        if(f.isRemindersEnabled()){check(f.getReminderDaysBefore()!=null&&f.getReminderDaysBefore()>=0&&f.getReminderDaysBefore()<=30,"reminderDaysBefore");check(f.getReminderEveryDays()!=null&&f.getReminderEveryDays()>0&&f.getReminderEveryDays()<=30,"reminderEveryDays");}
-        else check(f.getReminderDaysBefore()==null&&f.getReminderEveryDays()==null,"fields");
-        var hash=hash(f);var old=retry(a,"lending_credit_policy",f.getRequestKey(),hash);if(old.isPresent())return old.get();
-        records.lock("CREDIT_POLICY/"+a.getSaccoId()+"/"+a.getStationId());check(records.policy(a).map(Policy::revision).orElse(0)==f.getExpectedRevision(),"changed");
-        UUID id=UUID.randomUUID();records.policy(a,id,f,hash,clock.now());event(a,id,"CREDIT_POLICY_RECORDED");return id;
-    }
     @Transactional(readOnly=true) public Page<Guarantee> guarantees(AppUserPrincipal a,String search,int page,String sort){authorize(a,"GUARANTOR_CAPACITY","VIEW");query(search,page);return page(records.guarantees(a,search,page,order(sort,Map.of("loan","loan_number","borrower","borrower","guarantor","guarantor","status","g.status","liability","liability"),"loan"),clock.today()),page);}
     @Transactional(readOnly=true) public Guarantee guarantee(AppUserPrincipal a,UUID id){authorize(a,"GUARANTOR_CAPACITY","VIEW");return records.guarantee(a,id,clock.today(),false);}
     @Transactional(readOnly=true) public Page<Assessment> assessments(AppUserPrincipal a,UUID id,int page){guarantee(a,id);query("",page);return page(records.assessments(a,id,page),page);}

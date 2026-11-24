@@ -435,26 +435,26 @@ class AdminServiceTest {
         var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"WORKFLOW","Workflow Loan","Staff approval",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,null,new com.sacco.mvp.service.dto.LoanProductDocumentsForm());
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,true,new BigDecimal("75.50"),new com.sacco.mvp.service.dto.LoanProductDocumentsForm());
         assertThat(approval.getProductId()).isEqualTo(product.getId()).isNotEqualTo(suppliedProduct);
         assertThat(approval.getExpectedRevision()).isZero();
         verify(groupApprovals).saveRule(actor,approval);
         assertThat(product.getMinTenure()).isEqualTo(1);
         assertThat(product.getMaxTenure()).isEqualTo(12);
+        assertThat(product.isCollateralRequired()).isTrue();
+        assertThat(product.getResolvedMinCollateralCoverageRatio()).isEqualByComparingTo("0.7550");
     }
 
-    @Test void creatingProductSavesChargeSetupForTheServerGeneratedProduct() {
+    @Test void creatingProductRejectsChargesWithoutAnApprovedPolicy() {
         var actor=new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("SACCO-01")
             .stationId("ST-1").position(Position.ICT_MANAGER).staffAccessStatus(StaffAccessStatus.ACTIVE).status(MemberStatus.ACTIVE).build(),
             Set.of(UserClaim.LOAN_PRODUCTS_CREATE,UserClaim.LOAN_PRODUCTS_CONFIGURE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE));
-        var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();var supplied=UUID.randomUUID();policy.setProductId(supplied);
-        when(loanProductSettingRepository.save(any())).thenAnswer(call->call.getArgument(0));
-        var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"CHARGES","Fee loan","Staff charge setup",1,
+        assertThatThrownBy(()->adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"CHARGES","Fee loan","Charges",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.TEN,BigDecimal.ZERO,new BigDecimal("0.01"),
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,policy,new com.sacco.mvp.service.dto.LoanProductDocumentsForm());
-        assertThat(policy.getProductId()).isEqualTo(product.getId()).isNotEqualTo(supplied);
-        verify(loanCharges).savePolicy(actor,policy);
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,false,null,new com.sacco.mvp.service.dto.LoanProductDocumentsForm()))
+            .hasMessage("charges.error.policy");
+        verify(loanProductSettingRepository,never()).save(any());
     }
 
     @org.junit.jupiter.params.ParameterizedTest

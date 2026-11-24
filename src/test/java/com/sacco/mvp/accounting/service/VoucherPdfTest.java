@@ -113,7 +113,9 @@ class VoucherPdfTest {
    var v=new Voucher(UUID.randomUUID(),"SPLIT-PDF",type,LocalDate.of(2026,10,8),"Synthetic party","REF-SPLIT","","",cash.id(),t.amount(),1,UUID.randomUUID(),UUID.randomUUID(),"Test staff",OffsetDateTime.now(),null,null,"Institution","Branch",List.of(t));
    try(var document=Loader.loadPDF(new VoucherPdfService(messages,new ReportExportLimiter(1)).render(v,Locale.ENGLISH).bytes())){
     var text=new PDFTextStripper().getText(document);assertThat(text).contains("100.00");
-    if(type==Type.PAYMENT){assertRow(document,"111010",1,"","60.00",true);assertRow(document,"511010",2,"100.00","",true);assertRow(document,"111020",3,"","40.00",true);}
+    if(type==Type.PAYMENT){
+     assertThat(text.split("Split cash and bank",-1)).hasSize(2);
+     assertRow(document,"111010",1,"","60.00",true);assertRow(document,"511010",2,"100.00","",true);assertRow(document,"111020",3,"","40.00",true);}
     else {assertThat(text).doesNotContain("111010","111020","511010");assertThat(text.split("Split cash and bank",-1)).hasSize(2);}
    }
   }

@@ -96,13 +96,14 @@ public class StatementPresentation {
                 case "fs.surplus" -> label("fs.equity.profit",locale);
                 default -> movement(snapshot,r.label(),locale);
             };
+            boolean balance=r.label().equals("fs.opening") || r.label().equals("fs.closing");
             var cells=new ArrayList<Cell>();cells.add(cell(name));
-            for(String column:snapshot.equityColumns())cells.add(equityAmount(r.values().get(column),locale));
-            cells.add(equityAmount(r.total(),locale));
+            for(String column:snapshot.equityColumns())cells.add(equityAmount(r.values().get(column),balance,locale));
+            cells.add(equityAmount(r.total(),balance,locale));
             rows.add(new DisplayRow(cells,r.label().equals("fs.closing"),false,null));
         }
     }
-    private Cell equityAmount(BigDecimal amount,Locale locale){return amount==null?cell(label("fs.unavailable",locale)):amount.signum()==0?new Cell("",amount):cell(amount);}
+    private Cell equityAmount(BigDecimal amount,boolean balance,Locale locale){return amount==null?cell(label("fs.unavailable",locale)):!balance && amount.signum()==0?new Cell("",amount):cell(amount);}
     private String component(Snapshot s,String key,Locale locale){
         if(key.startsWith("component:")&&s.setup()!=null){var c=s.setup().components().get(Integer.parseInt(key.substring(10)));return local(c.name(),c.nameSw(),locale);}
         return key.startsWith("account:")?key.substring(8):label(key,locale);

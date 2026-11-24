@@ -58,10 +58,16 @@ class CreditControlMvcTest {
             .andExpect(flash().attributeCount(0)).andReturn();
         assertThat(((AssetForm)result.getModelAndView().getModel().get("assetForm")).getCode()).isEqualTo("ASSET-1");
     }
+    @Test void formerBranchPolicyRoutesAreGone() throws Exception {
+        mvc.perform(get("/finance/credit/policy").with(user(staff))).andExpect(status().isNotFound());
+        mvc.perform(post("/finance/credit/policy").with(user(staff)).with(csrf())).andExpect(status().isNotFound());
+        assertThat(UserClaim.CREDIT_CONTROLS_VIEW.isAvailable()).isFalse();
+        assertThat(UserClaim.CREDIT_CONTROLS_CONFIGURE.isAvailable()).isFalse();
+    }
     @Test void allNewClaimsRequireExplicitAssignment(){for(var role:Position.values())for(var claim:UserClaim.values())if(Set.of(AccessFeature.CREDIT_CONTROLS,AccessFeature.GUARANTOR_CAPACITY,AccessFeature.COLLATERAL,AccessFeature.COLLECTIONS).contains(claim.getFeature()))assertThat(UserClaim.defaultClaims(Set.of(role),false)).doesNotContain(claim);}
     @Test void staticAndDynamicLabelsExistInBothLanguages()throws Exception{
         var keys=new HashSet<String>();try(var files=Files.list(Path.of("src/main/webapp/WEB-INF/jsp/credit"))){for(var file:files.toList()){var matcher=java.util.regex.Pattern.compile("code=[\"']([^\"'$]+)[\"']").matcher(Files.readString(file));while(matcher.find())keys.add(matcher.group(1));}}
-        for(String field:List.of("loan","borrower","guarantor","liability","status","code","description","owner","value","pledged","expires","officer","arrears","oldest","next","state","income","expenses","otherDebt","capacity","assessedOn","validThrough","policyReference","evidence","actor","principal","dueInterest","futureInterest","charges"))keys.add("credit.field."+field);
+        for(String field:List.of("loan","borrower","guarantor","liability","status","code","description","owner","value","pledged","expires","officer","arrears","oldest","next","state","income","otherDebt","capacity","assessedOn","validThrough","policyReference","evidence","actor","principal","dueInterest","futureInterest","charges"))keys.add("credit.field."+field);
         for(var locale:List.of(Locale.ENGLISH,Locale.of("sw"))){var bundle=ResourceBundle.getBundle("messages",locale);for(String key:keys)assertThat(bundle.containsKey(key)).as("%s %s",locale,key).isTrue();}
     }
     @Configuration @EnableWebMvc static class Config {@Bean CreditControlService service(){return mock(CreditControlService.class);}@Bean CreditControlController controller(CreditControlService service){return new CreditControlController(service);}}

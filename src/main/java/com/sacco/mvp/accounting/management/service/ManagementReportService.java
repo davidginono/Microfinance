@@ -27,7 +27,7 @@ public class ManagementReportService {
     @Transactional(readOnly=true) public List<Choice> choices(AppUserPrincipal a,Kind kind,String category,String search,int page) {
         authorize(a,kind,false);check(search!=null && search.length()<=100 && search.chars().noneMatch(Character::isISOControl) && page>=0 && page<=10000,"parameters");
         return switch(category) {
-            case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of());}
+            case "accounts" -> {accountReport(kind);yield reports.accounts(a,search,page,List.of(),kind==Kind.DAILY_COLLECTIONS);}
             case "clients" -> reports.clients(a,search,page,null,kind==Kind.EXPECTED_REPAYMENTS);
             case "products" -> {
                 loanReport(kind);
@@ -44,8 +44,8 @@ public class ManagementReportService {
         if(start!=null)ids.add(start);
         if(end!=null)ids.add(end);
         var selected=new HashMap<UUID,Choice>();
-        reports.accounts(a,"",0,List.copyOf(ids)).forEach(choice->selected.put(choice.id(),choice));
-        check(selected.keySet().equals(ids),"cashBankAccount");
+        reports.accounts(a,"",0,List.copyOf(ids),kind==Kind.DAILY_COLLECTIONS).forEach(choice->selected.put(choice.id(),choice));
+        check(selected.keySet().equals(ids),kind==Kind.DAILY_COLLECTIONS?"postingAccount":"cashBankAccount");
         return selected;
     }
     @Transactional(readOnly=true) public Choice selectedClient(AppUserPrincipal a,Kind kind,UUID id) {

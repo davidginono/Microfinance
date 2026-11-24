@@ -322,15 +322,7 @@ public class LoanRecordingService {
         boolean group="GROUP".equals(form.getLoanFor());
         switch(step){
             case "loan" -> validateLoanStep(actor,form,group);
-            case "guarantors" -> {
-                if(group){
-                    var selected=product(actor,form);
-                    var plan=charges.validateRecordingQuote(actor,form,selected,false);
-                    var cap=calculate(form,selected).totalRepayment().add(plan.total());
-                    simpleGroups.validateGuarantors(actor,form,selected,cap);
-                }
-                evidence.validateGuarantors(actor,form);
-            }
+            case "guarantors" -> evidence.validateGuarantors(actor,form);
             case "collateral" -> {
                 evidence.validateCollateral(form.getApplicationDetails());
                 evidence.validateCollateralFields(actor,form);
@@ -387,6 +379,12 @@ public class LoanRecordingService {
                 catch(FieldValidation e){throw new IllegalArgumentException("recording.error.attachments",e);}
             }
             validateGroupConsent(form,uploads);
+            if(!form.getApplicationDetails().getGuarantors().isEmpty()){
+                var selected=product(actor,form);
+                var plan=charges.validateRecordingQuote(actor,form,selected,false);
+                var cap=calculate(form,selected).totalRepayment().add(plan.total());
+                simpleGroups.validateGuarantors(actor,form,cap);
+            }
         }
     }
 
@@ -435,7 +433,7 @@ public class LoanRecordingService {
         var tx=new org.springframework.transaction.support.TransactionTemplate(transactions);tx.setTimeout(30);
         return tx.execute(status->{var retry=simpleGroups.retry(a,f);if(retry.isPresent())return retry.get();
             var p=product(a,f);var prepared=simpleGroups.prepare(a,f,p,calculate(f,p),true);UUID draft=f.getApplicationId();int version=f.getExpectedVersion();f.setApplicationId(null);
-            UUID id=saveInternal(a,f,recovered.files(),prepared.party(),prepared.destination());simpleGroups.record(a,id,prepared,f,paper);simpleGroups.recordGuarantors(a,id,f,p);
+            UUID id=saveInternal(a,f,recovered.files(),prepared.party(),prepared.destination());simpleGroups.record(a,id,prepared,f,paper);simpleGroups.recordGuarantors(a,id,f);
             if(draft!=null){f.setApplicationId(draft);f.setExpectedVersion(version);simpleGroups.consumeDraft(a,f);}return id;});
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot){
@@ -491,14 +489,23 @@ public class LoanRecordingService {
         snapshot.put("prepaymentTerms",LoanPrepaymentTerms.product(selectedProduct).snapshot());
         if(f.getGroupDisclosure()!=null)snapshot.put("groupDisclosure",f.getGroupDisclosure());
         if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
-        var policy=recordedPolicy(a,selectedProduct,product.getDisplayName(),product.getGuarantorsRequired());
+        boolean group="GROUP".equals(f.getLoanFor());
+        int requiredGuarantors=group?0:Objects.requireNonNullElse(product.getGuarantorsRequired(),0);
+        var policy=recordedPolicy(selectedProduct,product.getDisplayName(),requiredGuarantors);
+        if(editing!=null){
+            var prior=schedules.parseSummary(editing.getPolicySnapshot());
+            for(String key:List.of("collateralPolicySource","collateralRequired","collateralCoverageRatio")){
+                if(prior.containsKey(key))policy.put(key,prior.get(key));
+                else policy.remove(key);
+            }
+        }
         if(shared.active()>0)policy.put("sharedCredit",Map.of("active",shared.active(),"maximumLiability",shared.liability(),"monthlyPayment",shared.monthlyPayment(),"assessedAt",now));
         snapshot.put("recordedCharges",chargePlan);snapshot.put("recordedChargeTotal",chargePlan.total());snapshot.put("recordedChargeDeductions",chargePlan.deductions());snapshot.put("recordedNetCashEstimate",f.getPrincipal().subtract(settlement==null?ZERO:settlement.total()).subtract(chargePlan.deductions()));snapshot.put("recordedTotalPayable",f.getPrincipal().add(calculation.totalInterest()).add(chargePlan.total()));policy.put("recordedChargePolicy",Objects.toString(chargePlan.policyId(),""));
         var existing=editing==null?existingDraft:editing;
         long number=existing==null?numbers.nextFor(a.getSaccoId()):existing.getApplicationNumber();
         var loan=LoanApplication.builder().id(existing==null?UUID.randomUUID():existing.getId()).applicationNumber(number).saccoId(a.getSaccoId()).stationId(a.getStationId())
             .applicantMemberId(f.getClientId()).borrowerPartyId(borrowerParty).paymentDetailsSnapshot(payoutSnapshot).topUpSourceLoanId(f.getTopUpSourceLoanId()).loanType(product.getLoanType()).loanProductSettingId(product.getId()).amount(f.getPrincipal().setScale(2))
-            .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(product.getGuarantorsRequired()).formData(write(storedForm))
+            .tenorMonths(f.getMonths()).status(LoanStatus.RECORDED).requiredGuarantors(requiredGuarantors).formData(write(storedForm))
             .policySnapshot(write(policy))
             .financialSnapshot(write(snapshot)).repaymentFrequency(product.getResolvedRepaymentFrequency()).firstRepaymentDate(f.getFirstPaymentDate())
             .installmentAmount(calculation.installment()).createdAt(existing==null?now:existing.getCreatedAt()).updatedAt(now).build();
@@ -922,8 +929,9 @@ public class LoanRecordingService {
         return records.account(actor,id,category.equals("MONEY")?"FUNDING_MONEY":category,false);
     }
 
-    private Map<String,Object> recordedPolicy(AppUserPrincipal a,LoanProductSetting selectedProduct,String label,Integer guarantors) {
+    private Map<String,Object> recordedPolicy(LoanProductSetting selectedProduct,String label,Integer guarantors) {
         var policy=new LinkedHashMap<String,Object>();
+        if(!selectedProduct.isCustomRecordingConfiguration())policy.put("collateralPolicySource","PRODUCT");
         policy.put("collateralRequired",selectedProduct.isCollateralRequired());policy.put("collateralCoverageRatio",selectedProduct.getResolvedMinCollateralCoverageRatio());
         policy.put("source","ACCOUNTANT_DIRECT");policy.put("product",label);policy.put("guarantorsRequired",guarantors);policy.put("disbursementProofRequired",selectedProduct.isDisbursementProofRequired());policy.put("recordingWorkflowVersion","GROUP_REVIEW_V1");
 

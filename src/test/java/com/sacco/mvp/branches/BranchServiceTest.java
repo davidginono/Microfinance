@@ -42,20 +42,18 @@ class BranchServiceTest {
         assertThatThrownBy(() -> scope.require(UserClaim.LOAN_RECORDING_VIEW)).isInstanceOf(AccessDeniedException.class);
     }
 
-    @Test void ictDefaultsGiveLocalAdminAccessAndPlatformDelegationEnablesBranchCreation() {
+    @Test void ictAdministratorsCreateBranchesWithTheLiveCreateClaim() {
         var locked=UserClaim.lockedClaims(Set.of(Position.ICT_MANAGER));
-        assertThat(locked).contains(UserClaim.USER_ACCESS_VIEW,UserClaim.USER_ACCESS_UPDATE,UserClaim.BRANCHES_UPDATE,UserClaim.STAFF_BRANCH_ASSIGN)
+        assertThat(locked).contains(UserClaim.USER_ACCESS_VIEW,UserClaim.USER_ACCESS_UPDATE,UserClaim.BRANCHES_UPDATE,UserClaim.BRANCHES_CREATE,UserClaim.STAFF_BRANCH_ASSIGN)
             .doesNotContain(UserClaim.INSTITUTION_BRANCH_ADMIN,UserClaim.OTHER_BRANCHES_VIEW,UserClaim.LOAN_RECORDING_APPROVE);
         assertThat(UserClaim.defaultClaims(Set.of(Position.ICT_MANAGER),false)).containsAll(locked);
         when(access.workspaceClaims(actor)).thenReturn(locked);
         when(registry.findStation("I1","B1")).thenReturn(Optional.of(branch("B1",true,SaccoAccessStatus.ACTIVE)));
         assertThat(service.branchForEdit(actor,"B1").id()).isEqualTo("B1");
         assertThatThrownBy(() -> service.branchForEdit(actor,"B2")).isInstanceOf(AccessDeniedException.class);
+        when(access.workspaceClaims(actor)).thenReturn(Set.of(UserClaim.BRANCHES_VIEW,UserClaim.BRANCHES_UPDATE));
         assertThatThrownBy(() -> service.create(actor,"B2","Arusha")).isInstanceOf(AccessDeniedException.class);
-        var delegated=EnumSet.copyOf(locked);
-        delegated.add(UserClaim.INSTITUTION_BRANCH_ADMIN);
-        when(access.workspaceClaims(actor)).thenReturn(delegated);
-        when(access.hasBranchDelegation(delegated)).thenReturn(true);
+        when(access.workspaceClaims(actor)).thenReturn(locked);
         service.create(actor,"b2","Arusha");
         verify(registry).addStation("I1","B2","Arusha");
     }

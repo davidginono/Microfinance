@@ -1,0 +1,31 @@
+<%@ page pageEncoding="UTF-8" %>
+                <section class="product-builder-section product-config-step" data-product-config-step="accounts" aria-label="<spring:message code='productAccounts.title' />">
+                    <div class="product-builder-section-header">
+                        <h2><spring:message code="productAccounts.title" /></h2>
+                    </div>
+                    <div id="product-config-accounts" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
+                        <c:choose>
+                            <c:when test="${creatingLoanProduct}">
+                                <c:forEach items="${['productAccounts.principal','productAccounts.interest','charges.account.APPLICATION','charges.account.PROCESSING']}" var="accountLabel">
+                                    <label><spring:message code="${accountLabel}" /><input type="text" readonly class="aws-control" value="<spring:message code='productAccounts.generatedOnCreate' />" /></label>
+                                </c:forEach>
+                            </c:when>
+                            <c:otherwise>
+                                <c:set var="productAccountSection" value="${true}" /><c:set var="accountProduct" value="${product}" />
+                                <%@ include file="loan-product-account-fields.jspf" %>
+                                <c:set var="productAccountSection" value="${false}" />
+                                <sec:authorize access="@access.has(principal,'LOAN_PRODUCTS_VIEW')">
+                                    <%@ include file="loan-product-charge-mappings.jspf" %>
+                                </sec:authorize>
+                            </c:otherwise>
+                        </c:choose>
+                    </div>
+                </section>
+
+                <section class="product-builder-section product-config-step" data-product-config-step="evidence">
+                    <div class="product-builder-section-header"><h2><spring:message code="recording.attachments" /></h2></div>
+                    <div class="product-builder-section-body" data-product-config-panel hidden>
+                        <c:set var="documentProduct" value="${product}" /><c:set var="documentRequirements" value="${requiredAttachments}" />
+                        <%@ include file="loan-product-document-fields.jspf" %>
+                    </div>
+                </section>

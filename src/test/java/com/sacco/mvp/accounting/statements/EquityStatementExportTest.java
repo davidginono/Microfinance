@@ -18,6 +18,35 @@ import static com.sacco.mvp.accounting.statements.StatementCalculatorTest.*;
 import static com.sacco.mvp.accounting.statements.StatementCalculatorTest.PERIOD;
 
 class EquityStatementExportTest {
+    @Test void equityOpeningAndClosingShowNumericZeroInThePreviewAndExports() throws Exception {
+        var accounts=List.of(balance("EQUITY","CAPITAL","EQUITY","FINANCING","0","0","0"));
+        var base=StatementCalculator.calculate(accounts,List.of(),PERIOD,false);
+        var setup=new Setup(1,List.of(),List.of(),List.of());
+        var equity=EquityStatementCalculator.calculate(accounts,List.of(),setup);
+        var snapshot=new Snapshot(3,UUID.randomUUID(),PERIOD,OffsetDateTime.parse("2026-01-31T12:00:00+03:00"),
+            "I","B","Institution","Branch",accounts,base.position(),base.income(),base.cash(),equity.columns(),
+            equity.current(),base.checks(),setup,equity.previous(),List.of());
+        var messages=new ReloadableResourceBundleMessageSource();
+        messages.setBasename("classpath:messages");
+        var presentation=new StatementPresentation(messages);
+        var export=new StatementExportService(presentation,new ReportExportLimiter(1),new com.sacco.mvp.service.ApplicationClock("Africa/Dar_es_Salaam"));
+        var document=presentation.document(snapshot,Kind.EQUITY,accounts,Locale.ENGLISH);
+        assertThat(document.rows()).filteredOn(row->row.cells().getFirst().text().startsWith("Balance as at"))
+            .hasSize(4).allSatisfy(row->assertThat(row.cells().subList(1,row.cells().size()))
+                .allSatisfy(cell->assertThat(cell.text()).isEqualTo("0.00")));
+        try(var pdf=Loader.loadPDF(export.export(snapshot,document,"PDF",Locale.ENGLISH))){
+            assertThat(new PDFTextStripper().getText(pdf)).contains("Balance as at","0.00");
+        }
+        try(var book=new XSSFWorkbook(new ByteArrayInputStream(export.export(snapshot,document,"XLSX",Locale.ENGLISH)))){
+            var formatter=new org.apache.poi.ss.usermodel.DataFormatter(Locale.ENGLISH);
+            for(var row:book.getSheetAt(0)){
+                if(row.getCell(0)==null || !formatter.formatCellValue(row.getCell(0)).startsWith("Balance as at"))continue;
+                assertThat(formatter.formatCellValue(row.getCell(1))).isEqualTo("0.00");
+                assertThat(row.getHeightInPoints()).isGreaterThanOrEqualTo(21);
+            }
+        }
+    }
+
     @Test void configuredEquityAndNotesUseFrozenBilingualDataAcrossOutputs()throws Exception{
         var capital=balance("EQUITY","CAPITAL","EQUITY","FINANCING","-1000","0","200");var income=balance("INCOME","INCOME","INCOME","OPERATING","0","0","30.45");var accounts=List.of(capital,income);var movements=List.of(new Movement(capital.id(),Category.CONTRIBUTION,false,n("0"),n("200")));
         var setup=new Setup(2,List.of(new Component("Owner capital","Mtaji wa mmiliki",List.of(capital.id()),false)),List.of(new Note(1,"Capital","Mtaji","BALANCE","Verified source disclosure","Maelezo ya chanzo",List.of(capital.id()),true),new Note(2,"Basis of preparation","Msingi wa maandalizi","NARRATIVE","Synthetic policy text, not an approved institution policy.","Maelezo ya mfano pekee.",List.of())),List.of(new CategoryLabel(Category.CONTRIBUTION,"Owner investment","Uwekezaji wa mmiliki")));

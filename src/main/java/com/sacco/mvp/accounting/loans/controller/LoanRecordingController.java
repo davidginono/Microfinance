@@ -143,7 +143,9 @@ public class LoanRecordingController {
     }
 
     private String recordStep(String field){
-        if(field.startsWith("applicationDetails.guarantors["))return "guarantors";
+        if(field.startsWith("applicationDetails.guarantors[")){
+            return field.matches(".*\\.(clientNumber|guaranteeBudget|guaranteeEvidence|signedOn)$")?"attachments":"guarantors";
+        }
         if(field.startsWith("applicationDetails.collateral[") || field.equals("groupApplication.checked"))return "collateral";
         if(field.startsWith("applicationDetails.document") || field.startsWith("applicationDetails.requiredAttachmentIds")
             || field.equals("applicationDetails.declarationAccepted"))return "attachments";

@@ -32,7 +32,7 @@ class IndirectCashFlowExportTest {
         Path output=Path.of("target/indirect-cash-check/samples");Files.createDirectories(output);
         for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
             var preview=new ExtendedModelMap();var print=new ExtendedModelMap();
-            controller.preview(actor,s.id(),Kind.CASH_FLOW,preview,locale);
+            controller.preview(actor,s.id(),Kind.CASH_FLOW,null,preview,locale);
             controller.print(actor,s.id(),Kind.CASH_FLOW,Kind.CASH_FLOW,null,null,print,locale,new MockHttpServletResponse());
             var document=(StatementPresentation.Document)preview.get("document");
             assertThat(print.get("document")).isEqualTo(document);

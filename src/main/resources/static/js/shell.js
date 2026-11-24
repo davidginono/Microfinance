@@ -45,7 +45,6 @@
             'users & roles': '/admin/users'
         },
         'staff workspace': {
-            'settings': '/staff/settings',
             'staff reports and analytics': '/staff/analytics'
         },
         'disbursement panel': {

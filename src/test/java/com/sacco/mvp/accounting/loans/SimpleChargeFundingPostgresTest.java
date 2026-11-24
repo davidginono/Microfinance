@@ -14,43 +14,49 @@ class SimpleChargeFundingPostgresTest {
     @BeforeAll void start(){f.start();}
     @AfterAll void stop(){f.stop();}
     @BeforeEach void setup(){f.fixture();f.chargePolicy("SEPARATE");}
-    AccountMappingForm mappings(){var p=f.chargeService().policy(f.actor,f.product).orElseThrow();var form=new AccountMappingForm();
-        form.setProductId(f.product);form.setExpectedVersion(p.id());form.setReceivableAccountId(f.chargeAccount);
-        form.setApplicationAccountId(f.managementAccount);form.setProcessingAccountId(f.processingAccount);form.setInsuranceAccountId(f.insuranceAccount);return form;}
+    PolicyForm approvedPolicy(){
+        var prior=f.chargeService().policy(f.actor,f.product).orElseThrow();
+        var form=new PolicyForm();
+        form.setProductId(f.product);form.setExpectedVersion(prior.id());form.setEffectiveFrom(LoanRecordingPostgresTest.TODAY);
+        form.setEnabled(true);form.setReceivableAccountId(f.chargeAccount);form.setApplicationAccountId(f.managementAccount);
+        form.setProcessingAccountId(f.processingAccount);form.setInsuranceAccountId(f.insuranceAccount);
+        form.setPolicyReference("Synthetic approved charge policy");form.setAgreementReference("Synthetic signed agreement");
+        form.setInsurer("Synthetic insurer");form.setInsurerVerification("Synthetic verifier");
+        return form;
+    }
     UUID disabledToday(){var p=new PolicyForm();p.setProductId(f.product);p.setExpectedVersion(f.chargeService().policy(f.actor,f.product).orElseThrow().id());
         p.setEffectiveFrom(LoanRecordingPostgresTest.TODAY);p.setEnabled(false);p.setApplicationAccountId(f.managementAccount);p.setProcessingAccountId(f.processingAccount);
         return f.chargeService().savePolicy(f.actor,p);}
-    @Test void completeSameDayMappingsFundPendingChargesWithoutPolicyOrReferenceFields(){
+    @Test void approvedPolicyFundsPendingChargesWithoutAProductEditor(){
         UUID disabled=disabledToday();var entry=f.form();entry.setApplicationDate(LoanRecordingPostgresTest.TODAY);entry.setFirstPaymentDate(LoanRecordingPostgresTest.TODAY.plusMonths(1));
         entry.setInsurancePremium(new java.math.BigDecimal("10"));entry.setEvidence("Synthetic signed funding agreement");entry.setInsuranceEvidence("Synthetic premium / "+UUID.randomUUID());
         UUID loan=f.service.save(f.actor,entry);
         assertThat(f.jdbc.queryForObject("select financial_snapshot->'recordedCharges'->>'supported' from loan_applications where id=?",String.class,loan)).isEqualTo("false");
-        UUID active=f.chargeService().saveAccountMappings(f.actor,mappings());
+        UUID active=f.chargeService().savePolicy(f.actor,approvedPolicy());
         var policy=f.chargeService().policy(f.actor,f.product).orElseThrow();assertThat(policy.id()).isEqualTo(active);assertThat(policy.enabled()).isTrue();
-        assertThat(policy.policyReference()).isEmpty();assertThat(policy.agreementReference()).isEmpty();assertThat(policy.insurerVerification()).isEmpty();
-        assertThat(policy.insurer()).isEqualTo(f.jdbc.queryForObject("select name from gl_account where id=?",String.class,f.insuranceAccount));
+        assertThat(policy.policyReference()).isEqualTo("Synthetic approved charge policy");
         var funding=f.chargedFunding(loan);funding.setEffectiveDate(LoanRecordingPostgresTest.TODAY);f.service.disburse(f.actor,funding);
         assertThat(f.chargeService().balance(f.actor,loan,LoanRecordingPostgresTest.TODAY).outstanding()).isEqualByComparingTo("30");
         assertThat(f.jdbc.queryForObject("select policy_id from loan_charge_contract where loan_id=?",UUID.class,loan)).isEqualTo(active);
         assertThat(f.jdbc.queryForObject("select enabled from loan_charge_policy where id=?",Boolean.class,disabled)).isFalse();
     }
     @Test void replayIsIdempotentAndSameDaySelectionRejectsStaleWriters(){
-        disabledToday();var form=mappings();var stale=mappings();UUID active=f.chargeService().saveAccountMappings(f.actor,form);
-        assertThat(f.chargeService().saveAccountMappings(f.actor,form)).isEqualTo(active);
-        assertThatThrownBy(()->f.chargeService().saveAccountMappings(f.actor,stale)).hasMessage("charges.error.stale");
+        disabledToday();var form=approvedPolicy();var stale=approvedPolicy();UUID active=f.chargeService().savePolicy(f.actor,form);
+        assertThat(f.chargeService().savePolicy(f.actor,form)).isEqualTo(active);
+        assertThatThrownBy(()->f.chargeService().savePolicy(f.actor,stale)).hasMessage("charges.error.stale");
         assertThat(f.chargeService().policy(f.actor,f.product).orElseThrow().id()).isEqualTo(active);
         assertThat(f.jdbc.queryForObject("select count(*) from loan_charge_policy where request_key=?",Integer.class,form.getRequestKey())).isEqualTo(1);
     }
     @Test void historicalReferencesAndFrozenTermsStayUnchanged(){
         UUID loan=f.chargedLoan();var before=f.chargeService().quotedTerms(f.actor,loan);var old=f.chargeService().policy(f.actor,f.product).orElseThrow();
-        f.chargeService().saveAccountMappings(f.actor,mappings());
+        f.chargeService().savePolicy(f.actor,approvedPolicy());
         assertThat(f.chargeService().quotedTerms(f.actor,loan)).isEqualTo(before);
         assertThat(f.jdbc.queryForObject("select policy_reference from loan_charge_policy where id=?",String.class,old.id())).isEqualTo(old.policyReference());
         assertThatThrownBy(()->f.jdbc.update("delete from loan_charge_policy where id=?",old.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
     @Test void mappingsStillRequireActiveAccountsInTheSameInstitution(){
-        var bad=mappings();bad.setReceivableAccountId(f.cash);
-        assertThatThrownBy(()->f.chargeService().saveAccountMappings(f.actor,bad)).hasMessage("charges.error.account");
+        var bad=approvedPolicy();bad.setReceivableAccountId(f.cash);
+        assertThatThrownBy(()->f.chargeService().savePolicy(f.actor,bad)).hasMessage("charges.error.account");
         assertThat(f.jdbc.queryForObject("select count(*) from loan_charge_policy where request_key=?",Integer.class,bad.getRequestKey())).isZero();
     }
 }

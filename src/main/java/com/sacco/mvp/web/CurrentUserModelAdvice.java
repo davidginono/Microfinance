@@ -28,7 +28,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("staffOffices")
     public java.util.List<com.sacco.mvp.staffoffice.model.StaffOffice> staffOffices(@AuthenticationPrincipal AppUserPrincipal principal) {
-        return principal==null || !principal.isStaffSession() || isJsonRequest() ? java.util.List.of()
+        return principal==null || !principal.isStaffSession() || isShellFreeRequest() ? java.util.List.of()
             : com.sacco.mvp.staffoffice.model.StaffOffice.assigned(principal.getStaffRoles());
     }
 
@@ -50,7 +50,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("adminScope")
     public AdminScopeService.AdminScopeView adminScope(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isJsonRequest()) {
+        if (isShellFreeRequest()) {
             return null;
         }
         return adminScopeService.currentScope(principal);
@@ -58,7 +58,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("headerStation")
     public HeaderStationView headerStation(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null || isPlatformAdminIdentity(principal) || isJsonRequest()) {
+        if (principal == null || isPlatformAdminIdentity(principal) || isShellFreeRequest()) {
             return null;
         }
         AdminScopeService.AdminScopeView scope = adminScopeService.currentScope(principal);
@@ -94,7 +94,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("activeSaccoName")
     public String activeSaccoName(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isJsonRequest()) {
+        if (isShellFreeRequest()) {
             return null;
         }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
@@ -108,7 +108,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("activeSaccoLogoText")
     public String activeSaccoLogoText(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isJsonRequest()) {
+        if (isShellFreeRequest()) {
             return "LM";
         }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
@@ -117,7 +117,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("activeSaccoLogoUrl")
     public String activeSaccoLogoUrl(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (isJsonRequest()) {
+        if (isShellFreeRequest()) {
             return null;
         }
         ActiveSaccoBrand brand = resolveActiveSaccoBrand(principal);
@@ -126,7 +126,7 @@ public class CurrentUserModelAdvice {
 
     @ModelAttribute("platformSupportContact")
     public PlatformSupportContactSettings platformSupportContact(@AuthenticationPrincipal AppUserPrincipal principal) {
-        if (principal == null || isJsonRequest() || isPlatformAdminIdentity(principal)) {
+        if (principal == null || isShellFreeRequest() || isPlatformAdminIdentity(principal)) {
             return null;
         }
         boolean workspaceUser = principal.isMemberAccess()
@@ -211,8 +211,9 @@ public class CurrentUserModelAdvice {
         return principal != null && principal.isPlatformIdentity();
     }
 
-    private boolean isJsonRequest() {
-        return WebRequestClassifier.isJsonRequest(requestFactory.getObject());
+    private boolean isShellFreeRequest() {
+        var request=requestFactory.getObject();
+        return WebRequestClassifier.isJsonRequest(request) || WebRequestClassifier.isStatementReportFragment(request);
     }
 
     @lombok.Getter

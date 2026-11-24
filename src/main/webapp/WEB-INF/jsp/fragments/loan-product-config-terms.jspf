@@ -1,0 +1,82 @@
+<%@ page pageEncoding="UTF-8" %>
+<div hidden data-product-error-tab="<c:out value='${productErrorTab}' />"></div>
+                <section class="product-builder-section product-config-step is-active" data-product-config-step="identity" aria-label="Product identity"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.identity" /></h2></div>
+                    <div id="product-config-identity" class="product-builder-section-body product-identity-grid" data-product-config-panel>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.name" text="Loan Product Name" />
+                            <input name="productName" type="text" required maxlength="120" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${fn:escapeXml(product.displayName)}" data-product-name-field />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.status" text="Product Status" />
+                            <select name="productStatus" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
+                                <option value="ACTIVE" ${product.status ne 'SUSPENDED' ? 'selected' : ''}><spring:message code="status.active" text="Active" /></option>
+                                <option value="SUSPENDED" ${product.status eq 'SUSPENDED' ? 'selected' : ''}><spring:message code="status.suspended" text="Suspended" /></option>
+                            </select>
+                        </label>
+
+                        <label class="product-identity-description block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="common.description" text="Description" />
+                            <textarea name="productDescription" rows="3" required maxlength="500" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" placeholder='<spring:message code="admin.settings.loanProducts.descriptionPlaceholder" text="Short description shown to clients when choosing this product." />'>${fn:escapeXml(product.productDescription)}</textarea>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="product-builder-section product-config-step" data-product-config-step="eligibility" aria-label="Eligibility"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.eligibility" /></h2></div>
+                    <div id="product-config-eligibility" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.minimumAmount" text="Minimum Loan Amount" />
+                            <input name="minimumAmount" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${creatingLoanProduct ? 0 : product.minimumAmount}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.maximumAmount" text="Maximum Loan Amount" />
+                            <input name="maximumAmount" type="text" inputmode="decimal" data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${product.maximumAmount}" placeholder='<spring:message code="admin.settings.loanProducts.maximumAmountPlaceholder" text="Leave blank if there is no maximum amount" />' />
+                        </label>
+
+                        <c:set var="tenureProduct" value="${product}" /><%@ include file="loan-tenure-fields.jspf" %>
+
+                        <c:set var="eligibilityProduct" value="${product}" />
+                        <%@ include file="loan-product-eligibility-fields.jspf" %>
+                        <label class="aws-settings-checkbox-row">
+                            <input name="collateralRequired" type="checkbox" value="true" class="aws-settings-checkbox" ${product.collateralRequired ? 'checked' : ''} />
+                            <span><spring:message code="productCollateral.required" /></span>
+                        </label>
+                        <label>
+                            <spring:message code="productCollateral.coverage" />
+                            <input name="collateralCoveragePercent" type="number" min="0" max="9999.99" step="0.01" class="aws-control" value="${creatingLoanProduct ? 0 : product.resolvedMinCollateralCoverageRatio * 100}" />
+                        </label>
+                    </div>
+                </section>
+
+                <section class="product-builder-section product-config-step" data-product-config-step="pricing" aria-label="Repayment and charges"><div class="product-builder-section-header"><h2><spring:message code="admin.settings.loanProducts.repaymentCharges" /></h2></div>
+                    <div id="product-config-pricing" class="product-builder-section-body product-builder-grid two-up" data-product-config-panel hidden>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.applicationFee" text="Application Fee (TZS)" />
+                            <input name="applicationFee" type="text" inputmode="decimal" required data-money-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${creatingLoanProduct ? 0 : (product.applicationFee ne null ? product.applicationFee : settings.resolvedApplicationFee)}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.insurancePercent" text="Insurance %" />
+                            <input name="insurancePercent" type="number" min="0" step="0.01" required data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.insuranceRate ne null ? product.insuranceRate : 0) * 100}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.processingFeePercent" text="Loan Processing Fee %" />
+                            <input name="processingFeePercent" type="number" min="0" step="0.01" required data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${(product.processingFeeRate ne null ? product.processingFeeRate : 0) * 100}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.annualInterestPercent" text="Annual Interest %" />
+                            <input name="annualInterestPercent" type="number" min="0" step="0.01" required data-trim-decimal-input="true" class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800" value="${creatingLoanProduct ? 10 : product.interestRate * 100}" />
+                        </label>
+
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <spring:message code="admin.settings.loanProducts.amountReturnMethod" text="Interest Method" />
+                            <select name="interestMethod" required class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-800">
+                                <option value="FLAT_RATE" ${creatingLoanProduct or product.interestMethod eq 'FLAT_RATE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.flatRate" text="Flat Rate" /></option>
+                                <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
+                            </select>
+                        </label>
+                    </div>
+                </section>

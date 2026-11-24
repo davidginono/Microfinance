@@ -8,14 +8,10 @@ import java.util.*;
 public final class LoanChargeDtos {
     private LoanChargeDtos() {}
     public enum Timing { SEPARATE, DEDUCT, FINANCED }
-    @Data public static class AccountMappingForm {
-        private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,insuranceAccountId,applicationAccountId,processingAccountId;
-    }
     @Data public static class PolicyForm {
         private UUID requestKey=UUID.randomUUID(),expectedVersion,productId,receivableAccountId,managementAccountId,insuranceAccountId,applicationAccountId,processingAccountId;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private UUID feeRecoveryAccountId;
-        private boolean saveChargePolicy;
         @org.springframework.format.annotation.DateTimeFormat(iso=org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
         private LocalDate effectiveFrom;
         private Timing managementTiming=Timing.SEPARATE,insuranceTiming=Timing.SEPARATE;
@@ -52,7 +48,6 @@ public final class LoanChargeDtos {
         public String getComponent(){return component;} public UUID getAccountId(){return accountId;}
         public String getLabel(){return label;} public String getState(){return state;}
     }
-    public record Editor(PolicyForm form,Policy current,Map<String,List<com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Choice>> accounts,List<GeneratedAccount> generated,Map<String,String> currentMappings) {}
     public record AccountSummary(Policy current,List<GeneratedAccount> generated,Map<String,String> currentMappings) {}
     public record Term(UUID id,String kind,String basis,BigDecimal basisValue,BigDecimal amount,Timing timing,
         UUID receivableAccountId,UUID liabilityAccountId,String evidence,String provider,String verification) {}

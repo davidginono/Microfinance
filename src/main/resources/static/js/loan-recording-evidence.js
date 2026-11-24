@@ -8,15 +8,9 @@
         const next = form.querySelector('[data-recording-next]');
         const submit = form.querySelector('[data-recording-submit]');
         const last = panels.length - 1;
-        const guarantors = panels.find(panel => panel.querySelector('[data-repeat-list="guarantors"]'));
-        let active = 0, reached = 0, requiredGuarantors = null;
+        let active = 0, reached = 0;
         let pending, passedSubmit = false;
         const stepName = index => panels[index].id.replace('recording-panel-', '');
-
-        function skipped(index) {
-            return !!guarantors && panels[index] === guarantors && form.elements.loanFor?.value === 'GROUP'
-                && (form.elements.loanMode.value === 'CUSTOM' || requiredGuarantors === 0);
-        }
 
         function show(index, focus = true) {
             active = index;
@@ -24,11 +18,9 @@
             panels.forEach((panel, i) => { panel.hidden = i !== index; });
             let number = 0;
             buttons.forEach((button, i) => {
-                const omit = skipped(i);
-                (button.closest('li') || button).hidden = omit;
                 const counter = button.querySelector('.recording-step-number');
-                if (counter && !omit) counter.textContent = ++number;
-                button.disabled = omit || i > reached;
+                if (counter) counter.textContent = ++number;
+                button.disabled = i > reached;
                 if (i === index) button.setAttribute('aria-current', 'step');
                 else button.removeAttribute('aria-current');
             });
@@ -92,7 +84,7 @@
         }
 
         async function go(index, saving = false) {
-            if (index < 0 || index > last || skipped(index)) return;
+            if (index < 0 || index > last) return;
             if (index < active) { pending?.abort(); show(index); return; }
             if (pending || (!saving && index === active)) return;
             const attempt = new AbortController();
@@ -101,7 +93,7 @@
             let ready = false;
             try {
                 for (let step = active; step < index + Number(saving); step++) {
-                    if (!skipped(step) && !await checkStep(step, attempt.signal)) return;
+                    if (!await checkStep(step, attempt.signal)) return;
                 }
                 ready = !attempt.signal.aborted;
             } finally {
@@ -116,33 +108,20 @@
         }
 
         function move(direction) {
-            let index = active + direction;
-            while (skipped(index)) index += direction;
-            go(index);
+            go(active + direction);
         }
 
         function updateSteps() {
-            if (guarantors) {
-                const omit = skipped(panels.indexOf(guarantors));
-                guarantors.disabled = omit;
-                guarantors.dataset.recordingSkipped = String(omit);
-            }
             root.querySelectorAll('[data-guarantor-label]').forEach(label => {
                 label.textContent = form.elements.loanFor?.value === 'GROUP' ? label.dataset.groupLabel : label.dataset.individualLabel;
             });
-            if (skipped(active)) show(active + 1);
-            else show(active, false);
+            show(active, false);
         }
 
         buttons.forEach((button, index) => button.addEventListener('click', () => go(index)));
-        panels.forEach((panel, index) => panel.addEventListener('validation:reveal', () => {if (!skipped(index)) show(index, false);}));
+        panels.forEach((panel, index) => panel.addEventListener('validation:reveal', () => {show(index, false);}));
         previous.addEventListener('click', () => move(-1));
         next.addEventListener('click', () => move(1));
-        form.addEventListener('recording:product', event => {
-            const count = event.detail?.guarantors;
-            requiredGuarantors = Number.isInteger(count) && count >= 0 ? count : null;
-            updateSteps();
-        });
         form.addEventListener('change', event => {
             pending?.abort();
             sectionError(active, '');
@@ -176,26 +155,57 @@
             var error = root.querySelector('[data-evidence-error]'), requirements = [], productVersion = 0, nextFieldId = 0;
             function fail() { error.textContent = root.dataset.error; error.hidden = false; }
             initWizard(root, form);
+            const evidenceBox = root.querySelector('[data-group-guarantor-evidence]');
+            const evidenceList = evidenceBox?.querySelector('[data-group-guarantor-evidence-list]');
+            const evidenceTemplate = evidenceBox?.querySelector('[data-group-guarantor-evidence-template]');
+            const evidenceByGuarantor = new WeakMap();
+            const storedGuarantors = root.querySelectorAll('[data-repeat-list="guarantors"] [data-repeat-row]');
+            evidenceList?.querySelectorAll('[data-group-guarantor-evidence-row]').forEach((row, index) => {
+                if (storedGuarantors[index]) evidenceByGuarantor.set(storedGuarantors[index], row);
+            });
             function reindex(list) {
+                const evidenceRows = [];
+                const groupGuarantor = form.elements.loanFor?.value === 'GROUP' && list.dataset.repeatList === 'guarantors';
                 var index = 0;
                 list.querySelectorAll('[data-repeat-row]').forEach(function (row) {
                     var controls = [...row.querySelectorAll('input,select,textarea')].filter(control =>
                         !control.matches('[data-document-field],[data-row-photos]') && (control.dataset.field || /^applicationDetails\./.test(control.name)));
-                    var groupGuarantor = form.elements.loanFor?.value === 'GROUP' && list.dataset.repeatList === 'guarantors';
-                    var populated = controls.some(control => (groupGuarantor ? control.dataset.field !== 'fullName' && !control.name.endsWith('.fullName') : !control.closest('[data-group-guarantee]'))
-                        && control.value.trim()) || !!row.querySelector('[data-row-photo-list]')?.children.length;
+                    const savedEvidence = groupGuarantor ? evidenceByGuarantor.get(row) : null;
+                    var populated = controls.some(control => control.value.trim()) ||
+                        (savedEvidence && [...savedEvidence.querySelectorAll('[data-field]')].some(control => control.value.trim())) ||
+                        !!row.querySelector('[data-row-photo-list]')?.children.length;
                     controls.forEach(function (control) {
                         if (!control.dataset.field) control.dataset.field = control.name.substring(control.name.lastIndexOf('.') + 1);
                         if (!('recordingRequired' in control.dataset)) control.dataset.recordingRequired = String(control.required);
-                        control.required = populated && (control.closest('[data-group-guarantee]') ? groupGuarantor : control.dataset.recordingRequired === 'true');
+                        control.required = populated && control.dataset.recordingRequired === 'true';
                         if (populated) control.name = 'applicationDetails.' + list.dataset.repeatList + '[' + index + '].' + control.dataset.field;
                         else control.removeAttribute('name');
                         if (!control.id) control.id = 'recording-evidence-control-' + (++nextFieldId);
                         var label = control.labels[0] || control.parentElement.querySelector('label');
                         if (label) label.htmlFor = control.id;
                     });
+                    if (populated && groupGuarantor && evidenceList) {
+                        let evidence = evidenceByGuarantor.get(row);
+                        if (!evidence) {
+                            evidence = evidenceTemplate.content.firstElementChild.cloneNode(true);
+                            evidenceByGuarantor.set(row, evidence);
+                        }
+                        evidence.querySelector('[data-group-guarantor-name]').textContent = row.querySelector('[data-field="fullName"]').value.trim();
+                        for (const control of evidence.querySelectorAll('[data-field]')) {
+                            control.name = 'applicationDetails.guarantors[' + index + '].' + control.dataset.field;
+                            control.required = true;
+                        }
+                        evidenceRows.push(evidence);
+                    }
                     if (populated) index++;
                 });
+                if (list.dataset.repeatList === 'guarantors' && evidenceList) {
+                    for (const row of [...evidenceList.children]) if (!evidenceRows.includes(row)) row.remove();
+                    evidenceRows.forEach((row, index) => {
+                        if (evidenceList.children[index] !== row) evidenceList.insertBefore(row, evidenceList.children[index] || null);
+                    });
+                    evidenceBox.hidden = evidenceRows.length === 0;
+                }
             }
             function ensurePreview(list) {
                 if (list.children.length) return;
@@ -249,14 +259,11 @@
             }
             var files = form.querySelector('input[type="file"][name="attachments"]');
             var uploads = [], documentList = root.querySelector('[data-evidence-documents]');
-            function activeUploads() {
-                return uploads.filter(upload => !upload.owner?.closest('[data-recording-skipped="true"]'));
-            }
             function syncFiles() {
                 var selection = new DataTransfer();
-                activeUploads().forEach(function (upload) { selection.items.add(upload.file); });
+                uploads.forEach(function (upload) { selection.items.add(upload.file); });
                 files.files = selection.files;
-                files.setCustomValidity(activeUploads().length > 10 ? root.dataset.uploadLimit : '');
+                files.setCustomValidity(uploads.length > 10 ? root.dataset.uploadLimit : '');
             }
             function removeUpload(upload) {
                 uploads.splice(uploads.indexOf(upload),1);
@@ -270,7 +277,7 @@
                 var type = kind === 'guarantors' ? 'GUARANTOR_PHOTO' : 'COLLATERAL_PHOTO';
                 var selected = Array.from(selection);
                 var message = '';
-                if (activeUploads().length + selected.length > 10) message = root.dataset.uploadLimit;
+                if (uploads.length + selected.length > 10) message = root.dataset.uploadLimit;
                 if (photo && selected.some(file => !/\.(png|jpe?g)$/i.test(file.name) || !['image/png','image/jpeg'].includes(file.type) || file.size > 5*1024*1024))
                     message = owner.querySelector('.attachment-dropzone-help').textContent;
                 var localError = picker.closest('.recording-row-photos')?.querySelector('[data-photo-error]');
@@ -333,7 +340,7 @@
             window.addEventListener('pagehide', () => uploads.forEach(upload => {if(upload.preview) URL.revokeObjectURL(upload.preview);}), {once:true});
             function bindUploads() {
                 root.querySelectorAll('[data-repeat-list]').forEach(reindex);
-                activeUploads().forEach(function (upload,index) {
+                uploads.forEach(function (upload,index) {
                     if (upload.owner) {
                         var subject = upload.owner.querySelector('[data-field="fullName"],[data-field="itemName"]')?.value;
                         upload.row.querySelector('[data-document-field="documentNames"]').value = ((subject ? subject.trim() + ' - ' : '') + upload.file.name).slice(0,120);
@@ -368,7 +375,7 @@
                     form.dispatchEvent(new CustomEvent('recording:product',{detail:data.product}));
                     requirements = data.requirements; documentRequirements();
                     if(rule && typeof data.attachmentsRequired==='boolean' && form.elements.loanFor?.value!=='GROUP'){
-                        rule.textContent=data.attachmentsRequired?(data.product.guarantors>0?rule.dataset.guarantor:rule.dataset.required):rule.dataset.optional;rule.hidden=false;
+                        rule.textContent=data.attachmentsRequired?(form.elements.loanFor?.value !== 'GROUP' && data.product.guarantors>0?rule.dataset.guarantor:rule.dataset.required):rule.dataset.optional;rule.hidden=false;
                     }
                     root.querySelector('[data-evidence-requirements]').textContent = requirements.map(function (item) { return item.name + ' (' + item.maxSizeMb + ' MB)'; }).join(', ');
                     if (!changed) return;

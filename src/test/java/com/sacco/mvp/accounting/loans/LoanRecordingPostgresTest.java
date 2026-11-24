@@ -69,13 +69,13 @@ class LoanRecordingPostgresTest {
         var run=UUID.randomUUID();var cutoff=OffsetDateTime.now();repository.create(run,actor,period,cutoff,UUID.randomUUID());repository.capture(run,actor,period,cutoff);
         return repository.activity(run,account,period,0,5001);
     }
-    @Test void frozenLegacyFeesStayDeferredWhenAStaffMemberSavesIncomeMappings(){
+    @Test void frozenLegacyFeesStayDeferredAfterAnApprovedPolicyRevision(){
         chargePolicy("SEPARATE");var deferred=account("LEGACY-DEFERRED","LIABILITY","CREDIT","POSTING","CLEARING");
         var legacyPolicy=UUID.randomUUID();
         jdbc.update("insert into loan_charge_policy(id,sacco_id,product_id,effective_from,enabled,management_timing,insurance_timing,receivable_account_id,management_account_id,insurance_account_id,policy_reference,agreement_reference,insurer,insurer_verification,allow_custom,request_key,payload_hash,actor_id,recorded_at) values(?,?,?,'2026-08-01',true,'SEPARATE','SEPARATE',?,?,?,'Frozen legacy policy','Legacy signed agreement','Synthetic insurer','Synthetic insurance evidence',false,?,repeat('0',64),?,now())",legacyPolicy,institution,product,chargeAccount,deferred,insuranceAccount,UUID.randomUUID(),actor.getMemberId());
         var loan=chargedLoan();var terms=chargeService().frozen(actor,loan);
         assertThat(terms.policyId()).isEqualTo(legacyPolicy);assertThat(terms.terms().getFirst().liabilityAccountId()).isEqualTo(deferred);
-        var upgrade=chargeService().editor(actor,product,null).form();upgrade.setEffectiveFrom(TODAY);
+        var upgrade=approvedChargeRevision();upgrade.setEffectiveFrom(TODAY);
         chargeService().savePolicy(actor,upgrade);
         service.disburse(actor,chargedFunding(loan));
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,deferred)).isEqualByComparingTo("20.00");
@@ -89,7 +89,7 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where account_id=?",BigDecimal.class,insuranceAccount)).isEqualByComparingTo("10.00");
         var originalLines=jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where account_id in (?,?) order by id",managementAccount,processingAccount);
         var policy=chargeService().policy(actor,product).orElseThrow();assertThat(policy.accountingVersion()).isEqualTo(2);assertThat(policy.managementAccountId()).isNull();
-        assertThat(chargeService().savePolicy(actor,chargeService().editor(actor,product,null).form())).isNotNull();
+        assertThat(chargeService().savePolicy(actor,approvedChargeRevision())).isNotNull();
         receiptService().post(actor,receiptForm(loan));
         assertThat(jdbc.queryForList("select id,account_id,account_version_id,debit,credit from gl_journal_line where account_id in (?,?) order by id",managementAccount,processingAccount)).isEqualTo(originalLines);
         assertThat(jdbc.queryForObject("select count(*) from gl_journal_line where journal_id in (select journal_id from loan_charge_command where loan_id=?)",Integer.class,loan)).isEqualTo(6);
@@ -206,13 +206,23 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("970.00");
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where account_id=?",BigDecimal.class,chargeAccount)).isZero();
     }
+    com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm approvedChargeRevision(){
+        var current=chargeService().policy(actor,product).orElseThrow();
+        var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();
+        policy.setProductId(product);policy.setExpectedVersion(current.id());policy.setEffectiveFrom(current.effectiveFrom());
+        policy.setEnabled(true);policy.setManagementTiming(current.managementTiming());policy.setInsuranceTiming(current.insuranceTiming());
+        policy.setReceivableAccountId(current.receivableAccountId());policy.setApplicationAccountId(managementAccount);
+        policy.setProcessingAccountId(processingAccount);policy.setInsuranceAccountId(current.insuranceAccountId());
+        policy.setPolicyReference(current.policyReference());policy.setAgreementReference(current.agreementReference());
+        policy.setInsurer(current.insurer());policy.setInsurerVerification(current.insurerVerification());
+        return policy;
+    }
+
     UUID enableWithheldFeeRecovery(){
         var holding=account("FEE-HOLDING","LIABILITY","CREDIT","POSTING","CLEARING");
-        var policy=chargeService().editor(actor,product,null).form();
-        policy.setFeeRecoveryAccountId(holding);
-        policy.setEffectiveFrom(chargeService().policy(actor,product).orElseThrow().effectiveFrom());
-        var saved=chargeService().revisePolicy(actor,product,policy);
-        assertThat(chargeService().revisePolicy(actor,product,policy)).isEqualTo(saved);
+        var policy=approvedChargeRevision();policy.setFeeRecoveryAccountId(holding);
+        var saved=chargeService().savePolicy(actor,policy);
+        assertThat(chargeService().savePolicy(actor,policy)).isEqualTo(saved);
         return holding;
     }
 
@@ -307,20 +317,18 @@ class LoanRecordingPostgresTest {
             f.getEffectiveDate(),TODAY,context.getBean(ApplicationClock.class).now(),null,null,client,"",0);
         var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS;
         var collected=daily.read(actor,kind,parameters,false);
-        assertThat(collected.rows()).singleElement().satisfies(row->{
-            assertThat(row).containsEntry("component","CHARGES").containsEntry("documentNumber",saved.header().number());
-            assertThat((BigDecimal)row.get("credit")).isEqualByComparingTo("7.00");
-        });
+        assertThat(collected.rows()).filteredOn(row->saved.header().number().equals(row.get("documentNumber")))
+            .hasSize(2).anySatisfy(row->assertThat((BigDecimal)row.get("moneyIn")).isEqualByComparingTo("7.00"));
         assertThat(daily.read(actor,kind,parameters,true).totals()).isEqualTo(collected.totals());
         assertThat(daily.read(operator("B2"),kind,parameters,false).count()).isZero();
         var emptyDate=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
             TODAY,TODAY,parameters.cutoff(),null,null,client,"",0);
-        assertThat(daily.read(actor,kind,emptyDate,false).count()).isZero();
+        assertThat(daily.read(actor,kind,emptyDate,false).totals().get("moneyIn")).isZero();
         var other=operator("B1");receiptService().reverse(other,saved.header().id(),UUID.randomUUID(),TODAY,"Synthetic returned collection");assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("30.00");
         var corrected=daily.read(actor,kind,parameters,false);
-        assertThat(corrected.count()).isEqualTo(2);
-        assertThat(corrected.totals().get("credit")).isEqualByComparingTo("7.00");
-        assertThat(corrected.totals().get("debit")).isEqualByComparingTo("7.00");
+        assertThat(corrected.count()).isEqualTo(collected.count()+2);
+        assertThat(corrected.totals().get("moneyIn")).isEqualByComparingTo("7.00");
+        assertThat(corrected.totals().get("moneyOut")).isEqualByComparingTo(collected.totals().get("moneyOut").add(new BigDecimal("7.00")));
     }
     @Test void chargedFundingCorrectionReversesDeductionsAndAssessmentsTogether(){
         chargePolicy("DEDUCT");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var request=adjustments().request(actor,adjustment(id,"DISBURSEMENT_REVERSAL"));var other=operator("B1");adjustments().decide(other,request,UUID.randomUUID(),true,"Synthetic verified cash return");
@@ -691,7 +699,7 @@ class LoanRecordingPostgresTest {
             assertThat(reports.read(actor,kind,otherProduct,false).count()).as(kind.name()).isZero();
         }
         var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);
-        assertThat(daily.count()).isEqualTo(4);assertThat(daily.totals().get("credit")).isEqualByComparingTo("240.00");assertThat(daily.excluded()).isZero();assertThat(daily.rows()).extracting(r->r.get("component")).containsOnly("PRINCIPAL","INTEREST");
+        assertThat(daily.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(daily.totals().get("moneyOut")).isEqualByComparingTo("2000.00");assertThat(daily.excluded()).isZero();
         var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,false);
         assertThat(portfolio.count()).isEqualTo(2);assertThat(portfolio.excluded()).isZero();assertThat(portfolio.totals().get("principalBalance")).isEqualByComparingTo("1800.00");
         var risk=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,p,false);assertThat(risk.totals().get("band0")).isEqualByComparingTo("1800.00");
@@ -699,10 +707,10 @@ class LoanRecordingPostgresTest {
         var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,false);assertThat(cashbook.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(cashbook.totals().get("moneyOut")).isEqualByComparingTo("2000.00");
         assertThat(reports.read(operator("B2"),com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false).count()).isZero();
         receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Reference report correction");
-        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(corrected.count()).isEqualTo(8);assertThat(corrected.totals().get("debit")).isEqualByComparingTo("240.00");assertThat(corrected.totals().get("credit")).isEqualByComparingTo("240.00");
+        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(corrected.count()).isGreaterThan(daily.count());assertThat(corrected.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(corrected.totals().get("moneyOut")).isEqualByComparingTo("2240.00");
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,false).totals().get("principalBalance")).isEqualByComparingTo("2000.00");
         for(int n=0;n<26;n++){var extra=receiptForm(first);extra.getRows().getFirst().setAmount(BigDecimal.ONE);receiptService().post(actor,extra);}
-        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("credit")).isEqualByComparingTo("266.00");
+        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("moneyIn")).isEqualByComparingTo("266.00");
         var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,null,null,"",1);
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,secondPage,false).rows()).hasSize((int)Math.min(26,all.count()-25));
         var noAccounts=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),UUID.randomUUID(),null,null,"",0);

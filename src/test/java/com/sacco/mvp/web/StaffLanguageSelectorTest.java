@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 import java.util.Set;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,21 +59,20 @@ class StaffLanguageSelectorTest {
         var principal=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).position(Position.MINOR_ADMIN).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of());
         when(settings.updateLanguage(principal.getMemberId(),"sw")).thenReturn("sw");
         var controller=new StaffSettingsController(mock(NotificationInboxService.class),settings,locale);
-        var request=new MockHttpServletRequest();var flash=new RedirectAttributesModelMap();
-        assertThat(controller.updateLanguage(principal,"sw","/admin/settings-controls?section=loan#products",request,flash))
+        var request=new MockHttpServletRequest();
+        assertThat(controller.updateLanguage(principal,"sw","/admin/settings-controls?section=loan#products",request))
             .isEqualTo("redirect:/admin/settings-controls?section=loan#products");
         verify(settings).updateLanguage(principal.getMemberId(),"sw");verify(locale).cacheUserLocale(request,principal.getMemberId(),"sw");
-        assertThat(flash.getFlashAttributes()).isEmpty();
     }
 
     @ParameterizedTest
     @ValueSource(strings={"https://example.com/","//example.com/","/%2fexample.com/","/\\example.com/","/%5cexample.com/","/path\r\nLocation:evil","/%0d%0aevil","javascript:alert(1)","relative",""})
-    void unsafeReturnDestinationsUseTheExistingSettingsPage(String destination) {
+    void unsafeReturnDestinationsUseTheStaffDashboard(String destination) {
         var settings=mock(UserSettingsService.class);var locale=mock(MemberLocaleInterceptor.class);
         var principal=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).position(Position.MINOR_ADMIN).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of());
         when(settings.updateLanguage(principal.getMemberId(),"en")).thenReturn("en");
         var controller=new StaffSettingsController(mock(NotificationInboxService.class),settings,locale);
-        assertThat(controller.updateLanguage(principal,"en",destination,new MockHttpServletRequest(),new RedirectAttributesModelMap()))
-            .isEqualTo("redirect:/staff/settings");
+        assertThat(controller.updateLanguage(principal,"en",destination,new MockHttpServletRequest()))
+            .isEqualTo("redirect:/staff/dashboard");
     }
 }

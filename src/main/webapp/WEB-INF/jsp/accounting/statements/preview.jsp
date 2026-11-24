@@ -2,21 +2,20 @@
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
-<c:set var="base" value="/reports/financial/statements/${run.id}" />
+<%@ include file="preview-urls.jspf" %>
 <div class="accounting-workspace">
  <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.previewTitle" text="Reports Preview" /></span></nav>
  <div class="erp-page-header erp-detail-header" data-aws-page-header>
   <h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1>
   <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" data-fs-export class="report-page-actions" data-aws-action-pin="true">
    <input type="hidden" name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><input type="hidden" name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><input type="hidden" name="line" value="<c:out value='${line}' />" /></c:if><c:if test="${not empty account}"><input type="hidden" name="account" value="${account}" /></c:if>
-   <c:url value="${base}/print" var="printUrl"><c:param name="kind" value="${kind}" /><c:if test="${not empty selectionKind}"><c:param name="selectionKind" value="${selectionKind}" /></c:if><c:if test="${not empty line}"><c:param name="line" value="${line}" /></c:if><c:if test="${not empty account}"><c:param name="account" value="${account}" /></c:if></c:url>
    <a class="app-btn btn-neutral" href="<c:out value='${printUrl}' />" data-print-action="true"><report:reportExport format="print" /></a>
    <button type="submit" class="app-btn btn-neutral" name="format" value="PDF" data-download-action="true"><report:reportExport format="pdf" /></button>
    <button type="submit" class="app-btn btn-neutral" name="format" value="XLSX" data-download-action="true"><report:reportExport format="excel" /></button>
   </form></sec:authorize>
  </div>
  <div class="fs-workspace" data-tab-loading="<spring:message code='fs.tabLoading' />" data-tab-error="<spring:message code='fs.tabError' />">
- <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
+ <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab="${k}" data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
  <div class="fs-toolbar">
   <details class="fs-view-settings"><summary><spring:message code="fs.viewSettings" /></summary><div class="fs-view-fields">
    <label class="fs-select-setting"><span><spring:message code="fs.font" /></span><select class="aws-control" data-fs-font><option value="reference"><spring:message code="fs.referenceFont" /></option><option value="sans">Arial</option><option value="serif">Times New Roman</option><option value="mono">Courier New</option></select></label>
@@ -24,26 +23,14 @@
    <label data-fs-comparison-setting ${kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES'?'':'hidden'}><input type="checkbox" checked data-fs-comparison /><spring:message code="fs.showComparison" /></label>
   <p class="fs-help"><spring:message code="fs.previewSettingsHelp" /></p></div></details>
  </div>
- <div data-fs-report-section>
- <c:if test="${filtered}"><p class="fs-help"><spring:message code="fs.filteredTrial" /></p></c:if>
- <section class="fs-paper-scroll" tabindex="0" aria-label="<spring:message code='fs.previewTitle' text='Reports Preview' />"><article class="fs-paper fs-${document.style}" data-fs-paper data-kind="${kind}" <c:if test="${document.style=='equity'}">style="min-width:${fn:length(document.columns)>7?fn:length(document.columns)*150:1100}px"</c:if>>
-  <c:choose><c:when test="${document.style=='equity'}">
-   <h2><c:out value="${document.title}" /></h2>
-   <p class="fs-equity-period"><span><spring:message code="fs.equity.forPeriod" /></span><span><c:out value="${equityPeriod}" /></span></p>
-  </c:when><c:otherwise>
-  <h2><c:out value="${document.title}" /></h2>
-  <div class="fs-paper-meta"><strong><c:out value="${snapshot.institutionName}" /></strong><span><c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose></span><span><spring:message code="${document.asAt?'fs.asAt':'fs.period'}" /> <c:if test="${not document.asAt}">${appTime:display(run.from)} — </c:if>${appTime:display(run.through)} · TZS</span><span><spring:message code="fs.generated" /> <c:out value="${generatedLabel}" /></span><span><spring:message code="fs.previous" />: ${appTime:display(snapshot.parameters.previousFrom())} — ${appTime:display(snapshot.parameters.previousThrough())}</span></div>
-  </c:otherwise></c:choose>
-  <c:if test="${kind=='CASH_FLOW'}"><p class="fs-method"><spring:message code="${snapshot.version>=4?'fs.indirectMethod':'fs.directMethod'}" /></p></c:if>
-  <table data-table-sort-mode="none" data-table-sort-reason="financial-statement" class="fs-table"><c:if test="${document.style=='equity'}"><colgroup><c:forEach items="${document.columns}" var="column"><col style="width:${column.weight*100}%" /></c:forEach></colgroup></c:if><thead><tr><c:forEach items="${document.columns}" var="column" varStatus="cs"><c:if test="${cs.index==document.detailsBefore}"><th class="fs-details"><spring:message code="fs.details" /></th></c:if><th class="${column.numeric?'fs-number':''} ${cs.last and (kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES')?'fs-comparison':''}"><c:out value="${column.label}" /></th></c:forEach></tr></thead>
-   <tbody><c:forEach items="${document.rows}" var="row"><tr class="${row.heading?'fs-section':''} ${row.total?'fs-total':''}"><c:forEach items="${row.cells}" var="cell" varStatus="cs"><c:if test="${cs.index==document.detailsBefore}"><td class="fs-details"><c:if test="${not empty row.details}"><a class="fs-details-button" href="<c:url value='${row.details}' />"><spring:message code="fs.details" /><span class="sr-only"> <c:out value="${row.cells[1].text}" /></span></a></c:if></td></c:if><td class="${document.columns[cs.index].numeric?'fs-number':''} ${cell.amount!=null?'fs-amount':''} ${cs.last and (kind=='POSITION' or kind=='INCOME' or kind=='CASH_FLOW' or kind=='NOTES')?'fs-comparison':''}"><c:choose><c:when test="${kind=='LEDGER' and cs.index==1 and not empty row.details}"><a href="<c:url value='${row.details}' />"><c:out value="${cell.text}" /></a></c:when><c:otherwise><c:out value="${cell.text}" /></c:otherwise></c:choose></td></c:forEach></tr></c:forEach><c:if test="${empty document.rows}"><tr><td colspan="20"><spring:message code="fs.noRows" /></td></tr></c:if></tbody>
-  </table>
-  <c:if test="${document.style=='equity'}"><p class="fs-equity-scope"><c:out value="${snapshot.institutionName}" /> | <c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose> | TZS</p></c:if>
- </article></section>
- <c:if test="${kind=='LEDGER'}"><div class="fs-pager"><c:if test="${page>0}"><a class="app-btn btn-neutral" href="<c:url value='${base}/ledger/${account}?page=${page-1}' />"><spring:message code="fs.previousPage" /></a></c:if><span>${page+1}</span><c:if test="${hasNext}"><a class="app-btn btn-neutral" href="<c:url value='${base}/ledger/${account}?page=${page+1}' />"><spring:message code="fs.nextPage" /></a></c:if></div></c:if>
- </div>
+ <%@ include file="preview-report.jspf" %>
  <div class="fs-preview-footer">
- <c:if test="${not run.saved}"><form class="fs-save-report" data-fs-save method="post" action="<c:url value='${base}/save' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="kind" value="${kind}" /><button class="app-btn btn-launch"><spring:message code="common.savedraft" /></button></form></c:if>
+ <c:if test="${not run.saved}"><form class="fs-save-report" data-fs-save method="post" action="<c:url value='${base}/save' />"><input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}" /><input type="hidden" name="kind" value="${kind}" />
+ <input type="hidden" name="selectionKind" value="<c:out value='${selectionKind}' />" />
+ <input type="hidden" name="line" value="<c:out value='${line}' />" />
+ <input type="hidden" name="account" value="<c:out value='${account}' />" />
+ <input type="hidden" name="page" value="<c:out value='${page}' />" />
+ <button class="app-btn btn-launch"><spring:message code="common.savedraft" /></button></form></c:if>
  </div>
 </div>
 </div>

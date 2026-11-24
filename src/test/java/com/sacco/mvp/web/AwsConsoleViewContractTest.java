@@ -249,8 +249,9 @@ class AwsConsoleViewContractTest {
 
     @Test
     void financialStatusAndSettingsUseSharedAwsContainerPrimitives() throws Exception {
-        String settings=read(JSP_ROOT.resolve("staff/settings.jsp"));
-        assertThat(settings).contains("aws-settings-panel", "staffSettingsLanguage", "_csrf", "staff/settings/language");
+        assertThat(JSP_ROOT.resolve("staff/settings.jsp")).doesNotExist();
+        assertThat(read(JSP_ROOT.resolve("fragments/header.jspf"))).contains("staff/settings/language", "data-shell-language");
+        assertThat(read(JSP_ROOT.resolve("fragments/sidebar.jspf"))).doesNotContain("/staff/settings", "section=language");
         assertThat(read(Path.of("src/main/resources/static/css/shell.css"))).contains(".aws-settings-control-row", ".aws-settings-panel--compact");
     }
 

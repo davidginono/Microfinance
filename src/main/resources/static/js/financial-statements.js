@@ -25,62 +25,95 @@
   }
   if(saveSettings)save();
  }
- applyViewSettings(document);
- if(!document.querySelector('.fs-workspace'))return;
- history.replaceState({...history.state,statementPreview:true},'',location.href);
- let pending,renderedUrl=location.href;
- const workspace=document.querySelector('.fs-workspace');
- function clearPending(){
-  const section=workspace.querySelector('[data-fs-report-section]');
-  section.removeAttribute('aria-busy');section.querySelector('.fs-tab-status')?.remove();
- }
- async function switchStatement(url,push){
-  pending?.abort();
-  const request=new AbortController();pending=request;
-  clearPending();
-  const current=workspace.querySelector('[data-fs-report-section]'),status=document.createElement('div');
-  status.className='fs-tab-status';status.setAttribute('role','status');status.setAttribute('aria-label',workspace.dataset.tabLoading);
-  const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='large';spinner.setAttribute('aria-hidden','true');status.append(spinner);
-  current.setAttribute('aria-busy','true');current.prepend(status);
-  try{
-   const response=await fetch(url,{credentials:'same-origin',cache:'no-store',signal:AbortSignal.any([request.signal,AbortSignal.timeout(20000)])});
-   if(response.redirected)throw new Error('Statement unavailable');
-   if(!response.ok)throw new Error('Statement unavailable');
-   const parsed=new DOMParser().parseFromString(await response.text(),'text/html');
-   const next=parsed.querySelector('[data-fs-report-section]'),paper=next?.querySelector('[data-fs-paper]');
-   if(!paper)throw new Error('Statement unavailable');
-   if(request.signal.aborted)return;
-   current.replaceWith(next);
+ function init(){
+  const workspace=document.querySelector('.fs-workspace');
+  if(!workspace)return;
+
+  const exportForm=document.querySelector('[data-fs-export]');
+  const saveForm=document.querySelector('[data-fs-save]');
+  const comparison=workspace.querySelector('[data-fs-comparison-setting]');
+  const section=()=>workspace.querySelector('[data-fs-report-section]');
+  const applyContext=current=>{
+   const kind=current.querySelector('[data-fs-paper]').dataset.kind;
    for(const tab of workspace.querySelectorAll('[data-fs-tab]')){
-    if(tab.href===new URL(url,location.href).href)tab.setAttribute('aria-current','page');else tab.removeAttribute('aria-current');
+    if(tab.dataset.fsTab===kind)tab.setAttribute('aria-current','page');
+    else tab.removeAttribute('aria-current');
    }
-   const comparison=workspace.querySelector('[data-fs-comparison-setting]');
-   if(comparison)comparison.hidden=!['POSITION','INCOME','CASH_FLOW','NOTES'].includes(paper.dataset.kind);
-   const exportForm=document.querySelector('[data-fs-export]'),nextExport=parsed.querySelector('[data-fs-export]');
-   if(exportForm&&nextExport){
-    exportForm.querySelectorAll('input[type=hidden]').forEach(input=>input.remove());
-    for(const input of nextExport.querySelectorAll('input[type=hidden]'))exportForm.prepend(input);
-    exportForm.querySelector('[data-print-action]')?.setAttribute('href',nextExport.querySelector('[data-print-action]').getAttribute('href'));
+   if(comparison)comparison.hidden=!['POSITION','INCOME','CASH_FLOW','NOTES'].includes(kind);
+   const fields={kind,selectionKind:current.dataset.selectionKind,line:current.dataset.line,account:current.dataset.account};
+   if(exportForm){
+    for(const [name,value] of Object.entries(fields)){
+     let input=exportForm.elements.namedItem(name);
+     if(!value){input?.remove();continue;}
+     if(!input){input=document.createElement('input');input.type='hidden';input.name=name;exportForm.append(input);}
+     input.value=value;
+    }
+    exportForm.querySelector('[data-print-action]').href=current.dataset.printUrl;
    }
-   const saveKind=document.querySelector('[data-fs-save] [name=kind]');if(saveKind)saveKind.value=paper.dataset.kind;
-   applyViewSettings(document);window.refreshEnhancedSelects?.(workspace.querySelector('.fs-toolbar'));
-   renderedUrl=new URL(url,location.href).href;
-   if(push)history.pushState({...history.state,statementPreview:true},'',url);
-   workspace.querySelector('.fs-tabs [aria-current="page"]')?.focus({preventScroll:true});
-  }catch(error){
-   if(request.signal.aborted)return;
-   current.removeAttribute('aria-busy');status.removeAttribute('aria-label');status.setAttribute('role','alert');status.textContent=workspace.dataset.tabError;
-  }finally{
-   if(pending===request)pending=null;
+   if(saveForm){
+    for(const [name,value] of Object.entries({...fields,page:current.dataset.page})){
+     saveForm.elements.namedItem(name).value=value || '';
+    }
+    saveForm.hidden=current.dataset.saved==='true';
+   }
+   applyViewSettings(workspace);
+   window.refreshEnhancedSelects?.(workspace.querySelector('.fs-toolbar'));
+  };
+
+  history.replaceState({...history.state,statementPreview:true},'',location.href);
+  let pending,renderedUrl=location.href;
+  const lockActions=busy=>{for(const form of [exportForm,saveForm])if(form)form.inert=busy;};
+
+  async function switchStatement(url,push,focus){
+   pending?.abort();
+   const request=new AbortController();pending=request;
+   const current=section();
+   window.AppLoading.end(current);
+   window.AppLoading.begin(current,{table:false,size:'large',label:workspace.dataset.tabLoading});
+   lockActions(true);
+   try{
+    const response=await fetch(url,{
+     credentials:'same-origin',cache:'no-store',headers:{'X-Statement-Fragment':'report'},
+     signal:AbortSignal.any([request.signal,AbortSignal.timeout(20000)])
+    });
+    if(response.redirected||!response.ok)throw new Error('Statement unavailable');
+    const parsed=new DOMParser().parseFromString(await response.text(),'text/html');
+    const next=parsed.querySelector('[data-fs-report-section]');
+    if(!next?.querySelector('[data-fs-paper]')||!next.dataset.printUrl)throw new Error('Statement unavailable');
+    if(request.signal.aborted)return;
+    window.AppLoading.end(current);
+    current.replaceWith(next);
+    applyContext(next);
+    renderedUrl=url;
+    if(push)history.pushState({...history.state,statementPreview:true},'',url);
+    if(focus)next.querySelector('.fs-paper-scroll')?.focus({preventScroll:true});
+   }catch(error){
+    if(request.signal.aborted)return;
+    window.AppLoading.fail(current,{label:workspace.dataset.tabError,retry:()=>switchStatement(url,push,focus)});
+   }finally{
+    if(pending===request){pending=null;lockActions(false);}
+   }
   }
+
+  workspace.addEventListener('click',event=>{
+   const link=event.target instanceof Element?event.target.closest('[data-fs-tab], [data-fs-drilldown]'):null;
+   if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+   event.preventDefault();
+   if(link.href!==renderedUrl)void switchStatement(link.href,true,link.hasAttribute('data-fs-drilldown'));
+   else{
+    pending?.abort();pending=null;window.AppLoading.end(section());lockActions(false);
+    section().querySelector('[data-ui-loading-error]')?.remove();
+    if(location.href!==renderedUrl)history.pushState({...history.state,statementPreview:true},'',renderedUrl);
+   }
+  });
+  window.addEventListener('popstate',event=>{
+   if(event.state?.statementPreview && location.href!==renderedUrl)void switchStatement(location.href,false,false);
+   else if(event.state?.statementPreview && pending){pending.abort();pending=null;window.AppLoading.end(section());lockActions(false);}
+  });
+  window.addEventListener('pagehide',()=>pending?.abort());
+  applyContext(section());
  }
- document.addEventListener('click',event=>{
-  const link=event.target instanceof Element?event.target.closest('[data-fs-tab]'):null;
-  if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
-  event.preventDefault();
-  if(link.href!==renderedUrl)void switchStatement(link.href,true);
-  else{pending?.abort();pending=null;clearPending();if(location.href!==renderedUrl)history.pushState({...history.state,statementPreview:true},'',renderedUrl);}
- });
- window.addEventListener('popstate',event=>{if(event.state?.statementPreview)void switchStatement(location.href,false);});
- window.addEventListener('pagehide',()=>pending?.abort());
+ if(window.WorkspaceNavigation)window.WorkspaceNavigation.onReady(init);
+ else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+ else init();
 })();

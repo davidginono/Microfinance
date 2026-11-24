@@ -3,8 +3,6 @@ package com.sacco.mvp.accounting.loans;
 import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.*;
 import com.sacco.mvp.clients.onboarding.service.OnboardingService;
 import com.sacco.mvp.domain.*;
-import com.sacco.mvp.lending.controls.dto.CreditControlDtos.PolicyForm;
-import com.sacco.mvp.lending.controls.service.CreditControlService;
 import com.sacco.mvp.service.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -42,7 +40,15 @@ class ClientOnboardingPostgresTest {
     void documents(UUID client,UUID revision) {
         for(String category:List.of("IDENTITY","ADDRESS","ACTIVITY","CONSENT")){var form=new DocumentForm();form.setRevisionId(revision);form.setCategory(category);service.attach(f.actor,client,form,image());}
     }
-    void policy(){var controls=f.context.getBean(CreditControlService.class);var p=new PolicyForm();p.setExpectedRevision(controls.policy(f.actor).revision());p.setKycRequired(true);p.setReference("Synthetic approved branch KYC gate");p.setVerified(true);controls.configure(f.actor,p);}
+    void policy(){
+        f.jdbc.update("""
+            insert into lending_credit_policy(id,sacco_id,station_id,revision,capacity_required,collateral_required,
+               reference,request_key,payload_hash,actor_id,recorded_at,reminders_enabled,kyc_required)
+            select ?,?,'B1',coalesce(max(revision),0)+1,false,false,'Synthetic approved branch KYC gate',?,?,?,?,false,true
+              from lending_credit_policy where sacco_id=? and station_id='B1'
+            """,UUID.randomUUID(),f.institution,UUID.randomUUID(),"0".repeat(64),f.actor.getMemberId(),
+            java.time.OffsetDateTime.now(),f.institution);
+    }
     String gate(){return f.jdbc.queryForObject("select client_kyc_error(?,?,?,?)",String.class,f.client,f.institution,"B1",day);}
     UUID otherClient(String branch){var id=UUID.randomUUID();f.jdbc.update("insert into members(id,sacco_id,station_id,member_no,full_name,phone,status,position,is_member,password_hash,client_portal_enabled,created_at) values(?,?,?,?,'Synthetic second client',?,'ACTIVE','MEMBER',true,'!NO_PORTAL_ACCESS',false,now())",id,f.institution,branch,id.toString(),phone());return id;}
 

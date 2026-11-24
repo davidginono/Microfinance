@@ -3080,14 +3080,26 @@ public class AdminService {
                                   boolean guarantorMinSavingsCheckRequired,
                                   BigDecimal guarantorMinimumSavings,
                                   LoanProductStatus productStatus,
-                                  Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
+                                  Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,boolean collateralRequired,BigDecimal collateralCoveragePercent,
+                                  com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
+        var current=loanProduct(saccoId,productId);
+        BigDecimal coverage=collateralCoverage(collateralRequired,collateralCoveragePercent);
+        boolean applicationChanged=increasedOrChangedPositive(normalizeApplicationFee(applicationFee),
+            current.getApplicationFee()==null?settings(saccoId).getResolvedApplicationFee():current.getApplicationFee());
+        boolean processingChanged=increasedOrChangedPositive(normalizePercentageRate(processingFeeRate,
+            "Loan processing fee percentage cannot be negative."),current.getProcessingFeeRate());
+        boolean insuranceChanged=increasedOrChangedPositive(normalizeInsuranceRate(insuranceRate),current.getInsuranceRate());
+        if(applicationChanged || processingChanged || insuranceChanged)
+            loanCharges.requireApprovedProductCharges(saccoId,productId,applicationChanged,processingChanged,insuranceChanged);
         updateLoanProduct(saccoId,adminId,productId,productCode,productName,productDescription,displayOrder,minimumAmount,maximumAmount,guarantorsRequired,ratio,savingsLimitCheckRequired,applicationFee,insuranceRate,processingFeeRate,annualRate,interestMethod,minimum.compatibilityMonths(),maximum.compatibilityMonths(),allowApplicationWithActiveLoan,freshFinancialDataRequired,disbursementOfficerRequired,disbursementProofRequired,applicantAttachmentRequired,guarantorMinSavingsCheckRequired,guarantorMinimumSavings,productStatus,maximumActiveLoans);
         LoanProductSetting product = loanProductSettingRepository.findByIdAndSaccoId(productId,saccoId).orElseThrow();
         productAccounts.configure(product,adminId,principalGlAccountId,interestGlAccountId);
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
+        if(collateralRequired || collateralCoveragePercent!=null)
+            setProductCollateral(product,adminId,collateralRequired,coverage);
         loanProductSettingRepository.save(product);
         if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
 
@@ -3124,16 +3136,21 @@ public class AdminService {
                                                 Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,
                                                 com.sacco.mvp.security.AppUserPrincipal actor,
                                                 com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval,
-                                                com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm chargePolicy,
+                                                boolean collateralRequired, BigDecimal collateralCoveragePercent,
                                                 com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
         if (actor == null || !saccoId.equals(actor.getSaccoId()) || !adminId.equals(actor.getMemberId()))
             throw new org.springframework.security.access.AccessDeniedException("Product scope mismatch");
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
+        if(normalizeApplicationFee(applicationFee).signum()>0 || normalizeInsuranceRate(insuranceRate).signum()>0
+            || normalizePercentageRate(processingFeeRate,"Loan processing fee percentage cannot be negative.").signum()>0)
+            throw new IllegalArgumentException("charges.error.policy");
+        BigDecimal coverage=collateralCoverage(collateralRequired,collateralCoveragePercent);
         LoanProductSetting product = createLoanProduct(saccoId,adminId,productCode,productName,productDescription,displayOrder,minimumAmount,maximumAmount,guarantorsRequired,ratio,savingsLimitCheckRequired,applicationFee,insuranceRate,processingFeeRate,annualRate,interestMethod,minimum.compatibilityMonths(),maximum.compatibilityMonths(),allowApplicationWithActiveLoan,freshFinancialDataRequired,disbursementOfficerRequired,disbursementProofRequired,applicantAttachmentRequired,guarantorMinSavingsCheckRequired,guarantorMinimumSavings,productStatus,maximumActiveLoans);
 
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
+        setProductCollateral(product,adminId,collateralRequired,coverage);
         loanProductSettingRepository.save(product);
         if (approval != null && (!approval.getGroups().isEmpty() || !approval.getApprovals().isEmpty())) {
             loanProductSettingRepository.flush();
@@ -3141,10 +3158,30 @@ public class AdminService {
             approval.setExpectedRevision(0);
             groupApprovals.saveRule(actor, approval);
         }
-        if(chargePolicy!=null){loanProductSettingRepository.flush();chargePolicy.setProductId(product.getId());loanCharges.savePolicy(actor,chargePolicy);}
         if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
         return product;
     }
 
+
+    private static boolean increasedOrChangedPositive(BigDecimal proposed, BigDecimal previous) {
+        return proposed.signum()>0 && proposed.compareTo(previous==null?BigDecimal.ZERO:previous)!=0;
+    }
+
+    private static BigDecimal collateralCoverage(boolean required,BigDecimal percent) {
+        if(!required)return BigDecimal.ZERO;
+        if(percent==null || percent.signum()<0 || percent.compareTo(new BigDecimal("9999.99"))>0
+            || percent.stripTrailingZeros().scale()>2)throw new IllegalArgumentException("productCollateral.invalidCoverage");
+        return percent.movePointLeft(2);
+    }
+
+    private void setProductCollateral(LoanProductSetting product,UUID actor,boolean required,BigDecimal coverage) {
+        if(product.isCollateralRequired()==required && product.getResolvedMinCollateralCoverageRatio().compareTo(coverage)==0)return;
+        if(product.isCustomRecordingConfiguration())throw new IllegalArgumentException("productCollateral.standardOnly");
+        var before=Map.of("required",product.isCollateralRequired(),"coverage",product.getResolvedMinCollateralCoverageRatio());
+        product.setCollateralRequired(required);
+        product.setMinCollateralCoverageRatio(coverage);
+        auditService.log("LOAN_PRODUCT",product.getId(),"ADMIN_UPDATE_PRODUCT_COLLATERAL",actor,before,
+            Map.of("required",required,"coverage",coverage));
+    }
 
 }

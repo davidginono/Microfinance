@@ -17,7 +17,7 @@ Assign the required new claims explicitly through the existing access editor. No
 
 Commands require their workspace's view claim as well as the action claim. The access matrix maps collateral release to its Approve action and recovery-decision recording to its Initiate action. Existing platform/staff scope restrictions remain.
 
-In **Branch credit controls**, record the institution's approved policy reference and confirm the evidence check. Independently enable ordinary guarantor assessments and registered collateral for secured products. Optional instalment reminders require an explicitly entered lead time (0–30 days) and repeat interval (1–30 days). New branch controls and reminder delivery are not silently activated or populated with invented policy decisions. Their absence is not evidence of verified creditworthiness.
+The Branch credit controls form is retired. Existing branch requirements for identity verification and guarantor assessment and existing reminder schedules still apply. Configure collateral for new standard loans under **Eligibility** on the loan product.
 
 ## 2. Architecture and operating paths
 
@@ -41,7 +41,7 @@ Register the asset's stable reference, description, owner and checked ownership 
 
 Pledges reserve specific verified value for an authorized loan. The sum of active pledges cannot exceed the latest valuation less other secured claims. Concurrent or stale requests cannot commit the same available value twice. Revaluations may record an actual decrease below existing pledges: the shortfall is visible and further excessive pledges/funding are blocked, rather than hiding the lower valuation.
 
-When the branch enables the secured-product gate, funding requires current registered coverage against the product's required ratio. New individual and recorded applications retain collateral terms in their policy snapshots. Older applications without those snapshot fields use the existing product fallback; an unavailable required ratio blocks the gate rather than inventing a percentage. Review their actual approved requirements before activating the gate. Funding holds the loan/policy/asset locks while checking and posting, with a database transition guard as a second protection.
+For new standard loans, the frozen product policy governs funding. A product that requires collateral needs current registered coverage against the frozen ratio. Earlier loans still use the saved branch gate. New individual and recorded applications retain collateral terms in their policy snapshots. Older applications without those snapshot fields use the existing product fallback; an unavailable required ratio blocks the gate rather than inventing a percentage. Review their actual approved requirements before activating the gate. Funding holds the loan/policy/asset locks while checking and posting, with a database transition guard as a second protection.
 
 Release requires a settled or cancelled/rejected/reversed loan, a reason and a different authorized officer from the pledge recorder. A `PAID` flag alone is insufficient: supported ledger settlement, instalments and charges must agree. Releasing security never rewrites the asset's original record or financial history. A later financial reversal cannot physically or legally reclaim released security automatically; staff must review the resulting position.
 

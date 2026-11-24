@@ -38,7 +38,7 @@ public class ManagementReportPdf {
                 context=new ArrayList<>(List.of(period,context.get(0)+" | TZS",printed));
                 context.addAll(LoanReportReferenceText.headerDetails(r,locale,key->message(key,locale)));
             }
-            if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message("accounts",locale)+": "+(r.parameters().startAccount()==null && r.parameters().endAccount()==null?message("allAccounts",locale):r.accountSelection()));
+            if(r.kind()==Kind.CASHBOOK || r.kind()==Kind.DAILY_COLLECTIONS)context.add(message(r.kind()==Kind.DAILY_COLLECTIONS?"postingAccountRange":"accounts",locale)+": "+(r.parameters().startAccount()==null && r.parameters().endAccount()==null?message(r.kind()==Kind.DAILY_COLLECTIONS?"allPostingAccounts":"allAccounts",locale):r.accountSelection()));
             if(!r.isReferenceLayout()){
                 if(!r.clientSelection().isBlank())context.add(message("client",locale)+": "+r.clientSelection());
                 if(!r.parameters().product().isBlank())context.add(message("productSearch",locale)+": "+r.parameters().product());

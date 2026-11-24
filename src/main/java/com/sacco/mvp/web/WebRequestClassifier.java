@@ -6,6 +6,13 @@ public final class WebRequestClassifier {
     private WebRequestClassifier() {
     }
 
+    public static boolean isStatementReportFragment(HttpServletRequest request) {
+        if (request == null || !"GET".equals(request.getMethod())
+                || !"report".equals(request.getHeader("X-Statement-Fragment"))) return false;
+        String path=request.getRequestURI().substring(request.getContextPath().length());
+        return path.matches("/reports/financial/statements/[0-9a-fA-F-]{36}(/trial|/ledger/[0-9a-fA-F-]{36})?");
+    }
+
     public static boolean isJsonRequest(HttpServletRequest request) {
         if (request == null) {
             return false;

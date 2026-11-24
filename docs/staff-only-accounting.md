@@ -22,7 +22,7 @@ Historical manager, board, guarantor and reversal entities remain where reports,
 
 Each branch can have its own ICT Manager. The Users access matrix uses the locked User Access view/update permissions, alongside the locked dashboard, branch view/update, and staff branch assignment permissions. Use the User Access create permission for staff invitation. These permissions apply to the staff member's branch.
 
-A platform administrator can delegate institution-wide branch administration from the institution's Members tab by opening the User ID of an active ICT Manager. That administrator can create branches, edit locations, select a branch when inviting staff, and transfer staff between open branches. Users must sign in again after their assignment changes. Financial history retains the original branch IDs.
+Institution administrators with Branches – Create can register branches in their own institution. A platform administrator can delegate institution-wide branch editing and staff transfers from the institution's Members tab by opening the User ID of an active ICT Manager. Delegation also lets that administrator choose an open branch when inviting staff. Users must sign in again after their assignment changes. Financial history retains the original branch IDs.
 
 A delegated institution administrator can assign **Other branches – View** in the Users access matrix. The Other branches workspace provides branch status and read-only client, loan, management report, and saved statement views. Each service also checks its existing view permission. Branch selection applies to the overview request. Staff continue working in their assigned branch.
 
