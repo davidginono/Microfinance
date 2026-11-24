@@ -55,7 +55,7 @@ public class VoucherPdfService {
             boolean firstPosting=true;
             for(var entry:t.postings().stream().sorted(java.util.Comparator.comparingInt(e->e.account().id().equals(v.moneyAccountId())?0:1)).toList()){
                 boolean debit="DEBIT".equals(entry.side());String amount=money(entry.amount(),locale);var account=entry.account();
-                rows.add(List.of(Integer.toString(rows.size()+1),firstPosting?description:"",account.code()+" - "+account.name(),debit?amount:"",debit?"":amount));
+                rows.add(List.of(firstPosting?Integer.toString(t.lineNo()):"",firstPosting?description:"",account.code()+" - "+account.name(),debit?amount:"",debit?"":amount));
                 firstPosting=false;
             }
         }

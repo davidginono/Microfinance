@@ -44,7 +44,7 @@ class VoucherPdfTest {
    try(var doc=Loader.loadPDF(exporter.render(voucher,Locale.ENGLISH).bytes())){
     if(type==Type.RECEIPT){String text=new PDFTextStripper().getText(doc);assertThat(text).contains("Synthetic account allocation","1,000.00").doesNotContain("111001","111002","QA Cash","QA Loan Principal","DEBIT","CREDIT","ACCOUNT / LEDGER");assertThat(text.split("Synthetic account allocation",-1)).hasSize(2);}
     else {assertRow(doc,"111001",1,cashDebit?"1,000.00":"",cashDebit?"":"1,000.00",type==Type.PAYMENT);
-    assertRow(doc,"111002",2,cashDebit?"":"1,000.00",cashDebit?"1,000.00":"",type==Type.PAYMENT);}
+    assertRow(doc,"111002","",cashDebit?"":"1,000.00",cashDebit?"1,000.00":"",type==Type.PAYMENT);}
    }
   }
  }
@@ -66,7 +66,7 @@ class VoucherPdfTest {
      var numberColumn=new org.apache.pdfbox.text.PDFTextStripperByArea();
      numberColumn.addRegion("numbers",new java.awt.geom.Rectangle2D.Float(22,0,30,800));numberColumn.extractRegions(doc.getPage(0));
      var numbers=numberColumn.getTextForRegion("numbers").lines().map(String::strip).filter(value->value.matches("[0-9]+")).toList();
-     assertThat(numbers).as("Only populated %s rows are numbered",type).containsExactlyElementsOf(java.util.stream.IntStream.rangeClosed(1,type==Type.RECEIPT?3:6).mapToObj(Integer::toString).toList());
+     assertThat(numbers).as("Only the first row of each %s transaction is numbered",type).containsExactly("1","2","3");
     }
     Files.write(Path.of("target/"+type.name().toLowerCase()+"-format.pdf"),output.bytes());
     javax.imageio.ImageIO.write(new PDFRenderer(doc).renderImageWithDPI(0,120),"png",Path.of("target/"+type.name().toLowerCase()+"-format.png").toFile());
@@ -115,7 +115,7 @@ class VoucherPdfTest {
     var text=new PDFTextStripper().getText(document);assertThat(text).contains("100.00");
     if(type==Type.PAYMENT){
      assertThat(text.split("Split cash and bank",-1)).hasSize(2);
-     assertRow(document,"111010",1,"","60.00",true);assertRow(document,"511010",2,"100.00","",true);assertRow(document,"111020",3,"","40.00",true);}
+     assertRow(document,"111010",1,"","60.00",true);assertRow(document,"511010","","100.00","",true);assertRow(document,"111020","","","40.00",true);}
     else {assertThat(text).doesNotContain("111010","111020","511010");assertThat(text.split("Split cash and bank",-1)).hasSize(2);}
    }
   }
