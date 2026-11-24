@@ -26,10 +26,7 @@
 .batch-client > .neo-select,.batch-client > select { min-width:0; flex:1; }
 .batch-remove { flex:0 0 auto; }
 .batch-loan-list { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.batch-balance { font-size:.78rem; line-height:1.6; font-variant-numeric:tabular-nums; white-space:normal; }
-.batch-balance { display:grid; grid-template-columns:minmax(0,1fr) max-content; gap:2px 10px; margin:0; }
-.batch-balance dt { min-width:0; overflow-wrap:anywhere; }
-.batch-balance dd { margin:0; text-align:right; white-space:nowrap; }
+.batch-balance { font-variant-numeric:tabular-nums; }
 .batch-footer { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:12px; padding:0; }
 .batch-footer > [data-batch-progress]:not(:empty) { margin-right:auto; }
 .batch-footer .accounting-actions { display:flex; flex:0 0 auto; flex-wrap:wrap; gap:8px; }

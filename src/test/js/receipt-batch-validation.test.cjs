@@ -6,7 +6,7 @@ const source=readFileSync('src/main/resources/static/js/receipt-batches.js','utf
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const settle=async()=>{for(let n=0;n<6;n++)await tick();};
 async function setup(estimate,patch={},realWidgets=false){
-  const messages=Object.fromEntries(readFileSync('src/main/resources/messages_en.properties','utf8').split(/\r?\n/).filter(line=>line.startsWith('batch.field.')).map(line=>{const split=line.indexOf('=');return [line.slice(6,split),line.slice(split+1)];}));Object.assign(messages,{saveFailed:'Could not save draft.',checking:'Checking receipt...',client:'Client',status:'Status','state.DRAFT':'Draft',receipts:'Receipts',total:'Total',posted:'Posted',ready:'Ready',failed:'Needs attention',remaining:'Remaining'});
+  const messages=Object.fromEntries(readFileSync('src/main/resources/messages_en.properties','utf8').split(/\r?\n/).filter(line=>/^batch\.(?:field\.|(?:balances|viewBalances|totalLoanOutstanding|principalOutstanding|interestDue|chargesOutstanding)=)/.test(line)).map(line=>{const split=line.indexOf('=');return [line.slice(6,split),line.slice(split+1)];}));Object.assign(messages,{saveFailed:'Could not save draft.',checking:'Checking receipt...',client:'Client',status:'Status','state.DRAFT':'Draft',receipts:'Receipts',total:'Total',posted:'Posted',ready:'Ready',failed:'Needs attention',remaining:'Remaining'});
   const dom=new JSDOM(`<body><h1>Repayment 1</h1><main data-receipt-batch="batch" data-can-edit="true" data-today="2026-10-19">
     <section class="erp-resource-section"><h2>Batch details</h2><dl class="erp-detail-facts" data-batch-summary></dl></section><div data-batch-error hidden></div>
     <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external"><div class="app-table-titlebar"><h2>Receipts</h2><div class="accounting-actions"><button data-batch-refresh data-aws-table-refresh>Refresh</button><button data-batch-add></button><button data-batch-save></button></div></div><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
@@ -79,14 +79,23 @@ test('failed table refresh preserves receipt values and recovers through the sha
     assert.equal(d.querySelector('input[type="number"]').value,'500.00');
   }finally{w.close();}
 });
-test('balances show only the outstanding amounts and interest due, including a genuine zero',async()=>{
-  const line={loanId:'loan',loanNumber:'LN-001',outstandingPrincipal:'1000.00',duePrincipal:'0.00',dueInterest:'0.00',totalLoanOutstanding:'1000.00',principal:'50.00',interest:'0.00',principalBalance:'950.00'};
-  const {dom,d,edit,save}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'Cash',lines:[line]})));
+test('the balance dropdown shows only unpaid amounts and preserves the compact row',async()=>{
+  const line={loanId:'loan',loanNumber:'LN-001',outstandingPrincipal:'1000.00',duePrincipal:'0.00',dueInterest:'0.00',chargesOutstanding:'25.00',totalLoanOutstanding:'1025.00',principal:'25.00',interest:'0.00',chargesPaid:'25.00',feesRecovered:'10.00',principalBalance:'975.00'};
+  const {dom,w,d,edit,save}=await setup(response=>Promise.resolve(response({policyVersion:1,allocationOrder:'INTEREST_FIRST',moneyAccount:'Cash',lines:[line]})),{},true);
   try{
-    const balance=()=>[...d.querySelectorAll('.batch-row .batch-balance > *')].map(node=>node.textContent);
-    assert.deepEqual(balance(),['totalLoanOutstanding','1,025.50','principalOutstanding','1,000.00','interestDue','25.50']);
+    const dropdown=()=>d.querySelector('.batch-row select.batch-balance');
+    const options=()=>[...dropdown().options].map(option=>option.textContent);
+    assert.deepEqual(options(),['View balances','Total outstanding · 1,025.50','Outstanding principal · 1,000.00','Interest due · 25.50']);
     await edit('50.00');await save();
-    assert.deepEqual(balance(),['totalLoanOutstanding','1,000.00','principalOutstanding','1,000.00','interestDue','0.00']);
+    assert.deepEqual(options(),['View balances','Total outstanding · 1,025.00','Outstanding principal · 1,000.00','Interest due · 0.00','Fees due · 25.00']);
+    const select=dropdown();
+    assert.equal(select.dataset.neoEnhanced,undefined);
+    assert.equal(select.getAttribute('aria-label'),'Balances (TZS)');
+    assert.equal(select.name,'');
+    select.value='chargesOutstanding';
+    select.dispatchEvent(new w.Event('change',{bubbles:true}));
+    assert.equal(select.selectedOptions[0].textContent,'View balances');
+    assert.equal(d.querySelector('input[type="number"]').value,'50.00');
     assert.equal(d.querySelector('.batch-row').cells.length,8);
   }finally{dom.window.close();}
 });
@@ -99,7 +108,9 @@ test('missing loan balances remain unavailable after the payment date changes',a
       : original(url,options);
     const date=d.querySelector('.batch-row input[type="date"]');
     date.value='2026-10-18';date.dispatchEvent(new w.Event('change'));await settle();
-    assert.deepEqual([...d.querySelectorAll('.batch-balance dd')].map(node=>node.textContent),['—','—','—']);
+    assert.deepEqual([...d.querySelectorAll('.batch-balance option')].slice(1).map(option=>option.textContent),[
+      'Total outstanding · —','Outstanding principal · —','Interest due · —'
+    ]);
   }finally{dom.window.close();}
 });
 test('retained errors are short, field-specific and accessible under the date control',async()=>{
@@ -239,9 +250,14 @@ test('a rejected removal keeps the draft and re-enables its minus button',async(
     assert.equal(d.querySelector('[data-batch-error]').textContent,'Refresh before removing.');
   }finally{dom.window.close();}
 });
-test('posted receipts have a disabled minus button',async()=>{
-  const {dom,d}=await setup(()=>{},{state:'POSTED',failureKey:null});
-  try{assert.equal(d.querySelector('.batch-remove').disabled,true);}finally{dom.window.close();}
+test('posted receipts stay read-only and their balances remain available',async()=>{
+  const preview={lines:[{loanId:'loan',outstandingPrincipal:'1000.00',dueInterest:'0.00',totalLoanOutstanding:'1000.00'}]};
+  const {dom,d}=await setup(()=>{},{state:'POSTED',failureKey:null,preview});
+  try{
+    assert.equal(d.querySelector('.batch-remove').disabled,true);
+    assert.equal(d.querySelector('.batch-row input[type="number"]').disabled,true);
+    assert.equal(d.querySelector('.batch-balance').disabled,false);
+  }finally{dom.window.close();}
 });
 test('amount, date and client errors identify the actual constraint',async()=>{
   const cases=[

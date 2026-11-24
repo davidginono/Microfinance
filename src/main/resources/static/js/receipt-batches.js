@@ -187,15 +187,20 @@ function initializeReceiptBatches() {
     function paintStatus(item){if(!item.status)return;const state=el('span',t('state.' + item.state));state.dataset.resourceStatus=item.state;item.status.replaceChildren(state,item.referenceIssue);if(item.receiptId){const a = el('a',t('posted'));a.href = root + '/finance/vouchers/receipts/' + item.receiptId;item.status.append(a);}}
     function paintBalance(target,balance,totalLabel = 'totalLoanOutstanding'){
         balanceRequests.delete(target);
-        const facts = el('dl',null,'batch-balance');
+        let select = target.querySelector('.batch-balance');
+        if(!select){
+            select = el('select',null,'aws-control batch-balance');
+            select.dataset.nativeSelect = 'true';
+            select.setAttribute('aria-label',t('balances'));
+            select.addEventListener('change',()=>{select.value = '';});
+            target.replaceChildren(select);
+        }
+        select.replaceChildren(new Option(t('viewBalances'),''));
         const amounts = [[totalLabel,balance.totalLoanOutstanding],['principalOutstanding',balance.outstandingPrincipal],['interestDue',balance.dueInterest]];
         if('chargesOutstanding' in balance)amounts.push(['chargesOutstanding',balance.chargesOutstanding]);
-        if(balance.chargesPaid != null)amounts.push(['interestPaid',balance.interest],['chargesPaid',balance.chargesPaid],['principalPaid',balance.principal]);
-        if(balance.feesRecovered != null)amounts.push(['feesRecovered',balance.feesRecovered]);
         for(const [label,value] of amounts){
-            facts.append(el('dt',t(label)),el('dd',value == null?'—':money(value)));
+            select.add(new Option(t(label) + ' · ' + (value == null?'—':money(value)),label));
         }
-        target.replaceChildren(facts);
     }
     function paintReceiptBalance(item){
         if(!item.preview || item.form.rows.length !== 1)return;
