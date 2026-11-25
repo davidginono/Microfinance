@@ -45,7 +45,6 @@ public enum UserClaim {
     GROUP_LENDING_CREATE(AccessFeature.GROUP_LENDING, AccessAction.CREATE),
     GROUP_LENDING_UPDATE(AccessFeature.GROUP_LENDING, AccessAction.UPDATE),
     GROUP_LENDING_CONFIGURE(AccessFeature.GROUP_LENDING, AccessAction.CONFIGURE),
-    GROUP_LENDING_SUBMIT(AccessFeature.GROUP_LENDING, AccessAction.INITIATE),
     GROUP_LENDING_POST(AccessFeature.GROUP_LENDING, AccessAction.POST),
     GROUP_LENDING_REVERSE(AccessFeature.GROUP_LENDING, AccessAction.REVERSE),
     GROUP_LENDING_EXPORT(AccessFeature.GROUP_LENDING, AccessAction.EXPORT),
@@ -137,7 +136,6 @@ public enum UserClaim {
     LOAN_RECORDING_REJECT(AccessFeature.LOAN_RECORDING, AccessAction.REJECT),
     LOAN_RECORDING_CREATE(AccessFeature.LOAN_RECORDING, AccessAction.CREATE),
     LOAN_RECORDING_CANCEL(AccessFeature.LOAN_RECORDING, AccessAction.CANCEL),
-    LOAN_RECORDING_DISBURSE(AccessFeature.LOAN_RECORDING, AccessAction.DISBURSE),
     LOAN_RECORDING_POST(AccessFeature.LOAN_RECORDING, AccessAction.ADD),
     LOAN_RECORDING_REVERSE(AccessFeature.LOAN_RECORDING, AccessAction.REVERSE),
     LOAN_RECORDING_EXPORT(AccessFeature.LOAN_RECORDING, AccessAction.EXPORT),
@@ -231,7 +229,6 @@ public enum UserClaim {
     DISBURSEMENT_QUEUE_DISBURSE(AccessFeature.DISBURSEMENT_QUEUE, AccessAction.DISBURSE),
 
     LOAN_REPORTS_VIEW(AccessFeature.LOAN_REPORTS, AccessAction.VIEW),
-    LOAN_REPORTS_EXPORT(AccessFeature.LOAN_REPORTS, AccessAction.EXPORT),
 
     NOTIFICATIONS_VIEW(AccessFeature.NOTIFICATIONS, AccessAction.VIEW),
     NOTIFICATIONS_UPDATE(AccessFeature.NOTIFICATIONS, AccessAction.UPDATE),
@@ -313,6 +310,14 @@ public enum UserClaim {
         return Optional.ofNullable(BY_FEATURE_ACTION.getOrDefault(feature, Map.of()).get(action)).filter(UserClaim::isAvailable);
     }
 
+    public boolean isPlatformOnly() {
+        return switch (this) {
+            case PLATFORM_SETTINGS_VIEW, PLATFORM_SETTINGS_UPDATE, SACCO_REGISTRY_CREATE, SACCO_REGISTRY_UPDATE,
+                 SACCO_REGISTRY_DELETE, SMS_USAGE_ADD, SMS_USAGE_CONFIGURE -> true;
+            default -> false;
+        };
+    }
+
     public static List<AccessMatrixRow> matrixRows() {
         List<AccessMatrixRow> rows = new ArrayList<>();
         for (AccessFeature feature : AccessFeature.values()) {
@@ -322,7 +327,10 @@ public enum UserClaim {
                 ? List.of(feature, AccessFeature.VOUCHER_APPROVAL) : List.of(feature);
             for (AccessFeature source : sources) {
                 BY_FEATURE_ACTION.getOrDefault(source, Map.of()).forEach((action, claim) -> {
-                    if (claim.isAvailable() && claim != INSTITUTION_BRANCH_ADMIN) available.put(action, claim);
+                    if (claim.isAvailable() && !claim.isPlatformOnly()
+                        && claim != INSTITUTION_BRANCH_ADMIN && claim != STAFF_BRANCH_ASSIGN) {
+                        available.put(action, claim);
+                    }
                 });
             }
             if (!available.isEmpty()) rows.add(new AccessMatrixRow(feature, feature.getDisplayName(), Map.copyOf(available)));
@@ -361,7 +369,7 @@ public enum UserClaim {
                 ACCOUNTANT_QUEUE_VIEW, ACCOUNTANT_QUEUE_APPROVE, ACCOUNTANT_QUEUE_REJECT, ACCOUNTANT_QUEUE_EXPORT);
             case "ACCESS_DISBURSEMENT_QUEUE" -> addAll(claims,
                 DISBURSEMENT_QUEUE_VIEW, DISBURSEMENT_QUEUE_EXPORT,
-                LOAN_DOCUMENTS_VIEW, STAFF_ANALYTICS_VIEW, LOAN_REPORTS_VIEW, LOAN_REPORTS_EXPORT,
+                LOAN_DOCUMENTS_VIEW, STAFF_ANALYTICS_VIEW, LOAN_REPORTS_VIEW,
                 NOTIFICATIONS_VIEW, NOTIFICATIONS_UPDATE);
             case "DISBURSE_LOAN" -> addAll(claims,
                 DISBURSEMENT_QUEUE_VIEW, DISBURSEMENT_QUEUE_DISBURSE,
@@ -404,7 +412,7 @@ public enum UserClaim {
                 case LOAN_OFFICER -> claims.addAll(legacyClaims("REVIEW_LOAN_OFFICER_QUEUE"));
                 case MANAGER -> claims.addAll(legacyClaims("REVIEW_MANAGER_QUEUE"));
                 case ACCOUNTANT -> {
-                    addAll(claims, LOAN_RECORDING_VIEW, LOAN_RECORDING_CREATE, LOAN_RECORDING_DISBURSE,
+                    addAll(claims, LOAN_RECORDING_VIEW, LOAN_RECORDING_CREATE,
                         LOAN_RECORDING_POST, LOAN_RECORDING_REVERSE, LOAN_RECORDING_EXPORT);
                     claims.addAll(legacyClaims("REVIEW_ACCOUNTANT_QUEUE"));
                     addAll(claims, ACCOUNTING_ACCOUNTS_VIEW, ACCOUNTING_ACCOUNTS_CREATE, ACCOUNTING_ACCOUNTS_UPDATE);
@@ -418,8 +426,6 @@ public enum UserClaim {
                 case CHAIRPERSON -> claims.addAll(legacyClaims("REVIEW_CHAIRPERSON_QUEUE"));
                 case BOARD -> claims.addAll(legacyClaims("REVIEW_BOARD_QUEUE"));
                 case CREDIT_COMMITTEE -> claims.addAll(legacyClaims("REVIEW_CREDIT_COMMITTEE_QUEUE"));
-                case MINOR_ADMIN -> claims.addAll(workspaceAdminDefaults());
-                case ICT_MANAGER -> addAll(claims, USER_ACCESS_CREATE, LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
                 case ADMIN -> claims.addAll(platformAdminDefaults());
                 default -> { }
             }
@@ -434,7 +440,7 @@ public enum UserClaim {
         claims.addAll(legacyClaims("ACCESS_ADMIN_SETTINGS"));
         claims.addAll(legacyClaims("ACCESS_OUTBOX_MONITOR"));
         addAll(claims, LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
-        claims.removeIf(claim -> !claim.isAvailable());
+        claims.removeIf(UserClaim::isPlatformOnly);
         return claims;
     }
 
@@ -443,7 +449,7 @@ public enum UserClaim {
         addAll(claims,
             SACCO_REGISTRY_VIEW, SACCO_REGISTRY_CREATE, SACCO_REGISTRY_UPDATE, SACCO_REGISTRY_DELETE,
             PLATFORM_SETTINGS_VIEW, PLATFORM_SETTINGS_UPDATE,
-            SMS_USAGE_ADD);
+            SMS_USAGE_ADD, SMS_USAGE_CONFIGURE);
         claims.removeIf(claim -> !claim.isAvailable());
         return claims;
     }
@@ -457,9 +463,15 @@ public enum UserClaim {
     }
 
     public static Set<UserClaim> lockedClaims(Collection<Position> roles) {
-        boolean ict = Position.normalizeStaffRoles(roles).stream().anyMatch(role -> role.userGroup() == Position.ICT_MANAGER);
-        return ict ? Set.of(ADMIN_DASHBOARD_VIEW, USER_ACCESS_VIEW, USER_ACCESS_UPDATE,
-            BRANCHES_VIEW, BRANCHES_CREATE, BRANCHES_UPDATE, STAFF_BRANCH_ASSIGN) : Set.of();
+        var staffRoles = Position.normalizeStaffRoles(roles);
+        if (!staffRoles.contains(Position.ICT_MANAGER) && !staffRoles.contains(Position.MINOR_ADMIN)) return Set.of();
+        var claims = EnumSet.of(ADMIN_DASHBOARD_VIEW, USER_ACCESS_VIEW, USER_ACCESS_CREATE, USER_ACCESS_UPDATE,
+            BRANCHES_VIEW, BRANCHES_CREATE, BRANCHES_UPDATE, STAFF_BRANCH_ASSIGN,
+            LOAN_PRODUCTS_CONFIGURE, ACCOUNTING_ACCOUNTS_UPDATE);
+        if (staffRoles.contains(Position.MINOR_ADMIN)) {
+            claims.addAll(workspaceAdminDefaults());
+        }
+        return claims;
     }
 
     public static Set<UserClaim> administratorRecoveryClaims() {
@@ -474,7 +486,7 @@ public enum UserClaim {
         addAll(claims, queueClaims);
         addAll(claims,
             LOAN_DOCUMENTS_VIEW, STAFF_ANALYTICS_VIEW, STAFF_ANALYTICS_EXPORT,
-            LOAN_REPORTS_VIEW, LOAN_REPORTS_EXPORT,
+            LOAN_REPORTS_VIEW,
             NOTIFICATIONS_VIEW, NOTIFICATIONS_UPDATE, SUPPORT_VIEW, SUPPORT_CREATE);
     }
 

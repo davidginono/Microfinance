@@ -99,6 +99,9 @@ public class UserClaimService {
         if(client) return Set.of();
         var effective = EnumSet.noneOf(UserClaim.class);
         effective.addAll(assigned);
+        if (!Position.containsSuperAdminRole(roles)) {
+            effective.removeIf(UserClaim::isPlatformOnly);
+        }
         var locked = UserClaim.lockedClaims(roles);
         effective.addAll(locked);
         if(locked.isEmpty()) effective.remove(UserClaim.INSTITUTION_BRANCH_ADMIN);

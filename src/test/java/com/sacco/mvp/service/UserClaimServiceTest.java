@@ -177,8 +177,9 @@ class UserClaimServiceTest {
 
     @Test void ictKeepsOnlyLockedDefaultsWhenOtherPermissionsHaveBeenRevoked() {
         UUID member=UUID.randomUUID();var roles=List.of(Position.ICT_MANAGER);
-        when(memberAccessClaimRepository.findByIdMemberId(member)).thenReturn(List.of(accessClaim(member,"USER_ACCESS_VIEW")));
-        when(memberAccessClaimRepository.findByIdMemberIdIn(Set.of(member))).thenReturn(List.of(accessClaim(member,"USER_ACCESS_VIEW")));
+        var stored=List.of(accessClaim(member,"USER_ACCESS_VIEW"),accessClaim(member,"PLATFORM_SETTINGS_UPDATE"));
+        when(memberAccessClaimRepository.findByIdMemberId(member)).thenReturn(stored);
+        when(memberAccessClaimRepository.findByIdMemberIdIn(Set.of(member))).thenReturn(stored);
         assertThat(userClaimService.effectiveClaims(member,roles,false)).containsExactlyInAnyOrderElementsOf(UserClaim.lockedClaims(roles));
         assertThat(userClaimService.effectiveClaims(java.util.Map.of(member,new UserClaimService.ClaimSubject(roles,false))).get(member))
             .containsExactlyInAnyOrderElementsOf(UserClaim.lockedClaims(roles));

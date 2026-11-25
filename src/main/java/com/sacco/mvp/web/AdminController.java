@@ -1004,7 +1004,6 @@ public class AdminController {
             model.addAttribute("staffBranches",adminService.staffBranches(principal,live));
             model.addAttribute("selectedStaffBranch",selectedBranch);
             model.addAttribute("canGrantBranchView",adminService.hasBranchDelegation(live));
-            model.addAttribute("lockedIctClaims",UserClaim.lockedClaims(java.util.Set.of(Position.ICT_MANAGER)));
             AdminService.UserAccessView user = adminService.userAccess(
                 adminScopeService.currentSaccoId(principal),
                 selectedBranch,
@@ -1013,7 +1012,8 @@ public class AdminController {
             List<Position> staffPositions = staffPositionsFor(principal);
             model.addAttribute("user", user);
             model.addAttribute("staffPositions", staffPositions);
-            model.addAttribute("accessActions", com.sacco.mvp.domain.AccessAction.values());
+            var adminRole = user.getStaffRoles().contains(Position.MINOR_ADMIN) ? Position.MINOR_ADMIN : Position.ICT_MANAGER;
+            model.addAttribute("lockedAdminClaims", UserClaim.lockedClaims(List.of(adminRole)));
             model.addAttribute("accessMatrixRows", UserClaim.matrixRows());
             model.addAttribute("statuses", MemberStatus.values());
             model.addAttribute("roleDefaultClaimsJson", roleDefaultClaimsJson(staffPositions));

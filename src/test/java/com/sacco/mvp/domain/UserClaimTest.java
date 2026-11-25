@@ -20,7 +20,7 @@ class UserClaimTest {
     }
     @Test void groupLendingClaimsRequireExplicitAssignmentAndPermitTheirOwnLanding() {
         var groupClaims=java.util.Arrays.stream(UserClaim.values()).filter(c->c.getFeature()==AccessFeature.GROUP_LENDING).toList();
-        assertThat(groupClaims).hasSize(9);
+        assertThat(groupClaims).hasSize(8);
         assertThat(UserClaim.defaultClaims(java.util.List.of(Position.values()),true)).doesNotContainAnyElementsOf(groupClaims);
         assertThat(UserClaim.matrixRows()).anyMatch(row->row.feature()==AccessFeature.GROUP_LENDING
             && row.claimsByAction().size()==groupClaims.stream().filter(UserClaim::isAvailable).count());
@@ -81,9 +81,36 @@ class UserClaimTest {
         java.util.List<UserClaim> displayed = new java.util.ArrayList<>();
         for (var row : rows) displayed.addAll(row.claimsByAction().values());
         java.util.List<UserClaim> available = java.util.Arrays.stream(UserClaim.values()).filter(UserClaim::isAvailable)
-            .filter(claim -> claim != UserClaim.INSTITUTION_BRANCH_ADMIN).toList();
+            .filter(claim -> !claim.isPlatformOnly() && claim != UserClaim.INSTITUTION_BRANCH_ADMIN
+                && claim != UserClaim.STAFF_BRANCH_ASSIGN).toList();
         assertThat(displayed).doesNotHaveDuplicates();
         assertThat(displayed).containsExactlyInAnyOrderElementsOf(available);
+        assertThat(voucher.claimsByAction().values()).contains(UserClaim.VOUCHER_APPROVAL_HOLD,
+            UserClaim.VOUCHER_APPROVAL_FORCE, UserClaim.VOUCHER_APPROVAL_ESCALATED_APPROVE);
+    }
+
+    @Test
+    void staffMatrixHidesPlatformOperationsAndRetiredClaims() {
+        for (String name : java.util.List.of("GROUP_LENDING_SUBMIT", "LOAN_RECORDING_DISBURSE", "LOAN_REPORTS_EXPORT")) {
+            assertThat(UserClaim.fromStoredName(name)).isEmpty();
+        }
+        assertThat(UserClaim.matrixRows()).noneMatch(row -> row.feature() == AccessFeature.PLATFORM_SETTINGS);
+        assertThat(UserClaim.matrixRows().stream().filter(row -> row.feature() == AccessFeature.SACCO_REGISTRY)
+            .findFirst().orElseThrow().claimsByAction().values()).containsExactly(UserClaim.SACCO_REGISTRY_VIEW);
+        assertThat(UserClaim.matrixRows().stream().filter(row -> row.feature() == AccessFeature.SMS_USAGE)
+            .findFirst().orElseThrow().claimsByAction().values()).containsExactly(UserClaim.SMS_USAGE_VIEW);
+    }
+
+    @Test
+    void workspaceAdministratorDefaultsAreLockedForTheirOwnRole() {
+        for (var role : java.util.List.of(Position.MINOR_ADMIN, Position.ICT_MANAGER)) {
+            var roles = java.util.List.of(role);
+            assertThat(UserClaim.lockedClaims(roles)).containsExactlyInAnyOrderElementsOf(UserClaim.defaultClaims(roles, false))
+                .contains(UserClaim.USER_ACCESS_CREATE, UserClaim.LOAN_PRODUCTS_CONFIGURE, UserClaim.ACCOUNTING_ACCOUNTS_UPDATE)
+                .doesNotContain(UserClaim.SMS_USAGE_CONFIGURE, UserClaim.LOAN_RECORDING_POST, UserClaim.VOUCHER_APPROVAL_APPROVE);
+        }
+        assertThat(UserClaim.lockedClaims(java.util.List.of(Position.MINOR_ADMIN))).contains(UserClaim.WORKSPACE_SETTINGS_UPDATE);
+        assertThat(UserClaim.lockedClaims(java.util.List.of(Position.ICT_MANAGER))).doesNotContain(UserClaim.WORKSPACE_SETTINGS_UPDATE);
     }
 
     @Test

@@ -985,7 +985,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void updateUserKeepsIctRecoveryClaimsWhenTheyAreOmitted() {
+    void updateUserKeepsInstitutionAdminDefaultsWhenTheyAreOmitted() {
         UUID accountId = UUID.randomUUID();
         Member member = Member.builder()
             .id(accountId)
@@ -1002,11 +1002,15 @@ class AdminServiceTest {
             .build();
         when(memberRepository.findById(accountId)).thenReturn(Optional.of(member));
         adminService.updateUser("SACCO-01","ST-1",accountId,Set.of(Position.MINOR_ADMIN),accountId,
-            List.of(Position.MINOR_ADMIN),MemberStatus.ACTIVE,List.of(UserClaim.USER_ACCESS_UPDATE));
+            List.of(Position.ICT_MANAGER),MemberStatus.ACTIVE,
+            List.of(UserClaim.PLATFORM_SETTINGS_UPDATE, UserClaim.SMS_USAGE_ADD, UserClaim.VOUCHER_RULE_CONFIGURE));
         verify(memberRepository).save(member);
-        for(var claim:UserClaim.lockedClaims(Set.of(Position.ICT_MANAGER))) {
+        for(var claim:UserClaim.lockedClaims(Set.of(Position.MINOR_ADMIN))) {
             verify(memberAccessClaimRepository).save(claimNamed(claim));
         }
+        verify(memberAccessClaimRepository).save(claimNamed(UserClaim.VOUCHER_RULE_CONFIGURE));
+        verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.PLATFORM_SETTINGS_UPDATE));
+        verify(memberAccessClaimRepository, never()).save(claimNamed(UserClaim.SMS_USAGE_ADD));
     }
 
     @Test

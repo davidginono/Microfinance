@@ -1869,7 +1869,11 @@ public class AdminService {
             normalized.removeIf(claim -> claim.getFeature() == AccessFeature.MEMBER_LOANS
                 || claim.getFeature() == AccessFeature.GUARANTOR_REQUESTS);
         }
+        if (!Position.containsSuperAdminRole(staffRoles)) {
+            normalized.removeIf(UserClaim::isPlatformOnly);
+        }
         normalized.remove(UserClaim.INSTITUTION_BRANCH_ADMIN);
+        normalized.remove(UserClaim.STAFF_BRANCH_ASSIGN);
         normalized.addAll(UserClaim.lockedClaims(staffRoles));
         if (normalized.contains(UserClaim.DISBURSEMENT_QUEUE_DISBURSE)) {
             normalized.add(UserClaim.DISBURSEMENT_QUEUE_VIEW);
@@ -1901,8 +1905,8 @@ public class AdminService {
         if (Position.containsAdminRole(staffRoles)
             && !assignedClaims.containsAll(UserClaim.administratorRecoveryClaims())) {
             throw new IllegalStateException(
-                "Administrator access requires Admin Dashboard - View, Access Matrix - View and Update, "
-                    + "and User Access - View and Update. Select these permissions or use Restore Default Permissions.");
+                "Administrator access requires Admin Dashboard - View and User Access - View and Edit. "
+                    + "Select these permissions or use Restore Default Permissions.");
         }
     }
 
@@ -2562,6 +2566,10 @@ public class AdminService {
         private UUID accountId;
         private String stationId;
         public Set<UserClaim> getLockedClaims() { return UserClaim.lockedClaims(staffRoles); }
+        public Set<Position> getStaffGroups() {
+            return Position.normalizeStaffRoles(staffRoles).stream().map(Position::userGroup)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        }
         private String userIdLabel;
         private String loginId;
         private String memberNumber;

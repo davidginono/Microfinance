@@ -2,13 +2,15 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),{readFile
 const jsp=readFileSync('src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp','utf8'),editor=jsp.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 const shared=readFileSync('src/main/resources/static/js/resource-table.js','utf8'),matrix=readFileSync('src/main/resources/static/js/access-matrix.js','utf8');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
-async function setup(extraClaims=[]){
+async function setup(extraClaims=[], adminSelected=false){
  const actions=['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE'];
- const row=(feature,key,claims)=>`<tr data-claim-row data-claim-key="${key}"><th scope="row"><span class="access-matrix-name">${feature}</span></th>${actions.map(column=>`<td data-claim-action="${column}">${claims[column]?`<input type="checkbox" name="claims" data-access-claim="${claims[column].key}" value="${claims[column].key}" ${claims[column].allowed?'checked':''}>`:'<span aria-disabled="true">Not applicable</span>'}</td>`).join('')}</tr>`;
+ const row=(feature,key,claims)=>`<tr data-claim-row data-claim-key="${key}"><th scope="row"><span class="access-matrix-name">${feature}</span></th>${actions.map(column=>`<td data-claim-action="${column}">${claims[column]?`<input type="checkbox" name="claims" data-access-claim="${claims[column].key}" value="${claims[column].key}" data-admin-default="${Boolean(claims[column].adminDefault)}" ${claims[column].allowed?'checked':''}>`:'<span aria-disabled="true">Not applicable</span>'}</td>`).join('')}</tr>`;
  const rows=[row('Voucher approval actions','VOUCHER_APPROVAL',{APPROVE:{key:'VOUCHER_APPROVAL_APPROVE',allowed:false}}),row('Repayments','LOAN_REPAYMENTS',{VIEW:{key:'LOAN_REPAYMENTS_VIEW',allowed:true},UPDATE:{key:'LOAN_REPAYMENTS_UPDATE',allowed:false}}),...Array.from({length:25},(_,n)=>row('Feature '+n,'EXAMPLE_'+String(n).padStart(2,'0'),{CONFIGURE:{key:'EXAMPLE_'+String(n).padStart(2,'0'),allowed:n%2===0}})),...extraClaims.map(claim=>row(claim.name,claim.key,claim.actions))].join('');
  const labels=`<template id="resource-table-labels" data-search-page="Search claims" data-no-matches="No matching claims" data-select="Select" data-preferences="Preferences" data-pagination="Pagination" data-page="Page" data-previous="Previous" data-next="Next" data-actions="Actions" data-page-size="Page size" data-records="Records" data-display="Display" data-wrap="Wrap" data-striped="Striped" data-compact="Compact" data-sticky="Sticky" data-none="None" data-first-column="First column" data-first-two-columns="First two columns" data-columns="Columns" data-reorder="Reorder" data-close="Close" data-cancel="Cancel" data-confirm="Confirm"></template>`;
  const markup=`${labels}<script type="application/json" id="role-default-claims-json">{"MANAGER":["VOUCHER_APPROVAL_APPROVE"]}</script><script type="application/json" id="Member-default-claims-json">[]</script><form data-access-edit-form data-form-unordered-fields="claims" data-member-access="false" method="post"><input type="hidden" name="_csrf" value="kept"><input type="checkbox" name="positions" data-staff-role-checkbox="edit-user" value="MANAGER" checked><select name="status"><option selected>ACTIVE</option><option>INACTIVE</option></select><section data-access-matrix data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true"><div class="app-table-titlebar"><h2>Access matrix — Joseph <span class="app-table-count" data-access-count></span></h2><div class="app-table-toolbar"><button type="button" data-restore-default-claims data-table-command>Restore defaults</button></div></div><div class="aws-filter-toolbar"><input type="search" data-access-search></div><div class="erp-table-scroll"><table data-table-sort-mode="none"><thead><tr><th data-table-identifier data-access-sort="claim">Permission claim</th>${actions.map(action=>`<th data-table-column-locked data-access-sort="${action}">${action}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div><p data-access-empty hidden>No matching permission claims.</p></section><div class="admin-user-edit-actions"><button type="button" data-access-discard disabled>Discard</button><button type="submit" data-access-save disabled>Save</button></div></form>`;
  const dom=new JSDOM(markup,{url:'http://localhost/admin/users/1/edit',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
+ w.document.querySelector('[value="MANAGER"]').insertAdjacentHTML('afterend',
+  `<input type="checkbox" name="positions" data-staff-role-checkbox="edit-user" value="ICT_MANAGER" ${adminSelected?'checked':''}>`);
  w.WorkspaceNavigation={onReady:callback=>callback()};w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
  w.eval(editor);w.eval(shared);w.eval(matrix);await settle();return {dom,w,d:w.document};
 }
@@ -67,11 +69,34 @@ test('changing permissions enables Save/Discard, hidden-page edits survive, and 
 test('restore defaults still applies to every page and preserves original discard recovery',async()=>{
  const {dom,w,d}=await setup();try{const form=d.querySelector('form'),before=[...new w.FormData(form).getAll('claims')].sort();search(w,d,'repayments');d.querySelector('[data-restore-default-claims]').click();await settle();assert.deepEqual([...new w.FormData(form).getAll('claims')],['VOUCHER_APPROVAL_APPROVE']);assert.equal(d.querySelector('[data-access-save]').disabled,false);d.querySelector('[data-access-discard]').click();assert.deepEqual([...new w.FormData(form).getAll('claims')].sort(),before);}finally{dom.window.close();}
 });
-test('shared preferences changes matrix page size locally and leaves editable columns locked',async()=>{
+test('shared preferences changes matrix page size without showing fixed column controls',async()=>{
  const {dom,w,d}=await setup();try{let requests=0;w.fetch=()=>requests++;d.querySelector('.resource-table-preferences-button').click();const dialog=d.querySelector('dialog');dialog.querySelector('input[name="pageSize"][value="30"]').checked=true;
- assert.ok([...dialog.querySelectorAll('.resource-table-column-option input')].every(input=>input.disabled));dialog.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(d.querySelectorAll('[data-claim-row]:not([hidden])').length,27);assert.equal(requests,0);assert.equal(d.querySelector('[data-access-save]').disabled,true);}finally{dom.window.close();}
+ assert.equal(dialog.querySelector('.resource-table-column-options'),null);dialog.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(d.querySelectorAll('[data-claim-row]:not([hidden])').length,27);assert.equal(requests,0);assert.equal(d.querySelector('[data-access-save]').disabled,true);}finally{dom.window.close();}
 });
 
+test('administrator defaults stay checked during restore and discard and unlock when the role is removed',async()=>{
+ const {dom,w,d}=await setup([{name:'Workspace Settings',key:'WORKSPACE_SETTINGS',actions:{
+  UPDATE:{key:'WORKSPACE_SETTINGS_UPDATE',adminDefault:true}
+ }}],true);
+ try {
+  const grant=d.querySelector('[data-access-claim="WORKSPACE_SETTINGS_UPDATE"]');
+  const role=d.querySelector('[value="ICT_MANAGER"]');
+  assert.equal(grant.checked,true);
+  assert.equal(grant.disabled,true);
+  grant.click();
+  assert.equal(grant.checked,true);
+  d.querySelector('[data-restore-default-claims]').click();
+  assert.equal(grant.checked,true);
+  assert.equal(grant.disabled,true);
+  role.click();
+  assert.equal(grant.checked,false);
+  assert.equal(grant.disabled,false);
+  d.querySelector('[data-access-discard]').click();
+  assert.equal(role.checked,true);
+  assert.equal(grant.checked,true);
+  assert.equal(grant.disabled,true);
+ } finally {dom.window.close();}
+});
 
 test('status-only edits enable the common footer Save while the matrix is hidden',async()=>{
  const {dom,w,d}=await setup();try{

@@ -705,8 +705,8 @@
             const pageSize = region.dataset.tablePageSize ? radioGroup(l.pageSize, sizes.map(size => [size, size + ' ' + l.records.toLocaleLowerCase()]), Number(region.dataset.tablePageSize), 'pageSize') : [];
             const wrap = check(display, l.wrap, settings.wrap), striped = check(display, l.striped, settings.striped), compact = check(display, l.compact, settings.compact);
             const sticky = radioGroup(l.sticky, [[0,l.none],[1,l.firstColumn],[2,l.firstTwoColumns]], settings.sticky, 'sticky');
-            const columns = node('fieldset', 'resource-table-column-options'); columns.append(node('legend', '', l.columns)); body.append(columns);
             const locked = lockedColumns();
+            const columns = locked.size < headers.length ? node('fieldset', 'resource-table-column-options') : null;
             const choices = [], order = [...settings.order];
             let dragged;
             const reorder = (source, target) => {
@@ -745,7 +745,11 @@
                     choices[index].setAttribute('role','switch');
                 });
             };
-            renderColumns();
+            if (columns) {
+                columns.append(node('legend', '', l.columns));
+                body.append(columns);
+                renderColumns();
+            }
             const footer = node('div', 'app-modal-actions resource-table-dialog-actions'); const cancel = node('button', 'app-btn btn-neutral', l.cancel); cancel.type = 'button'; const confirm = node('button', 'app-btn btn-neutral', l.confirm); confirm.type = 'submit'; footer.append(cancel, confirm); form.append(footer); dialog.append(form);
             document.body.append(dialog);
             const oldBodyOverflow = document.body.style.overflow, oldRootOverflow = document.documentElement.style.overflow;

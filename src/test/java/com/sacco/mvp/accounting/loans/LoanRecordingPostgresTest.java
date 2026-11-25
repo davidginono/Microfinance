@@ -1044,7 +1044,7 @@ class LoanRecordingPostgresTest {
         assertThat(receiptService().post(actor,input).header().id()).isEqualTo(receipt.header().id());
         receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Correct custom-account receipt");
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
-        assertThatThrownBy(()->service.postingPreview(operator("B2"),post(loan,"120.00","WRONG-BRANCH"),"PAYMENT")).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.receiptPreview(operator("B2"),receiptForm(loan))).isInstanceOf(AccessDeniedException.class);
     }
     @Test void generatedAccountRenumberingPreservesPostedLoansAndContinuesRepayment() throws Exception {
         var accounting=context.getBean(GeneralLedgerService.class);accounting.initializeChart(actor);
@@ -1584,8 +1584,7 @@ class LoanRecordingPostgresTest {
         assertThat(service.preview(actor,form()).interest()).isEqualByComparingTo("20.00");
         assertThat(jdbc.queryForObject("select count(*) from accountant_loan_record where sacco_id=?",Integer.class,institution)).isZero();
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));
-        var f=post(id,"120.00","R1");f.setInterestAccountId(interest);
-        var preview=service.postingPreview(actor,f,"PAYMENT");
+        var preview=service.receiptPreview(actor,receiptForm(id)).getFirst();
         assertThat(preview.principal()).isEqualByComparingTo("100.00");
         assertThat(preview.interest()).isEqualByComparingTo("20.00");
         assertThat(preview.principalBalance()).isEqualByComparingTo("900.00");

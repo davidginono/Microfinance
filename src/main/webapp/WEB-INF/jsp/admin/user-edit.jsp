@@ -56,7 +56,7 @@
                            name="positions"
                            value="${position}"
                            data-staff-role-checkbox="edit-user"
-                           ${user.staffRoles.contains(position) ? 'checked' : ''}
+                           ${user.staffGroups.contains(position) ? 'checked' : ''}
                            class="admin-cloud-checkbox" />
                     <span class="admin-role-card-name"><spring:message code="admin.role.${position}" text="${position.displayName}" /></span>
                     <c:choose>
@@ -76,7 +76,8 @@
         </div>
     </section>
 
-    <c:set var="matrixColumns" value="${['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE','CREATE','VALIDATE','POST','INITIATE','WITHDRAW','CANCEL','HOLD','FORCE_APPROVE','ESCALATED_APPROVE','WAIVE','REJECT','ASSIGN','EXPORT','IMPORT','DISBURSE','REVERSE']}" />
+    <c:set var="matrixColumns" value="${['VIEW','ADD','UPDATE','DELETE','APPROVE','CONFIGURE','CREATE','VALIDATE','POST','INITIATE','WITHDRAW','CANCEL','HOLD','FORCE_APPROVE','ESCALATED_APPROVE','WAIVE','REJECT','EXPORT','IMPORT','DISBURSE','REVERSE']}" />
+    <c:set var="lockedClaims" value="${user.lockedClaims}" />
     <section id="user-access-claims" class="erp-panel admin-user-edit-panel erp-table-wrap" data-resource-table="admin-user-claims-matrix" data-table-pagination-mode="external" data-table-page-size="10" data-aws-no-refresh="true" data-access-matrix>
         <div class="app-table-titlebar admin-user-section-header admin-user-section-header--actions">
             <h2><spring:message code="access.matrix.title" /> <span class="app-table-count" data-access-count></span></h2>
@@ -91,8 +92,8 @@
                 <tr data-claim-row data-claim-key="${row.feature}">
                     <th scope="row"><span class="access-matrix-name"><c:out value="${matrixFeatureLabel}" /></span></th>
                     <c:forEach items="${matrixColumns}" var="column"><c:set var="matrixClaim" value="${null}" /><c:forEach items="${row.claimsByAction}" var="entry"><c:if test="${entry.key.name()==column}"><c:set var="matrixClaim" value="${entry.value}" /></c:if></c:forEach>
-                        <td data-claim-action="${column}"><c:choose><c:when test="${not empty matrixClaim}"><spring:message code="access.action.${column}" var="matrixActionLabel" /><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" data-access-row="${row.feature}" data-access-column="${column}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) or user.lockedClaims.contains(matrixClaim) ? 'checked' : ''}
-                            ${user.lockedClaims.contains(matrixClaim) ? 'disabled' : ''} data-ict-claim="${lockedIctClaims.contains(matrixClaim)}" class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td>
+                        <td data-claim-action="${column}"><c:choose><c:when test="${not empty matrixClaim}"><spring:message code="access.action.${column}" var="matrixActionLabel" /><input type="checkbox" name="claims" value="${matrixClaim}" data-access-claim="${matrixClaim}" aria-label="<spring:message code='access.matrix.allow' /> <c:out value='${matrixFeatureLabel}' /> — <c:out value='${matrixActionLabel}' />" ${user.claims.contains(matrixClaim) or lockedClaims.contains(matrixClaim) ? 'checked' : ''}
+                            ${lockedClaims.contains(matrixClaim) ? 'disabled' : ''} data-admin-default="${lockedAdminClaims.contains(matrixClaim)}" class="admin-cloud-checkbox" /></c:when><c:otherwise><span class="access-matrix-unavailable" aria-disabled="true"><span data-resource-status="STOPPED"><spring:message code="access.matrix.unavailable" /></span></span></c:otherwise></c:choose></td>
                     </c:forEach>
                 </tr>
             </c:if></c:forEach></tbody>
@@ -267,10 +268,10 @@
             return Array.from(root.querySelectorAll(selector + ':not(:disabled)'));
         }
         function syncMatrixState(editForm) {
-            const ictAssigned = Boolean(editForm.querySelector('[data-staff-role-checkbox="edit-user"][value="ICT_MANAGER"]:checked'));
-            editForm.querySelectorAll('[data-ict-claim="true"]').forEach((input) => {
-                input.disabled = ictAssigned;
-                if (ictAssigned) input.checked = true;
+            const adminAssigned = Boolean(editForm.querySelector('[data-staff-role-checkbox="edit-user"][value="ICT_MANAGER"]:checked:not(:disabled)'));
+            editForm.querySelectorAll('[data-admin-default="true"]').forEach((input) => {
+                input.disabled = adminAssigned;
+                if (adminAssigned) input.checked = true;
             });
             editForm.querySelector('[data-access-matrix]')?.dispatchEvent(new Event('access-matrix:changed'));
         }
@@ -299,10 +300,10 @@
         function syncClaimsForSelectedRoles(editForm) {
             const selectedDefaults = selectedDefaultClaims(editForm);
             const roleDefaults = allRoleDefaultClaims();
-            editForm.querySelectorAll('[data-access-claim]:not(:disabled)').forEach((input) => {
+            editForm.querySelectorAll('[data-access-claim]').forEach((input) => {
                 if (selectedDefaults.has(input.value)) {
                     input.checked = true;
-                } else if (roleDefaults.has(input.value)) {
+                } else if (roleDefaults.has(input.value) || input.disabled) {
                     input.checked = false;
                 }
             });

@@ -45,7 +45,7 @@ class AccessMatrixJspRenderingTest {
             <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
             """ + source.substring(start, source.indexOf("</section>", start) + "</section>".length());
         var positions = Position.staffAssignableRoles();
-        var user = AdminService.UserAccessView.builder().staffRoles(EnumSet.of(Position.ICT_MANAGER)).build();
+        var user = AdminService.UserAccessView.builder().staffRoles(EnumSet.of(Position.MINOR_ADMIN)).build();
         var response = render(page, Map.of("staffPositions", positions, "user", user), "en");
         var cards = Pattern.compile("<label\\b[^>]*>(.*?)</label>", Pattern.DOTALL).matcher(response.body());
         var staticRoot = Path.of("src/main/resources/static");
@@ -57,7 +57,7 @@ class AccessMatrixJspRenderingTest {
             assertThat(checkbox.find()).as("Checkbox for %s", position).isTrue();
             assertThat(checkbox.group()).contains("type=\"checkbox\"", "name=\"positions\"", "value=\"" + position + "\"");
             assertThat(Pattern.compile("\\schecked(?:\\s|=|>)").matcher(checkbox.group()).find())
-                .as("Saved selection for %s", position).isEqualTo(user.getStaffRoles().contains(position));
+                .as("Saved selection for %s", position).isEqualTo(position == Position.ICT_MANAGER);
             assertThat(card).contains(">" + position.getDisplayName() + "</span>");
 
             if (position == Position.ADMIN) {
@@ -84,15 +84,20 @@ class AccessMatrixJspRenderingTest {
             <%@ taglib prefix="c" uri="jakarta.tags.core" %>
             <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
             """+matrix;
-        Set<UserClaim> assigned=EnumSet.of(UserClaim.MANAGER_QUEUE_VIEW,UserClaim.VOUCHER_RULE_CONFIGURE);
-        var user=AdminService.UserAccessView.builder().claims(assigned).build();
-        var response=render(page,Map.of("user",user,"accessMatrixRows",UserClaim.matrixRows(),"canGrantBranchView",true),language);
+        Set<UserClaim> assigned=EnumSet.of(UserClaim.VOUCHER_RULE_CONFIGURE, UserClaim.PLATFORM_SETTINGS_UPDATE);
+        var user=AdminService.UserAccessView.builder().staffRoles(Set.of(Position.MINOR_ADMIN)).claims(assigned).build();
+        var response=render(page,Map.of("user",user,"accessMatrixRows",UserClaim.matrixRows(),
+            "canGrantBranchView",true,"lockedAdminClaims",user.getLockedClaims()),language);
         assertThat(response.body()).contains("<span class=\"access-matrix-name\">"+approvalLabel+"</span>");
+        assertThat(response.body()).doesNotContain("data-access-sort=\"ASSIGN\"", "data-access-claim=\"PLATFORM_SETTINGS_UPDATE\"");
         for(var claim:UserClaim.matrixRows().stream().flatMap(row->row.claimsByAction().values().stream()).toList()){
             var input=Pattern.compile("<input[^>]*data-access-claim=\""+claim.name()+"\"[^>]*>").matcher(response.body());
             assertThat(input.find()).as(claim.name()).isTrue();
+            boolean fixed = user.getLockedClaims().contains(claim);
             assertThat(Pattern.compile("\\schecked(?:\\s|=|>)").matcher(input.group()).find())
-                .as("Saved selection for %s",claim).isEqualTo(assigned.contains(claim));
+                .as("Saved selection for %s",claim).isEqualTo(fixed || assigned.contains(claim));
+            assertThat(Pattern.compile("\\sdisabled(?:\\s|=|>)").matcher(input.group()).find())
+                .as("Lock for %s",claim).isEqualTo(fixed);
         }
     }
 

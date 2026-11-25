@@ -70,7 +70,7 @@ class FinanceWorkspaceSecurityTest {
                 UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE,UserClaim.ACCOUNTING_ACCOUNTS_UPDATE,
                 UserClaim.ACCOUNTING_JOURNALS_VIEW,UserClaim.ACCOUNTING_JOURNALS_CREATE,UserClaim.ACCOUNTING_JOURNALS_REVERSE,
                 UserClaim.ACCOUNTING_BUSINESS_VIEW,UserClaim.ACCOUNTING_BUSINESS_CREATE,UserClaim.ACCOUNTING_BUSINESS_REVERSE,
-                UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,UserClaim.LOAN_RECORDING_DISBURSE,
+                UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_CREATE,
                 UserClaim.LOAN_RECORDING_POST,UserClaim.LOAN_RECORDING_REVERSE,UserClaim.LOAN_RECORDING_EXPORT);
             else if(Set.of(Position.ADMIN,Position.MINOR_ADMIN,Position.ICT_MANAGER).contains(role))assertThat(financial).containsExactly(UserClaim.ACCOUNTING_ACCOUNTS_UPDATE);
             else assertThat(financial).isEmpty();

@@ -297,16 +297,6 @@ public class LoanRecordingService {
             recoveryFees.signum()>0?cash.subtract(recoveryFees):null);
     }
     @Transactional(readOnly=true)
-    public AllocationPreview postingPreview(AppUserPrincipal a,PostForm f,String kind){
-        authorize(a,kind.equals("DISBURSEMENT")?"DISBURSE":"POST");validatePost(f);records.record(a,f.getLoanId(),false);
-        var loan=loans.findById(f.getLoanId()).orElseThrow();
-        records.account(a,f.getMoneyAccountId(),kind.equals("DISBURSEMENT")?"FUNDING_MONEY":"MONEY",false);
-        if(kind.equals("DISBURSEMENT")){check(loan.getStatus()==LoanStatus.READY_FOR_DISBURSEMENT,"state");check(f.getAmount().compareTo(loan.getAmount())==0,"disbursementAmount");records.account(a,f.getPrincipalAccountId(),"PRINCIPAL",false);return new AllocationPreview(f.getAmount(),ZERO,f.getAmount());}
-        check(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
-        var balance=repayments.paymentBalance(f.getLoanId(),a,f.getEffectiveDate());
-        var linked=productAccounts.required(a,f.getLoanId());records.account(a,linked.principalId(),"PRINCIPAL",false);records.account(a,linked.interestId(),"INTEREST",false);return chargeAllocation(f.getAmount(),balance.dueInterest(),balance.outstandingPrincipal(),charges.balance(a,f.getLoanId(),f.getEffectiveDate()).outstanding());
-    }
-    @Transactional(readOnly=true)
     public Quote interestQuote(AppUserPrincipal a,RecordForm f){
         authorize(a,"CREATE");money(f.getPrincipal());check(Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"terms");
         if("CONFIGURED".equals(f.getLoanMode()) && f.getTenureValue()==null){
