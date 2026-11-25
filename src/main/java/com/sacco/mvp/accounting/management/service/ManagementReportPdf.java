@@ -56,7 +56,7 @@ public class ManagementReportPdf {
                     var column=columns.get(n);
                     widths[n+numberColumn]=column.width()/total;
                     numeric[n+numberColumn]=column.money();
-                    labels.add(LoanReportReferenceText.documentHeading(r.kind(),column.key(),key->message(key,locale)));
+                    labels.add(LoanReportReferenceText.documentHeading(r.kind(),column.labelKey(),key->message(key,locale)));
                 }
                 var groupFacts=r.getGroupFacts();
                 var rowsByGroup=new LinkedHashMap<Object,List<Map<String,Object>>>();

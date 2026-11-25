@@ -152,6 +152,109 @@ class StatementWorkspacePostgresTest {
         assertThat(reports.read(actor,daily,accountOnly,true).rows()).hasSize(2);
     }
 
+    @Test void cashbookClassifiesEachCashPostingAgainstItsOwnVoucherTransaction() {
+        UUID expenseRoot=group("600000","Expenses","EXPENSE",null);
+        group("610000","Operating expenses","EXPENSE",expenseRoot);
+        UUID transport=account("610101","Transport","EXPENSE","OTHER");
+        UUID revenue=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='510000'",UUID.class,institution);
+        group("512000","Other income","INCOME",revenue);
+        UUID fees=account("512001","Service fees","INCOME","INCOME");
+        UUID liabilities=group("200000","Liabilities","LIABILITY",null);
+        UUID current=group("210000","Current liabilities","LIABILITY",liabilities);
+        group("211000","Payables","LIABILITY",current);
+        UUID creditor=account("211001","Trade creditors","LIABILITY","PAYABLE");
+        var form=new VoucherDtos.Form();
+        form.setEffectiveDate(from);
+        form.setParty("Synthetic counterparty");
+        form.setReference("CASHBOOK-SPLIT");
+        var partPayment=new VoucherDtos.RowForm();
+        partPayment.setDescription("Part payment of transport invoice");
+        partPayment.setAmount(new BigDecimal("100.00"));
+        partPayment.setEntries(List.of(entry("DEBIT",transport,"100.00"),entry("CREDIT",bank,"40.00"),
+            entry("CREDIT",creditor,"60.00")));
+        form.setRows(List.of(
+            partPayment,
+            journalRow(transport,bank,"25.40"),
+            journalRow(bank,fees,"16.27"),
+            journalRow(bank,creditor,"31.56"),
+            journalRow(bank,income,"7.18"),
+            journalRow(transport,fees,"10.00"),
+            journalRow(creditor,bank,"4.16")));
+        vouchers.post(actor,VoucherDtos.Type.JOURNAL,form);
+
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(
+            new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var filters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            from,from,OffsetDateTime.now(),bank,bank,null,"",0);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK;
+        var cashbook=reports.read(actor,kind,filters,false);
+        assertThat(cashbook.rows()).hasSize(6);
+        assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("40.00").equals(row.get("moneyOut")))
+            .singleElement().satisfies(row->{
+                assertThat((BigDecimal)row.get("expenseDr")).isEqualByComparingTo("100.00");
+                assertThat((BigDecimal)row.get("otherCreditorsCr")).isEqualByComparingTo("60.00");
+            });
+        assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("25.40").equals(row.get("moneyOut")))
+            .singleElement().satisfies(row->assertThat((BigDecimal)row.get("expenseDr")).isEqualByComparingTo("25.40"));
+        assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("16.27").equals(row.get("moneyIn")))
+            .singleElement().satisfies(row->assertThat((BigDecimal)row.get("otherIncomeCr")).isEqualByComparingTo("16.27"));
+        assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("31.56").equals(row.get("moneyIn")))
+            .singleElement().satisfies(row->assertThat((BigDecimal)row.get("otherCreditorsCr")).isEqualByComparingTo("31.56"));
+        assertThat(cashbook.totals().get("expenseDr")).isEqualByComparingTo("125.40");
+        assertThat(cashbook.totals().get("otherIncomeCr")).isEqualByComparingTo("16.27");
+        assertThat(cashbook.totals().get("otherCreditorsCr")).isEqualByComparingTo("91.56");
+        assertThat(reports.read(actor,kind,filters,true).totals()).isEqualTo(cashbook.totals());
+    }
+
+    @Test void splitCashReceiptsKeepAmbiguousIncomeUnknownEvenWhenFilteringToOneBank() {
+        UUID secondBank=account("111002","Second bank","ASSET","BANK");
+        UUID revenue=jdbc.queryForObject("select id from gl_account where sacco_id=? and code='510000'",UUID.class,institution);
+        group("512000","Other income","INCOME",revenue);
+        UUID fees=account("512001","Service fees","INCOME","INCOME");
+        var line=new VoucherDtos.RowForm();
+        line.setDescription("Mixed receipt");
+        line.setAmount(new BigDecimal("100.00"));
+        line.setEntries(List.of(entry("DEBIT",bank,"60.00"),entry("DEBIT",secondBank,"40.00"),
+            entry("CREDIT",fees,"30.00"),entry("CREDIT",capital,"70.00")));
+        var voucher=new VoucherDtos.Form();
+        voucher.setEffectiveDate(from);
+        voucher.setParty("Synthetic counterparty");
+        voucher.setReference("MIXED-SPLIT");
+        voucher.setRows(List.of(line,journalRow(bank,fees,"12.00")));
+        vouchers.post(actor,VoucherDtos.Type.JOURNAL,voucher);
+
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(
+            new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var filters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            from,from,OffsetDateTime.now(),bank,bank,null,"",0);
+        var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,filters,false);
+        assertThat(cashbook.rows()).hasSize(2);
+        assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("60.00").equals(row.get("moneyIn")))
+            .singleElement().satisfies(row->assertThat(row).containsEntry("otherIncomeCr",null));
+        assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("12.00").equals(row.get("moneyIn")))
+            .singleElement().satisfies(row->assertThat((BigDecimal)row.get("otherIncomeCr")).isEqualByComparingTo("12.00"));
+        assertThat(cashbook.totals()).containsEntry("otherIncomeCr",null);
+        assertThat(cashbook.groups()).singleElement().satisfies(group->assertThat(group.totals()).containsEntry("otherIncomeCr",null));
+        assertThat(cashbook.totals().get("expenseDr")).isZero();
+    }
+
+    private VoucherDtos.EntryForm entry(String side,UUID account,String amount) {
+        var entry=new VoucherDtos.EntryForm();
+        entry.setSide(side);
+        entry.setAccountId(account);
+        entry.setAmount(new BigDecimal(amount));
+        return entry;
+    }
+
+    private VoucherDtos.RowForm journalRow(UUID debit,UUID credit,String amount) {
+        var line=new VoucherDtos.RowForm();
+        line.setDebitAccountId(debit);
+        line.setCreditAccountId(credit);
+        line.setAmount(new BigDecimal(amount));
+        line.setDescription("Cashbook classification");
+        return line;
+    }
+
     @Test void dailyCollectionsIncludesAllPostingAccountsAndCashbookUsesTheCashFamily() {
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
         var cashbook=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK;

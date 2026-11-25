@@ -106,10 +106,20 @@ class ManagementReportTest {
                     assertThat(text).contains(kind==Kind.DISBURSED_LOANS_AUDIT?start.replace('-', ' '):start,language.equals("en")?"Page 1":"Ukurasa 1");
                 }else if(kind!=Kind.PORTFOLIO_RISK && kind!=Kind.PORTFOLIO_ANALYSIS)assertThat(text).contains("01/10/2026");
                 assertThat(doc.getNumberOfPages()).isGreaterThan(1);
+                if(kind==Kind.CASHBOOK){
+                    var locale=Locale.forLanguageTag(language);
+                    var labels=result.getDocumentColumns().stream().map(column->exporter.message("field."+column.labelKey(),locale)).toList();
+                    assertThat(labels.subList(5,7)).containsExactlyElementsOf(language.equals("en")
+                        ? List.of("Receipts DR","Payment CR") : List.of("Stakabadhi DR","Malipo CR"));
+                    assertThat(labels.subList(11,labels.size())).containsExactlyElementsOf(language.equals("en")
+                        ? List.of("Expense DR","Other income CR","Other Creditors CR")
+                        : List.of("Gharama DR","Mapato mengine CR","Wadai wengine CR"));
+                    assertThat(text.replaceAll("\\s","")).doesNotContain("Moneyin","Moneyout","Fedhazilizoingia","Fedhazilizotoka");
+                }
                 for(var column:result.getDocumentColumns()){
                     Locale locale=Locale.forLanguageTag(language);
                     String heading=com.sacco.mvp.accounting.management.service.LoanReportReferenceText.documentHeading(
-                        kind,column.key(),key->exporter.message(key,locale));
+                        kind,column.labelKey(),key->exporter.message(key,locale));
                     assertThat(text.replaceAll("\\s","")).contains(heading.split("\\s+")[0]);
                 }
             }

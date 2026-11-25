@@ -240,7 +240,9 @@ public class ManagementReportRepository {
         String sums=money.stream().map(k->{
             String field="\""+k+"\"";
             String sum="sum("+field+")";
-            String amount=k.equals("netDisbursed")?"case when count(*)=count("+field+") then coalesce("+sum+",0) end":
+            boolean needsEveryRow=k.equals("netDisbursed") ||
+                (kind==Kind.CASHBOOK && Set.of("expenseDr","otherIncomeCr","otherCreditorsCr").contains(k));
+            String amount=needsEveryRow?"case when count(*)=count("+field+") then coalesce("+sum+",0) end":
                 loan?"case when count(*)=0 then 0 else "+sum+" end":
                 kind==Kind.CASHBOOK && !Set.of("moneyIn","moneyOut").contains(k)?sum:"coalesce("+sum+",0)";
             return amount+" as "+field;
@@ -313,7 +315,7 @@ public class ManagementReportRepository {
         """.formatted(RECEIPT_REFERENCE,POST_ITEM_ID,RECEIPT_JOINS);
     private static final String CASH=CASH_RANGE+"""
         report_rows as (
-          select b.code||' | '||b.name as "groupName",j.effective_date::text||j.posted_at::text||l.id::text as "rowOrder",
+          select l.code||' | '||l.name as "groupName",j.effective_date::text||j.posted_at::text||l.line_key as "rowOrder",
             j.effective_date as date,coalesce(v.client_number,r.client_number,m.member_no) as "clientNumber",coalesce(v.party,r.party,m.full_name,'') as name,
             coalesce(nullif(v.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as particulars,
             coalesce(v.reference,(%s),case when %s is null then p.reference else a.loan_id end,j.source_reference) as reference,
@@ -321,13 +323,51 @@ public class ManagementReportRepository {
             case when q.kind='DISBURSEMENT_REVERSAL' then q.amount when p.id is not null then case when l.debit>0 then p.principal_amount else 0 end else null end as "principalIn",
             case when p.id is not null then case when l.credit>0 then p.principal_amount else 0 end else null end as "principalOut",
             case when p.id is not null then case when l.debit>0 then p.interest_amount else 0 end else null end as "interestIn",
-            case when p.id is not null then case when l.credit>0 then p.interest_amount else 0 end else null end as "interestOut"
-          from gl_journal j join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
-          join gl_account b on b.id=l.account_id and b.sacco_id=j.sacco_id
+            case when p.id is not null then case when l.credit>0 then p.interest_amount else 0 end else null end as "interestOut",
+            case when l.cash_count=1 or l.expense=0 then l.expense
+                 when l.expense=l.total and l.cash_credit=l.total then l.credit end as "expenseDr",
+            case when l.cash_count=1 or l.other_income=0 then l.other_income
+                 when l.other_income=l.total and l.cash_debit=l.total then l.debit end as "otherIncomeCr",
+            case when l.cash_count=1 or l.creditors=0 then l.creditors
+                 when l.creditors=l.total and l.cash_debit=l.total then l.debit end as "otherCreditorsCr"
+          from gl_journal j
           left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id
           left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=j.sacco_id and p.station_id=j.station_id and p.state='POSTED' and p.recorded_at<=:cutoff
           left join loan_adjustment_decision ad on ad.journal_id=j.id
           left join loan_adjustment_request q on q.id=ad.request_id and q.sacco_id=j.sacco_id and q.station_id=j.station_id
+          left join accountant_loan_topup topup on topup.journal_id=j.id and topup.sacco_id=j.sacco_id and topup.station_id=j.station_id
+            and topup.recorded_at<=:cutoff
+          left join loan_product_account_binding source_binding on source_binding.loan_id=topup.source_id
+            and source_binding.sacco_id=topup.sacco_id and source_binding.station_id=topup.station_id and source_binding.linked_at<=:cutoff
+          cross join lateral (
+            with entries as materialized (
+              -- Posted vouchers preserve the transaction grouping of their validated journal lines.
+              select x.transaction_id,x.transaction_id::text||'/'||x.entry_no::text as line_key,x.account_id,
+                case x.side when 'DEBIT' then x.amount else 0 end as debit,case x.side when 'CREDIT' then x.amount else 0 end as credit
+              from accounting_voucher_posting x where x.voucher_id=v.id and x.sacco_id=j.sacco_id and x.station_id=j.station_id
+              union all
+              select null::uuid,z.id::text,z.account_id,z.debit,z.credit from gl_journal_line z
+              where v.id is null and z.journal_id=j.id and z.sacco_id=j.sacco_id and z.station_id=j.station_id
+            )
+            select e.*,b.code,b.name,b.purpose,
+              count(*) filter(where is_cash) over movement as cash_count,
+              sum(e.debit) over movement as total,
+              sum(case when is_cash then e.debit else 0 end) over movement as cash_debit,
+              sum(case when is_cash then e.credit else 0 end) over movement as cash_credit,
+              sum(case when eligible and b.type='EXPENSE' then e.debit else 0 end) over movement as expense,
+              sum(case when eligible and b.type='INCOME' and interest_heading.id is null then e.credit else 0 end) over movement as other_income,
+              sum(case when eligible and b.type='LIABILITY' and b.purpose='PAYABLE' then e.credit else 0 end) over movement as creditors
+            from entries e join gl_account b on b.id=e.account_id and b.sacco_id=:institution
+            left join gl_account interest_heading on interest_heading.id=b.parent_id and interest_heading.sacco_id=b.sacco_id
+              and interest_heading.type='INCOME' and interest_heading.kind='HEADING' and interest_heading.code='511000'
+              and exists(select 1 from gl_account h where h.id=interest_heading.parent_id and h.sacco_id=b.sacco_id
+                and h.type='INCOME' and h.kind='HEADING' and h.code='510000')
+            cross join lateral (select b.id in(select id from cash_accounts) or b.purpose in ('CASH','BANK','MOBILE_MONEY') as is_cash) cash
+            cross join lateral (select not is_cash and b.id is distinct from p.principal_account_id and b.id is distinct from p.interest_account_id
+              and b.id is distinct from source_binding.principal_account_id and b.id is distinct from source_binding.interest_account_id
+              and b.id is distinct from (case when q.kind='DISBURSEMENT_REVERSAL' then q.credit_account_id end) as eligible) component
+            window movement as (partition by e.transaction_id)
+          ) l
           left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
           left join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=j.sacco_id and m.station_id=j.station_id
           left join accountant_loan_receipt_row x on x.posting_id=p.id
@@ -335,7 +375,7 @@ public class ManagementReportRepository {
           %s
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
             and j.effective_date between :from and :through
-            and (b.id in(select id from cash_range) or (not :bounded and b.purpose in ('CASH','BANK','MOBILE_MONEY')))
+            and (l.account_id in(select id from cash_range) or (not :bounded and l.purpose in ('CASH','BANK','MOBILE_MONEY')))
             and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.borrower_party_id,m.id)=:clientId)
         )
         """.formatted(RECEIPT_REFERENCE,POST_ITEM_ID,RECEIPT_JOINS);

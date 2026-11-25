@@ -23,7 +23,11 @@ public final class ManagementReports {
         public Choice(UUID id,String code,String name){this(id,code,name,name);}
         public String getLabel(){return label;}
     }
-    public record Column(String key, boolean money, float width) {}
+    public record Column(String key, boolean money, float width, String labelKey) {
+        public Column(String key, boolean money, float width) {
+            this(key, money, width, key);
+        }
+    }
     public record Group(String name, long count, Map<String,BigDecimal> totals) {}
     public record SubtotalLayout(Set<String> groups,Set<String> periods) {}
     public record Result(Kind kind, Parameters parameters, String institution, String branch,
@@ -122,7 +126,9 @@ public final class ManagementReports {
             case DAILY_COLLECTIONS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.6f),text("documentReference",1),text("documentNumber",1),
                 text("date",1),text("postingAccount",1.4f),text("transaction",1.65f),money("debit"),money("credit"),money("moneyIn"),money("moneyOut"),text("recordedBy",1));
             case CASHBOOK -> List.of(text("date",1),text("clientNumber",.8f),text("name",1.4f),text("particulars",2),text("reference",1.2f),
-                money("moneyIn"),money("moneyOut"),money("principalIn"),money("principalOut"),money("interestIn"),money("interestOut"));
+                new Column("moneyIn",true,1,"receiptsDr"),new Column("moneyOut",true,1,"paymentCr"),
+                money("principalIn"),money("principalOut"),money("interestIn"),money("interestOut"),
+                money("expenseDr"),money("otherIncomeCr"),money("otherCreditorsCr"));
             case LOAN_PORTFOLIO -> List.of(text("clientNumber",.8f),text("loanId",1),text("name",1.8f),text("gender",.6f),money("disbursed"),
                 money("contractTotal"),text("disbursementDate",1),money("instalment"),text("frequency",1),money("principalBalance"),money("interestBalance"),text("maturity",1),text("periods",.6f));
             case PORTFOLIO_RISK -> List.of(text("clientNumber",.8f),text("loanId",1),text("name",1.6f),money("disbursed"),text("disbursementDate",1),money("principalBalance"),
