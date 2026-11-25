@@ -77,6 +77,27 @@ class StatementWorkspacePostgresTest {
         assertThatThrownBy(()->statements.ledgerAccounts(actor,"",0,null)).isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(()->statements.generateLedger(actor,from,through,bank,key)).isInstanceOf(AccessDeniedException.class);
     }
+    @Test void allAccountsIncludeUnusedAccountsAndSearchFrozenActivityBeforePaging(){
+        UUID unused=account("111002","Unused bank","ASSET","BANK");
+        var voucher=post(bank,capital,"1.50","Voucher search fixture");
+        var run=statements.get(actor,statements.generateLedger(actor,from,through,null,UUID.randomUUID()));
+        assertThat(statements.ledgerRows(actor,run,null,0,"")).contains(new LedgerRow(unused,null));
+        assertThat(statements.ledgerRows(actor,run,null,0,"Unused bank")).containsExactly(new LedgerRow(unused,null));
+        var matches=statements.ledgerRows(actor,run,null,0,voucher.number());
+        assertThat(matches).extracting(LedgerRow::accountId).containsExactly(bank,capital);
+        assertThat(matches).allSatisfy(row->assertThat(row.activity().voucherNumber()).isEqualTo(voucher.number()));
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(
+            new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var params=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
+            from,through,run.snapshot().generatedAt(),bank,bank,null,"",0);
+        var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK;
+        var complete=reports.read(actor,kind,params,false);
+        var matching=reports.read(actor,kind,params,voucher.number().toLowerCase(Locale.ROOT));
+        assertThat(matching.rows()).singleElement().satisfies(row->assertThat(row.get("reference")).isEqualTo(voucher.number()));
+        assertThat(matching.totals()).isEqualTo(complete.totals());
+        var after=post(bank,capital,"1.75","Posted after capture");
+        assertThat(statements.ledgerRows(actor,run,null,0,after.number())).isEmpty();
+    }
     UUID preview(){return statements.generate(actor,new Parameters(from,through,false),UUID.randomUUID());}
     @Test void figuresReconcileAndFreezeMembershipAcrossLateBackdatedPostings(){UUID id=preview();var initial=statements.get(actor,id).snapshot();assertThat(initial.version()).isEqualTo(5);assertThat(initial.cashFlow().getFirst().key()).isEqualTo("cashSurplus");assertThat(initial.cashFlow().getFirst().current()).isEqualByComparingTo("416.67");assertThat(initial.position().getLast().current()).isEqualByComparingTo("1416.67");assertThat(initial.income().getLast().current()).isEqualByComparingTo("416.67");assertThat(initial.equity().getLast().total()).isEqualByComparingTo("1416.67");assertThat(initial.checks()).extracting(Check::key).contains("coverage","equityMovements","notesSetup");
         post(bank,income,"10.00","Later backdated receipt");assertThat(statements.get(actor,id).snapshot()).isEqualTo(initial);assertThat(statements.activity(actor,id,income,0)).hasSize(1);assertThat(statements.get(actor,preview()).snapshot().income().getLast().current()).isEqualByComparingTo("426.67");

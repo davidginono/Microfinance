@@ -5,7 +5,9 @@
       data-line="<c:out value='${line}' />"
       data-account="<c:out value='${account}' />"
       data-page="<c:out value='${page}' />"
+      data-preview-search="<c:out value='${previewSearch}' />"
       data-saved="${run.saved}">
+ <c:if test="${searchEmpty}"><p role="status"><spring:message code="report.noMatches" /></p></c:if>
  <c:if test="${filtered}"><p class="fs-help"><spring:message code="fs.filteredTrial" /></p></c:if>
  <section class="fs-paper-scroll" tabindex="0" aria-label="<spring:message code='fs.previewTitle' text='Reports Preview' />"><article class="fs-paper fs-${document.style}" data-fs-paper data-kind="${kind}">
   <c:choose><c:when test="${document.style=='equity'}">
@@ -21,5 +23,5 @@
   </table>
   <c:if test="${document.style=='equity'}"><p class="fs-equity-scope"><c:out value="${snapshot.institutionName}" /> | <c:choose><c:when test="${snapshot.parameters.institutionWide}"><spring:message code="fs.institutionScope" /></c:when><c:otherwise><c:out value="${snapshot.branchName}" /></c:otherwise></c:choose> | TZS</p></c:if>
  </article></section>
- <c:if test="${kind=='LEDGER'}"><div class="fs-pager"><c:if test="${page>0}"><a class="app-btn btn-neutral" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${base}/ledger/${account}?page=${page-1}' />"><spring:message code="fs.previousPage" /></a></c:if><span>${page+1}</span><c:if test="${hasNext}"><a class="app-btn btn-neutral" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${base}/ledger/${account}?page=${page+1}' />"><spring:message code="fs.nextPage" /></a></c:if></div></c:if>
+ <c:if test="${kind=='LEDGER'}"><c:set var="ledgerPath" value="${base}/ledger${empty account?'':'/'.concat(account)}" /><div class="fs-pager"><c:if test="${page>0}"><a class="app-btn btn-neutral" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${ledgerPath}'><c:param name="page" value="${page-1}" /><c:if test="${not empty previewSearch}"><c:param name="previewSearch" value="${previewSearch}" /></c:if></c:url>"><spring:message code="fs.previousPage" /></a></c:if><span>${page+1}</span><c:if test="${hasNext}"><a class="app-btn btn-neutral" data-fs-drilldown data-no-page-preloader="true" href="<c:url value='${ledgerPath}'><c:param name="page" value="${page+1}" /><c:if test="${not empty previewSearch}"><c:param name="previewSearch" value="${previewSearch}" /></c:if></c:url>"><spring:message code="fs.nextPage" /></a></c:if></div></c:if>
  </div>

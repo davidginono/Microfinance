@@ -42,7 +42,6 @@ public class StatementService {
     }
     @Transactional(isolation=Isolation.READ_COMMITTED,timeout=40)
     public UUID generateLedger(AppUserPrincipal actor,LocalDate from,LocalDate through,UUID account,UUID key){
-        require(account!=null,"selection");
         return limiter.run(()->request(actor,new Parameters(from,through,false),key,account));
     }
     private UUID request(AppUserPrincipal a,Parameters p,UUID key,UUID account){
@@ -118,6 +117,64 @@ public class StatementService {
     }
     @Transactional(readOnly=true) public List<Activity> activity(AppUserPrincipal a,UUID id,UUID account,int page){var run=get(a,id);branchActivity(run);page(page);require(run.snapshot().balances().stream().anyMatch(b->b.id().equals(account)),"selection");return repository.activity(id,account,run.snapshot().parameters(),page,31);}
     @Transactional(readOnly=true) public List<Activity> activityExport(AppUserPrincipal a,UUID id,UUID account){var run=get(a,id);branchActivity(run);exportAccess(a,run);require(run.snapshot().balances().stream().anyMatch(b->b.id().equals(account)),"selection");var rows=repository.activity(id,account,run.snapshot().parameters(),0,5001);require(rows.size()<=5000,"limit");return rows;}
+    @Transactional(readOnly=true)
+    public List<LedgerRow> ledgerRows(AppUserPrincipal actor,Run run,UUID account,int page,String search) {
+        authorize(actor,false);
+        requireBranchRun(actor,run);
+        page(page);
+        return ledgerRows(run,account,page,31,search);
+    }
+
+    @Transactional(readOnly=true)
+    public List<LedgerRow> ledgerExport(AppUserPrincipal actor,Run run,UUID account) {
+        exportAccess(actor,run);
+        requireBranchRun(actor,run);
+        int emptyAccountAllowance=account==null?run.snapshot().balances().size():1;
+        var rows=ledgerRows(run,account,0,5001+emptyAccountAllowance,"");
+        require(rows.stream().filter(row->row.activity()!=null).count()<=5000,"limit");
+        return rows;
+    }
+
+    @Transactional(readOnly=true)
+    public Set<UUID> matchingAccounts(Run run,String search) {
+        String term=normalizeSearch(search);
+        if(term.isEmpty())return Set.of();
+        var references=run.institutionWide()?Set.<UUID>of():repository.accountsForVoucher(run.id(),term);
+        var result=new HashSet<UUID>();
+        for(var balance:run.snapshot().balances()){
+            if(references.contains(balance.id()) || matchesAccount(balance,term))result.add(balance.id());
+        }
+        return result;
+    }
+
+    private static String normalizeSearch(String search) {
+        require(search!=null && search.length()<=100 && search.chars().noneMatch(Character::isISOControl),"filter");
+        return search.strip().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean matchesAccount(Balance balance,String term) {
+        return balance.code().toLowerCase(Locale.ROOT).contains(term) || balance.name().toLowerCase(Locale.ROOT).contains(term);
+    }
+
+    private List<LedgerRow> ledgerRows(Run run,UUID account,int page,int limit,String search) {
+        branchActivity(run);
+        String term=normalizeSearch(search);
+        var balances=run.snapshot().balances().stream().filter(row->account==null || row.id().equals(account)).toList();
+        require(account==null || !balances.isEmpty(),"selection");
+        var matches=new HashSet<UUID>();
+        if(!term.isEmpty())for(var balance:balances)
+            if(matchesAccount(balance,term))
+                matches.add(balance.id());
+        return repository.ledgerRows(run.id(),balances.stream().map(Balance::id).toList(),
+            run.snapshot().parameters(),term,matches,page,limit);
+    }
+
+    private static void requireBranchRun(AppUserPrincipal actor,Run run) {
+        var snapshot=run.snapshot();
+        if(!Objects.equals(actor.getSaccoId(),snapshot.institution()) || !Objects.equals(actor.getStationId(),snapshot.branch()))
+            throw new AccessDeniedException("Statement unavailable");
+    }
+
     private static void branchActivity(Run run){if(run.institutionWide())throw new AccessDeniedException("Institution aggregation does not authorize cross-branch transaction access");}
     public void exportAccess(AppUserPrincipal a,Run run){authorize(a,run.institutionWide());access.requireActor(a,"FINANCIAL_REPORTS_EXPORT");}
     @Transactional(readOnly=true) public Optional<byte[]> artifact(AppUserPrincipal a,UUID id,Kind kind,String format,String language){var run=get(a,id);exportAccess(a,run);return repository.artifact(id,kind,format,language).map(StatementService::verified);}

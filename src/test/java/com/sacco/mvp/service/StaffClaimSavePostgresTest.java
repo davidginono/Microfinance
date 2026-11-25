@@ -35,20 +35,21 @@ class StaffClaimSavePostgresTest {
     @Autowired VoucherWorkflowService vouchers;
     @Autowired JdbcTemplate jdbc;
     @Autowired MemberRepository members;
+    @Autowired org.springframework.web.context.WebApplicationContext web;
 
     String institution;
     AppUserPrincipal editor;
     UUID officer;
 
     @BeforeEach void createStaff() {
-        institution = "MATRIX-" + UUID.randomUUID();
+        institution = ("MATRIX-" + UUID.randomUUID()).toUpperCase(java.util.Locale.ROOT);
         jdbc.update("insert into registered_saccos(sacco_id,sacco_name,active,created_at,updated_at) values(?,'Synthetic institution',true,now(),now())", institution);
         jdbc.update("insert into sacco_stations(id,sacco_id,station_id,active,access_status,created_at,updated_at) values(?,?,'B1',true,'ACTIVE',now(),now())",
             UUID.randomUUID(), institution);
         UUID editorId = staff(Position.ICT_MANAGER);
         Set<UserClaim> editorClaims = Set.of(USER_ACCESS_UPDATE, VOUCHER_RULE_VIEW, VOUCHER_RULE_CONFIGURE);
         claims.updateClaims(editorId, List.copyOf(editorClaims));
-        editor = new AppUserPrincipal(members.findById(editorId).orElseThrow(), editorClaims);
+        editor = new AppUserPrincipal(members.findById(editorId).orElseThrow(), claims.effectiveClaims(editorId,List.of(Position.ICT_MANAGER),false));
         officer = staff(Position.LOAN_OFFICER);
     }
 
@@ -75,6 +76,25 @@ class StaffClaimSavePostgresTest {
         save(required);
         save(List.of(VOUCHER_WORKSPACE_VIEW, ACCOUNTING_JOURNALS_VIEW));
         save(List.of());
+    }
+
+    @org.junit.jupiter.api.Test
+    void postingMultiplePermissionsAndReopeningTheEditorKeepsEverySelectedClaim() throws Exception {
+        var mvc=org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup(web)
+            .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity()).build();
+        var user=org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(editor);
+        var save=org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/admin/users/"+officer)
+            .with(user).with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+            .param("positions",Position.LOAN_OFFICER.name()).param("status","ACTIVE").param("sourceBranch","B1").param("branch","B1")
+            .param("claims",VOUCHER_WORKSPACE_VIEW.name(),VOUCHER_APPROVAL_APPROVE.name(),ACCOUNTING_JOURNALS_VIEW.name());
+        var saved=mvc.perform(save).andReturn();
+        assertThat(saved.getResolvedException()).isNull();
+        assertThat(saved.getFlashMap().get("error")).isNull();
+        assertThat(saved.getResponse().getRedirectedUrl()).isEqualTo("/admin/users/"+officer+"/edit");
+        var reopened=mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/admin/users/"+officer+"/edit").with(user))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.view().name("admin/user-edit")).andReturn();
+        var access=(AdminService.UserAccessView)reopened.getModelAndView().getModel().get("user");
+        assertThat(access.getClaims()).containsExactlyInAnyOrder(VOUCHER_WORKSPACE_VIEW,VOUCHER_APPROVAL_APPROVE,ACCOUNTING_JOURNALS_VIEW);
     }
 
     private void save(List<UserClaim> selected) {

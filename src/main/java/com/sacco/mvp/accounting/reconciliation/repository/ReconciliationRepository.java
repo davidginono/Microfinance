@@ -45,8 +45,16 @@ public class ReconciliationRepository {
     }
     public List<Row> rows(AppUserPrincipal a,Parameters p,boolean export){return rows(a,p,export,false);}
     public List<Row> rows(AppUserPrincipal a, Parameters p, boolean export, boolean groups) {
-        return jdbc.query(SOURCE+"SELECT * FROM diagnostic_exceptions "+ORDER+",date NULLS LAST,identity,account LIMIT :limit OFFSET :offset",
-            parameters(a,p,groups).addValue("limit",export?5001:26).addValue("offset",export?0:p.page()*25),
+        return rows(a,p,export,groups,"");
+    }
+    public List<Row> rows(AppUserPrincipal a,Parameters p,boolean export,boolean groups,String search) {
+        String filter=search.isEmpty()?"":"""
+            WHERE strpos(lower(concat_ws(' ', e.account,e.reference)),:previewSearch)>0
+                OR EXISTS (SELECT 1 FROM gl_account a WHERE a.sacco_id=:institution AND a.code=e.account
+                    AND strpos(lower(a.name),:previewSearch)>0)
+            """;
+        return jdbc.query(SOURCE+"SELECT e.* FROM diagnostic_exceptions e "+filter+ORDER+",date NULLS LAST,identity,account LIMIT :limit OFFSET :offset",
+            parameters(a,p,groups).addValue("previewSearch",search).addValue("limit",export?5001:26).addValue("offset",export?0:p.page()*25),
             (r,n)->new Row(r.getString("component"),r.getString("section"),r.getString("client"),r.getString("loan"),
                 r.getString("account"),r.getString("reference"),r.getObject("date",java.time.LocalDate.class),
                 r.getString("activity"),r.getString("issue"),r.getBigDecimal("sl_debit"),r.getBigDecimal("sl_credit"),

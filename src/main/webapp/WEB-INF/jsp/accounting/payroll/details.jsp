@@ -4,11 +4,14 @@
 <template data-resource-details-page></template><%@ include file="../../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/payroll' />"><spring:message code="payroll.title" /></a><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="payroll.details" /></span></nav>
-<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="payroll.details" /></h1><div class="accounting-actions">
+<div class="erp-page-header"><h1 class="erp-page-title"><spring:message code="payroll.details" /></h1>
+<details class="page-action-menu" data-page-action-menu data-aws-action-pin="true">
+    <summary class="app-btn btn-neutral"><spring:message code="common.actions" /></summary>
+    <div class="page-action-options">
     <a class="app-btn btn-neutral" href="<c:url value='/finance/payroll/${batch.id}/feedback' />"><spring:message code="payroll.feedback.title" /></a>
     <sec:authorize access="@access.has(principal,'PAYROLL_DEDUCTIONS_EXPORT')"><a class="app-btn btn-neutral" href="<c:url value='/finance/payroll/${batch.id}/pdf' />"><spring:message code="payroll.pdf" /></a><a class="app-btn btn-neutral" data-download-action="true" href="<c:url value='/finance/payroll/${batch.id}/xlsx' />"><spring:message code="payroll.xlsx" /></a><button type="button" class="app-btn btn-neutral" data-payroll-print="<c:url value='/finance/payroll/${batch.id}/print' />"><spring:message code="payroll.print" /></button></sec:authorize>
     <c:if test="${batch.state=='CANCELLED'}"><sec:authorize access="@access.has(principal,'PAYROLL_DEDUCTIONS_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/payroll/new?replacesId=${batch.id}' />"><spring:message code="payroll.replace" /></a></sec:authorize></c:if>
-</div></div>
+</div></details></div>
 <div class="accounting-workspace">
 <%@ include file="error.jspf" %>
 <c:if test="${batch.state=='CANCELLED'}"><p role="status"><spring:message code="payroll.cancelledNotice" /></p></c:if>

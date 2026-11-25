@@ -58,10 +58,10 @@ class StatementExportTest {
         var run=new Run(s.id(),s.parameters().from(),s.parameters().through(),s.generatedAt(),false,true,s);
         when(service.get(actor,s.id())).thenReturn(run);
         var activity=java.util.stream.IntStream.range(0,35).mapToObj(i->new Activity(UUID.randomUUID(),PERIOD.from(),null,"JV-"+i,"Investment transaction",n("1"),n("0"),n(Integer.toString(i+1)),null)).toList();
-        when(service.activityExport(actor,s.id(),account.id())).thenReturn(activity);
+        when(service.ledgerExport(actor,run,account.id())).thenReturn(activity.stream().map(a->new LedgerRow(account.id(),a)).toList());
         var model=new ExtendedModelMap();
         assertThat(controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),model,Locale.ENGLISH,new MockHttpServletResponse())).isEqualTo("accounting/statements/print");
-        verify(service).exportAccess(actor,run);verify(service).activityExport(actor,s.id(),account.id());
+        verify(service).exportAccess(actor,run);verify(service).ledgerExport(actor,run,account.id());
         var document=(StatementPresentation.Document)model.get("document");
         assertThat(document.rows()).hasSize(37);
         assertThat(document.rows().get(35).cells().get(2).text()).isEqualTo("JV-34");

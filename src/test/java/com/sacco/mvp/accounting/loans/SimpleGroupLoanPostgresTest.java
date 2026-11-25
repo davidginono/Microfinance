@@ -263,14 +263,12 @@ class SimpleGroupLoanPostgresTest {
             .isInstanceOfSatisfying(SimpleGroupLoanService.ProfileIncomeException.class,error->
                 assertThat(error.clients()).containsExactlyInAnyOrder("UNRECORDED TEST","MISSING TEST"));
     }
-    @Test void aBorrowerDebtAboveTheirIncomeDoesNotBlockAnAffordableGroup(){
-        var form=application();var debt=new ExternalDebt();debt.setReference("Outside loan");
-        debt.setMonthlyPayment(new BigDecimal("2100000.00"));debt.setClientIds(List.of(clients.getFirst()));
-        form.getGroupApplication().getDebts().add(debt);
-        var loan=f.service.saveGroup(f.actor,form,List.of(),null);
+    @Test void newGroupAssessmentsStoreOnlyLedgerObligations(){
+        UUID loan=f.service.saveGroup(f.actor,application(),List.of(),null);
         assertThat(f.jdbc.queryForObject("select count(*) from staff_group_borrower where loan_id=? and expenses is null",Integer.class,loan)).isEqualTo(5);
-        assertThat(f.jdbc.queryForObject("select (form_data->>'otherDebt')::numeric from loan_applications where id=?",BigDecimal.class,loan))
-            .isEqualByComparingTo("2100000.00");
+        assertThat(f.jdbc.queryForObject("select snapshot->>'debtBasis' from staff_group_loan where loan_id=?",String.class,loan))
+            .isEqualTo("INTERNAL_LEDGER");
+        assertThat(f.jdbc.queryForObject("select jsonb_exists(snapshot,'outsideDebts') from staff_group_loan where loan_id=?",Boolean.class,loan)).isFalse();
     }
     @Test void oneGroupInstalmentReceivesFourHundredThousandThenAnotherHundredThousand(){
         UUID loan=fund();nextDay();assertThat(f.service.detail(f.actor,loan).loan().arrears()).isEqualByComparingTo("500000.00");
@@ -354,19 +352,6 @@ class SimpleGroupLoanPostgresTest {
             if(kind==com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO)assertThat(data.totals().get("principalBalance")).isEqualByComparingTo("4600000.00");
             assertThat(data.rows()).hasSize(1);assertThat(data.rows().getFirst().get("loanId")).isEqualTo(f.service.detail(f.actor,loan).loan().number());
         }
-    }
-    @Test void oneOutsideDebtOwedByAllFiveIsAssessedOnce(){
-        var form=application();var debt=new ExternalDebt();debt.setReference("Outside joint debt / checked statement");debt.setMonthlyPayment(new BigDecimal("100000.00"));debt.setClientIds(new ArrayList<>(clients));form.getGroupApplication().getDebts().add(debt);
-        UUID loan=f.service.saveGroup(f.actor,form,List.of(),paper());assertThat(f.jdbc.queryForObject("select (form_data->>'otherDebt')::numeric from loan_applications where id=?",BigDecimal.class,loan)).isEqualByComparingTo("100000.00");
-        assertThat(service.contract(f.actor,loan).orElseThrow().borrowers()).allSatisfy(person->assertThat(person.debt()).isEqualByComparingTo("100000.00"));
-    }
-    @Test void outsideDebtsMustIdentifyBorrowersFromTheSelectedGroup(){
-        var form=application();var debt=new ExternalDebt();debt.setReference("Outside loan");
-        debt.setMonthlyPayment(new BigDecimal("10000.00"));debt.setClientIds(List.of(f.client));
-        form.getGroupApplication().getDebts().add(debt);
-        assertThatThrownBy(()->f.service.saveGroup(f.actor,form,List.of(),null))
-            .isInstanceOfSatisfying(com.sacco.mvp.accounting.loans.service.LoanRecordingEvidenceService.FieldValidation.class,
-                error->assertThat(error.field()).isEqualTo("groupApplication.debts[0].clientIds"));
     }
     @Test void aRecordedJointLoanIsNotCountedFiveTimesInTheNextGroupBudget(){fund();f.jdbc.update("update loan_product_settings set allow_application_with_active_loan=true,maximum_active_loans=3 where id=?",f.product);UUID next=record();assertThat(f.jdbc.queryForObject("select (form_data->>'otherDebt')::numeric from loan_applications where id=?",BigDecimal.class,next)).isEqualByComparingTo("500000.00");}
     @Test void customisedWeeklyGroupTermsUseTheExistingCalculator(){

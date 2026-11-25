@@ -5059,3 +5059,17 @@ body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([
 @media (max-width: 420px) {
     .aws-console .app-station-mobile { display: none !important; }
 }
+
+.page-action-menu { position: relative; flex: 0 0 auto; }
+.page-action-menu > summary { display: inline-flex; align-items: center; gap: .45rem; list-style: none; cursor: pointer; }
+.page-action-menu > summary::-webkit-details-marker { display: none; }
+.page-action-menu > summary::after { content: ''; border: .25em solid transparent; border-top-color: currentColor; transform: translateY(.125em); }
+.page-action-options { position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 31; display: grid;
+    gap: 2px; min-width: 11rem; max-width: min(18rem, 85vw); max-height: min(65vh, 26rem);
+    overflow: auto; padding: 4px; border: 1px solid #b8c1cb; border-radius: 4px; background: #fff;
+    box-shadow: 0 4px 14px rgb(35 47 62 / 15%); }
+.page-action-options .app-btn { display: flex; width: 100%; height: auto; min-height: 32px;
+    justify-content: flex-start; white-space: normal; text-align: start; box-sizing: border-box; }
+
+.report-preview-search { display: inline-flex; margin: 0 .5rem .5rem 0; }
+.report-preview-search input { width: min(20rem, 75vw); }

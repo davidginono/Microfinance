@@ -42,6 +42,15 @@ public class ReconciliationService {
     private boolean groupAvailable(AppUserPrincipal actor){try{guard.requireActor(actor,"GROUP_LENDING_VIEW");return true;}catch(org.springframework.security.access.AccessDeniedException ignored){return false;}}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
     public Result report(AppUserPrincipal actor, Parameters p, boolean export) {
+        return readReport(actor,p,export,"");
+    }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
+    public Result preview(AppUserPrincipal actor,Parameters p,String search) {
+        if(search==null || search.length()>100 || search.chars().anyMatch(Character::isISOControl))
+            throw new IllegalArgumentException("reconciliation.error.parameters");
+        return readReport(actor,p,false,search.strip().toLowerCase(Locale.ROOT));
+    }
+    private Result readReport(AppUserPrincipal actor,Parameters p,boolean export,String search) {
         authorize(actor,export);
         if(p==null || p.from()==null || p.through()==null || p.cutoff()==null || p.from().getYear()<1900
             || p.through().isBefore(p.from()) || p.through().isAfter(p.from().plusDays(366)) || p.through().isAfter(clock.today())
@@ -55,7 +64,7 @@ public class ReconciliationService {
             var groups=reports.groups(actor,p,groupView);
             long count=groups.stream().mapToLong(Group::count).sum();
             if(export && count>5000)throw new IllegalArgumentException("reconciliation.error.large");
-            var rows=reports.rows(actor,p,export,groupView);
+            var rows=search.isEmpty()?reports.rows(actor,p,export,groupView):reports.rows(actor,p,false,groupView,search);
             if(export && rows.size()!=count)throw new IllegalArgumentException("reconciliation.error.large");
             var identity=reports.identity(actor);
             return new Result(p,identity[0],identity[1],export?rows:rows.stream().limit(25).toList(),groups,count,!export && rows.size()>25,selected);

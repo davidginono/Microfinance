@@ -13,12 +13,6 @@ public record LoanPrepaymentTerms(Schedule schedule, PartialInterest partialInte
     public LoanPrepaymentTerms {
         if (schedule == null || partialInterest == null || dayBasis == null) throw new IllegalArgumentException("prepayment.error.terms");
     }
-    public static LoanPrepaymentTerms product(LoanProductSetting p) {
-        var d=defaults();
-        return p==null?d:new LoanPrepaymentTerms(p.getPrepaymentSchedule()==null?d.schedule():p.getPrepaymentSchedule(),
-            p.getPartialPrepaymentInterest()==null?d.partialInterest():p.getPartialPrepaymentInterest(),
-            p.getSettlementDayBasis()==null?d.dayBasis():p.getSettlementDayBasis());
-    }
     public Map<String,String> snapshot() {
         return Map.of("version","PREPAYMENT_V1","schedule",schedule.name(),"partialInterest",partialInterest.name(),"dayBasis",dayBasis.name());
     }

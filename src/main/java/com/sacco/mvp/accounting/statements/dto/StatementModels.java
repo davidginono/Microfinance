@@ -9,6 +9,7 @@ public final class StatementModels {
     private StatementModels() {}
     public enum Kind { POSITION, INCOME, CASH_FLOW, EQUITY, NOTES, TRIAL, LEDGER }
     public record LedgerAccount(UUID id,String label) {}
+    public record LedgerRow(UUID accountId,Activity activity) {}
     public record Parameters(LocalDate from,LocalDate through,boolean institutionWide) {
         public LocalDate previousFrom(){return from.minusYears(1);}
         public LocalDate previousThrough(){return through.minusYears(1);}

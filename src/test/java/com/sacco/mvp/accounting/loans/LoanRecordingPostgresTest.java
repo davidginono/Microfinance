@@ -537,6 +537,20 @@ class LoanRecordingPostgresTest {
             var statement=(org.springframework.http.ResponseEntity<?>)controller.statementExport(actor,client,new org.springframework.mock.web.MockHttpServletRequest("GET","/finance/client-ledgers/"+client+"/pdf"),locale,new org.springframework.ui.ExtendedModelMap());try(var document=org.apache.pdfbox.Loader.loadPDF((byte[])statement.getBody())){assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document).toUpperCase(Locale.ROOT).replaceAll("\\s+"," ")).contains("25",language.equals("en")?"OUTSTANDING CHARGES":"TOZO AMBAZO HAZIJALIPWA");}
         }
     }
+    @Test void topUpRecordsAdditionalAmountWithServerDerivedPrincipalAndNoAgreementReference(){
+        var source=topUpSource();
+        var form=form();
+        form.setTopUpSourceLoanId(source);form.setApplicationDate(TODAY);form.setFirstPaymentDate(null);
+        form.setTopUpAdditionalAmount(new BigDecimal("475.48"));form.setPrincipal(new BigDecimal("8000.00"));form.setEvidence("");
+        var quote=service.interestQuote(actor,form);
+        assertThat(quote.schedule().stream().map(ScheduleRow::principal).reduce(BigDecimal.ZERO,BigDecimal::add))
+            .isEqualByComparingTo("1500.00");
+        UUID replacement=service.save(actor,form);
+        assertThat(service.save(actor,form)).isEqualTo(replacement);
+        assertThat(service.detail(actor,replacement).loan().principal()).isEqualByComparingTo("1500.00");
+        service.disburse(actor,topUpPost(replacement));
+        assertThat(service.topUp(actor,replacement).orElseThrow().cash()).isEqualByComparingTo("475.48");
+    }
     @Test void topUpSeparatesInternalSettlementFromCashAndExcludesFutureInterest(){
         var source=topUpSource();assertThat(service.detail(actor,source).loan().topUpEligible()).isTrue();
         var loan=recordTopUp(source);assertThat(service.detail(actor,source).loan().topUpEligible()).isFalse();var f=topUpPost(loan);var q=service.disbursementTopUp(actor,loan,TODAY).orElseThrow();

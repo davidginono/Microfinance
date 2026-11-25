@@ -10,6 +10,11 @@
         <div><dt><spring:message code="charges.sourceSettlement" /> (TZS)</dt><dd data-topup-charges><fmt:formatNumber value="${topUpQuote.charges}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.topUp.settlement" /> (TZS)</dt><dd data-topup-total><fmt:formatNumber value="${topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="recording.topUp.excluded" /> (TZS)</dt><dd data-topup-excluded><fmt:formatNumber value="${topUpQuote.excludedInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="charges.cashBeforeDeductions" /> (TZS)</dt><dd data-topup-cash><c:choose><c:when test="${not empty detail and not empty topUpQuote}"><fmt:formatNumber value="${detail.loan.principal-topUpQuote.total}" minFractionDigits="2" maxFractionDigits="2" /></c:when><c:otherwise>—</c:otherwise></c:choose></dd></div>
+        <c:if test="${empty detail}">
+            <div><dt><spring:message code="recording.topUp.newPrincipal" /> (TZS)</dt><dd data-topup-new-principal>—</dd></div>
+            <div><dt><spring:message code="recording.topUp.deductions" /> (TZS)</dt><dd data-topup-deductions>—</dd></div>
+            <div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-topup-net-cash>—</dd></div>
+        </c:if>
     </dl>
     <p><spring:message code="recording.topUp.explanation" /></p><p data-topup-error role="alert"></p>
 </section>

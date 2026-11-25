@@ -128,17 +128,69 @@ public class StatementPresentation {
             String text=local(note.text(),note.textSw(),locale);for(int offset=0;offset<text.length();offset+=500)rows.add(row(false,false,null,"",text.substring(offset,Math.min(text.length(),offset+500)),"",""));
         }
     }
+    public Document searchPreview(Document document,Snapshot snapshot,Kind kind,Set<UUID> matchingAccounts,String search) {
+        String term=search.strip().toLowerCase(Locale.ROOT);
+        if(term.isEmpty())return document;
+        var accountCodes=new HashSet<String>();
+        for(var balance:snapshot.balances())if(matchingAccounts.contains(balance.id()))accountCodes.add(balance.code());
+        var lines=switch(kind){
+            case POSITION -> snapshot.position();
+            case INCOME -> snapshot.income();
+            case CASH_FLOW -> snapshot.cashFlow();
+            default -> List.<Row>of();
+        };
+        var lineKeys=new HashSet<String>();
+        for(var line:lines)if(line.accounts().stream().anyMatch(matchingAccounts::contains))
+            lineKeys.add("/trial?kind="+kind+"&line="+line.key());
+        if(kind==Kind.EQUITY && equityMatches(snapshot,matchingAccounts,term,document))return document;
+        var rows=document.rows().stream().filter(row->row.heading() || row.total()
+            || !row.cells().isEmpty() && accountCodes.contains(row.cells().getFirst().text())
+            || row.details()!=null && lineKeys.stream().anyMatch(row.details()::endsWith)
+            || row.cells().stream().anyMatch(cell->cell.amount()==null && cell.text().toLowerCase(Locale.ROOT).contains(term))).toList();
+        return new Document(document.title(),document.style(),document.columns(),rows,document.detailsBefore(),document.asAt());
+    }
+
+    private static boolean equityMatches(Snapshot snapshot,Set<UUID> matchingAccounts,String term,Document document) {
+        if(document.columns().stream().anyMatch(column->column.label().toLowerCase(Locale.ROOT).contains(term)))return true;
+        if(snapshot.setup()!=null && snapshot.setup().components().stream()
+            .anyMatch(component->component.accounts().stream().anyMatch(matchingAccounts::contains)))return true;
+        return snapshot.balances().stream().filter(b->matchingAccounts.contains(b.id()) && "EQUITY".equals(b.type()))
+            .anyMatch(b->snapshot.equityColumns().stream().anyMatch(column->column.contains(b.code()) || column.contains(b.name())));
+    }
+
     public DisplayRow row(boolean total,boolean heading,String details,Object... values){return new DisplayRow(Arrays.stream(values).map(this::cell).toList(),total,heading,details);}
-    public Document ledger(Snapshot s,Balance b,List<Activity> activity,Locale locale){
-        var columns=List.of(new Column(label("fs.date",locale),false,.10f),
+    private List<Column> ledgerColumns(Locale locale) {
+        return List.of(new Column(label("fs.date",locale),false,.10f),
             new Column(label("fs.accountNumber",locale),false,.14f),new Column(label("fs.voucherNumber",locale),false,.17f),
             new Column(label("fs.description",locale),false,.23f),new Column(label("fs.debit",locale),true,.12f),
             new Column(label("fs.credit",locale),true,.12f),new Column(label("fs.balance",locale),true,.12f));
+    }
+
+    public Document ledger(Snapshot s,Balance b,List<Activity> activity,Locale locale){
+        var columns=ledgerColumns(locale);
         var rows=new ArrayList<DisplayRow>();rows.add(row(true,false,null,"","","",label("fs.opening",locale),"","",b.opening()));
         for(var a:activity)rows.add(row(false,false,a.sourceUrl(),a.date(),a.accountNumber()==null||a.accountNumber().isBlank()?b.code():a.accountNumber(),
             a.voucherNumber(),a.description(),a.debit(),a.credit(),b.opening().add(a.running())));
         rows.add(row(true,false,null,"","","",label("fs.periodTotal",locale),b.debit(),b.credit(),b.closing()));
         return new Document(label("fs.title.LEDGER",locale)+" — "+b.code()+" "+b.name(),"trial",columns,rows,-1,false);
     }
+    public Document ledger(Snapshot snapshot,List<LedgerRow> activity,Locale locale) {
+        var rows=new ArrayList<DisplayRow>();
+        var byAccount=new LinkedHashMap<UUID,List<Activity>>();
+        for(var movement:activity){
+            var entries=byAccount.computeIfAbsent(movement.accountId(),key->new ArrayList<>());
+            if(movement.activity()!=null)entries.add(movement.activity());
+        }
+        var balances=new HashMap<UUID,Balance>();
+        snapshot.balances().forEach(balance->balances.put(balance.id(),balance));
+        List<Column> columns=ledgerColumns(locale);
+        byAccount.forEach((id,entries)->{
+            var balance=balances.get(id);
+            rows.add(row(false,true,null,"",balance.code(),"",balance.name(),"","",""));
+            rows.addAll(ledger(snapshot,balance,entries,locale).rows());
+        });
+        return new Document(label("fs.title.LEDGER",locale),"trial",columns,rows,-1,false);
+    }
+
     private Cell cell(Object value){if(value instanceof BigDecimal amount){var f=new DecimalFormat("#,##0.00;(#,##0.00)",DecimalFormatSymbols.getInstance(Locale.UK));return new Cell(f.format(amount),amount);}return new Cell(value==null?"":com.sacco.mvp.service.ApplicationTimestamps.display(value),null);}
 }

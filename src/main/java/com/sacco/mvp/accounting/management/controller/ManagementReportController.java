@@ -38,13 +38,16 @@ public class ManagementReportController {
         private boolean run;
     }
     @InitBinder("filter") void bind(WebDataBinder binder){binder.setAllowedFields("from","through","cutoff","startAccount","endAccount","clientId","product","productId","page","run");}
-    @GetMapping public String screen(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,org.springframework.validation.BindingResult binding,Model m,Locale locale,HttpServletResponse response){
+    @GetMapping public String screen(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable String reportName,@ModelAttribute("filter") Filter f,org.springframework.validation.BindingResult binding,@RequestParam(defaultValue="") String previewSearch,Model m,Locale locale,HttpServletResponse response){
         Kind kind=kind(reportName);service.authorize(a,kind,false);defaults(f,kind);response.setHeader("Cache-Control","no-store");
         try{
             context(a,kind,reportName,f,m);
             if(binding.hasErrors())throw new IllegalArgumentException("management.error.parameters");
             if(f.isRun()){
-                var report=service.report(a,kind,parameters(f),false);
+                var report=previewSearch.isBlank()?service.report(a,kind,parameters(f),false):
+                    service.preview(a,kind,parameters(f),previewSearch);
+                m.addAttribute("previewSearch",previewSearch);
+                m.addAttribute("searchEmpty",!previewSearch.isBlank() && report.rows().isEmpty());
                 if(report.isReferenceLayout()) referenceContext(report,locale,m);
                 m.addAttribute("report",report);
                 record(a,report,"PREVIEW");

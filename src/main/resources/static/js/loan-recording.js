@@ -112,8 +112,9 @@
     let timer, controller, version = 0;
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
-      const approvedRate=recordForm.querySelector('[data-approved-rate]');if(approvedRate)approvedRate.hidden=true;
       const custom = mode.value === 'CUSTOM', reducing = custom && method.value === 'REDUCING_BALANCE';
+      const approvedRate=recordForm.querySelector('[data-approved-rate]');
+      if(approvedRate && custom)approvedRate.hidden=true;
       tenureType.hidden = !custom;
       unit.required = custom;
       if(!custom){
@@ -150,14 +151,18 @@
         tenureLimits.querySelector('[data-limit-unit]').textContent = region.dataset[unit.value.toLowerCase()] || '';
       }
       clearTimeout(timer); controller?.abort(); ++version;
-      recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));spinner.hidden = true;region.setAttribute('aria-busy','false'); output.textContent = '\u2014'; description.textContent = ''; description.hidden = true;
-      if(schedule){schedule.hidden = true;rows.replaceChildren();summary.textContent = '';}
-      if (!recordForm.querySelector('#principal').value || !unit.value || !recordForm.querySelector('#tenureValue').value
-        || (!custom && !recordForm.querySelector('#productId').value)
-        || (custom && !recordForm.querySelector(amount ? '#interestAmount' : '#interestPercent').value)) return;
+      const ready=recordForm.querySelector('#principal').value && unit.value && recordForm.querySelector('#tenureValue').value
+        && (custom ? recordForm.querySelector(amount ? '#interestAmount' : '#interestPercent').value : recordForm.querySelector('#productId').value);
+      if (!ready) {
+        recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));
+        spinner.hidden=true;region.setAttribute('aria-busy','false');output.textContent='—';description.hidden=true;
+        if(schedule){schedule.hidden=true;rows.replaceChildren();summary.textContent='';}
+        return;
+      }
+      spinner.hidden=false;region.setAttribute('aria-busy','true');description.hidden=true;
       const current = version;
       timer = setTimeout(async () => {
-        controller = new AbortController(); spinner.hidden = false; region.setAttribute('aria-busy','true');
+        controller = new AbortController();
         recordForm.dispatchEvent(new CustomEvent('loan:quote-pending'));
         const data = new URLSearchParams();new FormData(recordForm).forEach((value,key) => {if(typeof value === 'string')data.append(key,value);});
         try {
@@ -179,11 +184,17 @@
             summary.textContent = summary.dataset[quote.frequency.toLowerCase()] + ' \u00b7 ' + quote.tenureValue + ' ' + region.dataset[quote.tenureUnit.toLowerCase()];
             schedule.hidden = false;
           }
-        } catch(error) {if(current === version && error.name !== 'AbortError'){description.textContent = error.message || region.dataset.error;description.hidden = false;recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));}}
+        } catch(error) {
+          if(current === version && error.name !== 'AbortError'){
+            output.textContent='—';description.textContent=error.message || region.dataset.error;description.hidden=false;
+            if(schedule){schedule.hidden=true;rows.replaceChildren();summary.textContent='';}
+            recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));
+          }
+        }
         finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-settled'));}}
       }, 150);
     }
-    const pricing = new Set(['loanMode','productId','principal','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod','applicationDate','customApplicationCharge','customProcessingCharge','insurancePremium','customProcessingPercent','customInsurancePercent','evidence']);
+    const pricing = new Set(['loanMode','productId','principal','topUpAdditionalAmount','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod','applicationDate','customApplicationCharge','customProcessingCharge','insurancePremium','customProcessingPercent','customInsurancePercent','evidence']);
     const changed = event => {if(pricing.has(event.target.name))refresh();};
     recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
     recordForm.addEventListener('loan:quote-retry',refresh);

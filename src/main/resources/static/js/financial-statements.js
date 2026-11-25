@@ -32,9 +32,11 @@
   const exportForm=document.querySelector('[data-fs-export]');
   const saveForm=document.querySelector('[data-fs-save]');
   const comparison=workspace.querySelector('[data-fs-comparison-setting]');
+  const search=workspace.querySelector('[data-report-preview-search]');
   const section=()=>workspace.querySelector('[data-fs-report-section]');
   const applyContext=current=>{
    const kind=current.querySelector('[data-fs-paper]').dataset.kind;
+   if(search)search.value=current.dataset.previewSearch || '';
    for(const link of document.querySelectorAll('[data-fs-nav]')){
     const active=link.dataset.fsNav===(kind==='LEDGER'?'ledger':'statements');
     link.classList.toggle('shell-nav-active',active);
@@ -94,6 +96,7 @@
     current.replaceWith(next);
     applyContext(next);
     renderedUrl=url;
+    if(!push && !focus && search)history.replaceState(history.state,'',url);
     if(push)history.pushState({...history.state,statementPreview:true},'',url);
     if(focus)next.querySelector('.fs-paper-scroll')?.focus({preventScroll:true});
    }catch(error){
@@ -104,10 +107,21 @@
    }
   }
 
+  const binding=search && window.AppSearch?.bind(search,()=>{
+   const url=new URL(renderedUrl);
+   url.searchParams.delete('page');
+   const term=search.value.trim();
+   if(term)url.searchParams.set('previewSearch',term);
+   else url.searchParams.delete('previewSearch');
+   void switchStatement(url.href,false,false);
+  },()=>{
+   pending?.abort();pending=null;window.AppLoading.end(section());lockActions(false);
+  });
+
   workspace.addEventListener('click',event=>{
    const link=event.target instanceof Element?event.target.closest('[data-fs-tab], [data-fs-drilldown]'):null;
    if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
-   event.preventDefault();
+   event.preventDefault();binding?.cancel();
    if(link.href!==renderedUrl)void switchStatement(link.href,true,link.hasAttribute('data-fs-drilldown'));
    else{
     pending?.abort();pending=null;window.AppLoading.end(section());lockActions(false);
@@ -119,7 +133,7 @@
    if(event.state?.statementPreview && location.href!==renderedUrl)void switchStatement(location.href,false,false);
    else if(event.state?.statementPreview && pending){pending.abort();pending=null;window.AppLoading.end(section());lockActions(false);}
   });
-  window.addEventListener('pagehide',()=>pending?.abort());
+  window.addEventListener('pagehide',()=>{binding?.cancel();pending?.abort();});
   applyContext(section());
  }
  if(window.WorkspaceNavigation)window.WorkspaceNavigation.onReady(init);

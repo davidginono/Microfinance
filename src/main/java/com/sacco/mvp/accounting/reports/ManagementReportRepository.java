@@ -229,6 +229,12 @@ public class ManagementReportRepository {
         return read(a.getSaccoId(),a.getStationId(),kind,p,export);
     }
     public Data read(String institution,String branch,Kind kind,Parameters p,boolean export){
+        return read(institution,branch,kind,p,export,"");
+    }
+    public Data read(AppUserPrincipal actor,Kind kind,Parameters p,String search){
+        return read(actor.getSaccoId(),actor.getStationId(),kind,p,false,search);
+    }
+    private Data read(String institution,String branch,Kind kind,Parameters p,boolean export,String search){
         var m=parameters(institution,branch,p)
             .addValue("disbursementPeriod",kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.LOAN_PORTFOLIO)
             .addValue("startAccount",p.startAccount(),Types.OTHER)
@@ -248,7 +254,19 @@ public class ManagementReportRepository {
             return amount+" as "+field;
         }).reduce((x,y)->x+","+y).orElseThrow();
         var total=jdbc.queryForMap(source+" select count(*) count,"+sums+" from report_rows",m);
-        var rows=jdbc.query(source+" select * from report_rows order by \"groupName\",\"rowOrder\" limit :limit offset :offset",m,(r,n)->reportRow(r,kind));
+        String searchFilter="";
+        if(!search.isEmpty()){
+            m.addValue("previewSearch",search);
+            String account=kind==Kind.CASHBOOK?"r.\"groupName\",":"";
+            searchFilter="""
+                where strpos(lower(concat_ws(' ', %s
+                    to_jsonb(r)->>'postingAccount',to_jsonb(r)->>'disbursementAccount',
+                    to_jsonb(r)->>'clientNumber',to_jsonb(r)->>'loanId',to_jsonb(r)->>'reference',
+                    to_jsonb(r)->>'documentReference',to_jsonb(r)->>'documentNumber',
+                    to_jsonb(r)->>'reversesReference')), :previewSearch)>0
+                """.formatted(account);
+        }
+        var rows=jdbc.query(source+" select r.* from report_rows r "+searchFilter+" order by \"groupName\",\"rowOrder\" limit :limit offset :offset",m,(r,n)->reportRow(r,kind));
         var groups=jdbc.query(source+" select \"groupName\",count(*) count,"+sums+" from report_rows group by \"groupName\" order by \"groupName\" limit 1001",m,(r,n)->new Group(r.getString("groupName"),r.getLong("count"),totals(row(r),money)));
         long excluded=kind==Kind.DAILY_COLLECTIONS?jdbc.queryForObject("""
             select count(*) from loan_repayment_transactions t

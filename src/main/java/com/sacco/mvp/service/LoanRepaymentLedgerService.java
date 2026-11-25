@@ -113,8 +113,49 @@ public class LoanRepaymentLedgerService {
     public List<com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository.Waiver> interestWaivers(UUID id,AppUserPrincipal actor,int page){
         return prepayments.history(readableLedger(id,actor),page);
     }
+    public record WaiverInstallment(UUID id, int number, LocalDate dueDate, BigDecimal scheduled, BigDecimal eligible) {}
+    public record WaiverSchedule(String loanNumber, long sequence, boolean legacy, boolean active, List<WaiverInstallment> installments) {}
+
+    @Transactional(readOnly=true)
+    public WaiverSchedule waiverSchedule(UUID id,AppUserPrincipal actor,LocalDate date) {
+        var ledger=readableLedger(id,actor);
+        var loan=loans.findById(id).orElseThrow();
+        boolean active=Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus())
+            && !transactions.settledThroughTopUp(id);
+        boolean mayWaive=actor.getClaims().contains(UserClaim.LOAN_INTEREST_WAIVE.name());
+        boolean validDate=date!=null && !date.isBefore(ledger.getDisbursementDate()) && !date.isAfter(clock.today());
+        var amounts=active && mayWaive && validDate?prepayments.earned(id,date):Map.<UUID,BigDecimal>of();
+        var schedule=active && mayWaive && validDate?rows(id).stream().map(row->new WaiverInstallment(
+            row.getId(),row.getInstallmentNumber(),row.getDueDate(),row.getInterest(),prepayments.unpaidEarned(row,amounts))).toList()
+            :List.<WaiverInstallment>of();
+        return new WaiverSchedule(ledger.getLoanId(),ledger.getNextSequence(),prepayments.terms(id).isEmpty(),active,schedule);
+    }
+
+    @Transactional
+    public UUID waiveInstallments(UUID id,AppUserPrincipal actor,UUID key,LocalDate date,String reason,
+                                     Long sequence,Map<UUID,BigDecimal> parts) {
+        if(sequence==null || parts==null || parts.isEmpty() || parts.size()>600
+            || parts.values().stream().anyMatch(a->a==null || a.signum()<=0 || a.scale()>2 || a.precision()-a.scale()>16))
+            throw new IllegalArgumentException("prepayment.error.amount");
+        var selections=new LinkedHashMap<UUID,BigDecimal>();
+        parts.forEach((installment,amount)->selections.put(installment,money(amount)));
+        var total=selections.values().stream().reduce(ZERO,BigDecimal::add);
+        return writeWaiver(id,actor,key,date,total,reason,null,sequence,selections);
+    }
+
+    @Transactional
+    public UUID reverseInterestWaiver(UUID id,AppUserPrincipal actor,UUID key,LocalDate date,String reason,UUID reverses) {
+        if(reverses==null)throw new IllegalArgumentException("prepayment.error.input");
+        return writeWaiver(id,actor,key,date,null,reason,reverses,null,null);
+    }
+
     @Transactional
     public UUID waiveInterest(UUID id,AppUserPrincipal actor,UUID key,LocalDate date,BigDecimal amount,String reason,UUID reverses){
+        return writeWaiver(id,actor,key,date,money(amount),reason,reverses,null,null);
+    }
+
+    private UUID writeWaiver(UUID id,AppUserPrincipal actor,UUID key,LocalDate date,BigDecimal amount,String reason,
+                             UUID reverses,Long sequence,Map<UUID,BigDecimal> parts) {
         requireStaff(actor,UserClaim.LOAN_INTEREST_WAIVE);
         if(reverses!=null)requireStaff(actor,accountingGuard.recordedLoan(id)?UserClaim.LOAN_RECORDING_REVERSE:UserClaim.LOAN_REPAYMENTS_REVERSE);
         // All recorded monetary commands lock the owning recorded source before its ledger.
@@ -122,7 +163,7 @@ public class LoanRepaymentLedgerService {
         LoanLedger l=lockedLedger(id,actor);readableLedger(id,actor);
         var loan=loans.findById(id).orElseThrow();require(Set.of(LoanStatus.DISBURSED,LoanStatus.PAR,LoanStatus.DEFAULTED).contains(loan.getStatus()),"state");
         require(date!=null,"date");requireAfterAdjustment(l,date);var rows=rows(id);
-        UUID result=prepayments.waive(l,rows,actor,key,date,money(amount),reason,reverses);installments.saveAll(rows);installments.flush();
+        UUID result=prepayments.waive(l,rows,actor,key,date,amount,reason,reverses,sequence,parts);installments.saveAll(rows);installments.flush();
         updateProjection(l,loan,rows);return result;
     }
 

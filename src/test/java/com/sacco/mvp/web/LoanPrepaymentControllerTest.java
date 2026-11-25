@@ -26,19 +26,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 class LoanPrepaymentControllerTest {
     AnnotationConfigWebApplicationContext context;MockMvc mvc;LoanRepaymentLedgerService ledger;
-    final UUID loan=UUID.randomUUID(),key=UUID.randomUUID();
+    final UUID loan=UUID.randomUUID(),key=UUID.randomUUID(),installment=UUID.randomUUID();
     @BeforeEach void setup(){context=new AnnotationConfigWebApplicationContext();context.setServletContext(new MockServletContext());context.register(Config.class);context.refresh();ledger=context.getBean(LoanRepaymentLedgerService.class);when(context.getBean(ApplicationClock.class).today()).thenReturn(LocalDate.of(2026,10,19));mvc=MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();}
     @AfterEach void stop(){context.close();}
     AppUserPrincipal actor(UserClaim... claims){return new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),Set.of(claims));}
-    org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder command(){return post("/repayments/loans/"+loan+"/interest-waivers").param("requestKey",key.toString()).param("effectiveDate","2026-10-19").param("amount","5.00").param("reason","Approved concession").param("confirmed","true");}
+    org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder command(){return post("/repayments/loans/"+loan+"/interest-waivers").param("requestKey",key.toString()).param("effectiveDate","2026-10-19").param("selections[0].installmentId",installment.toString()).param("selections[0].selected","true").param("selections[0].amount","5.00").param("sequence","2").param("reason","Approved concession").param("confirmed","true");}
     @Test void incompleteSharedEvidenceKeepsRecoverableFeedbackAndSubmittedValues()throws Exception{
-        doThrow(new IllegalArgumentException("recording.error.sharedWaiverHistory")).when(ledger).waiveInterest(any(),any(),any(),any(),any(),any(),any());mvc.perform(command().with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf())).andExpect(status().is3xxRedirection()).andExpect(flash().attribute("prepaymentError","recording.error.sharedWaiverHistory")).andExpect(flash().attributeExists("waiverForm"));
+        doThrow(new IllegalArgumentException("recording.error.sharedWaiverHistory")).when(ledger).waiveInstallments(any(),any(),any(),any(),any(),any(),any());mvc.perform(command().with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf())).andExpect(status().is3xxRedirection()).andExpect(flash().attribute("prepaymentError","recording.error.sharedWaiverHistory")).andExpect(flash().attributeExists("waiverForm"));
     }
     @Test void waiverRequiresCsrf()throws Exception{mvc.perform(command().with(user(actor(UserClaim.LOAN_INTEREST_WAIVE)))).andExpect(status().isForbidden());verifyNoInteractions(ledger);}
     @Test void viewAndPostingClaimsDoNotGrantWaiver()throws Exception{mvc.perform(command().with(user(actor(UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_POST))).with(csrf())).andExpect(status().isForbidden());verifyNoInteractions(ledger);}
     @Test void validWaiverUsesTheScopedPathAndIgnoresInjectedActorAndLoanFields()throws Exception{
-        mvc.perform(command().param("loanId",UUID.randomUUID().toString()).param("actorId",UUID.randomUUID().toString()).with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf())).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/repayments/loans/"+loan+"#interest-waivers"));
-        verify(ledger).waiveInterest(eq(loan),any(),eq(key),eq(LocalDate.of(2026,10,19)),eq(new java.math.BigDecimal("5.00")),eq("Approved concession"),isNull());
+        mvc.perform(command().param("loanId",UUID.randomUUID().toString()).param("actorId",UUID.randomUUID().toString()).with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf())).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/repayments/loans/"+loan+"/interest-waivers"));
+        verify(ledger).waiveInstallments(eq(loan),any(),eq(key),eq(LocalDate.of(2026,10,19)),eq("Approved concession"),eq(2L),eq(Map.of(installment,new java.math.BigDecimal("5.00"))));
     }
     @Test void settlementIsNotAClientWorkspace()throws Exception{
         mvc.perform(get("/repayments/loans/"+loan+"/settlement").with(user(actor(UserClaim.MEMBER_LOANS_VIEW)))).andExpect(status().isForbidden());verifyNoInteractions(ledger);
@@ -54,16 +54,16 @@ class LoanPrepaymentControllerTest {
     }
     @Test void financeWaiverReturnsToTheSameLoanWorkspace()throws Exception{
         mvc.perform(post("/finance/loan-records/"+loan+"/interest-waivers")
-            .param("requestKey",key.toString()).param("effectiveDate","2026-10-19").param("amount","5.00")
+            .param("requestKey",key.toString()).param("effectiveDate","2026-10-19").param("selections[0].installmentId",installment.toString()).param("selections[0].selected","true").param("selections[0].amount","5.00").param("sequence","2")
             .param("reason","Approved concession").param("confirmed","true")
             .with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf()))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/"+loan+"#interest-waivers"));
-        verify(ledger).waiveInterest(eq(loan),any(),eq(key),any(),any(),eq("Approved concession"),isNull());
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/"+loan+"/interest-waivers"));
+        verify(ledger).waiveInstallments(eq(loan),any(),eq(key),any(),eq("Approved concession"),eq(2L),any());
     }
     @Test void failedWaiverPreservesInputWithoutPosting()throws Exception{
-        mvc.perform(post("/finance/loan-records/"+loan+"/interest-waivers").param("amount","5.00").param("reason","Keep this reason")
+        mvc.perform(post("/finance/loan-records/"+loan+"/interest-waivers").param("selections[0].installmentId",installment.toString()).param("selections[0].selected","true").param("selections[0].amount","5.00").param("sequence","2").param("reason","Keep this reason")
             .with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))).with(csrf()))
-            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/"+loan+"#interest-waivers"))
+            .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/finance/loan-records/"+loan+"/interest-waivers"))
             .andExpect(flash().attribute("prepaymentError","prepayment.error.confirmation"))
             .andExpect(flash().attributeExists("waiverForm"));
         verifyNoInteractions(ledger);
@@ -71,10 +71,8 @@ class LoanPrepaymentControllerTest {
     @Configuration @EnableWebMvc @EnableWebSecurity @EnableMethodSecurity static class Config {
         @Bean LoanRepaymentLedgerService ledger(){return mock(LoanRepaymentLedgerService.class);}
         @Bean ApplicationClock clock(){return mock(ApplicationClock.class);}
-        @Bean AdminService admin(){return mock(AdminService.class);}
-        @Bean AdminScopeService scope(){return mock(AdminScopeService.class);}
         @Bean("access") AccessControlService access(){return new AccessControlService();}
-        @Bean LoanPrepaymentController controller(LoanRepaymentLedgerService l,ApplicationClock c,AdminService a,AdminScopeService s){return new LoanPrepaymentController(l,a,s);}
+        @Bean LoanPrepaymentController controller(LoanRepaymentLedgerService l,ApplicationClock c){return new LoanPrepaymentController(l,c);}
         @Bean InternalResourceViewResolver views(){return new InternalResourceViewResolver("/WEB-INF/jsp/",".jsp");}
         @Bean SecurityFilterChain security(HttpSecurity http)throws Exception{return http.authorizeHttpRequests(a->a.anyRequest().authenticated()).build();}
     }

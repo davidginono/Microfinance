@@ -18,7 +18,7 @@
                 <c:forEach var="item" items="${reportKinds}"><option value="${item}" ${kind eq item ? 'selected' : ''}><spring:message code="management.title.${item}" /></option></c:forEach>
             </select></label>
             <label><spring:message code="fs.from" /><input type="date" class="aws-control" name="from" value="${from}" required /></label>
-            <label><spring:message code="fs.through" /><input type="date" class="aws-control" name="through" value="${through}" required /></label>
+            <label><spring:message code="report.endDate" /><input type="date" class="aws-control" name="through" value="${through}" required /></label>
             <button class="app-btn btn-neutral"><spring:message code="common.view" /></button>
         </form>
     </div></section>

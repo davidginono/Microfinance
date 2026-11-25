@@ -40,13 +40,8 @@
                 form.querySelectorAll('[data-group-guarantee], [data-group-confirmation], [data-group-agreement-upload]').forEach(function(node){node.hidden=!group;node.querySelectorAll('input,button').forEach(function(field){field.disabled=!group;});});
                 var draft=form.querySelector('[data-recording-draft]');if(group&&draft)draft.disabled=false;
             }
-            var debts=form.querySelector('[data-group-debt-list]'),debtTemplate=form.querySelector('[data-group-debt-template]');
-            function numberDebts(){debts.querySelectorAll('[data-group-debt]').forEach(function(row,index){row.querySelectorAll('input,select').forEach(function(input){var field=input.dataset.debtField||input.name.substring(input.name.lastIndexOf('.')+1);input.name=(input.name.charAt(0)==='_'?'_':'')+'groupApplication.debts['+index+'].'+field;});});form.querySelector('[data-add-group-debt]').disabled=debts.children.length>=50;}
-            form.querySelector('[data-add-group-debt]').addEventListener('click',function(){if(debts.children.length>=50)return;var row=debtTemplate.content.cloneNode(true);debts.append(row);numberDebts();debts.lastElementChild.querySelector('input').focus();});
-            debts.addEventListener('click',function(event){var button=event.target.closest('[data-remove-group-debt]');if(button){button.closest('[data-group-debt]').remove();numberDebts();form.querySelector('[data-add-group-debt]').focus();}});
             async function load() {
                 var sequence=++request;if(pending)pending.abort();error.hidden=true;
-                debts.replaceChildren();
                 panel.removeAttribute('aria-busy');
                 form.elements['groupApplication.expectedVersion'].value='';
                 form.elements['groupApplication.checked'].checked=false;clearAgreement();
@@ -56,13 +51,12 @@
                     var response=await fetch(form.dataset.groupRoot+'/'+encodeURIComponent(select.value),{credentials:'same-origin',headers:{Accept:'application/json'},signal:pending.signal});
                     if(!response.ok)throw new Error('group');var context=await response.json();if(sequence!==request)return;var data=context.setup;
                     form.elements['groupApplication.expectedVersion'].value=data.version;
-                    var options=debtTemplate.content.querySelector('select');options.replaceChildren();data.people.forEach(function(person){options.add(new Option(person.number+' · '+person.name,person.id));});
                 } catch (failure) {if(failure.name!=='AbortError'&&sequence===request)error.hidden=false;}
                 finally {if(sequence===request)panel.removeAttribute('aria-busy');}
             }
             form.addEventListener('change',toggle);kind.addEventListener('change',toggle);
             if(error){select.addEventListener('change',load);form.querySelector('[data-group-retry]').addEventListener('click',load);}
-            toggle();numberDebts();if(debts.children.length)form.querySelector('[data-group-debts]').open=true;
+            toggle();
         });
     }
     if(window.WorkspaceNavigation)window.WorkspaceNavigation.onReady(initialize);else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){initialize(document);});else initialize(document);

@@ -8,7 +8,7 @@
 <%@ include file="../fragments/sidebar.jspf" %>
 <link rel="stylesheet" href="<c:url value='/css/loan-repayments.css' />" /><link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" />
 <div class="repayment-workspace">
-    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="repayment.title" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p></div>
+    <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title" id="repayments-loan-title"><spring:message code="repayment.title" /></h1><p><spring:message code="repayment.asOf" /> <c:out value="${ledger.asOf}" /></p><c:if test="${not empty waiverPageLink}"><a class="app-btn btn-neutral" href="<c:url value='${waiverPageLink}' />"><sec:authorize access="@access.has(principal,'LOAN_INTEREST_WAIVE')" var="mayWaiveInterest" /><spring:message code="${mayWaiveInterest?'prepayment.waiveAction':'prepayment.history'}" /></a></c:if></div>
     <c:if test="${not empty repaymentError}"><div class="repayment-error" role="alert"><spring:message code="${repaymentError}" /></div></c:if>
     <c:if test="${ledger.financialState=='WRITTEN_OFF' or ledger.financialState=='DISBURSEMENT_REVERSED'}"><p role="status"><span data-resource-status="${ledger.financialState}"><spring:message code="recording.status.${ledger.financialState}" /></span>. <spring:message code="adjustment.historicalSchedule" /></p></c:if>
     <section class="repayment-section"><h2><spring:message code="recording.loanDetails" /></h2><dl class="repayment-facts erp-detail-facts">
@@ -86,4 +86,4 @@
     </section></c:if>
 </div>
 <script src="<c:url value='/js/loan-repayments.js' />" defer></script>
-<%@ include file="interest-waivers.jspf" %><%@ include file="../fragments/footer.jspf" %>
+<%@ include file="../fragments/footer.jspf" %>

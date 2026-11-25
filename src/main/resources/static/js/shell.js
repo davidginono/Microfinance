@@ -2343,3 +2343,18 @@
         syncStationOptions();
     });
 }());
+
+document.addEventListener('click', event => {
+    document.querySelectorAll('[data-page-action-menu][open]').forEach(menu => {
+        if (!menu.contains(event.target) || event.target.closest('a[href], button:not(:disabled)')) menu.open = false;
+    });
+});
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const menu = event.target.closest?.('[data-page-action-menu][open]');
+    if (menu) {
+        menu.open = false;
+        menu.querySelector('summary').focus();
+        event.preventDefault();
+    }
+});

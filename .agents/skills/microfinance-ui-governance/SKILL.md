@@ -43,6 +43,8 @@ Use the shared [split-view contract](../microfinance-table-standard/SKILL.md#aws
 
 ## Resource Creation And Details
 
+- Loan details and staff details headers with three or more page-level commands use one Actions menu. Keep section controls and form footers in their own sections. Preserve each command’s permission, eligibility, confirmation, and form behavior.
+
 - Profile entry uses the common editor, fields, actions and wizard listed in `AGENTS.md` across Portal registration, Complete Profile and Staff Client Profile. Extend those sources instead of introducing another profile layout or footer. The Client Number is generated and belongs in authorized details, not a profile-entry control. Save draft bypasses completeness checks while retaining supplied-value validation, scope and verification gates.
 - Staff can create provisional client records. Clients register and activate their own user accounts. Keep these actions distinct in labels and help text.
 - Authorized staff save provisional profile edits directly using Save changes. Use a Summary step and optional attachments; do not submit staff-entered profiles for further review. Show Recorded by staff without implying independent verification or portal access. Keep client-submitted review and its evidence requirements separate.

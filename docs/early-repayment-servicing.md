@@ -2,9 +2,7 @@
 
 Implemented for the existing local repayment ledger and directly recorded individual/batch receipts. This is an Oracle-inspired servicing increment, not an Oracle integration or certification of an institution's lending policy.
 
-## Defaults and product configuration
-
-From a product's edit page, open **Early repayment rules**. Configuration requires the existing `LOAN_PRODUCTS_CONFIGURE` claim and an institution-scoped workspace administrator. Save retains the policy reference/reason and before/after rules in the permanent audit.
+## Defaults for new loans
 
 Defaults are `LAST_INSTALMENTS`, `RECALCULATE`, and `ACTUAL_PERIOD`:
 
@@ -32,7 +30,7 @@ Individual and batch receipt previews use the same payment calculation as postin
 
 ## Settlement and waivers
 
-The standalone settlement page was removed at the user's request. Its old URLs redirect to the existing loan record or repayment details. Authorized staff use the optional **Waive unpaid earned interest** section in those details; waiver history and independent linked reversals remain with the loan. Failed commands retain entered values and return to the same workspace. Product configuration, dated backend calculations and automatic receipt/batch prepayment treatment remain unchanged. Future scheduled interest is not today's settlement amount.
+The former settlement URLs redirect to the existing loan or repayment details. The Actions menu opens the dedicated **Waive interest** page, which shows scheduled and eligible interest for each actual instalment. Authorized staff select instalments, adjust the prefilled eligible amounts, and save one auditable concession. The page also shows waiver history and independent linked reversals. The transaction rechecks the selected amounts and loan sequence before saving. Future scheduled interest is not today's settlement amount.
 
 `LOAN_INTEREST_WAIVE` is a new, explicitly assigned claim, shown as **Waive interest** in the access matrix. It is not added to role defaults. A waiver has a positive exact-cent amount limited to unpaid earned interest, an effective date, reason/evidence, scoped idempotency key and permanent audit. It changes neither cash received nor interest paid and posts no invented cash or accrual journal. The current accounting model recognizes interest on collection; a later GL accrual/recognition increment will require its own waiver posting matrix.
 

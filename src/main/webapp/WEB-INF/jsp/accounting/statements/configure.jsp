@@ -11,16 +11,16 @@
     <c:choose><c:when test="${ledgerForm}">
     <label data-loan-choice data-lazy-choice data-choice-url="<c:url value='/reports/financial/statements/ledger/accounts' />">
      <spring:message code="fs.account" />
-     <select class="aws-control" name="account" required data-choice-select data-searchable="true">
-      <option value="" data-empty-option="true"><spring:message code="voucher.chooseAccount" /></option>
+     <select class="aws-control" name="account" data-choice-select data-searchable="true">
+      <option value="" data-empty-option="true"><spring:message code="fs.allAccounts" /></option>
       <c:if test="${not empty ledgerAccount}"><option selected value="${ledgerAccount.id}"><c:out value="${ledgerAccount.label}" /></option></c:if>
      </select><%@ include file="../loans/choice-search.jspf" %>
     </label>
     </c:when><c:otherwise>
     <label><spring:message code="fs.statement" /><select class="aws-control" name="kind"><c:forEach items="${kinds}" var="k"><option value="${k}" ${kind==k?'selected':''}><spring:message code="fs.title.${k}" /></option></c:forEach></select></label>
     </c:otherwise></c:choose>
-    <label><spring:message code="fs.from" /><input class="aws-control" type="date" name="from" value="${from}" max="${today}" required /></label>
-    <label><spring:message code="fs.through" /><input class="aws-control" type="date" name="through" value="${through}" max="${today}" data-today="${today}" required /></label>
+    <label><spring:message code="report.startDate" /><input class="aws-control" type="date" name="from" value="${from}" max="${today}" required /></label>
+    <label><spring:message code="report.endDate" /><input class="aws-control" type="date" name="through" value="${through}" max="${today}" data-today="${today}" required /></label>
     <c:if test="${not ledgerForm}"><label><spring:message code="fs.scope" /><select class="aws-control" name="institutionWide"><option value="false" ${not institutionWide?'selected':''}><spring:message code="fs.branchScope" /></option><sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_INSTITUTION')"><option value="true" ${institutionWide?'selected':''}><spring:message code="fs.institutionScope" /></option></sec:authorize></select></label></c:if>
    </div>
   </section>

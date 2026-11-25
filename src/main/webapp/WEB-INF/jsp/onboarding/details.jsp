@@ -3,10 +3,12 @@
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb'/>"><a class="erp-page-path__link" href="<c:url value='/finance/clients/onboarding'/>"><spring:message code="kyc.title"/></a><span aria-hidden="true">&#8250;</span><span aria-current="page"><spring:message code="kyc.details"/></span></nav>
 <div class="erp-page-header erp-detail-header" data-aws-page-header>
 <h1 class="erp-page-title"><spring:message code="kyc.details"/></h1>
-<c:if test="${not historical}"><div class="accounting-actions" data-aws-action-pin="true">
+<c:if test="${not historical}"><sec:authorize access="@access.hasAny(principal,'LOAN_RECORDING_CREATE','CLIENT_ONBOARDING_UPDATE')"><details class="page-action-menu" data-page-action-menu data-aws-action-pin="true">
+        <summary class="app-btn btn-neutral"><spring:message code="common.actions" /></summary>
+        <div class="page-action-options">
     <sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-records/new'><c:param name='clientId' value='${client.id}'/></c:url>"><spring:message code="applications.create"/></a></sec:authorize>
     <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/edit'/>"><spring:message code="kyc.edit"/></a><c:if test="${client.state=='DRAFT' or client.state=='RECORDED'}"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/${client.id}/documents/new'/>"><spring:message code="kyc.addDocument"/></a></c:if></sec:authorize>
-</div></c:if>
+</div></details></sec:authorize></c:if>
 </div>
 <c:if test="${provisionalClientCreated}">
     <div class="workspace-flashbar" data-workspace-flashbar><div class="app-notification-bar console-message" data-message-type="success" data-app-toast role="status" tabindex="-1">

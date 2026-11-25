@@ -298,7 +298,7 @@ public class LoanRecordingService {
     }
     @Transactional(readOnly=true)
     public Quote interestQuote(AppUserPrincipal a,RecordForm f){
-        authorize(a,"CREATE");money(f.getPrincipal());check(Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"terms");
+        authorize(a,"CREATE");if(f.getTopUpSourceLoanId()!=null)deriveTopUp(a,f);money(f.getPrincipal());check(Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"terms");
         if("CONFIGURED".equals(f.getLoanMode()) && f.getTenureValue()==null){
             check(f.getProductId()!=null,"product");var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));
             f.setTenureUnit(p.getResolvedTenureUnit());f.setTenureValue(p.getResolvedMinimumTenure());
@@ -308,7 +308,7 @@ public class LoanRecordingService {
         return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),scheduleRows(result,null),tenure(f).unit(),tenure(f).value());
     }
     @Transactional(readOnly=true)
-    public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");boolean group="GROUP".equals(f.getLoanFor());validateRecord(f,group);check(group||records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);if(group)simpleGroups.prepare(a,f,product,result,false);
+    public Quote preview(AppUserPrincipal a,RecordForm f){authorize(a,"CREATE");if(f.getTopUpSourceLoanId()!=null)deriveTopUp(a,f);boolean group="GROUP".equals(f.getLoanFor());validateRecord(f,group);check(group||records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var result=calculate(f,product);if(group)simpleGroups.prepare(a,f,product,result,false);
         return new Quote(product.getDisplayName(),product.getInterestRate(),product.getInterestMethod().name(),product.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),List.of(),tenure(f).unit(),tenure(f).value());}
 
     @Transactional(readOnly=true)
@@ -343,6 +343,7 @@ public class LoanRecordingService {
     }
 
     private void validateLoanStep(AppUserPrincipal actor,RecordForm form,boolean group,UUID editingId) {
+        var settlement=form.getTopUpSourceLoanId()==null?null:deriveTopUp(actor,form);
         validateRecord(form,group);
         var selected=product(actor,form);
         var calculation=calculate(form,selected);
@@ -365,12 +366,8 @@ public class LoanRecordingService {
         evidence.validateProductFields(actor,form,false);
         var plan=charges.validateRecordingQuote(actor,form,selected,!group);
         if(group && !plan.supported())throw new IllegalArgumentException("simpleGroup.error.charges");
-        if(form.getTopUpSourceLoanId()!=null){
-            var settlement=topUpQuote(actor,form.getTopUpSourceLoanId(),form.getApplicationDate(),null);
-            check(settlement.clientId().equals(form.getClientId()),"client");
+        if(settlement!=null)
             check(form.getPrincipal().subtract(plan.deductions()).compareTo(settlement.total())>0,"topUpCash");
-            text(form.getEvidence(),500,true);
-        }
     }
 
     private void validateRecordingUploads(AppUserPrincipal actor,RecordForm form,boolean group,
@@ -516,7 +513,9 @@ public class LoanRecordingService {
     }
     private UUID saveInternal(AppUserPrincipal a,RecordForm f,List<org.springframework.web.multipart.MultipartFile> files,UUID borrowerParty,String payoutSnapshot,LoanApplication editing,boolean keepGroupConsent){
         validateFiles(files);
-        authorize(a,"CREATE");validateRecord(f,borrowerParty!=null);
+        authorize(a,"CREATE");
+        if(f.getTopUpSourceLoanId()!=null && f.getTopUpAdditionalAmount()!=null)f.setPrincipal(null);
+        validateRecord(f,borrowerParty!=null);
         if(editing!=null && "GROUP".equals(f.getLoanFor()))f.setFirstPaymentDate(editing.getFirstRepaymentDate());
         f.setExpenses(null);
         if(borrowerParty==null){
@@ -532,9 +531,18 @@ public class LoanRecordingService {
             existingDraft=loans.findById(f.getApplicationId()).orElseThrow();
         }
         var namedUploads=f.getApplicationDetails()==null?null:evidence.prepare(a,f,files);
-        check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");var product=product(a,f);var calculation=calculate(f,product);
+        check(borrowerParty!=null || records.client(a,f.getClientId()).isPresent(),"client");
         if("GROUP".equals(f.getLoanFor()))validateGroupConsent(f,namedUploads,keepGroupConsent);
         var shared=borrowerParty==null?sharedCredit.lockForRecording(a,f.getClientId()):com.sacco.mvp.grouplending.dto.SharedCreditExposure.NONE;
+        TopUpQuote settlement=null;
+        if(f.getTopUpSourceLoanId()!=null){
+            check(records.lockReceiptLoans(a,List.of(f.getTopUpSourceLoanId()),f.getClientId()).size()==1,"topUpUnavailable");
+            settlement=deriveTopUp(a,f);
+            money(f.getPrincipal());
+            f.setRequestedPrincipal(f.getPrincipal());
+        }
+        var product=product(a,f);
+        var calculation=calculate(f,product);
         if(borrowerParty==null)validateIndividualAffordability(a,f,product,calculation,shared);
         var chargePlan=charges.recordingQuote(a,f,product,borrowerParty==null);
         if("GROUP".equals(f.getLoanFor())&&!chargePlan.supported())throw new IllegalArgumentException("simpleGroup.error.charges");
@@ -550,21 +558,16 @@ public class LoanRecordingService {
             storedForm.setCustomApplicationCharge(null);storedForm.setCustomProcessingCharge(null);
             storedForm.setCustomProcessingPercent(null);storedForm.setCustomInsurancePercent(null);storedForm.setCustomProcessingBasis(null);storedForm.setCustomInsuranceBasis(null);
         }
-        TopUpQuote settlement=null;
-        if(f.getTopUpSourceLoanId()!=null){
-            check(records.lockReceiptLoans(a,List.of(f.getTopUpSourceLoanId()),f.getClientId()).size()==1,"topUpUnavailable");
-            settlement=topUpQuote(a,f.getTopUpSourceLoanId(),f.getApplicationDate(),null);
-            check(settlement.clientId().equals(f.getClientId()),"client");check(f.getPrincipal().subtract(chargePlan.deductions()).compareTo(settlement.total())>0,"topUpCash");
-            text(f.getEvidence(),500,true);
-        }
+        if(settlement!=null)
+            check(f.getPrincipal().subtract(chargePlan.deductions()).compareTo(settlement.total())>0,"topUpCash");
         var snapshot=new LinkedHashMap<String,Object>();snapshot.put("calculationVersion",LoanAmortizationCalculator.VERSION);snapshot.put("principalAmount",f.getPrincipal());
         snapshot.put("interestRate",product.getInterestRate());snapshot.put("interestMethod",product.getInterestMethod().name());snapshot.put("repaymentFrequency",product.getResolvedRepaymentFrequency().name());
         tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
-        snapshot.put("prepaymentTerms",LoanPrepaymentTerms.product(selectedProduct).snapshot());
+        snapshot.put("prepaymentTerms",LoanPrepaymentTerms.defaults().snapshot());
         if(f.getGroupDisclosure()!=null)snapshot.put("groupDisclosure",f.getGroupDisclosure());
-        if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
+        if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpAdditionalAmount",f.getPrincipal().subtract(settlement.total()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         boolean group="GROUP".equals(f.getLoanFor());
         int requiredGuarantors=group?0:Objects.requireNonNullElse(product.getGuarantorsRequired(),0);
         var policy=recordedPolicy(selectedProduct,product.getDisplayName(),requiredGuarantors);
@@ -951,8 +954,20 @@ public class LoanRecordingService {
     private static void validateFiles(List<org.springframework.web.multipart.MultipartFile> files){check(files!=null && files.size()<=10 && files.stream().allMatch(f->f.getSize()<=25L*1024*1024),"attachments");}
     @Transactional(readOnly=true) public List<Map<String,Object>> attachments(AppUserPrincipal a,UUID id){authorize(a,"VIEW");records.record(a,id,false);return attachments.parse(loans.findById(id).orElseThrow().getAttachmentsJson());}
     @Transactional(readOnly=true) public LoanAttachmentService.AttachmentResource attachment(AppUserPrincipal a,UUID id,String attachmentId){authorize(a,"VIEW");records.record(a,id,false);return attachments.load(id,attachmentId,loans.findById(id).orElseThrow().getAttachmentsJson());}
+    private TopUpQuote deriveTopUp(AppUserPrincipal actor,RecordForm form) {
+        var settlement=topUpQuote(actor,form.getTopUpSourceLoanId(),form.getApplicationDate(),null);
+        check(settlement.clientId().equals(form.getClientId()),"client");
+        if(form.getTopUpAdditionalAmount()!=null){
+            money(form.getTopUpAdditionalAmount());
+            form.setPrincipal(settlement.total().add(form.getTopUpAdditionalAmount()));
+        }
+        return settlement;
+    }
+
     private void validateRecord(RecordForm f){validateRecord(f,false);}
-    private void validateRecord(RecordForm f,boolean organization){if(f!=null&&organization)f.setFirstPaymentDate(null);check(f!=null && f.getRequestKey()!=null && (organization?f.getClientId()==null:f.getClientId()!=null) && ("CUSTOM".equals(f.getLoanMode()) || f.getProductId()!=null) && Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"request");money(f.getPrincipal());f.setRequestedPrincipal(f.getPrincipal());f.setMonths(tenure(f).compatibilityMonths());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
+    private void validateRecord(RecordForm f,boolean organization){if(f!=null&&organization)f.setFirstPaymentDate(null);check(f!=null && f.getRequestKey()!=null && (organization?f.getClientId()==null:f.getClientId()!=null) && ("CUSTOM".equals(f.getLoanMode()) || f.getProductId()!=null) && Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"request");
+        money(f.getTopUpSourceLoanId()!=null && f.getTopUpAdditionalAmount()!=null?f.getTopUpAdditionalAmount():f.getPrincipal());
+        f.setRequestedPrincipal(f.getPrincipal());f.setMonths(tenure(f).compatibilityMonths());check(f.getMonths()!=null && f.getMonths()>=1 && f.getMonths()<=600,"terms");
         if("CONFIGURED".equals(f.getLoanMode())){f.setInterestEntry("PERCENTAGE");f.setInterestBasis("ANNUAL");f.setInterestPercent(null);f.setInterestAmount(null);}
         check(f.getApplicationDate()!=null && !f.getApplicationDate().isAfter(clock.today()),"date");text(f.getPurpose(),500,true);text(f.getBusiness(),1000,false);text(f.getGuarantors(),1000,false);text(f.getCollateral(),1000,false);text(f.getEvidence(),500,false);text(f.getNotes(),500,false);
         check(Set.of("DECLARED","DOCUMENTED","UNAVAILABLE").contains(f.getInformationSource()),"information");for(var amount:Arrays.asList(f.getIncome(),f.getOtherDebt()))if(amount!=null)check(amount.signum()>=0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");}

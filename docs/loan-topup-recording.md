@@ -6,11 +6,11 @@ Staff record a replacement agreement from a selected Loan record or its details 
 
 ## Settlement and cash
 
-This increment supports one verified, directly recorded, active source in the same institution and first-class branch, one replacement agreement and positive net cash in TZS. Untracked balances, fees, outstanding provisions, write-offs and unavailable settlement information are refused. The institution's existing top-up feature switch remains authoritative. A signed agreement reference is required.
+This increment supports one verified, directly recorded, active source in the same institution and first-class branch, one replacement agreement and positive net cash in TZS. Untracked balances, fees, outstanding provisions, write-offs and unavailable settlement information are refused. The institution's existing top-up feature switch remains authoritative.
 
 The dated quote uses remaining posted principal and unpaid contractual instalment interest due on the settlement date. Future scheduled interest is displayed separately and excluded. This uses the application's existing scheduled-interest convention; it does not introduce daily accrual, accrued-interest receivables, financed fees or a new income-recognition policy. Products and contracts requiring those treatments need their own supported settlement calculation before use.
 
-New contractual principal is distinct from the source settlement and net cash. For example, new principal 1,500, source principal 1,000 and due interest 20 produce an internal settlement of 1,020 and actual cash of 480. The new schedule covers 1,500 and uses `LoanAmortizationCalculator`. Source principal and due interest are explicit financing components disclosed alongside the new agreement.
+Staff enter the additional amount before deductions. For example, additional cash of 480, source principal of 1,000 and earned interest of 20 produce an internal settlement of 1,020 and a replacement principal of 1,500. Any permitted deduction reduces the cash paid. The new schedule covers 1,500 and uses `LoanAmortizationCalculator`. Source principal and due interest are explicit financing components disclosed alongside the new agreement.
 
 The teller's dated preview must still match the source sequence and principal/interest amounts when posting. Changed repayments or dates invalidate the preview and clear its confirmation. The contractual principal, pricing and tenure cannot silently change. Changes to approved contractual terms continue to require the existing reassessment/review path.
 

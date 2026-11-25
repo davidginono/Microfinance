@@ -43,8 +43,8 @@
   <c:if test="${not empty formError}"><p class="coa-error" role="alert" tabindex="-1"><spring:message code="${formError}" /></p></c:if>
   <input type="hidden" name="run" value="true" />
   <div class="management-filter-grid">
-    <c:if test="${kind!='PORTFOLIO_RISK' and kind!='PORTFOLIO_ANALYSIS'}"><label><spring:message code="${(kind=='LOAN_PORTFOLIO' or kind=='DISBURSED_LOANS_AUDIT')?'management.disbursedFrom':kind=='EXPECTED_REPAYMENTS'?'management.dueFrom':'management.from'}" /><input class="aws-control" name="from" type="date" value="<c:out value='${filter.from}' />" max="${kind=='EXPECTED_REPAYMENTS'?today.plusDays(366):today}" required /></label></c:if>
-    <label><spring:message code="${kind=='PORTFOLIO_RISK' or kind=='PORTFOLIO_ANALYSIS'?'management.asAt':((kind=='LOAN_PORTFOLIO' or kind=='DISBURSED_LOANS_AUDIT')?'management.disbursedThrough':kind=='EXPECTED_REPAYMENTS'?'management.dueThrough':'management.through')}" /><input class="aws-control" name="through" type="date" value="<c:out value='${filter.through}' />" max="${kind=='EXPECTED_REPAYMENTS'?today.plusDays(366):today}" required /></label>
+    <c:if test="${kind!='PORTFOLIO_RISK' and kind!='PORTFOLIO_ANALYSIS'}"><label><spring:message code="report.startDate" /><input class="aws-control" name="from" type="date" value="<c:out value='${filter.from}' />" max="${kind=='EXPECTED_REPAYMENTS'?today.plusDays(366):today}" required /></label></c:if>
+    <label><spring:message code="${kind=='PORTFOLIO_RISK' or kind=='PORTFOLIO_ANALYSIS'?'management.asAt':'report.endDate'}" /><input class="aws-control" name="through" type="date" value="<c:out value='${filter.through}' />" max="${kind=='EXPECTED_REPAYMENTS'?today.plusDays(366):today}" required /></label>
     <c:if test="${kind=='DAILY_COLLECTIONS' or kind=='CASHBOOK'}">
       <c:url value="/reports/financial/operations/${reportName}/choices/accounts" var="accountLookup" />
       <c:forEach items="${['start','end']}" var="edge">
@@ -78,13 +78,17 @@
 <script src="<c:url value='/js/loan-recording.js' />" defer></script>
 </c:when>
 <c:otherwise>
-<section class="erp-table-wrap management-preview">
+<div data-report-preview>
+<%@ include file="../report-preview-search.jspf" %>
+<section class="erp-table-wrap management-preview" data-report-preview-results data-ui-loading-region data-report-cutoff="<c:out value='${filter.cutoff}' />" data-report-from="<c:out value='${filter.from}' />" data-report-through="<c:out value='${filter.through}' />">
+  <c:if test="${searchEmpty}"><p role="status"><spring:message code="report.noMatches" /></p></c:if>
   <div class="app-table-titlebar"><h2 id="management-preview-title"><spring:message code="management.preview" /> <span class="app-table-count">(<c:out value="${report.count}" />)</span></h2></div>
   <div class="management-canvas ${report.isReferenceLayout()?'management-canvas--reference':''}" role="region" aria-labelledby="management-preview-title" tabindex="0">
     <%@ include file="document.jspf" %>
   </div>
-  <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" /></c:url><a class="app-btn btn-neutral" href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
-</section>
+  <div class="management-pager accounting-actions"><span><spring:message code="management.page" arguments="${filter.page+1}" /></span><c:forEach items="${['previous','next']}" var="move"><c:if test="${move=='previous'?filter.page>0:report.hasNext}"><c:url value="/reports/financial/operations/${reportName}" var="pageUrl"><c:param name="run" value="true" /><c:param name="page" value="${filter.page+(move=='previous'?-1:1)}" /><c:if test="${not empty previewSearch}"><c:param name="previewSearch" value="${previewSearch}" /></c:if><c:param name="from" value="${filter.from}" /><c:param name="through" value="${filter.through}" /><c:param name="cutoff" value="${filter.cutoff}" /><c:param name="startAccount" value="${filter.startAccount}" /><c:param name="endAccount" value="${filter.endAccount}" /><c:param name="clientId" value="${filter.clientId}" /><c:param name="product" value="${filter.product}" /><c:param name="productId" value="${filter.productId}" /></c:url><a class="app-btn btn-neutral" data-report-preview-page href="<c:out value='${pageUrl}' />"><spring:message code="common.${move}" /></a></c:if></c:forEach></div>
+</section></div>
+<script src="<c:url value='/js/report-preview-search.js' />" defer></script>
 </c:otherwise>
 </c:choose>
 <script src="<c:url value='/js/management-reports.js' />" defer></script>

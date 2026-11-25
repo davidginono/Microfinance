@@ -14,8 +14,7 @@ import static org.mockito.Mockito.*;
 class LoanInterestWaiverAdviceTest {
     final UUID loan=UUID.randomUUID();
     final LoanRepaymentLedgerService ledger=mock(LoanRepaymentLedgerService.class);
-    final ApplicationClock clock=mock(ApplicationClock.class);
-    final LoanInterestWaiverAdvice advice=new LoanInterestWaiverAdvice(ledger,clock);
+    final LoanInterestWaiverAdvice advice=new LoanInterestWaiverAdvice(ledger);
     final AppUserPrincipal actor=new AppUserPrincipal(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1")
         .position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.LOAN_RECORDING_VIEW));
     MockHttpServletRequest request(String pattern){
@@ -30,19 +29,14 @@ class LoanInterestWaiverAdviceTest {
     @Test void otherPageAndJsonRoutesDoNotLoadWaiverData(){
         advice.details(request("/finance/loan-recording/choices/{id}"),actor,new ExtendedModelMap());verifyNoInteractions(ledger);
     }
-    @Test void scopeDenialIsPreserved(){
+    @Test void fundedDetailsLinkToTheWaiverWorkspaceWithoutLoadingHistory(){
         when(ledger.hasLedger(loan)).thenReturn(true);
-        when(ledger.interestWaivers(loan,actor,0)).thenThrow(new org.springframework.security.access.AccessDeniedException("Forbidden"));
-        assertThatThrownBy(()->advice.details(request("/finance/loan-records/{id}"),actor,new ExtendedModelMap()))
-            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-    }
-    @Test void preservesFailedFormAndUsesIndependentBoundedHistoryPage(){
-        when(ledger.hasLedger(loan)).thenReturn(true);when(ledger.interestWaivers(loan,actor,2)).thenReturn(List.of());
-        var request=request("/finance/loan-records/{id}");request.setParameter("waiverPage","2");
-        var model=new ExtendedModelMap();var form=new LoanPrepaymentController.WaiverForm();form.setReason("Retained evidence");model.addAttribute("waiverForm",form);
-        advice.details(request,actor,model);
-        assertThat(model.get("waiverForm")).isSameAs(form);assertThat(model.get("waiverPage")).isEqualTo(2);
-        assertThat(model.get("waiverBase")).isEqualTo("/finance/loan-records/"+loan);
-        verify(ledger).interestWaivers(loan,actor,2);
+        for(String base:List.of("/finance/loan-records/","/repayments/loans/")){
+            var model=new ExtendedModelMap();
+            advice.details(request(base+"{id}"),actor,model);
+            assertThat(model.get("waiverPageLink")).isEqualTo(base+loan+"/interest-waivers");
+        }
+        verify(ledger,times(2)).hasLedger(loan);
+        verifyNoMoreInteractions(ledger);
     }
 }

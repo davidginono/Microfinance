@@ -55,6 +55,12 @@ class StatementLedgerEntryTest {
         mvc.perform(post(PATH)).andExpect(status().isForbidden());
         mvc.perform(form().param("institutionWide","true")).andExpect(redirectedUrl("/reports/financial/statements/"+run+"/ledger/"+account));
     }
+    @Test void noAccountSelectionOpensTheAllAccountLedger()throws Exception{
+        UUID run=UUID.randomUUID();
+        when(statements.generateLedger(actor,from,through,null,key)).thenReturn(run);
+        mvc.perform(form().with(request->{request.setParameter("account","");return request;}))
+            .andExpect(redirectedUrl("/reports/financial/statements/"+run+"/ledger"));
+    }
     @Test void failedGenerationRetainsDatesAndTheScopedAccount()throws Exception{
         var selected=new LedgerAccount(account,"111001 — Bank");
         when(statements.generateLedger(actor,from,through,account,key)).thenThrow(new IllegalArgumentException("fs.error.dates"));

@@ -123,7 +123,7 @@ test('decimal interest strings retain exact cents when displayed',async()=>{
   assert.equal(w.document.querySelector('[data-interest-value]').textContent,'9,007,199,254,740,991.01');dom.window.close();
 });
 
-test('schedule uses server rows, preserves cents, and clears stale estimates on changes and errors',async()=>{
+test('schedule and interest stay visible during refresh and clear on error',async()=>{
   const {w,set,run,respond,dom}=fixture();const d=w.document,preview=d.querySelector('[data-schedule-preview]');
   set('tenureUnit','MONTHS');set('tenureValue','6');set('principal','1000');const pending=run();
   assert.equal(preview.hidden,true);
@@ -131,7 +131,10 @@ test('schedule uses server rows, preserves cents, and clears stale estimates on 
   assert.equal(preview.hidden,false);
   assert.equal(d.querySelector('[data-schedule-summary]').textContent,'Monthly · 6 Months');
   assert.deepEqual([...d.querySelectorAll('[data-schedule-rows] td')].map(cell=>cell.textContent),['1','Month 1','9,007,199,254,741,008.04','9,007,199,254,741,008.04','9,007,199,254,740,991.01','17.03','0.00']);
-  set('tenureValue','12');assert.equal(preview.hidden,true);assert.equal(d.querySelector('[data-schedule-rows]').children.length,0);
+  set('tenureValue','12');
+  assert.equal(preview.hidden,false);assert.equal(d.querySelector('[data-schedule-rows]').children.length,1);
+  assert.equal(d.querySelector('[data-interest-value]').textContent,'17.03');
+  assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
   const failed=run();respond(1,null,false);await failed;assert.equal(preview.hidden,true);
   dom.window.close();
 });

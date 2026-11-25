@@ -62,25 +62,41 @@ public class LoanPrepaymentService {
         }
         return result;
     }
+    public BigDecimal unpaidEarned(LoanLedgerInstallment row,Map<UUID,BigDecimal> earned) {
+        return earned.getOrDefault(row.getId(),BigDecimal.ZERO).setScale(2,RoundingMode.HALF_UP)
+            .subtract(row.getInterestPaid()).max(BigDecimal.ZERO);
+    }
+
     @Transactional(propagation=Propagation.MANDATORY)
-    public UUID waive(LoanLedger l,List<LoanLedgerInstallment> rows,AppUserPrincipal actor,UUID key,LocalDate date,BigDecimal amount,String reason,UUID reverses) {
+    public UUID waive(LoanLedger l,List<LoanLedgerInstallment> rows,AppUserPrincipal actor,UUID key,LocalDate date,BigDecimal amount,String reason,UUID reverses,Long sequence,Map<UUID,BigDecimal> selections) {
         requireActor(actor,l);
         require(key!=null && date!=null && !date.isAfter(clock.today()) && !date.isBefore(l.getDisbursementDate()),"input");
         require(reason!=null && !reason.isBlank() && reason.strip().length()<=500,"reason");reason=reason.strip();
+        var original=reverses==null?null:repository.waiver(l,reverses)
+            .orElseThrow(()->new IllegalArgumentException("prepayment.error.unavailable"));
+        if(original!=null && amount==null)amount=original.amount();
         require(amount!=null && amount.signum()>0 && amount.scale()<=2 && amount.precision()-amount.scale()<=16,"amount");
         shared.authorizeWaiver(actor,l.getLoanApplicationId(),reverses);
         var retry=repository.request(l,key);if(retry.isPresent()){
-            var r=retry.get();require(r.loanId().equals(l.getLoanApplicationId()) && r.actor().equals(actor.getMemberId()) && r.date().equals(date) && r.amount().compareTo(amount)==0 && r.reason().equals(reason) && Objects.equals(r.reverses(),reverses),"retry");return r.id();
+            var r=retry.get();require(r.loanId().equals(l.getLoanApplicationId()) && r.actor().equals(actor.getMemberId()) && r.date().equals(date) && r.amount().compareTo(amount)==0 && r.reason().equals(reason) && Objects.equals(r.reverses(),reverses),"retry");
+            if(selections!=null)require(repository.parts(r.id()).equals(selections),"retry");
+            return r.id();
         }
+        if(sequence!=null)require(l.getNextSequence()==sequence,"conflict");
         vouchers.requireInterestWaiverPeriod(actor,date);
         var last=latestWaiverDate(l.getLoanApplicationId());require(last==null || !date.isBefore(last),"date");require(l.getLastPaymentDate()==null || !date.isBefore(l.getLastPaymentDate()),"date");
         var parts=new LinkedHashMap<UUID,BigDecimal>();
         if(reverses==null){
-            var earned=earned(l.getLoanApplicationId(),date);BigDecimal left=amount;
-            for(var row:rows){var due=earned.getOrDefault(row.getId(),BigDecimal.ZERO).setScale(2,RoundingMode.HALF_UP).subtract(row.getInterestPaid()).max(BigDecimal.ZERO);var take=left.min(due);if(take.signum()>0){parts.put(row.getId(),take);left=left.subtract(take);}}
+            var earned=earned(l.getLoanApplicationId(),date);
+            BigDecimal left=amount;
+            for(var row:rows){
+                var eligible=unpaidEarned(row,earned);
+                var take=selections==null?left.min(eligible):selections.getOrDefault(row.getId(),BigDecimal.ZERO);
+                require(take.compareTo(eligible)<=0,"amount");
+                if(take.signum()>0){parts.put(row.getId(),take);left=left.subtract(take);}
+            }
             require(left.signum()==0,"amount");
         }else{
-            var original=repository.waiver(l,reverses).orElseThrow(()->new IllegalArgumentException("prepayment.error.unavailable"));
             require(original.reverses()==null && original.reversedBy()==null && !original.actor().equals(actor.getMemberId()) && original.amount().compareTo(amount)==0 && !date.isBefore(original.date()),"checker");
             require(!repository.laterPayment(l.getLoanApplicationId(),original.sequence()) && !repository.laterWaiver(l.getLoanApplicationId(),original.sequence()),"latest");parts.putAll(repository.parts(reverses));
         }
@@ -88,13 +104,6 @@ public class LoanPrepaymentService {
         UUID id=UUID.randomUUID();repository.waiver(l,id,key,date,amount,actor.getMemberId(),reason,reverses,clock.now(),parts);shared.waiver(actor,l.getLoanApplicationId(),id,amount,reverses);l.setNextSequence(l.getNextSequence()+1);
         audit.logEvent("LOAN_REPAYMENT",id,reverses==null?"INTEREST_WAIVED":"INTEREST_WAIVER_REVERSED",actor.getMemberId(),AuditEventStatus.SUCCESS,reason,"LOAN",l.getLoanId(),l.getSaccoId(),l.getStationId(),Map.of("loan",l.getLoanApplicationId(),"amount",amount,"date",date,"reverses",Objects.toString(reverses,"")));
         return id;
-    }
-    @Transactional(propagation=Propagation.MANDATORY)
-    public void configure(LoanProductSetting product,AppUserPrincipal actor,LoanPrepaymentTerms terms,String reason){
-        if(actor==null || !actor.isStaffSession() || !actor.getClaims().contains(UserClaim.LOAN_PRODUCTS_CONFIGURE.name()) || !Objects.equals(product.getSaccoId(),actor.getSaccoId()))throw new org.springframework.security.access.AccessDeniedException("Forbidden");
-        require(reason!=null && !reason.isBlank() && reason.strip().length()<=500,"reason");
-        var before=LoanPrepaymentTerms.product(product);product.setPrepaymentSchedule(terms.schedule());product.setPartialPrepaymentInterest(terms.partialInterest());product.setSettlementDayBasis(terms.dayBasis());
-        audit.logEvent("ACCOUNTING",product.getId(),"LOAN_PREPAYMENT_TERMS_CONFIGURED",actor.getMemberId(),AuditEventStatus.SUCCESS,reason.strip(),"LOAN_PRODUCT",product.getDisplayCode(),product.getSaccoId(),null,Map.of("before",before.snapshot(),"after",terms.snapshot()));
     }
     private static void require(boolean condition,String key){if(!condition)throw new IllegalArgumentException("prepayment.error."+key);}
     private static void requireActor(AppUserPrincipal actor,LoanLedger ledger){

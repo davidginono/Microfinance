@@ -123,7 +123,7 @@
                         <a href="<c:url value='${reportPath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri==reportPath?'shell-nav-active':''}"><spring:message code="management.nav.${reportKind}" /></a>
                     </sec:authorize>
                     <c:if test="${reportKind=='CASHBOOK'}">
-                        <c:set var="ledgerActive" value="${requestUri=='/reports/financial/statements/ledger' or (fn:startsWith(requestUri,'/reports/financial/statements/') and fn:contains(requestUri,'/ledger/'))}" />
+                        <c:set var="ledgerActive" value="${requestUri=='/reports/financial/statements/ledger' or (fn:startsWith(requestUri,'/reports/financial/statements/') and (fn:contains(requestUri,'/ledger/') or fn:endsWith(requestUri,'/ledger')))}" />
                         <a data-fs-nav="ledger" href="<c:url value='/reports/financial/statements/ledger' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${ledgerActive?'shell-nav-active':''}"><spring:message code="fs.title.LEDGER" /></a>
                     </c:if>
                 </c:forEach>

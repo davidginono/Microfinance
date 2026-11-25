@@ -60,6 +60,14 @@ public class ManagementReportService {
     private static void loanReport(Kind kind){check(kind!=Kind.CASHBOOK && kind!=Kind.DAILY_COLLECTIONS,"parameters");}
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
     public Result report(AppUserPrincipal a,Kind kind,Parameters p,boolean export){
+        return readReport(a,kind,p,export,"");
+    }
+    @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ,timeout=30)
+    public Result preview(AppUserPrincipal a,Kind kind,Parameters p,String search){
+        check(search!=null && search.length()<=100 && search.chars().noneMatch(Character::isISOControl),"parameters");
+        return readReport(a,kind,p,false,search.strip().toLowerCase(Locale.ROOT));
+    }
+    private Result readReport(AppUserPrincipal a,Kind kind,Parameters p,boolean export,String search){
         authorize(a,kind,export);validate(p,clock.today(),clock.now(),kind);
         return limiter.run(()->{
             var selected=selectedRange(a,kind,p.startAccount(),p.endAccount());
@@ -69,7 +77,7 @@ public class ManagementReportService {
             String accountSelection=start==null?(end==null?"":"≤ "+end.label()):end==null?"≥ "+start.label():start.label()+" → "+end.label();
             var client=selectedClient(a,kind,p.clientId());
             var product=p.productId()==null?null:selectedProduct(a,kind,p.productId());
-            var data=reports.read(a,kind,p,export);
+            var data=search.isEmpty()?reports.read(a,kind,p,export):reports.read(a,kind,p,search);
             check(data.groups().size()<=1000 && (!export || data.rows().size()<=5000),"large");
             var identity=reports.identity(a);
             var resolved=product==null?p:p.withProductName(product.name());

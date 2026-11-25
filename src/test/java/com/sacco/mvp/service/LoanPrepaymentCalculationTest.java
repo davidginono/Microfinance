@@ -17,7 +17,7 @@ class LoanPrepaymentCalculationTest {
     LoanLedger ledger(){return LoanLedger.builder().loanApplicationId(loan).principal(m("1000.00")).disbursementDate(start).build();}
     LoanLedgerInstallment row(int n,LocalDate date,String interest){return LoanLedgerInstallment.builder().id(UUID.randomUUID()).loanApplicationId(loan).installmentNumber(n).dueDate(date).principal(m("500.00")).principalPaid(m("0.00")).interest(m(interest)).interestPaid(m("0.00")).build();}
     @Test void defaultsAndSnapshotAreExplicitAndIndependentOfProductPricing(){
-        var terms=LoanPrepaymentTerms.product(LoanProductSetting.builder().build());
+        var terms=LoanPrepaymentTerms.defaults();
         assertThat(terms.schedule()).isEqualTo(LoanPrepaymentTerms.Schedule.LAST_INSTALMENTS);
         assertThat(terms.partialInterest()).isEqualTo(LoanPrepaymentTerms.PartialInterest.RECALCULATE);
         assertThat(LoanPrepaymentTerms.read(terms.snapshot())).isEqualTo(terms);

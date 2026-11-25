@@ -17,6 +17,7 @@
  <div class="fs-workspace" data-tab-loading="<spring:message code='fs.tabLoading' />" data-tab-error="<spring:message code='fs.tabError' />">
  <div class="fs-tabs" role="navigation" aria-label="<spring:message code='fs.statement' />"><c:forEach items="${kinds}" var="k"><c:url value="${base}" var="tabUrl"><c:param name="kind" value="${k}" /></c:url><a data-fs-tab="${k}" data-no-page-preloader="true" href="<c:out value='${tabUrl}' />" ${kind==k?'aria-current="page"':''}><spring:message code="fs.short.${k}" /></a></c:forEach></div>
  <div class="fs-toolbar">
+  <%@ include file="../report-preview-search.jspf" %>
   <details class="fs-view-settings"><summary><spring:message code="fs.viewSettings" /></summary><div class="fs-view-fields">
    <label class="fs-select-setting"><span><spring:message code="fs.font" /></span><select class="aws-control" data-fs-font><option value="reference"><spring:message code="fs.referenceFont" /></option><option value="sans">Arial</option><option value="serif">Times New Roman</option><option value="mono">Courier New</option></select></label>
    <label class="fs-select-setting"><span><spring:message code="fs.density" /></span><select class="aws-control" data-fs-density><option value="compact"><spring:message code="fs.compact" /></option><option value="comfortable"><spring:message code="fs.comfortable" /></option></select></label>

@@ -66,6 +66,27 @@ class LoanPrepaymentPostgresTest {
         assertThatThrownBy(()->f.jdbc.update("update loan_interest_waiver set amount=1 where id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
         assertThatThrownBy(()->f.jdbc.update("update loan_ledger_installments set interest_waived=1 where loan_application_id=?",loan)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
+    @Test void selectedInstalmentsWaiveExactAmountsAndRejectStaleOrExcessiveRequests(){
+        var loan=loan(InterestMethod.FLAT_RATE);
+        var date=LoanRecordingPostgresTest.TODAY;
+        var schedule=f.ledger.waiverSchedule(loan,f.actor,date);
+        var first=schedule.installments().getFirst();
+        var second=schedule.installments().getLast();
+        assertThat(first.eligible()).isPositive();
+        assertThat(second.eligible()).isPositive();
+        var key=UUID.randomUUID();
+        assertThatThrownBy(()->f.ledger.waiveInstallments(loan,f.actor,key,date,"Test waiver",schedule.sequence(),
+            Map.of(first.id(),first.eligible(),second.id(),second.eligible().add(m("0.01"))))).hasMessage("prepayment.error.amount");
+        var parts=Map.of(first.id(),m("1.00"),second.id(),second.eligible());
+        UUID result=f.ledger.waiveInstallments(loan,f.actor,key,date,"Test waiver",schedule.sequence(),parts);
+        assertThat(f.ledger.waiveInstallments(loan,f.actor,key,date,"Test waiver",schedule.sequence(),parts)).isEqualTo(result);
+        assertThat(f.jdbc.queryForObject("select amount from loan_interest_waiver_part where waiver_id=? and installment_id=?",BigDecimal.class,result,second.id()))
+            .isEqualByComparingTo(second.eligible());
+        assertThatThrownBy(()->f.ledger.waiveInstallments(loan,f.actor,UUID.randomUUID(),date,"Stale waiver",schedule.sequence(),
+            Map.of(first.id(),m("1.00")))).hasMessage("prepayment.error.conflict");
+        f.ledger.reverseInterestWaiver(loan,f.operator("B1"),UUID.randomUUID(),date,"Correction",result);
+        assertThat(f.ledger.waiverSchedule(loan,f.actor,date).installments()).isEqualTo(schedule.installments());
+    }
     @Test void concurrentWaiverRetriesPostOneConcessionAndViewPermissionCannotWaive()throws Exception{
         var loan=loan(InterestMethod.FLAT_RATE);var key=UUID.randomUUID();
         var viewOnly=new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(f.actor.getMemberId()).saccoId(f.institution).stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_RECORDING_VIEW));

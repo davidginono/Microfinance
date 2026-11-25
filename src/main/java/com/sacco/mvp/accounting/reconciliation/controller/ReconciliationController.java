@@ -40,13 +40,18 @@ public class ReconciliationController {
     }
     @ModelAttribute void headers(HttpServletResponse response) { response.setHeader("Cache-Control","no-store"); }
     @GetMapping public String screen(@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("filter") Filter f,
-            org.springframework.validation.BindingResult binding,Model model,HttpServletResponse response) {
+            org.springframework.validation.BindingResult binding,@RequestParam(defaultValue="") String previewSearch,Model model,HttpServletResponse response) {
         service.authorize(actor,false);defaults(f);model.addAttribute("canViewGroupAttribution",service.canViewGroupAttribution(actor));model.addAttribute("canExportReport",service.canExport(actor,f.getComponent()));model.addAttribute("today",clock.today());
         model.addAttribute("activities",service.activities(actor,"",0));
         try {
             if(binding.hasErrors())throw new IllegalArgumentException("reconciliation.error.parameters");
             if(f.getActivityId()!=null)model.addAttribute("selectedActivity",service.activity(actor,f.getActivityId()));
-            if(f.isRun())model.addAttribute("report",read(actor,f,false,"PREVIEW"));
+            if(f.isRun()){
+                var report=previewSearch.isBlank()?read(actor,f,false,"PREVIEW"):record(actor,f,"PREVIEW",service.preview(actor,parameters(f),previewSearch));
+                model.addAttribute("report",report);
+                model.addAttribute("previewSearch",previewSearch);
+                model.addAttribute("searchEmpty",!previewSearch.isBlank() && report.rows().isEmpty());
+            }
         } catch(IllegalArgumentException|DateTimeException e) {
             response.setStatus(400);model.addAttribute("formError",safe(e));
         }
@@ -67,10 +72,16 @@ public class ReconciliationController {
         defaults(f);model.addAttribute("report",read(actor,f,true,"PRINT"));return "accounting/reconciliation/print";
     }
     private Result read(AppUserPrincipal actor,Filter f,boolean export,String action) {
-        var result=service.report(actor,new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),f.getComponent(),f.getPage(),f.getActivityId(),f.isUnassigned()),export);
+        return record(actor,f,action,service.report(actor,parameters(f),export));
+    }
+    private Result record(AppUserPrincipal actor,Filter f,String action,Result result) {
         audit.log("SL_GL_RECONCILIATION",null,action,actor.getMemberId(),null,Map.of("saccoId",actor.getSaccoId(),"stationId",actor.getStationId(),
             "from",result.parameters().from(),"through",result.parameters().through(),"cutoff",result.parameters().cutoff(),"component",result.parameters().component(),"activityId",f.getActivityFilter(),"exceptions",result.count()));
         return result;
+    }
+    private static Parameters parameters(Filter f) {
+        return new Parameters(LocalDate.parse(f.getFrom()),LocalDate.parse(f.getThrough()),OffsetDateTime.parse(f.getCutoff()),
+            f.getComponent(),f.getPage(),f.getActivityId(),f.isUnassigned());
     }
     private void defaults(Filter f) {
         if(f.getFrom()==null)f.setFrom(clock.today().withDayOfMonth(1).toString());

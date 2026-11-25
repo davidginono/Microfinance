@@ -16,7 +16,6 @@
 
 <div class="product-config-page-actions">
     <a href="<c:url value='/admin/settings-controls'><c:param name='section' value='loan' /></c:url>" class="app-btn btn-neutral"><spring:message code="admin.workspace.backProducts" /></a>
-    <a class="app-btn btn-neutral" href="<c:url value='/admin/settings-controls/loan-products/${product.id}/prepayment' />"><spring:message code="prepayment.product.title" /></a>
     <form action="/admin/settings-controls/loan-products/${product.id}/delete"
           method="post"
           data-confirm-eyebrow="Confirm Deletion"

@@ -52,7 +52,7 @@ class SimpleGroupFormRenderingTest {
                 var form=new RecordForm();form.setLoanFor("GROUP");form.getGroupApplication().setGroupId(group);form.getGroupApplication().setSignedOn(java.time.LocalDate.of(2026,11,12));
                 request.setAttribute("recordForm",form);request.setAttribute("groupSetup",new Setup(group,1,"Group",first,"Asha","BANK_ACCOUNT","Bank","Group","123","Checked",List.of(new Person(first,"C1","Asha"),new Person(second,"C2","Juma"))));
                 request.setAttribute("saveUrl","/record");
-                request.setAttribute("simpleGroup",new Contract(UUID.randomUUID(),group,"Group","Asha","Group bank","Agreement","EN",true,List.of(new Borrower(first,"C1","Asha",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,java.math.BigDecimal.ZERO,"CLIENT_PROFILE:"+UUID.randomUUID()),new Borrower(second,"C2","Juma",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,java.math.BigDecimal.ZERO,"Historical budget reference"))));
+                request.setAttribute("simpleGroup",new Contract(UUID.randomUUID(),group,"Group","Asha","Group bank","Agreement","EN",true,List.of(new Borrower(first,"C1","Asha",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,"CLIENT_PROFILE:"+UUID.randomUUID()),new Borrower(second,"C2","Juma",form.getGroupApplication().getSignedOn(),java.math.BigDecimal.TEN,"Historical budget reference"))));
                 request.getRequestDispatcher("/form.jsp").forward(request,response);
             }
         });context.addServletMappingDecoded("/form","form");
@@ -68,7 +68,7 @@ class SimpleGroupFormRenderingTest {
                 String loan=entry.substring(0,entry.indexOf("id=\"recording-panel-guarantors\""));
                 String collateral=entry.substring(entry.indexOf("id=\"recording-panel-collateral\""),entry.indexOf("id=\"recording-panel-attachments\""));
                 assertThat(loan).doesNotContain("groupAgreement","groupApplication.checked",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)));
-                assertThat(loan).contains("class=\"group-debt-content\"",messages.getMessage("simpleGroup.debtHelp",null,Locale.forLanguageTag(language)));
+                assertThat(loan).doesNotContain("data-group-debt", "groupApplication.debts");
                 assertThat(entry).contains(messages.getMessage("simpleGroup.extraGuarantorsHelp",null,Locale.forLanguageTag(language)));
                 assertThat(collateral).contains("data-group-confirmation","name=\"groupApplication.checked\"",messages.getMessage("simpleGroup.liability",null,Locale.forLanguageTag(language)),messages.getMessage("simpleGroup.checked",null,Locale.forLanguageTag(language)));
                 assertThat(collateral.indexOf("data-group-confirmation")).isGreaterThan(collateral.indexOf("data-add-row=\"collateral\""));

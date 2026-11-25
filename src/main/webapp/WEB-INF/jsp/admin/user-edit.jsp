@@ -315,9 +315,6 @@
                 roleInput.addEventListener('change', () => syncClaimsForSelectedRoles(form));
             });
 
-            form.querySelectorAll('[data-access-claim]').forEach((input) => {
-                input.addEventListener('change', () => syncMatrixState(form));
-            });
 
             const restoreButton = form.querySelector('[data-restore-default-claims]');
             if (restoreButton) {

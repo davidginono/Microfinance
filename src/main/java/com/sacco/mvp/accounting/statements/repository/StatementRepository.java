@@ -118,14 +118,51 @@ public class StatementRepository {
             """,this::stored,id,institution,branch).stream().findFirst();
     }
     public void save(UUID id,AppUserPrincipal a,OffsetDateTime now){jdbc.update("update statement_run set saved_at=? where id=? and sacco_id=? and station_id=? and saved_at is null",now,id,a.getSaccoId(),a.getStationId());}
-    public List<Activity> activity(UUID run,UUID account,Parameters p,int page,int limit){return jdbc.query("""
-        with snapshot as (select id,generated_at from statement_run where id=?), activity as (
-         select j.id,j.sacco_id,j.station_id,j.effective_date,j.source_type,j.source_reference,j.reason,l.account_id,sum(l.debit) debit,sum(l.credit) credit,
-          sum(sum(l.debit-l.credit)) over(order by j.effective_date,j.id) running
+    public Set<UUID> accountsForVoucher(UUID run,String search) {
+        return new HashSet<>(jdbc.query("""
+            select distinct l.account_id
+            from statement_run s join statement_run_journal captured on captured.run_id=s.id
+            join gl_journal j on j.id=captured.journal_id and j.sacco_id=s.sacco_id and j.station_id=s.station_id
+            join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
+            left join accounting_posted_voucher_document d on d.journal_id=j.id and d.sacco_id=j.sacco_id
+                and d.station_id=j.station_id and d.issued_at<=s.generated_at
+            where s.id=? and not s.institution_wide and
+                (strpos(lower(coalesce(d.number,'')),?)>0 or strpos(lower(coalesce(j.source_reference,'')),?)>0)
+            limit 2001
+            """,(row,index)->row.getObject("account_id",UUID.class),run,search,search));
+    }
+
+    public List<Activity> activity(UUID run,UUID account,Parameters p,int page,int limit){
+        return ledgerRows(run,List.of(account),p,"",Set.of(),page,limit).stream().map(LedgerRow::activity)
+            .filter(Objects::nonNull).toList();
+    }
+
+    public List<LedgerRow> ledgerRows(UUID run,List<UUID> accounts,Parameters p,String search,
+                                     Set<UUID> accountMatches,int page,int limit){
+        String accountIds="{"+String.join(",",accounts.stream().map(UUID::toString).toList())+"}";
+        String matches="{"+String.join(",",accountMatches.stream().map(UUID::toString).toList())+"}";
+        return jdbc.query("""
+        with snapshot as (select id,generated_at from statement_run where id=?),
+        selected as (select account_id,ordinality from unnest(?::uuid[]) with ordinality a(account_id,ordinality)),
+        movement as (
+         select j.id,j.sacco_id,j.station_id,j.effective_date,j.source_type,j.source_reference,j.reason,l.account_id,
+          sum(l.debit) debit,sum(l.credit) credit,
+          sum(sum(l.debit-l.credit)) over(partition by l.account_id order by j.effective_date,j.id) running
          from snapshot s join statement_run_journal c on c.run_id=s.id join gl_journal j on j.id=c.journal_id
          join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
-         where l.account_id=? and j.effective_date between ? and ?
-         group by j.id,l.account_id order by j.effective_date,j.id limit ? offset ?
+         join selected a on a.account_id=l.account_id
+         where j.effective_date between ? and ?
+         group by j.id,l.account_id
+        ), terms as (select ?::text search,?::uuid[] account_matches),
+        activity as (
+         select a.account_id selected_account,a.ordinality,m.*
+         from selected a cross join terms q cross join snapshot s left join movement m on m.account_id=a.account_id
+         where q.search='' or a.account_id=any(q.account_matches)
+            or strpos(lower(coalesce(m.source_reference,'')),q.search)>0
+            or exists(select 1 from accounting_posted_voucher_document d where d.journal_id=m.id
+                and d.sacco_id=m.sacco_id and d.station_id=m.station_id and d.issued_at<=s.generated_at
+                and strpos(lower(d.number),q.search)>0)
+         order by a.ordinality,m.effective_date,m.id limit ? offset ?
         )
         select activity.*,v.id voucher_id,v.type voucher_type,coalesce(subledger.account_number,v.client_number) account_number,
          coalesce(d.number,t.receipt_reference) voucher_number, v.description voucher_description,entries.narration,
@@ -162,11 +199,11 @@ public class StatementRepository {
          ) linked
          join loan_applications a on a.id=linked.loan_id and a.sacco_id=activity.sacco_id and a.station_id=activity.station_id
         ) subledger on true
-        order by activity.effective_date,activity.id
-        """,(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("voucher_number"),
+        order by activity.ordinality,activity.effective_date,activity.id
+        """,(r,n)->new LedgerRow(r.getObject("selected_account",UUID.class),r.getObject("id")==null?null:new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("voucher_number"),
             PostingDescription.resolve(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),r.getString("narration"),r.getString("voucher_description"),
                 r.getString("receipt_line"),r.getString("receipt_description"),r.getString("notes"),r.getString("reason")),
-            r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r)),run,account,p.from(),p.through(),limit,page*30);}
+            r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r))),run,accountIds,p.from(),p.through(),search,matches,limit,page*30);}
     // Keep earlier immutable documents while serving the current, simplified layout.
     public Optional<Artifact> artifact(UUID id,Kind kind,String format,String language){return jdbc.query("select bytes,checksum from statement_run_artifact where run_id=? and kind=? and format=? and language=?",(r,n)->new Artifact(r.getBytes(1),r.getString(2)),id,artifactKind(kind),format,language).stream().findFirst();}
     public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,artifactKind(kind),format,language,bytes,checksum);}

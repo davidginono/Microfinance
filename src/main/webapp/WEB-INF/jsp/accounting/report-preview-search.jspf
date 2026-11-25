@@ -1,0 +1,7 @@
+<%@ page pageEncoding="UTF-8" %>
+<label class="report-preview-search">
+  <span class="sr-only"><spring:message code="report.search" /></span>
+  <input class="aws-control" type="search" maxlength="100" autocomplete="off" data-report-preview-search
+    placeholder="<spring:message code='report.search' />" data-error="<spring:message code='report.searchError' />"
+    value="<c:out value='${previewSearch}' />" />
+</label>

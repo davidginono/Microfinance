@@ -6,7 +6,10 @@
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/groups' />"><spring:message code="group.title" /></a><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="group.details" /></span></nav>
 <div class="erp-page-header erp-detail-header" data-aws-page-header>
     <h1 class="erp-page-title"><spring:message code="group.details" /></h1>
-    <div class="accounting-actions" data-aws-action-pin="true">
+    <sec:authorize access="@access.hasAny(principal,'LOAN_RECORDING_CREATE','GROUP_LENDING_UPDATE')">
+    <details class="page-action-menu" data-page-action-menu data-aws-action-pin="true">
+        <summary class="app-btn btn-neutral"><spring:message code="common.actions" /></summary>
+        <div class="page-action-options">
         <sec:authorize access="@access.has(principal,'LOAN_RECORDING_CREATE')"><a class="app-btn btn-launch" href="<c:url value='/finance/loan-records/new?groupId=${group.id}' />"><spring:message code="simpleGroup.apply" /></a></sec:authorize>
         <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_CREATE') and @access.has(principal,'GROUP_LENDING_UPDATE')"><a class="app-btn btn-neutral" href="<c:url value='/finance/clients/onboarding/new?groupId=${group.id}' />"><spring:message code="simpleGroup.registerClient" /></a></sec:authorize>
         <sec:authorize access="@access.has(principal,'GROUP_LENDING_UPDATE')">
@@ -18,7 +21,8 @@
                 <button class="app-btn btn-neutral" type="submit"><spring:message code="${group.status=='ACTIVE'?'group.deactivate':'group.reactivate'}" /></button>
             </form>
         </sec:authorize>
-    </div>
+    </div></details>
+    </sec:authorize>
 </div>
 <c:if test="${not empty successMessageCode}"><p class="coa-success" role="status"><spring:message code="${successMessageCode}" /></p></c:if>
 <c:if test="${not empty groupError}"><div role="alert" class="accounting-error-summary"><spring:message code="${groupError}" /></div></c:if>
