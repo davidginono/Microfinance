@@ -59,7 +59,18 @@
                            ${user.staffRoles.contains(position) ? 'checked' : ''}
                            class="admin-cloud-checkbox" />
                     <span class="admin-role-card-name"><spring:message code="admin.role.${position}" text="${position.displayName}" /></span>
-
+                    <c:choose>
+                        <c:when test="${position eq 'ADMIN'}">
+                            <svg class="admin-role-card-image" aria-hidden="true" focusable="false"
+                                 fill="none" stroke="#34495e" stroke-width="3" stroke-linejoin="round">
+                                <use href="<c:url value='/images/staff-role-icons.svg' />#ADMIN" />
+                            </svg>
+                        </c:when>
+                        <c:otherwise>
+                            <c:set var="roleImage" value="${position eq 'ACCOUNTS_CLERK_2' ? 'ACCOUNTS_CLERK' : position}" />
+                            <img class="admin-role-card-image" src="<c:url value='/images/staff-roles/${roleImage}.png' />" alt="" />
+                        </c:otherwise>
+                    </c:choose>
                 </label>
             </c:forEach>
         </div>

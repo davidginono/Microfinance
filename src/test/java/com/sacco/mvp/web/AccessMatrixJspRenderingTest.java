@@ -1,5 +1,6 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.domain.Position;
 import com.sacco.mvp.domain.UserClaim;
 import com.sacco.mvp.service.AdminService;
 import jakarta.servlet.http.HttpServlet;
@@ -33,6 +34,45 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AccessMatrixJspRenderingTest {
     @TempDir Path temporary;
+
+    @Test
+    void staffRoleCardsRenderTheirIllustrationsAndSavedSelections() throws Exception {
+        String source = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp"));
+        int start = source.indexOf("<section id=\"user-access-roles\"");
+        String page = """
+            <%@ page session="false" %>
+            <%@ taglib prefix="c" uri="jakarta.tags.core" %>
+            <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
+            """ + source.substring(start, source.indexOf("</section>", start) + "</section>".length());
+        var positions = Position.staffAssignableRoles();
+        var user = AdminService.UserAccessView.builder().staffRoles(EnumSet.of(Position.ICT_MANAGER)).build();
+        var response = render(page, Map.of("staffPositions", positions, "user", user), "en");
+        var cards = Pattern.compile("<label\\b[^>]*>(.*?)</label>", Pattern.DOTALL).matcher(response.body());
+        var staticRoot = Path.of("src/main/resources/static");
+
+        for (Position position : positions) {
+            assertThat(cards.find()).as("Card for %s", position).isTrue();
+            String card = cards.group(1);
+            var checkbox = Pattern.compile("<input\\b[^>]*>").matcher(card);
+            assertThat(checkbox.find()).as("Checkbox for %s", position).isTrue();
+            assertThat(checkbox.group()).contains("type=\"checkbox\"", "name=\"positions\"", "value=\"" + position + "\"");
+            assertThat(Pattern.compile("\\schecked(?:\\s|=|>)").matcher(checkbox.group()).find())
+                .as("Saved selection for %s", position).isEqualTo(user.getStaffRoles().contains(position));
+            assertThat(card).contains(">" + position.getDisplayName() + "</span>");
+
+            if (position == Position.ADMIN) {
+                assertThat(card).containsPattern("<svg\\b[^>]*aria-hidden=\"true\"");
+                assertThat(card).contains("href=\"/images/staff-role-icons.svg#ADMIN\"");
+                assertThat(Files.readString(staticRoot.resolve("images/staff-role-icons.svg"))).contains("id=\"ADMIN\"");
+            } else {
+                String icon = position == Position.ACCOUNTS_CLERK_2 ? "ACCOUNTS_CLERK" : position.name();
+                String asset = "images/staff-roles/" + icon + ".png";
+                assertThat(card).containsPattern("<img\\b[^>]*alt=\"\"").contains("src=\"/" + asset + "\"");
+                assertThat(staticRoot.resolve(asset)).isRegularFile();
+            }
+        }
+        assertThat(cards.find()).isFalse();
+    }
 
     @ParameterizedTest
     @CsvSource({"en,Loan approval workflow setup","sw,Mipangilio ya hatua za kuidhinisha mikopo"})
