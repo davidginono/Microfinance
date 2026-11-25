@@ -292,7 +292,7 @@ public class LoanRecordingService {
         var plan=charges.quotedTerms(a,id);var deductions=charges.fundingDeductions(plan,selected);
         var cash=loan.principal().subtract(source.map(TopUpQuote::total).orElse(ZERO)).subtract(deductions);
         check(cash.signum()>0,"disbursementAmount");
-        var recoveryFees=source.isEmpty() && loan.clientId()!=null && charges.fundingRecoveryAccount(a,id,date).isPresent()?plan.managementTotal():ZERO;
+        var recoveryFees=source.isEmpty() && "INDIVIDUAL".equals(loan.loanFor()) && charges.fundingRecoveryAccount(a,id,date).isPresent()?plan.managementTotal():ZERO;
         return new FundingQuote(cash,deductions,plan.total().subtract(deductions),source.orElse(null),recoveryFees,
             recoveryFees.signum()>0?cash.subtract(recoveryFees):null);
     }

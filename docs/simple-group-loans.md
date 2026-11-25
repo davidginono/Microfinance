@@ -13,6 +13,8 @@ This increment replaces the former individual/shared/organization group-originat
 7. Save a draft or record the application. Drafts retain uploads and require renewed confirmation. The recorder can use **Edit** beside **Send for review** until the first review starts. Saving a correction keeps the loan ID, captures the prior terms and evidence, and reassesses the same group. Material changes require updated signed evidence where applicable. Review freezes the corrected terms for the configured approval workflow. Approval moves no money.
 8. The authorized funding action posts one parent loan to the existing ledger and journals, using the frozen group destination and ordinary payment evidence requirements. Authorized funding staff enter the first instalment date, which must follow the disbursement date and is then fixed. Previously recorded contracts retain their frozen first date. Record all repayments against that Loan ID and name the actual payer.
 
+At disbursement, staff can deduct agreed charges from the group payout. For an approved principal of TZS 3,000,000, deducting a TZS 15,000 application charge and TZS 45,000 insurance premium pays the group TZS 2,940,000. Regular instalments repay the full TZS 3,000,000 principal plus contractual interest. The funding journal records each deduction once. Any agreed charge left payable separately stays on the charge balance until collected.
+
 The leader is the contact. The loan is recorded under the joint group. There are no member principal shares, member loan accounts or extra receivables.
 
 ## Five-client example

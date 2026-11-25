@@ -1,6 +1,8 @@
 package com.sacco.mvp.accounting.loans;
 
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
+import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term;
+import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing;
 import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.CreateForm;
 import com.sacco.mvp.clients.onboarding.service.OnboardingService;
 import com.sacco.mvp.grouplending.dto.GroupLendingDtos.*;
@@ -11,6 +13,8 @@ import com.sacco.mvp.service.UserClaimService;
 import org.apache.pdfbox.pdmodel.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.mock.web.MockMultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
@@ -108,6 +112,65 @@ class SimpleGroupLoanPostgresTest {
     UUID fund(){UUID loan=record();var post=f.post(loan,"5000000.00","D-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY);post.setFirstPaymentDate(DAY.plusDays(1));f.service.disburse(f.actor,post);return loan;}
     void nextDay(){var day=DAY.plusDays(2);var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(day);when(clock.now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
     Posting pay(UUID loan,String amount,String payer){var post=f.post(loan,amount,"P-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY.plusDays(2));post.setSharedPayer(payer);return f.service.repay(f.actor,post);}
+
+    @ParameterizedTest
+    @CsvSource({
+        "SEPARATE, true, 2940000, 0",
+        "SEPARATE, false, 2955000, 15000",
+        "DEDUCT, false, 2940000, 0"
+    })
+    void groupFundingDeductsChargesOnceAndRepaysApprovedPrincipal(Timing applicationTiming, boolean selectApplication,
+                                                                  BigDecimal netCash, BigDecimal separateCharge) {
+        f.chargePolicy("SEPARATE");
+        if (applicationTiming == Timing.DEDUCT) {
+            var revision = f.approvedChargeRevision();
+            revision.setManagementTiming(Timing.DEDUCT);
+            f.chargeService().savePolicy(f.actor, revision);
+        } else if (selectApplication) {
+            f.enableWithheldFeeRecovery();
+        }
+        f.jdbc.update("update loan_product_settings set application_fee=15000, processing_fee_rate=0, insurance_rate=0.015 where id=?", f.product);
+        var approvedPrincipal = new BigDecimal("3000000.00");
+        var application = application();
+        application.setPrincipal(approvedPrincipal);
+        application.setInsurancePremium(new BigDecimal("45000.00"));
+        application.setInsuranceEvidence("Synthetic verified group premium");
+        UUID loan = f.service.saveGroup(f.actor, application, List.of(), paper());
+        var funding = f.post(loan, approvedPrincipal.toPlainString(), "D-GROUP-CHARGES");
+        funding.setEffectiveDate(DAY);
+        funding.setFirstPaymentDate(DAY.plusDays(1));
+        var selected = f.chargeService().frozen(f.actor, loan).terms().stream()
+            .filter(term -> term.kind().equals("INSURANCE") || (selectApplication && term.kind().equals("APPLICATION")))
+            .map(Term::id).toList();
+        funding.setDeductChargeIds(selected);
+
+        var quote = f.service.fundingQuote(f.actor, loan, DAY, selected);
+        assertThat(quote.recoveryFees()).isZero();
+        assertThat(quote.reducedCash()).isNull();
+        assertThat(quote.cash()).isEqualByComparingTo(netCash);
+        assertThat(quote.separate()).isEqualByComparingTo(separateCharge);
+        var posted = f.service.disburse(f.actor, funding);
+        assertThat(f.service.disburse(f.actor, funding).id()).isEqualTo(posted.id());
+        assertThat(posted.amount()).isEqualByComparingTo(netCash);
+        assertThat(f.jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",
+            BigDecimal.class, posted.journalId(), f.cash)).isEqualByComparingTo(netCash);
+        assertThat(f.jdbc.queryForObject("select sum(principal) from loan_ledger_installments where loan_application_id=?",
+            BigDecimal.class, loan)).isEqualByComparingTo(approvedPrincipal);
+        assertThat(f.service.chargeSummary(f.actor, loan).balance().outstanding()).isEqualByComparingTo(separateCharge);
+        assertThat(f.service.detail(f.actor, loan).loan().outstandingPrincipal()).isEqualByComparingTo(approvedPrincipal);
+
+        nextDay();
+        var first = pay(loan, "300000.00", "Group treasurer");
+        assertThat(first.charges()).isEqualByComparingTo(separateCharge);
+        assertThat(first.principal()).isEqualByComparingTo(first.amount().subtract(separateCharge));
+        var remaining = approvedPrincipal.subtract(first.principal());
+        assertThat(f.service.detail(f.actor, loan).loan().outstandingPrincipal()).isEqualByComparingTo(remaining);
+        var finalPayment = pay(loan, remaining.toPlainString(), "Group treasurer");
+        assertThat(finalPayment.principal()).isEqualByComparingTo(remaining);
+        assertThat(finalPayment.charges()).isZero();
+        assertThat(f.service.detail(f.actor, loan).loan().status()).isEqualTo("PAID");
+    }
+
     @Test void signedBorrowersSeeTheGroupLoanInTheirOwnLedgers() {
         UUID loan=record();
         var groupLoan=f.service.detail(f.actor,loan).loan();

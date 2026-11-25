@@ -20,7 +20,14 @@
 <fieldset id="funding-charge-picker" class="funding-charge-picker" hidden><legend><spring:message code="charges.chooseDeductions" /></legend>
 <c:forEach items="${fundingCharges.plan.terms}" var="term"><c:if test="${not feeRecoveryFunding or term.kind=='INSURANCE'}"><label><input type="checkbox" value="${term.id}" ${term.timing=='DEDUCT'?'checked disabled':''} <c:if test="${term.timing=='SEPARATE'}">name="deductChargeIds" ${not empty postingDeductChargeIds and postingDeductChargeIds.contains(term.id)?'checked':''}</c:if> /><span><spring:message code="charges.kind.${term.kind}" /> · TZS <fmt:formatNumber value="${term.amount}" minFractionDigits="2" maxFractionDigits="2" /></span></label></c:if></c:forEach>
 </fieldset>
-<dl class="loan-topup-facts" aria-live="polite"><div><dt><spring:message code="charges.deductions" /> (TZS)</dt><dd data-funding-deductions><fmt:formatNumber value="${fundingQuote.deductions}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="charges.separate" /> (TZS)</dt><dd data-funding-separate><fmt:formatNumber value="${fundingQuote.separate}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-funding-cash><fmt:formatNumber value="${disbursementBaseAmount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div></dl>
+<dl class="loan-topup-facts" aria-live="polite">
+    <c:if test="${not feeRecoveryFunding and empty topUpQuote}">
+        <div><dt><spring:message code="charges.principalToRepay" /> (TZS)</dt><dd><fmt:formatNumber value="${app.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+    </c:if>
+    <div><dt><spring:message code="charges.deductions" /> (TZS)</dt><dd data-funding-deductions><fmt:formatNumber value="${fundingQuote.deductions}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+    <div><dt><spring:message code="charges.separate" /> (TZS)</dt><dd data-funding-separate><fmt:formatNumber value="${fundingQuote.separate}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+    <div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-funding-cash><fmt:formatNumber value="${disbursementBaseAmount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+</dl>
 <c:choose><c:when test="${feeRecoveryFunding}">
     <dl class="loan-topup-facts" aria-live="polite">
         <div><dt><spring:message code="charges.fullPayout" /> (TZS)</dt><dd><fmt:formatNumber value="${app.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
