@@ -2442,13 +2442,6 @@ dialog::backdrop {
             background: transparent;
             padding: 0;
         }
-        .auth-mode-title {
-            color: #7b8aa0;
-            font-size: 0.98rem;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            text-align: center;
-        }
         .auth-section-label {
             color: #334155;
             font-size: 0.88rem;

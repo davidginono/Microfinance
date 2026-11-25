@@ -150,7 +150,7 @@ public class SimpleGroupLoanService {
         var policy=qualification.groupPolicy(a.getSaccoId(),a.getStationId());
         var ratio=product.getResolvedMaxRepaymentToDisposableIncomeRatio();check(ratio!=null&&ratio.signum()>0&&ratio.compareTo(BigDecimal.ONE)<=0,"budget");
         var missingHistory=new ArrayList<String>();
-        var pendingApplications=new ArrayList<String>();
+        boolean hasOpenApplication=false;
         var restrictedHistory=new ArrayList<String>();
         for(var row:rows){
             if(row.get("kyc")!=null)throw new IllegalArgumentException(row.get("kyc").toString());
@@ -158,11 +158,11 @@ public class SimpleGroupLoanService {
             var client=Objects.toString(row.get("full_name"));
             if(exposure==null || exposure.missingHistory()>0)missingHistory.add(client);
             if(exposure==null)continue;
-            if(exposure.pendingApplications()>0)pendingApplications.add(client);
+            if(exposure.pendingApplications()>0)hasOpenApplication=true;
             if(policy.applicantDefaultLimit()!=null && exposure.riskLoans()>=policy.applicantDefaultLimit())restrictedHistory.add(client);
         }
-        if(!missingHistory.isEmpty() || !pendingApplications.isEmpty() || !restrictedHistory.isEmpty())
-            throw new GroupCreditHistoryException(missingHistory,pendingApplications,restrictedHistory);
+        if(!missingHistory.isEmpty() || hasOpenApplication || !restrictedHistory.isEmpty())
+            throw new GroupCreditHistoryException(missingHistory,hasOpenApplication,restrictedHistory);
         for(var row:rows){
             UUID id=(UUID)row.get("id");var profile=profiles.get(id);
             var e=exposures.get(id);
@@ -303,18 +303,18 @@ public class SimpleGroupLoanService {
     }
     public static final class GroupCreditHistoryException extends IllegalArgumentException {
         private final List<String> missingHistory;
-        private final List<String> pendingApplications;
+        private final boolean hasOpenApplication;
         private final List<String> restrictedHistory;
 
-        public GroupCreditHistoryException(List<String> missingHistory,List<String> pendingApplications,List<String> restrictedHistory){
+        public GroupCreditHistoryException(List<String> missingHistory,boolean hasOpenApplication,List<String> restrictedHistory){
             super("simpleGroup.error.history");
             this.missingHistory=List.copyOf(missingHistory);
-            this.pendingApplications=List.copyOf(pendingApplications);
+            this.hasOpenApplication=hasOpenApplication;
             this.restrictedHistory=List.copyOf(restrictedHistory);
         }
 
         public List<String> missingHistory(){return missingHistory;}
-        public List<String> pendingApplications(){return pendingApplications;}
+        public boolean hasOpenApplication(){return hasOpenApplication;}
         public List<String> restrictedHistory(){return restrictedHistory;}
     }
     private static boolean validMoney(BigDecimal n,boolean positive){return n!=null&&n.scale()<=2&&n.precision()-n.scale()<=16&&(positive?n.signum()>0:n.signum()>=0);}

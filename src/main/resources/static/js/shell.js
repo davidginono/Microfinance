@@ -624,6 +624,11 @@
             if (path) {
                 shellMain.insertBefore(path, contentFrame);
             }
+            contentFrame.querySelectorAll('[data-workspace-flashbar]').forEach(function (flashbar) {
+                if (!flashbar.closest('section,form,dialog,[role="dialog"]')) {
+                    shellMain.insertBefore(flashbar, contentFrame);
+                }
+            });
             shellMain.insertBefore(header, contentFrame);
         });
     };
@@ -1187,7 +1192,7 @@
     };
 
     const restoreScrollAfterReload = function () {
-        if(window.WorkspaceNavigation?.restoring || document.querySelector('[data-toast-message],[data-workspace-response-error]'))return;
+        if(window.WorkspaceNavigation?.restoring || document.querySelector('[data-toast-message],[data-workspace-flashbar] [data-app-toast],[data-workspace-response-error]'))return;
         let saved;
         try {
             saved = JSON.parse(
@@ -1503,8 +1508,14 @@
             const main = element.closest('.shell-main');
             const breadcrumb = main?.querySelector('.erp-page-path');
             const offset = breadcrumb ? breadcrumb.getBoundingClientRect().height + 12 : 18;
-            const top = main ? main.scrollTop + rect.top - main.getBoundingClientRect().top - offset
-                : window.scrollY + rect.top - navHeight - 18;
+            let top = window.scrollY + rect.top - navHeight - 18;
+            if (main) {
+                const workspaceOrigin = main.getBoundingClientRect().top - main.scrollTop;
+                const flashbar = element.closest('[data-workspace-flashbar]');
+                // Keep the whole page heading in view when revealing a result near the top.
+                const showPageStart = flashbar && (flashbar.parentElement === main || rect.bottom - workspaceOrigin <= main.clientHeight);
+                top = showPageStart ? 0 : rect.top - workspaceOrigin - offset;
+            }
             (main || window).scrollTo({ top: Math.max(top, 0), behavior: 'instant' });
             element.setAttribute('tabindex', '-1');
             if (typeof element.focus === 'function') {
@@ -2155,6 +2166,9 @@
         });
         if (initialAlert) {
             window.scrollToFeedback(initialAlert);
+        } else if (!window.WorkspaceNavigation?.restoring && !window.location.hash) {
+            const notice = document.querySelector('.shell-main [data-workspace-flashbar] [data-app-toast]');
+            if (notice) window.scrollToFeedback(notice);
         }
         initSessionInactivityPrompt();
     });

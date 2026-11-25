@@ -96,12 +96,11 @@ class SimpleGroupLoanPostgresTest {
         assertThat(f.jdbc.queryForObject("select before_group_agreement from loan_record_edit where loan_id=? order by expected_version desc limit 1",byte[].class,loan))
             .isEqualTo(signed.getBytes());
     }
-    @Test void loanStepNamesGroupMembersWithAnOpenApplication(){
+    @Test void openApplicationBlocksTheGroupLoanStep(){
         record();
-        var names=service.setup(f.actor,group).people().stream().map(Person::name).toList();
         assertThatThrownBy(()->f.service.validateStep(f.actor,application(),"loan",List.of(),null))
             .isInstanceOfSatisfying(SimpleGroupLoanService.GroupCreditHistoryException.class,error->{
-                assertThat(error.pendingApplications()).containsExactlyInAnyOrderElementsOf(names);
+                assertThat(error.hasOpenApplication()).isTrue();
                 assertThat(error.missingHistory()).isEmpty();
                 assertThat(error.restrictedHistory()).isEmpty();
             });

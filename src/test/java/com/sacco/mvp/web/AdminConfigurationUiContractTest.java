@@ -220,7 +220,7 @@ class AdminConfigurationUiContractTest {
     @Test
     void sidebarShowsOneActiveStaffRailAndUsesOrangeEmblemWithExistingWordmark() throws Exception {
         String sidebar=read(JSP_ROOT.resolve("fragments/sidebar.jspf"));
-        assertThat(sidebar).contains("staff-offices.jspf", "/staff/settings", "shell-sidebar-subitem-label", "shell-powered-by-wordmark", "finance-navigation.jspf");
+        assertThat(sidebar).contains("staff-offices.jspf", "/account/security", "shell-sidebar-subitem-label", "shell-powered-by-wordmark", "finance-navigation.jspf");
         assertThat(sidebar).doesNotContain("/app/", "showManagerPanel", "showBoardPanel");
         assertThat(read(Path.of("src/main/resources/static/css/shell.css"))).contains("--sacco-topbar: #232f3e", "--sacco-sidebar: #ffffff", "#0073bb", ".shell-support-contact__link");
     }

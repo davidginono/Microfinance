@@ -4,6 +4,7 @@ import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.*;
 import com.sacco.mvp.service.AccessControlService;
 import com.sacco.mvp.staffoffice.model.StaffOffice;
+import com.sacco.mvp.web.view.CurrentUserView;
 import jakarta.servlet.http.*;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.jasper.servlet.*;
@@ -52,7 +53,8 @@ class StaffNavigationRenderingTest {
                 var security=SecurityContextHolder.createEmptyContext();security.setAuthentication(new UsernamePasswordAuthenticationToken(actor,null,actor.getAuthorities()));
                 SecurityContextHolder.setContext(security);
                 try{
-                    request.setAttribute("currentMember",actor);request.setAttribute("staffOffices",StaffOffice.assigned(actor.getStaffRoles()));
+                    request.setAttribute("currentMember",CurrentUserView.builder().position(role).fullName(actor.getFullName()).staffSession(true).build());
+                    request.setAttribute("staffOffices",StaffOffice.assigned(actor.getStaffRoles()));
                     request.setAttribute("isPlatformAdminIdentity",actor.isPlatformIdentity());request.setAttribute("jakarta.servlet.forward.request_uri",ARCHIVE);
                     request.setAttribute("pettyCashAvailable",Boolean.parseBoolean(request.getParameter("petty")));
                     request.getRequestDispatcher("/navigation.jsp").forward(request,response);
@@ -61,20 +63,23 @@ class StaffNavigationRenderingTest {
         });context.addServletMappingDecoded("/navigation","navigation");
         try{
             tomcat.start();var client=HttpClient.newHttpClient();String base="http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/navigation";
-            String all="CLIENT_ONBOARDING_VIEW,DISBURSEMENT_QUEUE_VIEW,LOAN_RECORDING_VIEW";
+            String all="CLIENT_ONBOARDING_VIEW,GROUP_LENDING_VIEW,DISBURSEMENT_QUEUE_VIEW,LOAN_RECORDING_VIEW";
             for(var role:Position.staffAssignableRoles()){
                 if(role==Position.ADMIN)continue;
                 String body=render(client,base,role,all,"en");
                 var office=StaffOffice.assigned(Set.of(role)).getFirst();
                 assertThat(body.indexOf(office.getBase()+"/queue")).isLessThan(body.indexOf("Office activities"));
                 assertThat(body.indexOf("Office activities")).isLessThan(body.indexOf("href=\"/finance/loan-records\""));
-                for(var path:List.of(CLIENT,QUEUE,ARCHIVE))assertThat(body).containsOnlyOnce("href=\""+path+"\"");
+                for(var path:List.of(CLIENT,"/finance/groups",QUEUE,ARCHIVE))assertThat(body).containsOnlyOnce("href=\""+path+"\"");
+                assertThat(body).containsSubsequence("Office activities","href=\""+CLIENT+"\"","href=\"/finance/groups\"","href=\""+QUEUE+"\"");
                 assertThat(body).doesNotContain(">Funding<");
                 assertThat(body).containsPattern("href=\"/disbursement/archive\"[^>]*shell-nav-active[^>]*aria-current=\"page\"");
             }
             for(var role:List.of(Position.ACCOUNTANT,Position.CUSTOMER_CARE,Position.DISBURSEMENT_OFFICER)){
                 String body=render(client,base,role,"","en");
-                assertThat(body).doesNotContain("Office activities","href=\""+CLIENT+"\"","href=\""+QUEUE+"\"","href=\""+ARCHIVE+"\"");
+                assertThat(body).doesNotContain("Office activities","href=\"/finance/groups\"","href=\""+CLIENT+"\"","href=\""+QUEUE+"\"","href=\""+ARCHIVE+"\"");
+                body=render(client,base,role,"GROUP_LENDING_VIEW","en");
+                assertThat(body).containsSubsequence("Office activities","href=\"/finance/groups\"").doesNotContain("href=\""+CLIENT+"\"","href=\""+QUEUE+"\"");
                 body=render(client,base,role,"CLIENT_ONBOARDING_VIEW","sw");
                 assertThat(body).contains("Shughuli za ofisi","href=\""+CLIENT+"\"").doesNotContain("href=\""+QUEUE+"\"","href=\""+ARCHIVE+"\"");
                 for(String claim:List.of("DISBURSEMENT_QUEUE_VIEW","DISBURSEMENT_QUEUE_DISBURSE")){

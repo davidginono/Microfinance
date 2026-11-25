@@ -94,7 +94,7 @@ class LoanRecordingMvcTest {
     }
     @Test void loanStepReportsEachCreditHistoryBlockerAgainstTheGroupField() throws Exception {
         var failure=new com.sacco.mvp.grouplending.service.SimpleGroupLoanService.GroupCreditHistoryException(
-            List.of("Asha Test"),List.of("Juma Test"),List.of("Neema Test"));
+            List.of("Asha Test"),true,List.of("Neema Test"));
         doThrow(failure).when(service).validateStep(eq(actor),any(),eq("loan"),any(),any());
         mvc.perform(post("/finance/loan-recording/validate-step").with(user(actor)).with(csrf())
                 .locale(Locale.ENGLISH).param("step","loan").param("loanFor","GROUP"))
@@ -102,7 +102,7 @@ class LoanRecordingMvcTest {
             .andExpect(jsonPath("$.errors[0].field").value("groupApplication.groupId"))
             .andExpect(jsonPath("$.errors[0].message",org.hamcrest.Matchers.allOf(
                 org.hamcrest.Matchers.containsString("Debt records are incomplete for Asha Test"),
-                org.hamcrest.Matchers.containsString("An application is still open for Juma Test"),
+                org.hamcrest.Matchers.containsString("An open application is blocking this group."),
                 org.hamcrest.Matchers.containsString("Neema Test reached the limit"))));
         verify(service,never()).saveGroup(any(),any(),any(),any());
     }

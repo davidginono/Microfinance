@@ -21,7 +21,7 @@ class SystemAdminLoginContractTest {
             .contains("Use the separate System Admin login.");
         assertThat(authController).contains("{\"/login\", \"/system-admin/login\"}");
         assertThat(login)
-            .contains("login.systemAdminHeading")
+            .contains("systemAdminLogin ? 'home.systemAdmin' : 'login.title'")
             .contains("name=\"loginType\" value=\"system-admin-password\"")
             .contains("data-forgot-password-open=\"system-admin\"")
             .contains("loginPageExpired")

@@ -172,7 +172,7 @@ public class LoanRecordingController {
     private String creditHistoryMessage(SimpleGroupLoanService.GroupCreditHistoryException error,Locale locale){
         var details=new ArrayList<String>();
         if(!error.missingHistory().isEmpty())details.add(messages.getMessage("simpleGroup.error.historyMissing",new Object[]{String.join(", ",error.missingHistory())},locale));
-        if(!error.pendingApplications().isEmpty())details.add(messages.getMessage("simpleGroup.error.historyPending",new Object[]{String.join(", ",error.pendingApplications())},locale));
+        if(error.hasOpenApplication())details.add(messages.getMessage("simpleGroup.error.historyPending",null,locale));
         if(!error.restrictedHistory().isEmpty())details.add(messages.getMessage("simpleGroup.error.historyRestricted",new Object[]{String.join(", ",error.restrictedHistory())},locale));
         return String.join(" ",details);
     }

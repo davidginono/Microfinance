@@ -44,7 +44,7 @@ class SidebarWorkspaceFilterTest {
     @Test
     void staffMenusAreLimitedToStaffWorkspace() throws IOException {
         String sidebar=sidebarFragment();
-        assertThat(sidebar).contains("${staffWorkspace}", "staff-offices.jspf", "staffSettingsPanel", "/staff/settings", "finance-navigation.jspf");
+        assertThat(sidebar).contains("${staffWorkspace}", "staff-offices.jspf", "staffSettingsPanel", "/account/security", "finance-navigation.jspf");
         assertThat(sidebar).doesNotContain("canAccessManagerArea", "canAccessAccountantArea", "canAccessBoardArea");
     }
 

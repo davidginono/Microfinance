@@ -540,10 +540,6 @@ body.aws-auth-shell.public-access .public-access-card :is([data-login-submit-but
     overflow-wrap: anywhere;
 }
 
-.public-access-card .auth-mode-title {
-    text-align: start;
-}
-
 body.aws-auth-shell .forgot-password-dialog {
     width: min(100%, 32rem);
     max-width: calc(100vw - 24px);

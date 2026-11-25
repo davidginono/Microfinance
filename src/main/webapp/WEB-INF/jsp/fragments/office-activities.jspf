@@ -1,8 +1,11 @@
-<sec:authorize access="@access.hasAny(principal,'CLIENT_ONBOARDING_VIEW','DISBURSEMENT_QUEUE_VIEW','DISBURSEMENT_QUEUE_DISBURSE')">
+<sec:authorize access="@access.hasAny(principal,'CLIENT_ONBOARDING_VIEW','GROUP_LENDING_VIEW','DISBURSEMENT_QUEUE_VIEW','DISBURSEMENT_QUEUE_DISBURSE')">
     <div class="shell-sidebar-nav-heading"><span><spring:message code="office.activities" /></span></div>
     <div class="shell-sidebar-group space-y-1">
         <sec:authorize access="@access.has(principal,'CLIENT_ONBOARDING_VIEW')">
             <a href="<c:url value='/finance/clients/onboarding' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/clients/onboarding')?'shell-nav-active':''}" <c:if test="${fn:startsWith(requestUri,'/finance/clients/onboarding')}">aria-current="page"</c:if>><spring:message code="kyc.title" /></a>
+        </sec:authorize>
+        <sec:authorize access="@access.has(principal,'GROUP_LENDING_VIEW')">
+            <a href="<c:url value='/finance/groups' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/finance/groups')?'shell-nav-active':''}" <c:if test="${fn:startsWith(requestUri,'/finance/groups')}">aria-current="page"</c:if>><spring:message code="group.title" /></a>
         </sec:authorize>
         <sec:authorize access="@access.canAccessDisbursementArea(principal)">
             <a href="<c:url value='/disbursement/loan-applications' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:startsWith(requestUri,'/disbursement/loan-applications')?'shell-nav-active':''}" <c:if test="${fn:startsWith(requestUri,'/disbursement/loan-applications')}">aria-current="page"</c:if>><spring:message code="menu.disbursementQueue" /></a>
