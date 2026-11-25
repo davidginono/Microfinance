@@ -2,15 +2,20 @@
 <sec:authorize access="@access.staffDashboardAccess(principal)">
 <a href="<c:url value='/staff/dashboard' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq '/staff/dashboard' ? 'shell-nav-active' : ''}" <c:if test="${requestUri eq '/staff/dashboard'}">aria-current="page"</c:if>><spring:message code="menu.dashboard" /></a>
 </sec:authorize>
-<c:forEach items="${staffOffices}" var="staffOffice">
+<sec:authorize access="@access.staffAnalyticsAccess(principal)" var="canOpenStaffAnalytics" />
+<c:forEach items="${staffOffices}" var="staffOffice" varStatus="officeStatus">
     <div class="shell-sidebar-nav-heading"><span><spring:message code="${staffOffice.labelKey}" /></span></div>
     <div class="shell-sidebar-group space-y-1">
-        <c:forEach items="${['queue','reports']}" var="officeSection">
-            <c:set var="officePath" value="${staffOffice.base}/${officeSection}" />
-            <a href="<c:url value='${officePath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq officePath ? 'shell-nav-active' : ''}" ${requestUri eq officePath ? 'aria-current="page"' : ''}>
-                <spring:message code="office.section.${officeSection}" />
+        <c:set var="officePath" value="${staffOffice.base}/queue" />
+        <a href="<c:url value='${officePath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri eq officePath ? 'shell-nav-active' : ''}" ${requestUri eq officePath ? 'aria-current="page"' : ''}>
+            <spring:message code="office.section.queue" />
+        </a>
+        <c:if test="${canOpenStaffAnalytics}">
+            <c:set var="analyticsActive" value="${requestUri eq '/staff/analytics' and officeStatus.first}" />
+            <a href="<c:url value='/staff/analytics' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${analyticsActive ? 'shell-nav-active' : ''}" ${analyticsActive ? 'aria-current="page"' : ''}>
+                <spring:message code="menu.staffReportsAnalytics" />
             </a>
-        </c:forEach>
+        </c:if>
     </div>
 </c:forEach>
 <sec:authorize access="@access.has(principal,'LOAN_RECORDING_VIEW')">

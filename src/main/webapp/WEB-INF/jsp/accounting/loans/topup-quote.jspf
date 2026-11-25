@@ -1,7 +1,9 @@
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page pageEncoding="UTF-8" %>
-<section class="accounting-section erp-detail-card loan-topup-summary" data-ui-loading-region data-topup-summary data-source="${recordForm.topUpSourceLoanId}" data-error="<spring:message code='recording.error.topUpUnavailable' />" aria-live="polite">
-    <h2><spring:message code="recording.topUp.breakdown" /></h2>
+<section class="accounting-section erp-detail-card loan-topup-summary" data-topup-summary data-source="${recordForm.topUpSourceLoanId}" data-error="<spring:message code='recording.error.topUpUnavailable' />" aria-live="polite">
+    <h2><span class="loan-quote-heading"><spring:message code="recording.topUp.breakdown" />
+        <span data-topup-loading role="status" aria-label="<spring:message code='common.loading' />" hidden><span class="app-loading-spinner" data-loading-size="small" aria-hidden="true"></span></span>
+    </span></h2>
     <c:if test="${not empty topUpError}"><p role="alert"><spring:message code="${topUpError}" /></p></c:if>
     <p><spring:message code="recording.topUp.source" />: <a href="<c:url value='/finance/loan-records/${topUpQuote.sourceId}' />"><c:out value="${topUpQuote.sourceNumber}" /></a> · <spring:message code="recording.asOf" /> <span data-topup-date><c:out value="${appTime:display(topUpQuote.date)}" /></span></p>
     <dl class="loan-topup-facts">

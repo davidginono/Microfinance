@@ -13,13 +13,11 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.view.InternalResourceViewResolver;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
@@ -52,37 +50,20 @@ class LoanRepaymentControllerTest {
     void close() { context.close(); }
 
     @Test
-    void validVerifiedPaymentRedirectsToItsReceipt() throws Exception {
-        UUID receipt = UUID.randomUUID();
-        when(ledger.post(eq(LOAN), any(), any())).thenReturn(new LoanRepaymentLedgerService.Receipt(
-            receipt, LOAN, "100001", "R-1", "PAYMENT", LocalDate.of(2026, 10, 1), null,
-            new BigDecimal("20.00"), new BigDecimal("10.00"), new BigDecimal("10.00"), "CASH", "C-1", null, null, null));
-
-        mvc.perform(validPayment().with(user(actor(true, UserClaim.LOAN_REPAYMENTS_CREATE))).with(csrf()))
-            .andExpect(status().is3xxRedirection())
-            .andExpect(redirectedUrl("/repayments/loans/" + LOAN + "/receipts/" + receipt));
-        verify(ledger).post(eq(LOAN), any(), argThat(c -> c.amount().compareTo(new BigDecimal("20.00")) == 0));
-    }
-
-    @Test
-    void missingCsrfCannotPost() throws Exception {
-        mvc.perform(validPayment().with(user(actor(true, UserClaim.LOAN_REPAYMENTS_CREATE))))
-            .andExpect(status().isForbidden());
+    void retiredIndexAndPaymentEntryAreUnavailableEvenForExistingStaff() throws Exception {
+        mvc.perform(get("/repayments").with(user(actor(true, UserClaim.LOAN_REPAYMENTS_VIEW))))
+            .andExpect(status().isNotFound());
+        mvc.perform(post("/repayments/loans/" + LOAN + "/payments")
+                .with(user(actor(true, UserClaim.LOAN_RECORDING_POST))).with(csrf()))
+            .andExpect(status().isNotFound());
         verifyNoInteractions(ledger);
     }
 
     @Test
-    void viewPermissionCannotPost() throws Exception {
-        mvc.perform(validPayment().with(user(actor(true, UserClaim.LOAN_REPAYMENTS_VIEW))).with(csrf()))
-            .andExpect(status().isForbidden());
-        verifyNoInteractions(ledger);
-    }
-
-    @Test
-    void clientLoanPermissionCannotOpenStaffRegistry() throws Exception {
-        mvc.perform(get("/repayments").with(user(actor(false, UserClaim.MEMBER_LOANS_VIEW))))
-            .andExpect(status().isForbidden());
-        verifyNoInteractions(ledger);
+    void authenticatedStaffCanOpenScopedRepaymentHistory() throws Exception {
+        mvc.perform(get("/repayments/loans/" + LOAN).with(user(actor(true, UserClaim.LOAN_REPAYMENTS_VIEW))))
+            .andExpect(status().isOk()).andExpect(view().name("repayments/loan"));
+        verify(ledger).view(eq(LOAN), any(), eq(0), eq(0));
     }
 
     @Test
@@ -93,52 +74,15 @@ class LoanRepaymentControllerTest {
     }
 
     @Test
-    void paymentMustBeConfirmed() throws Exception {
-        mvc.perform(validPayment("20.00", "false")
-                .with(user(actor(true, UserClaim.LOAN_REPAYMENTS_CREATE))).with(csrf()))
-            .andExpect(status().isOk()).andExpect(view().name("repayments/loan"))
-            .andExpect(model().attribute("repaymentError", "repayment.error.validation"));
-        verify(ledger, never()).post(any(), any(), any());
-    }
-
-    @Test
-    void excessiveDecimalPrecisionIsRejectedBeforePosting() throws Exception {
-        mvc.perform(validPayment("20.001", "true")
-                .with(user(actor(true, UserClaim.LOAN_REPAYMENTS_CREATE))).with(csrf()))
-            .andExpect(status().isOk()).andExpect(model().attributeHasFieldErrors("paymentForm", "amount"));
-        verify(ledger, never()).post(any(), any(), any());
-    }
-
-    @Test
     void reversalRequiresDedicatedPermissionAndCsrf() throws Exception {
         String url = "/repayments/loans/" + LOAN + "/payments/" + UUID.randomUUID() + "/reverse";
         mvc.perform(post(url).param("requestKey", UUID.randomUUID().toString()).param("reason", "Duplicate cash receipt")
-                .param("confirmed", "true").with(user(actor(true, UserClaim.LOAN_REPAYMENTS_CREATE))).with(csrf()))
+                .param("confirmed", "true").with(user(actor(true, UserClaim.LOAN_REPAYMENTS_VIEW))).with(csrf()))
             .andExpect(status().isForbidden());
         mvc.perform(post(url).param("requestKey", UUID.randomUUID().toString()).param("reason", "Duplicate cash receipt")
                 .param("confirmed", "true").with(user(actor(true, UserClaim.LOAN_REPAYMENTS_REVERSE))))
             .andExpect(status().isForbidden());
         verifyNoInteractions(ledger);
-    }
-
-    @Test
-    void invalidSearchRendersAnErrorWithoutChangingData() throws Exception {
-        when(ledger.list(any(), eq("not-a-number"), anyInt()))
-            .thenThrow(new IllegalArgumentException("repayment.error.search"));
-        mvc.perform(get("/repayments").param("loanNumber", "not-a-number")
-                .with(user(actor(true, UserClaim.LOAN_REPAYMENTS_VIEW))))
-            .andExpect(status().isOk()).andExpect(view().name("repayments/index"))
-            .andExpect(model().attribute("repaymentError", "repayment.error.search"));
-    }
-
-    private MockHttpServletRequestBuilder validPayment() {
-        return validPayment("20.00", "true");
-    }
-
-    private MockHttpServletRequestBuilder validPayment(String amount, String confirmed) {
-        return post("/repayments/loans/" + LOAN + "/payments").param("amount", amount)
-            .param("paymentDate", "2026-10-01").param("channel", "CASH").param("reference", "C-1")
-            .param("requestKey", UUID.randomUUID().toString()).param("confirmed", confirmed);
     }
 
     private AppUserPrincipal actor(boolean staff, UserClaim claim) {

@@ -48,8 +48,4 @@ class OfficeNavigationTest {
         new OfficeNavigation().postHandle(request(),new MockHttpServletResponse(),new Object(),external);
         assertThat(external.getViewName()).isEqualTo("redirect:https://outside.invalid");
     }
-    @Test void reportsReturnToTheirOfficeWithoutAddingReportFilters() {
-        assertThat(new Navigation(StaffOffice.CREDIT_OFFICER,"reports","","number",0).getHref())
-            .isEqualTo("/staff/offices/credit-officer/reports");
-    }
 }

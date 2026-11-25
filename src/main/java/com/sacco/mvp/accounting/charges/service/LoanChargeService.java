@@ -107,19 +107,19 @@ public class LoanChargeService {
     }
     private Plan quote(AppUserPrincipal a,RecordForm f,LoanProductSetting product,boolean strict,boolean allowPending,boolean lockAccounts){
         boolean manual="CUSTOM".equals(f.getLoanMode());
+        boolean topUp=f.getTopUpSourceLoanId()!=null;
         if(manual)accounting.requireActor(a,"LOAN_CHARGES_CUSTOM");
-        var application=amount(manual?f.getCustomApplicationCharge():product.getApplicationFee());
-        var processingInput=manual?enteredAmount(f.getPrincipal(),f.getCustomProcessingBasis(),f.getCustomProcessingPercent(),f.getCustomProcessingCharge()):null;
+        var application=topUp?ZERO:amount(manual?f.getCustomApplicationCharge():product.getApplicationFee());
+        var processingInput=manual && !topUp?enteredAmount(f.getPrincipal(),f.getCustomProcessingBasis(),f.getCustomProcessingPercent(),f.getCustomProcessingCharge()):null;
         var insuranceInput=manual?enteredAmount(f.getPrincipal(),f.getCustomInsuranceBasis(),f.getCustomInsurancePercent(),f.getInsurancePremium()):null;
-        var processing=manual?amount(processingInput):percent(f.getPrincipal(),product.getProcessingFeeRate());
+        var processing=topUp?ZERO:manual?amount(processingInput):percent(f.getPrincipal(),product.getProcessingFeeRate());
         var insuranceLimit=percent(f.getPrincipal(),product.getInsuranceRate());
         var insurance=manual?amount(insuranceInput):insuranceLimit;
         var policy=repository.policy(a.getSaccoId(),product.getId(),f.getApplicationDate()==null?clock.today():f.getApplicationDate()).filter(Policy::enabled).orElse(null);
         boolean custom=manual && application.add(processing).signum()>0;
-        String failure=manual && (f.getCustomApplicationCharge()==null || processingInput==null || insuranceInput==null)?"charges.error.enterFees":"";
+        String failure=manual && (insuranceInput==null || !topUp && (f.getCustomApplicationCharge()==null || processingInput==null))?"charges.error.enterFees":"";
         if(manual && insurance.compareTo(insuranceLimit)>0)failure="charges.error.insuranceLimit";
         if(custom){require(policy!=null && policy.enabled() && policy.allowCustom(),"custom");require(application.add(processing).compareTo(policy.customManagementLimit())<=0,"custom");}
-        if(f.getTopUpSourceLoanId()!=null && application.add(processing).signum()>0)failure="charges.error.topUpFee";
         if(application.add(processing).add(insurance).signum()>0 && (policy==null || !policy.enabled()))failure="charges.error.policy";
         var terms=new ArrayList<Term>();
         if(policy!=null && policy.enabled()){
@@ -133,7 +133,6 @@ public class LoanChargeService {
         if(application.signum()>0)terms.add(term("APPLICATION",manual?"CUSTOM_AMOUNT":"FIXED",application,application,policy,false,custom?managementEvidence:""));
         if(processing.signum()>0)terms.add(term("PROCESSING",processingRate?"PRINCIPAL_RATE":"CUSTOM_AMOUNT",processingRate?(manual?f.getCustomProcessingPercent().movePointLeft(2):product.getProcessingFeeRate()):processing,processing,policy,false,custom?managementEvidence:""));
         if(insurance.signum()>0)terms.add(term("INSURANCE",insuranceRate?"PRINCIPAL_RATE":"CUSTOM_AMOUNT",insuranceRate?(manual?f.getCustomInsurancePercent().movePointLeft(2):product.getInsuranceRate()):insurance,insurance,policy,true,insuranceEvidence));
-        if(f.getTopUpSourceLoanId()!=null && application.add(processing).signum()>0)failure="charges.error.topUpFee";
         if(terms.stream().filter(t->t.timing()==Timing.DEDUCT).map(Term::amount).reduce(ZERO,BigDecimal::add).compareTo(f.getPrincipal())>=0)failure="charges.error.amount";
         var plan=new Plan(policy==null?null:policy.id(),policy==null?"":policy.policyReference(),policy==null?"":policy.agreementReference(),List.copyOf(terms),failure.isEmpty(),failure);
         if(allowPending && canRecordWithPendingCharges(f,plan))return plan;
@@ -162,7 +161,7 @@ public class LoanChargeService {
     @Transactional(readOnly=true) public ChargeQuote quoteView(AppUserPrincipal a,RecordForm f,LoanProductSetting product){
         var plan=quote(a,f,product,false);boolean manual="CUSTOM".equals(f.getLoanMode());
         var fields=new ArrayList<ChargeField>();
-        for(String kind:List.of("APPLICATION","PROCESSING","INSURANCE")){
+        for(String kind:f.getTopUpSourceLoanId()!=null?List.of("INSURANCE"):List.of("APPLICATION","PROCESSING","INSURANCE")){
             var term=plan.terms().stream().filter(t->t.kind().equals(kind)).findFirst().orElse(null);var total=term==null?ZERO:term.amount();
             BigDecimal rate=null;
             if(!kind.equals("APPLICATION")){

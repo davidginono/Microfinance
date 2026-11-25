@@ -30,6 +30,7 @@ public enum AccessFeature {
     MEMBER_SETTINGS("Member Settings"),
     PAYMENT_DETAILS("Payment Details"),
     LOAN_REPAYMENTS("Repayments"),
+    LOAN_INTEREST_WAIVERS("Interest waivers"),
     LOAN_RECORDING("Accountant loan recording"),
     LOAN_FEE_RECOVERY("Loan fee recovery"),
     LOAN_ADJUSTMENTS("Loan provisions and corrections"),

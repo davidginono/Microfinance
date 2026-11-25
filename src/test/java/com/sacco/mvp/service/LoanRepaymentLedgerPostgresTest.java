@@ -95,8 +95,8 @@ class LoanRepaymentLedgerPostgresTest {
     @Test
     void postingRetryAndReversalPersistExactlyOnceAndBalance() {
         var command = command("100.00", "PG-" + UUID.randomUUID(), UUID.randomUUID());
-        var receipt = service.post(loan.getId(), poster, command);
-        assertThat(service.post(loan.getId(), poster, command).id()).isEqualTo(receipt.id());
+        var receipt = post(loan.getId(), poster, command);
+        assertThat(post(loan.getId(), poster, command).id()).isEqualTo(receipt.id());
         assertThat(count("loan_repayment_transactions")).isEqualTo(1);
         assertThat(balance("principal_paid")).isEqualByComparingTo("82.00");
         assertThat(balance("interest_paid")).isEqualByComparingTo("18.00");
@@ -117,8 +117,8 @@ class LoanRepaymentLedgerPostgresTest {
     }
 
     @Test void displaySortingPreservesContractBalancesAndTheLatestCorrectionTarget() {
-        service.post(loan.getId(),poster,command("20.00","SORT-1-"+UUID.randomUUID(),UUID.randomUUID()));
-        var latest=service.post(loan.getId(),poster,command("30.00","SORT-2-"+UUID.randomUUID(),UUID.randomUUID()));
+        post(loan.getId(),poster,command("20.00","SORT-1-"+UUID.randomUUID(),UUID.randomUUID()));
+        var latest=post(loan.getId(),poster,command("30.00","SORT-2-"+UUID.randomUUID(),UUID.randomUUID()));
         var request=new org.springframework.mock.web.MockHttpServletRequest();request.setMethod("GET");
         request.setParameter("tableSort[repayments-loan-2]","interest");
         org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(new org.springframework.web.context.request.ServletRequestAttributes(request));
@@ -140,7 +140,7 @@ class LoanRepaymentLedgerPostgresTest {
                 ready.countDown();
                 if (!start.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Start timeout");
                 try {
-                    service.post(loan.getId(), poster, command("218.00", "PG-" + UUID.randomUUID(), UUID.randomUUID()));
+                    post(loan.getId(), poster, command("218.00", "PG-" + UUID.randomUUID(), UUID.randomUUID()));
                     return true;
                 } catch (IllegalArgumentException ex) {
                     assertThat(ex.getMessage()).isEqualTo("repayment.error.state");
@@ -167,7 +167,7 @@ class LoanRepaymentLedgerPostgresTest {
     void failedAuditRollsBackReceiptAllocationsBalancesJournalAndStatus() {
         doThrow(new IllegalStateException("Audit unavailable")).when(context.getBean(AuditService.class))
             .logEvent(anyString(), any(), anyString(), any(), any(), anyString(), anyString(), anyString(), anyString(), anyString(), anyMap());
-        assertThatThrownBy(() -> service.post(loan.getId(), poster, command("218.00", "PG-" + UUID.randomUUID(), UUID.randomUUID())))
+        assertThatThrownBy(() -> post(loan.getId(), poster, command("218.00", "PG-" + UUID.randomUUID(), UUID.randomUUID())))
             .isInstanceOf(IllegalStateException.class).hasMessage("Audit unavailable");
         assertThat(count("loan_repayment_transactions")).isZero();
         assertThat(balance("principal_paid")).isZero();
@@ -180,7 +180,7 @@ class LoanRepaymentLedgerPostgresTest {
 
     @Test
     void databaseRejectsHistoryEditsContractChangesAndUnbalancedVouchers() {
-        var receipt = service.post(loan.getId(), poster, command("20.00", "PG-" + UUID.randomUUID(), UUID.randomUUID()));
+        var receipt = post(loan.getId(), poster, command("20.00", "PG-" + UUID.randomUUID(), UUID.randomUUID()));
         assertThatThrownBy(() -> jdbc.update("UPDATE loan_repayment_transactions SET amount = amount WHERE id = ?", receipt.id()))
             .isInstanceOf(DataAccessException.class);
         assertThatThrownBy(() -> jdbc.update("DELETE FROM loan_repayment_transactions WHERE id = ?", receipt.id()))
@@ -196,10 +196,10 @@ class LoanRepaymentLedgerPostgresTest {
 
     @Test
     void scopedReceiptAndReversalGuardsDoNotMutateTheLoan() {
-        var receipt = service.post(loan.getId(), poster, command("20.00", "PG-" + UUID.randomUUID(), UUID.randomUUID()));
+        var receipt = post(loan.getId(), poster, command("20.00", "PG-" + UUID.randomUUID(), UUID.randomUUID()));
         AppUserPrincipal otherBranch = operator("B2");
         assertThatThrownBy(() -> service.receipt(loan.getId(), receipt.id(), otherBranch)).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> service.post(loan.getId(), otherBranch, command("20.00", "PG-X", UUID.randomUUID())))
+        assertThatThrownBy(() -> post(loan.getId(), otherBranch, command("20.00", "PG-X", UUID.randomUUID())))
             .isInstanceOf(AccessDeniedException.class);
         assertThatThrownBy(() -> service.reverse(loan.getId(), receipt.id(), poster, UUID.randomUUID(), "Correction"))
             .isInstanceOf(IllegalArgumentException.class).hasMessage("repayment.error.checker");
@@ -209,8 +209,11 @@ class LoanRepaymentLedgerPostgresTest {
     private LoanApplication openLoan() {
         long number = NUMBER.incrementAndGet();
         OffsetDateTime now = OffsetDateTime.parse("2026-10-01T12:00:00+03:00");
+        UUID clientId = UUID.randomUUID();
+        jdbc.update("INSERT INTO members(id, sacco_id, station_id, member_no, full_name, status, position, created_at, is_member, password_hash) "
+            + "VALUES (?, 'I-PG', 'B1', ?, 'Test Client', 'ACTIVE', 'MEMBER', now(), true, '!NO_PORTAL_ACCESS')", clientId, clientId.toString());
         LoanApplication result = LoanApplication.builder().id(UUID.randomUUID()).applicationNumber(number).loanId(Long.toString(number))
-            .saccoId("I-PG").stationId("B1").applicantMemberId(poster.getMemberId()).loanType(LoanType.DEVELOPMENT_LOAN)
+            .saccoId("I-PG").stationId("B1").applicantMemberId(clientId).loanType(LoanType.DEVELOPMENT_LOAN)
             .amount(new BigDecimal("200.00")).tenorMonths(2).status(LoanStatus.DISBURSED).formData("{}")
             .policySnapshot("{}").requiredGuarantors(0).financialSnapshot("{\"annualInterestRate\":12}")
             .disbursementDate(LocalDate.of(2026, 8, 1)).createdAt(now).updatedAt(now)
@@ -225,10 +228,14 @@ class LoanRepaymentLedgerPostgresTest {
 
     private AppUserPrincipal operator(String branch) {
         UUID id = UUID.randomUUID();
-        jdbc.update("INSERT INTO members(id, sacco_id, station_id, member_no, full_name, status, position, created_at, is_member, password_hash) "
-            + "VALUES (?, 'I-PG', ?, ?, 'Test Operator', 'ACTIVE', 'MANAGER', now(), true, 'not-a-login-password')", id, branch, id.toString());
+        jdbc.update("INSERT INTO members(id, sacco_id, station_id, member_no, full_name, status, position, created_at, is_member, staff_access_status, password_hash) "
+            + "VALUES (?, 'I-PG', ?, ?, 'Test Operator', 'ACTIVE', 'MANAGER', now(), false, 'ACTIVE', 'not-a-login-password')", id, branch, id.toString());
         return new AppUserPrincipal(Member.builder().id(id).saccoId("I-PG").stationId(branch).memberNo(id.toString())
-            .fullName("Test Operator").memberAccount(false).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.LOAN_REPAYMENTS_VIEW, UserClaim.LOAN_REPAYMENTS_CREATE, UserClaim.LOAN_REPAYMENTS_REVERSE));
+            .fullName("Test Operator").memberAccount(false).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),Set.of(UserClaim.LOAN_REPAYMENTS_VIEW, UserClaim.LOAN_RECORDING_POST, UserClaim.LOAN_REPAYMENTS_REVERSE));
+    }
+
+    private LoanRepaymentLedgerService.Receipt post(UUID loanId,AppUserPrincipal actor,LoanRepaymentLedgerService.PaymentCommand command) {
+        return tx.execute(status -> service.postRecorded(loanId,actor,command));
     }
 
     private LoanRepaymentLedgerService.PaymentCommand command(String amount, String reference, UUID key) {
@@ -287,8 +294,9 @@ class LoanRepaymentLedgerPostgresTest {
         @Bean LoanRepaymentLedgerService ledger(LoanLedgerRepository ledgers, LoanLedgerInstallmentRepository installments,
                 LoanRepaymentTransactionRepository payments, LoanRepaymentAllocationRepository allocations, LoanJournalEntryRepository journal,
                 LoanApplicationRepository loans, ObjectMapper mapper, ApplicationClock clock, AccessControlService access, AuditService audit, org.springframework.jdbc.core.JdbcTemplate jdbcTemplate) {
-            return new LoanRepaymentLedgerService(ledgers, installments, payments, allocations, journal, loans, mapper, clock, access, audit,
-                org.mockito.Mockito.mock(com.sacco.mvp.accounting.loans.service.LoanPostingGuard.class),
+            var postingGuard = mock(com.sacco.mvp.accounting.loans.service.LoanPostingGuard.class);
+            when(postingGuard.recordedLoan(any())).thenReturn(true);
+            return new LoanRepaymentLedgerService(ledgers, installments, payments, allocations, journal, loans, mapper, clock, access, audit, postingGuard,
                 new com.sacco.mvp.accounting.repayment.service.LoanPrepaymentService(new com.sacco.mvp.accounting.repayment.repository.LoanPrepaymentRepository(jdbcTemplate),clock,audit,org.mockito.Mockito.mock(com.sacco.mvp.accounting.service.VoucherService.class),org.mockito.Mockito.mock(com.sacco.mvp.grouplending.service.GroupSharedLoanService.class)));
         }
     }

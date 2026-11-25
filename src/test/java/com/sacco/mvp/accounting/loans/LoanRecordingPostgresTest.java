@@ -470,8 +470,7 @@ class LoanRecordingPostgresTest {
         // Use an unpaid source for settlement, preserving the first loan's original terms.
         var p=chargeService().policy(actor,product).orElseThrow();var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();policy.setExpectedVersion(p.id());policy.setProductId(product);policy.setEffectiveFrom(LocalDate.of(2026,8,1));policy.setEnabled(true);policy.setPolicyReference("Synthetic separate collection policy");policy.setAgreementReference("Synthetic bilingual agreement");policy.setReceivableAccountId(chargeAccount);policy.setApplicationAccountId(managementAccount);policy.setProcessingAccountId(processingAccount);policy.setInsuranceAccountId(insuranceAccount);policy.setInsurer("Synthetic insurer");policy.setInsurerVerification("Synthetic licensed insurance evidence");chargeService().savePolicy(actor,policy);
         var original=chargedLoan();service.disburse(actor,chargedFunding(original));
-        assertThatThrownBy(()->recordTopUp(original)).hasMessage("charges.error.topUpFee");
-        jdbc.update("update loan_product_settings set application_fee=0,processing_fee_rate=0,insurance_rate=0.005 where id=?",product);
+        jdbc.update("update loan_product_settings set insurance_rate=0.005 where id=?",product);
         var latest=chargeService().policy(actor,product).orElseThrow();policy.setRequestKey(UUID.randomUUID());policy.setExpectedVersion(latest.id());policy.setEffectiveFrom(LocalDate.of(2026,10,1));policy.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT);chargeService().savePolicy(actor,policy);
         var f=form();f.setTopUpSourceLoanId(original);f.setPrincipal(new BigDecimal("1500.00"));f.setApplicationDate(TODAY);f.setFirstPaymentDate(null);f.setInsurancePremium(new BigDecimal("7.50"));f.setInsuranceEvidence("Synthetic actual new insurer premium");f.setEvidence("Synthetic signed replacement agreement");var id=service.save(actor,f);var funding=topUpPost(id);var quote=service.disbursementTopUp(actor,id,TODAY).orElseThrow();funding.setSettlementCharges(quote.charges());funding.setSettlementChargeSequence(quote.chargeSequence());service.disburse(actor,funding);
         var topup=service.topUp(actor,id).orElseThrow();assertThat(topup.sourceCharges()).isEqualByComparingTo("30.00");assertThat(topup.newDeductions()).isEqualByComparingTo("7.50");assertThat(topup.cash()).isEqualByComparingTo("442.50");assertThat(service.chargeSummary(actor,original).balance().outstanding()).isZero();assertThat(service.chargeSummary(actor,id).balance().outstanding()).isZero();
@@ -685,7 +684,6 @@ class LoanRecordingPostgresTest {
         adjustments().decide(reviewer,id,UUID.randomUUID(),true,"Confirmed no client funds remain");
         assertThat(status(loan)).isEqualTo("DISBURSEMENT_REVERSED");assertThat(adjustments().context(actor,loan).bookPrincipal()).isZero();
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isZero();assertThat(ledger.view(loan,actor,0,0).outstandingPrincipal()).isZero();
-        assertThat(ledger.list(actor,null,0).getContent()).allSatisfy(row->assertThat(row.outstandingPrincipal()).isZero());
         assertThat(ledger.refreshProjection(loan)).isFalse();
         assertThat(jdbc.queryForObject("select count(*) from loan_ledger_installments where loan_application_id=?",Integer.class,loan)).isPositive();
         assertThat(jdbc.queryForObject("select sum(z.debit-z.credit) from gl_journal_line z join gl_journal j on j.id=z.journal_id where j.sacco_id=? and z.account_id=?",BigDecimal.class,institution,principal)).isZero();
@@ -1571,7 +1569,8 @@ class LoanRecordingPostgresTest {
     }
     @Test void ordinaryRepaymentRouteCannotBypassDirectGlAndReferenceUniqueness(){
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));
-        assertThatThrownBy(()->ledger.post(id,actor,new LoanRepaymentLedgerService.PaymentCommand(new BigDecimal("120.00"),TODAY,LoanRepaymentTransaction.Channel.CASH,"R1",UUID.randomUUID()))).hasMessage("recording.error.directPath");
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        assertThatThrownBy(()->transaction.execute(s->ledger.postRecorded(id,actor,new LoanRepaymentLedgerService.PaymentCommand(new BigDecimal("120.00"),TODAY,LoanRepaymentTransaction.Channel.CASH,"R1",UUID.randomUUID())))).hasMessage("recording.error.directPath");
         var f=post(id,"120.00","R1");f.setPrincipalAccountId(null);f.setInterestAccountId(interest);service.repay(actor,f);f.setRequestKey(UUID.randomUUID());assertThatThrownBy(()->service.repay(actor,f)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
     @Test void recordingKeepsQuotedChargesUntilAccountingCanPostThem(){

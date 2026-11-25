@@ -1,7 +1,6 @@
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
-<%@ taglib prefix="form" uri="http://www.springframework.org/tags/form" %>
 <%@ taglib prefix="sec" uri="http://www.springframework.org/security/tags" %>
 <%@ include file="../fragments/header.jspf" %>
 <template data-resource-details-page></template>
@@ -20,22 +19,6 @@
         <div><dt><spring:message code="repayment.interestPaid" /></dt><dd>TZS <fmt:formatNumber value="${ledger.interestPaid}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
         <div><dt><spring:message code="repayment.futureInterest" /></dt><dd>TZS <fmt:formatNumber value="${ledger.futureInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
     </dl></section>
-    <sec:authorize access="@access.has(principal, 'LOAN_REPAYMENTS_CREATE')">
-        <c:if test="${ledger.outstandingPrincipal + ledger.dueInterest > 0 and ledger.financialState!='WRITTEN_OFF' and ledger.financialState!='DISBURSEMENT_REVERSED'}">
-            <section class="repayment-section"><h2><spring:message code="repayment.post" /></h2>
-                <c:url var="postUrl" value="/repayments/loans/${ledger.id}/payments" />
-                <form:form method="post" action="${postUrl}" modelAttribute="paymentForm" cssClass="repayment-form" data-repayment-form="true">
-                    <form:hidden path="requestKey" />
-                    <label for="amount"><spring:message code="common.amount" /> (TZS)<form:input path="amount" id="amount" type="number" data-amount-input="true" min="0.01" step="0.01" required="required" cssClass="aws-control" /></label>
-                    <label for="paymentDate"><spring:message code="repayment.paymentDate" /><form:input path="paymentDate" id="paymentDate" type="date" max="${today}" required="required" cssClass="aws-control" /></label>
-                    <label for="channel"><spring:message code="repayment.channel" /><form:select path="channel" id="channel" required="required" cssClass="aws-control"><form:option value=""><spring:message code="repayment.selectChannel" /></form:option><form:option value="CASH"><spring:message code="repayment.channel.CASH" /></form:option><form:option value="BANK"><spring:message code="repayment.channel.BANK" /></form:option><form:option value="MOBILE_MONEY"><spring:message code="repayment.channel.MOBILE_MONEY" /></form:option></form:select></label>
-                    <label for="reference"><spring:message code="repayment.channelReference" /><form:input path="reference" id="reference" maxlength="100" required="required" cssClass="aws-control" /></label>
-                    <label class="repayment-confirm"><form:checkbox path="confirmed" required="required" /><spring:message code="repayment.confirmReceived" /></label>
-                    <button type="submit" class="app-btn btn-launch" data-repayment-submit><i data-lucide="check" aria-hidden="true"></i><spring:message code="repayment.post" /></button>
-                </form:form>
-            </section>
-        </c:if>
-    </sec:authorize>
     <c:set var="latestReceipt" value="${ledger.latestReceipt}" />
     <section class="erp-table-wrap" data-aws-table-region data-resource-table="repayments-loan-1" data-resource-split>
         <div class="app-table-titlebar"><h2><spring:message code="repayment.history" /></h2></div>

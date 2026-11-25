@@ -11,7 +11,7 @@ import java.util.*;
 /** Allowlisted navigation context only; destination services still authorize every read and command. */
 public class OfficeNavigation implements HandlerInterceptor {
     private static final Set<String> SOURCES=Set.of("loan-reviews","voucher-reviews","vouchers","account-reviews","accounts",
-        "clients","loans","funding","collections","collateral","staff","support","reports");
+        "clients","loans","funding","collections","collateral","staff","support");
     public static Navigation context(HttpServletRequest request,AppUserPrincipal actor) {
         if(actor==null||!actor.isStaffSession())return null;
         var office=StaffOffice.fromSlug(Objects.toString(request.getParameter("office"),"")).orElse(null);

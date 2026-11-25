@@ -43,12 +43,14 @@ class StaffOfficeMvcTest {
         when(institutions.findStation("I1","B1")).thenReturn(Optional.of(SaccoStation.builder().stationId("B1").active(true).accessStatus(SaccoAccessStatus.ACTIVE).build()));
         return new AppUserPrincipal(member,Set.of());
     }
-    @Test void allAssignedOfficesKeepQueuesAndReportsWithoutProfileCompletionOrBusinessClaims()throws Exception {
-        for(var office:StaffOffice.values())for(var section:List.of("queue","reports"))
-            mvc.perform(get(office.getBase()+"/"+section).with(user(actor(office.getGroup(),"B1")))
-                    .param("stationId","FOREIGN").param("saccoId","FOREIGN"))
+    @Test void assignedOfficesKeepQueuesAndRetireReportCatalogues()throws Exception {
+        for(var office:StaffOffice.values()) {
+            var staff=actor(office.getGroup(),"B1");
+            mvc.perform(get(office.getBase()+"/queue").with(user(staff)).param("stationId","FOREIGN").param("saccoId","FOREIGN"))
                 .andExpect(status().isOk()).andExpect(view().name("staff/office"))
                 .andExpect(header().string("Cache-Control","no-store"));
+            mvc.perform(get(office.getBase()+"/reports").with(user(staff))).andExpect(status().isNotFound());
+        }
     }
     @Test void officeUrlsDenyPlatformRetiredUnassignedAndUnscopedSessions()throws Exception {
         var current=actor(Position.CUSTOMER_CARE,"B1");

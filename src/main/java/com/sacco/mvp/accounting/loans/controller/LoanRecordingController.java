@@ -111,7 +111,7 @@ public class LoanRecordingController {
     }
     private String recordField(RecordForm form,String key){
         return switch(key){
-            case "recording.error.product","charges.error.topUpFee"->"productId";
+            case "recording.error.product"->"productId";
             case "recording.error.customConfiguration","charges.error.custom"->"loanMode";
             case "recording.error.client","recording.error.clientCashFlow","recording.error.clientBusiness","applications.error.client","applications.error.verification",
                  "recording.error.sharedActiveLoan","recording.error.sharedCreditHistory","recording.error.sharedApplicationPending"->"clientId";
@@ -546,7 +546,6 @@ public class LoanRecordingController {
 
     private String chargeField(String error){
         return switch(error){
-            case "charges.error.topUpFee"->"productId";
             case "charges.error.custom"->"loanMode";
             case "charges.error.insuranceLimit","charges.error.insuranceDuplicate","charges.error.insurance"->"insurancePremium";
             default->"";

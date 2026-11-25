@@ -8,9 +8,7 @@
 <%@ include file="../fragments/alerts.jspf" %>
 <c:set var="office" value="${officeView.office}" />
 <spring:message code="${office.labelKey}" var="officeName" />
-<nav class="erp-page-path" aria-label="<spring:message code='office.path' />"><a href="<c:url value='/staff/dashboard' />"><spring:message code="menu.dashboard" /></a><span aria-hidden="true">›</span><span><c:out value="${officeName}" /></span><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="office.section.${officeView.section}" /></span></nav>
-<c:choose>
-    <c:when test="${officeView.section eq 'queue'}">
+<nav class="erp-page-path" aria-label="<spring:message code='office.path' />"><a href="<c:url value='/staff/dashboard' />"><spring:message code="menu.dashboard" /></a><span aria-hidden="true">›</span><span><c:out value="${officeName}" /></span><span aria-hidden="true">›</span><span aria-current="page"><spring:message code="office.section.queue" /></span></nav>
         <c:url value="${office.base}/queue" var="queueUrl" />
         <section class="erp-table-wrap" data-resource-table="staff-office-queue" data-group-register data-table-selection="single" data-aws-table-region>
             <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="office.queueTitle" arguments="${officeName}" /></h2>
@@ -38,16 +36,4 @@
         </section>
         <script src="<c:url value='/js/group-lending.js' />" defer></script>
         <script src="<c:url value='/js/staff-office.js' />" defer></script>
-    </c:when>
-    <c:otherwise>
-        <section class="erp-table-wrap" data-resource-table="staff-office-reports" data-group-register data-table-selection="single" data-aws-table-region>
-            <div class="app-table-titlebar"><h2 class="erp-panel-title"><spring:message code="office.section.reports" /></h2><div class="accounting-actions"><button type="button" class="app-btn btn-neutral" data-table-command data-group-command="view" disabled><spring:message code="common.view" /></button><span class="sr-only" data-group-selection-status aria-live="polite"></span></div></div>
-            <div class="erp-table-scroll"><table class="erp-table" data-table-sort-mode="local"><thead><tr><th><span class="sr-only"><spring:message code="voucher.select" /></span></th><th><spring:message code="office.report" /></th></tr></thead><tbody>
-                <c:forEach items="${officeView.reports}" var="report" varStatus="i"><tr data-group-row="report-${i.index}" data-target="<c:url value='${report.href}' />"><td><input type="checkbox" aria-label="<spring:message code='voucher.select' /> <spring:message code='${report.labelKey}' />" /></td><td data-group-identity><a class="resource-table-id-link" href="<c:url value='${report.href}' />"><spring:message code="${report.labelKey}" /></a></td></tr></c:forEach>
-                <c:if test="${empty officeView.reports}"><tr><td colspan="2"><spring:message code="office.noReports" /></td></tr></c:if>
-            </tbody></table></div>
-        </section>
-        <script src="<c:url value='/js/group-lending.js' />" defer></script>
-    </c:otherwise>
-</c:choose>
 <%@ include file="../fragments/footer.jspf" %>

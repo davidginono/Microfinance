@@ -37,12 +37,12 @@ public class StaffOfficeController {
         offices.requireOffice(actor,office);
         return "redirect:/staff/dashboard";
     }
-    @GetMapping("/{office}/{section:queue|reports}")
-    public String view(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable String office,@PathVariable String section,
+    @GetMapping("/{office}/queue")
+    public String queue(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable String office,
             @RequestParam(defaultValue="") String source,@RequestParam(defaultValue="") String search,
             @RequestParam(defaultValue="") String sort,@RequestParam(defaultValue="0") int page,Model model,HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store");
-        try {model.addAttribute("officeView",offices.read(actor,office,section,source,search,sort,page));}
+        try {model.addAttribute("officeView",offices.queue(actor,office,source,search,sort,page));}
         catch(IllegalArgumentException invalid) {throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,null,invalid);}
         model.addAttribute("search",search);model.addAttribute("sort",sort.isBlank()?"number":sort);
         return "staff/office";

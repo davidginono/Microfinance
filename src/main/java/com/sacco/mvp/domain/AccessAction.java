@@ -8,7 +8,6 @@ public enum AccessAction {
     CANCEL("Cancel loan"),
     UPDATE("Update"),
     APPROVE("Approve"),
-    WAIVE("Waive interest"),
     REJECT("Reject"),
     ASSIGN("Assign"),
     CONFIGURE("Configure"),

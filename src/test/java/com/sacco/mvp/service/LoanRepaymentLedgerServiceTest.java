@@ -48,6 +48,7 @@ class LoanRepaymentLedgerServiceTest {
             .status(LoanStatus.DISBURSED).amount(money("200")).disbursementDate(today.minusMonths(2))
             .applicantMemberId(ledger.getApplicantMemberId()).financialSnapshot("{\"interestRate\":0.12}").build();
         rows = List.of(row(1, today.minusMonths(1), "100", "10"), row(2, today, "100", "8"));
+        lenient().when(accountingGuard.recordedLoan(loanId)).thenReturn(true);
         lenient().when(clock.today()).thenReturn(today);
         lenient().when(clock.now()).thenReturn(OffsetDateTime.parse("2026-10-01T12:00:00+03:00"));
         lenient().when(ledgers.lockScoped(loanId, "I1", "B1")).thenReturn(Optional.of(ledger));
@@ -57,7 +58,7 @@ class LoanRepaymentLedgerServiceTest {
     }
 
     @Test void partialPaymentPaysAllDueInterestBeforePrincipalAndBalancesJournal() throws Exception {
-        var receipt = service.post(loanId, poster(), command("100", today));
+        var receipt = service.postRecorded(loanId, poster(), command("100", today));
         assertThat(receipt.principal()).isEqualByComparingTo("82");
         assertThat(receipt.interest()).isEqualByComparingTo("18");
         assertThat(rows.getFirst().getPrincipalPaid()).isEqualByComparingTo("82");
@@ -101,6 +102,7 @@ class LoanRepaymentLedgerServiceTest {
     @Test void storedScheduleCannotBeReadFromAnotherBranchOrAnUnrecordedLoan() {
         var foreign=actor(posterId,"B2",Set.of(UserClaim.LOAN_REPAYMENTS_VIEW),true);
         assertThatThrownBy(()->service.schedule(loanId,foreign,0)).isInstanceOf(AccessDeniedException.class);
+        when(accountingGuard.recordedLoan(loanId)).thenReturn(false);
         var recordingViewer=actor(posterId,"B1",Set.of(UserClaim.LOAN_RECORDING_VIEW),true);
         assertThatThrownBy(()->service.schedule(loanId,recordingViewer,0)).isInstanceOf(AccessDeniedException.class);
         verify(installments,never()).findAllByLoanApplicationIdOrderByInstallmentNumber(any(),any());
@@ -113,7 +115,7 @@ class LoanRepaymentLedgerServiceTest {
     }
 
     @Test void paymentUsesActualDateAndDoesNotCollectFutureInterest() {
-        var receipt = service.post(loanId, poster(), command("20", today.minusMonths(1)));
+        var receipt = service.postRecorded(loanId, poster(), command("20", today.minusMonths(1)));
         assertThat(receipt.paymentDate()).isEqualTo(today.minusMonths(1));
         assertThat(receipt.postedAt().toLocalDate()).isEqualTo(today);
         assertThat(receipt.interest()).isEqualByComparingTo("10");
@@ -122,7 +124,7 @@ class LoanRepaymentLedgerServiceTest {
     }
 
     @Test void paymentAboveCurrentDebtDoesNotMutateBalances() {
-        assertThatThrownBy(() -> service.post(loanId, poster(), command("210.01", today.minusMonths(1))))
+        assertThatThrownBy(() -> service.postRecorded(loanId, poster(), command("210.01", today.minusMonths(1))))
             .hasMessage("repayment.error.advance");
         verify(transactions, never()).saveAndFlush(any());
         assertThat(ledger.getPrincipalPaid()).isZero();
@@ -130,7 +132,7 @@ class LoanRepaymentLedgerServiceTest {
     }
 
     @Test void arbitraryPaymentAboveDueInstalmentsReducesFuturePrincipalOnly() {
-        var receipt=service.post(loanId,poster(),command("111.03",today.minusMonths(1)));
+        var receipt=service.postRecorded(loanId,poster(),command("111.03",today.minusMonths(1)));
         assertThat(receipt.interest()).isEqualByComparingTo("10.00");assertThat(receipt.principal()).isEqualByComparingTo("101.03");
         assertThat(rows.getFirst().getPrincipalPaid()).isEqualByComparingTo("100.00");assertThat(rows.getLast().getPrincipalPaid()).isEqualByComparingTo("1.03");
         assertThat(rows.getLast().getInterestPaid()).isZero();assertThat(rows.getLast().getPrincipal()).isEqualByComparingTo("100.00");
@@ -138,13 +140,13 @@ class LoanRepaymentLedgerServiceTest {
     }
 
     @Test void paymentBeforeFirstInstalmentIsEntirelyPrincipalAndDoesNotChargeFutureInterest() {
-        var receipt=service.post(loanId,poster(),command("37.19",today.minusMonths(1).minusDays(1)));
+        var receipt=service.postRecorded(loanId,poster(),command("37.19",today.minusMonths(1).minusDays(1)));
         assertThat(receipt.principal()).isEqualByComparingTo("37.19");assertThat(receipt.interest()).isZero();
         assertThat(rows.getFirst().getPrincipalPaid()).isEqualByComparingTo("37.19");assertThat(rows).allMatch(r->r.getInterestPaid().signum()==0);
     }
 
     @Test void fullEarlyRepaymentExcludesFutureInterestWithoutRecordingItAsCashOrChangingTheContract() {
-        service.post(loanId,poster(),command("210.00",today.minusMonths(1)));
+        service.postRecorded(loanId,poster(),command("210.00",today.minusMonths(1)));
         assertThat(ledger.getPrincipalPaid()).isEqualByComparingTo("200.00");assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAID);
         assertThat(rows.getLast().getInterestPaid()).isZero();
         assertThat(rows.getLast().getInterest()).isEqualByComparingTo("8.00");assertThat(rows.getLast().getInterestExcluded()).isEqualByComparingTo("8.00");
@@ -154,7 +156,7 @@ class LoanRepaymentLedgerServiceTest {
     }
 
     @Test void fullContractPaymentMarksPaidOnlyAfterAllComponentsAreSettled() {
-        service.post(loanId, poster(), command("218", today));
+        service.postRecorded(loanId, poster(), command("218", today));
         assertThat(loan.getStatus()).isEqualTo(LoanStatus.PAID);
         assertThat(loan.getPaidAt()).isNotNull();
         assertThat(ledger.getPrincipalPaid()).isEqualByComparingTo("200");
@@ -166,7 +168,7 @@ class LoanRepaymentLedgerServiceTest {
         var command = command("100", today);
         LoanRepaymentTransaction existing = original(command, "82", "18");
         when(transactions.findBySaccoIdAndStationIdAndRequestKey("I1", "B1", command.requestKey())).thenReturn(Optional.of(existing));
-        assertThat(service.post(loanId, poster(), command).id()).isEqualTo(existing.getId());
+        assertThat(service.postRecorded(loanId, poster(), command).id()).isEqualTo(existing.getId());
         verify(transactions, never()).saveAndFlush(any());
         verify(journal, never()).saveAll(any());
     }
@@ -175,7 +177,7 @@ class LoanRepaymentLedgerServiceTest {
         var command = command("100", today);
         when(transactions.findBySaccoIdAndStationIdAndRequestKey("I1", "B1", command.requestKey()))
             .thenReturn(Optional.of(original(command, "82", "18")));
-        assertThatThrownBy(() -> service.post(loanId, poster(), new LoanRepaymentLedgerService.PaymentCommand(
+        assertThatThrownBy(() -> service.postRecorded(loanId, poster(), new LoanRepaymentLedgerService.PaymentCommand(
             money("50"), today, command.channel(), command.reference(), command.requestKey()))).hasMessage("repayment.error.retry");
         verify(transactions, never()).saveAndFlush(any());
     }
@@ -183,37 +185,37 @@ class LoanRepaymentLedgerServiceTest {
     @Test void duplicateChannelReferenceIsRejected() {
         when(transactions.existsBySaccoIdAndStationIdAndChannelAndChannelReferenceAndKind("I1", "B1",
             LoanRepaymentTransaction.Channel.CASH, "cash-1", LoanRepaymentTransaction.Kind.PAYMENT)).thenReturn(true);
-        assertThatThrownBy(() -> service.post(loanId, poster(), command("100", today))).hasMessage("repayment.error.duplicate");
+        assertThatThrownBy(() -> service.postRecorded(loanId, poster(), command("100", today))).hasMessage("repayment.error.duplicate");
         verify(transactions, never()).saveAndFlush(any());
     }
 
     @Test void nonChronologicalAndFutureDatesAreRejected() {
         ledger.setLastPaymentDate(today);
-        assertThatThrownBy(() -> service.post(loanId, poster(), command("1", today.minusDays(1)))).hasMessage("repayment.error.date");
-        assertThatThrownBy(() -> service.post(loanId, poster(), command("1", today.plusDays(1)))).hasMessage("repayment.error.date");
-        assertThatThrownBy(() -> service.post(loanId, poster(), command("1", loan.getDisbursementDate().minusDays(1)))).hasMessage("repayment.error.date");
+        assertThatThrownBy(() -> service.postRecorded(loanId, poster(), command("1", today.minusDays(1)))).hasMessage("repayment.error.date");
+        assertThatThrownBy(() -> service.postRecorded(loanId, poster(), command("1", today.plusDays(1)))).hasMessage("repayment.error.date");
+        assertThatThrownBy(() -> service.postRecorded(loanId, poster(), command("1", loan.getDisbursementDate().minusDays(1)))).hasMessage("repayment.error.date");
         verify(transactions, never()).saveAndFlush(any());
     }
 
     @Test void invalidAmountsAreRejectedBeforeWrites() {
         for (String amount : List.of("0", "-1", "1.001", "10000000000000000")) {
-            assertThatThrownBy(() -> service.post(loanId, poster(), command(amount, today))).hasMessage("repayment.error.amount");
+            assertThatThrownBy(() -> service.postRecorded(loanId, poster(), command(amount, today))).hasMessage("repayment.error.amount");
         }
         verify(transactions, never()).saveAndFlush(any());
     }
 
     @Test void claimsAndExplicitBranchAreRequiredRegardlessOfStaffRole() {
-        assertThatThrownBy(() -> service.post(loanId, actor(posterId, "B1", Set.of(), true), command("1", today)))
+        assertThatThrownBy(() -> service.postRecorded(loanId, actor(posterId, "B1", Set.of(), true), command("1", today)))
             .isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> service.post(loanId, actor(posterId, null, Set.of(UserClaim.LOAN_REPAYMENTS_CREATE), true), command("1", today)))
+        assertThatThrownBy(() -> service.postRecorded(loanId, actor(posterId, null, Set.of(UserClaim.LOAN_RECORDING_POST), true), command("1", today)))
             .isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(() -> service.post(loanId, actor(posterId, "B1", Set.of(UserClaim.LOAN_REPAYMENTS_CREATE), false), command("1", today)))
+        assertThatThrownBy(() -> service.postRecorded(loanId, actor(posterId, "B1", Set.of(UserClaim.LOAN_RECORDING_POST), false), command("1", today)))
             .isInstanceOf(AccessDeniedException.class);
         verify(ledgers, never()).lockScoped(any(), any(), any());
     }
 
     @Test void crossBranchAccessFailsBeforeAnyFinancialWrite() {
-        assertThatThrownBy(() -> service.post(loanId, actor(posterId, "B2", Set.of(UserClaim.LOAN_REPAYMENTS_CREATE), true), command("1", today)))
+        assertThatThrownBy(() -> service.postRecorded(loanId, actor(posterId, "B2", Set.of(UserClaim.LOAN_RECORDING_POST), true), command("1", today)))
             .isInstanceOf(AccessDeniedException.class);
         verify(transactions, never()).saveAndFlush(any());
     }
@@ -320,7 +322,7 @@ class LoanRepaymentLedgerServiceTest {
         verify(journal, never()).saveAll(any());
     }
 
-    private AppUserPrincipal poster() { return actor(posterId, "B1", Set.of(UserClaim.LOAN_REPAYMENTS_CREATE), true); }
+    private AppUserPrincipal poster() { return actor(posterId, "B1", Set.of(UserClaim.LOAN_RECORDING_POST), true); }
     static AppUserPrincipal actor(UUID id, String branch, Set<UserClaim> claims, boolean staff) {
         return (staff ? new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(id).saccoId("I1").stationId(branch).fullName("Test Operator")
             .memberNo("C001").memberAccount(false).position(Position.MANAGER).status(MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),claims) : com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(id).saccoId("I1").stationId(branch).fullName("Test Operator")

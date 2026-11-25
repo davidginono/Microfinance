@@ -26,7 +26,7 @@ public final class WorkspaceLanding {
                 var parts=path.substring("/staff/offices/".length()).split("/");
                 var office=parts.length==2?StaffOffice.fromSlug(parts[0]).orElse(null):null;
                 if(office==null||!StaffOffice.assigned(principal.getStaffRoles()).contains(office)
-                    ||!java.util.Set.of("dashboard","queue","reports").contains(parts[1]))return fallback;
+                    ||!java.util.Set.of("dashboard","queue").contains(parts[1]))return fallback;
                 if(parts[1].equals("dashboard"))return fallback;
             }
             if(path.equals("/admin/dashboard")&&!principal.isPlatformIdentity())return fallback;

@@ -114,7 +114,12 @@ public class LoanRepaymentLedgerService {
         return prepayments.history(readableLedger(id,actor),page);
     }
     public record WaiverInstallment(UUID id, int number, LocalDate dueDate, BigDecimal scheduled, BigDecimal eligible) {}
-    public record WaiverSchedule(String loanNumber, long sequence, boolean legacy, boolean active, List<WaiverInstallment> installments) {}
+    public record WaiverSchedule(String loanNumber, long sequence, boolean legacy, boolean active,
+                                 LocalDate disbursedOn, List<WaiverInstallment> installments) {
+        public boolean hasEligibleInterest() {
+            return installments.stream().anyMatch(row -> row.eligible().signum() > 0);
+        }
+    }
 
     @Transactional(readOnly=true)
     public WaiverSchedule waiverSchedule(UUID id,AppUserPrincipal actor,LocalDate date) {
@@ -128,7 +133,7 @@ public class LoanRepaymentLedgerService {
         var schedule=active && mayWaive && validDate?rows(id).stream().map(row->new WaiverInstallment(
             row.getId(),row.getInstallmentNumber(),row.getDueDate(),row.getInterest(),prepayments.unpaidEarned(row,amounts))).toList()
             :List.<WaiverInstallment>of();
-        return new WaiverSchedule(ledger.getLoanId(),ledger.getNextSequence(),prepayments.terms(id).isEmpty(),active,schedule);
+        return new WaiverSchedule(ledger.getLoanId(),ledger.getNextSequence(),prepayments.terms(id).isEmpty(),active,ledger.getDisbursementDate(),schedule);
     }
 
     @Transactional
@@ -216,18 +221,6 @@ public class LoanRepaymentLedgerService {
     }
 
     @Transactional(readOnly = true)
-    public Page<LedgerListRow> list(AppUserPrincipal actor, String loanNumber, int page) {
-        requireStaff(actor, UserClaim.LOAN_REPAYMENTS_VIEW);
-        String search = loanNumber == null || loanNumber.isBlank() ? null : loanNumber.trim();
-        require(search == null || search.matches("[0-9]{4,20}"), "search");
-        return ledgers.balancesScoped(actor.getSaccoId(), actor.getStationId(), search,
-            PageRequest.of(Math.max(0, Math.min(page, 10000)), 25,
-                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("loanApplicationId"))))
-            .map(l -> new LedgerListRow(l.getLoanApplicationId(), l.getLoanId(), l.getDisbursementDate(),
-                l.getOutstandingPrincipal(), l.getPrincipalPaid(), l.getInterestPaid()));
-    }
-
-    @Transactional(readOnly = true)
     public Page<InstallmentRow> schedule(UUID loanId, AppUserPrincipal actor, int page) {
         require(page >= 0 && page < MAX_INSTALLMENTS / 25, "schedule");
         readableLedger(loanId, actor);
@@ -274,13 +267,6 @@ public class LoanRepaymentLedgerService {
         LoanRepaymentTransaction transaction = transactions.findById(transactionId)
             .filter(t -> t.getLoanApplicationId().equals(loanId)).orElseThrow(() -> new AccessDeniedException("Forbidden"));
         return receipt(transaction, ledger.getLoanId(), reversalIds(loanId, List.of(transactionId)).get(transactionId));
-    }
-
-    @Transactional
-    public Receipt post(UUID loanId, AppUserPrincipal actor, PaymentCommand command) {
-        requireStaff(actor, UserClaim.LOAN_REPAYMENTS_CREATE);
-        require(command.channel()!=LoanRepaymentTransaction.Channel.CASH_EQUIVALENTS,"channel");
-        return postInternal(loanId, actor, command);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -691,7 +677,6 @@ public class LoanRepaymentLedgerService {
     public record PaymentCommand(BigDecimal amount, LocalDate paymentDate, LoanRepaymentTransaction.Channel channel, String reference, UUID requestKey,UUID policyId,boolean principalFirst) {
         public PaymentCommand(BigDecimal amount,LocalDate date,LoanRepaymentTransaction.Channel channel,String reference,UUID key){this(amount,date,channel,reference,key,null,false);}
     }
-    public record LedgerListRow(UUID id, String loanId, LocalDate disbursementDate, BigDecimal outstandingPrincipal, BigDecimal principalPaid, BigDecimal interestPaid) {}
     private List<InstallmentRow> scheduleRows(List<LoanLedgerInstallment> rows,BigDecimal beginning){
         var result=new ArrayList<InstallmentRow>(rows.size());var balance=beginning;
         for(var row:rows){var ending=balance.subtract(row.getPrincipal()).subtract(row.getInterest());result.add(new InstallmentRow(row.getInstallmentNumber(),row.getDueDate(),row.getPrincipal(),row.getInterest(),row.getPrincipalPaid(),row.getInterestPaid(),balance,ending,row.getInterestExcluded(),row.getInterestWaived()));balance=ending;}

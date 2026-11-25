@@ -69,6 +69,11 @@ class StaffNavigationRenderingTest {
                 if(role==Position.ADMIN)continue;
                 String body=render(client,base,role,all,"en");
                 var office=StaffOffice.assigned(Set.of(role)).getFirst();
+                assertThat(body).doesNotContain("href=\"/staff/analytics\"","href=\""+office.getBase()+"/reports\"");
+                String analytics=render(client,base,role,"STAFF_ANALYTICS_VIEW,LOAN_REPAYMENTS_VIEW","en",false,"/staff/analytics");
+                assertThat(analytics).containsOnlyOnce("href=\"/staff/analytics\"")
+                    .containsPattern("href=\"/staff/analytics\"[^>]*aria-current=\"page\"")
+                    .doesNotContain("href=\"/repayments\"","href=\""+office.getBase()+"/reports\"");
                 assertThat(body.indexOf(office.getBase()+"/queue")).isLessThan(body.indexOf("Office activities"));
                 assertThat(body.indexOf("Office activities")).isLessThan(body.indexOf("href=\"/finance/loan-records\""));
                 for(var path:List.of(CLIENT,"/finance/groups",QUEUE,ARCHIVE))assertThat(body).containsOnlyOnce("href=\""+path+"\"");

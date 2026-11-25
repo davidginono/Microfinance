@@ -30,7 +30,7 @@ Verification: 85 selected Java checks passed across focused runs (64 PostgreSQL 
 
 ## Supported recording and disclosures
 
-The recording form calculates the existing product's fixed application component, processing percentage and insurance percentage on the server, using contractual principal and decimal, component-by-component HALF_UP rounding to TZS cents. Application and processing are components of one management fee, with a disclosed subtotal. They are not additional top-up fees. The new agreement's management components must be zero for a top-up.
+The recording form calculates the existing product's fixed application component, processing percentage and insurance percentage on the server, using contractual principal and decimal, component-by-component HALF_UP rounding to TZS cents. Application and processing are components of one management fee, with a disclosed subtotal. A product remains available for a top-up when it has management fees for ordinary loans. Replacement quotes and saved terms omit both management components. Source-loan charges and eligible insurance retain their separate treatment.
 
 A dated, immutable product charge policy must identify the institution's existing approved policy and agreement, collection timing, and active scoped control accounts. Configuration requires both LOAN_PRODUCTS_CONFIGURE and ACCOUNTING_ACCOUNTS_UPDATE. No fee, account, policy approval, opening balance or custom-charge permission is seeded. Custom application/processing amounts additionally require LOAN_CHARGES_CUSTOM, an enabled policy permitting overrides, its combined management-fee limit and supporting evidence. The permission is not added to default accountant grants.
 

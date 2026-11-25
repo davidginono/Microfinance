@@ -14,20 +14,18 @@ public final class OfficeWork {
         public static Page empty(int page) { return new Page(List.of(),page,false); }
     }
     public record Source(String key, String labelKey, boolean chronological) {}
-    public record Report(String labelKey, String href) {}
     public record Navigation(StaffOffice office,String source,String search,String sort,int page) {
         public Map<String,String> parameters() {
             return Map.of("office",office.getSlug(),"officeSource",source,"officeSearch",search,"officeSort",sort,"officePage",Integer.toString(page));
         }
         public Map<String,String> getParameters() { return parameters(); }
         public String href() {
-            var url=UriComponentsBuilder.fromPath(office.getBase()+(source.equals("reports")?"/reports":"/queue"));
-            if(!source.equals("reports"))url.queryParam("source",source).queryParam("search",search).queryParam("sort",sort).queryParam("page",page);
+            var url=UriComponentsBuilder.fromPath(office.getBase()+"/queue")
+                .queryParam("source",source).queryParam("search",search).queryParam("sort",sort).queryParam("page",page);
             return url.build().encode().toUriString();
         }
         public String getHref() { return href(); }
-        public String labelKey() { return source.equals("reports")?"office.backReports":"office.back"; }
-        public String getLabelKey() { return labelKey(); }
+        public String getLabelKey() { return "office.back"; }
         public String attach(String path) {
             var url=UriComponentsBuilder.fromUriString(path);
             getParameters().forEach(url::replaceQueryParam);

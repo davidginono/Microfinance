@@ -7,10 +7,17 @@
     const date=form.elements[posting?'disbursementDate':'applicationDate'];
     const principal=form.elements.topUpAdditionalAmount || form.elements.principal;
     const error=region.querySelector('[data-topup-error]');
+    const indicator=region.querySelector('[data-topup-loading]');
     let version=0,controller,timer;
-    function invalidate(){++version;controller?.abort();clearTimeout(timer);
-      region.setAttribute('aria-busy','false');
+    function loading(waiting){
+      region.setAttribute('aria-busy',String(waiting));
+      if(indicator)indicator.hidden=!waiting;
+    }
+    function clearSettlement(){
       for(const field of ['principal','interest','excluded','total','cash','charges']){const node=region.querySelector('[data-topup-'+field+']');if(node)node.textContent='—';}
+    }
+    function invalidate(){++version;controller?.abort();clearTimeout(timer);loading(false);
+      if(posting)clearSettlement();
       if(posting){form.elements.settlementSequence.value='';form.elements.settlementPrincipal.value='';form.elements.settlementInterest.value='';if(form.elements.settlementCharges)form.elements.settlementCharges.value='';if(form.elements.settlementChargeSequence)form.elements.settlementChargeSequence.value='';region.querySelector('[name="settlementConfirmed"]').checked=false;}
     }
     function formatMoney(value){
@@ -33,9 +40,9 @@
       return;
     }
     async function refresh(){
-      invalidate();const request=version;if(!date?.value)return;
+      invalidate();const request=version;if(!date?.value){clearSettlement();return;}
       timer=setTimeout(async()=>{
-        controller=new AbortController();region.setAttribute('aria-busy','true');error.textContent='';
+        controller=new AbortController();loading(true);
         try{
           const url=new URL(root+'/finance/loan-recording/top-up-quote',location.origin);
           url.searchParams.set('date',date.value);
@@ -44,9 +51,9 @@
           if(response.redirected)throw new Error(region.dataset.error);
           const q=await response.json();if(request!==version)return;
           if(!response.ok)throw new Error(q.error || region.dataset.error);
-          apply(q);
-        }catch(failure){if(request===version && failure.name!=='AbortError')error.textContent=failure.message || region.dataset.error;}
-        finally{if(request===version)region.setAttribute('aria-busy','false');}
+          apply(q);error.textContent='';
+        }catch(failure){if(request===version && failure.name!=='AbortError'){clearSettlement();error.textContent=failure.message || region.dataset.error;}}
+        finally{if(request===version)loading(false);}
       },350);
     }
     form.addEventListener('loan:quote',event=>{

@@ -149,6 +149,11 @@ class UserClaimTest {
             .doesNotContain(UserClaim.LOAN_REPAYMENTS_VIEW, UserClaim.LOAN_REPAYMENTS_CREATE, UserClaim.LOAN_REPAYMENTS_REVERSE);
         assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_REPAYMENTS, AccessAction.REVERSE))
             .contains(UserClaim.LOAN_REPAYMENTS_REVERSE);
+        assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_REPAYMENTS, AccessAction.CREATE)).isEmpty();
+        assertThat(UserClaim.fromStoredName("LOAN_REPAYMENTS_CREATE")).isEmpty();
+        assertThat(UserClaim.forFeatureAction(AccessFeature.LOAN_INTEREST_WAIVERS, AccessAction.CREATE))
+            .contains(UserClaim.LOAN_INTEREST_WAIVE);
+        assertThat(UserClaim.fromStoredName("LOAN_INTEREST_WAIVE")).containsExactly(UserClaim.LOAN_INTEREST_WAIVE);
     }
 
     @Test

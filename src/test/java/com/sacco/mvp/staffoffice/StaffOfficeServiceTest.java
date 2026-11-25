@@ -44,11 +44,9 @@ class StaffOfficeServiceTest {
     @Test void allOfficesAcceptStaffWithNoProfileAndNoClaimsWithoutBusinessQueries() {
         for(var office:StaffOffice.values()) {
             var a=actor(office);
-            for(var section:List.of("queue","reports")) {
-                var view=service.read(a,office.getSlug(),section,"","","",0);
-                assertThat(view.office()).isEqualTo(office);
-                assertThat(view.work().rows()).isEmpty();assertThat(view.reports()).isEmpty();
-            }
+            var view=service.queue(a,office.getSlug(),"","","",0);
+            assertThat(view.office()).isEqualTo(office);
+            assertThat(view.work().rows()).isEmpty();
             assertThat(WorkspaceLanding.staffDashboard(a)).isEqualTo("/staff/dashboard");
         }
         verifyNoInteractions(reviews,loans,vouchers,accounts,clients,credit,administration,admin);
@@ -70,7 +68,7 @@ class StaffOfficeServiceTest {
     }
     @Test void officeAndBranchChangesFailClosed() {
         var a=actor(StaffOffice.CUSTOMER_CARE);
-        assertThatThrownBy(()->service.read(a,"ict-manager","queue","","","",0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.queue(a,"ict-manager","","","",0)).isInstanceOf(AccessDeniedException.class);
         member.setStationId("B2");
         assertThatThrownBy(()->service.dashboard(a)).isInstanceOf(AccessDeniedException.class);
         member.setStationId("B1");member.setStaffRoles(Set.of(Position.CREDIT_OFFICER));member.setPosition(Position.CREDIT_OFFICER);
@@ -92,28 +90,20 @@ class StaffOfficeServiceTest {
         assertThat(view.activities()).isEmpty();assertThat(view.administration()).isNull();
         verifyNoInteractions(reviews,loans,vouchers,accounts,clients,credit,administration,admin);
     }
-    @Test void reportsRequireEveryExistingClaimAndNeverGrantExports() {
-        var a=actor(StaffOffice.FINANCE_MANAGER,UserClaim.FINANCIAL_REPORTS_VIEW,UserClaim.LOAN_REPORTS_VIEW);
-        var view=service.read(a,"finance-manager","reports","","","",0);
-        assertThat(view.reports().stream().map(r->r.href().split("\\?")[0]).toList()).contains("/reports/financial/operations/expected-repayments")
-            .doesNotContain("/reports/financial/operations/cashbook","/reports/financial/sl-gl-reconciliation");
-        assertThat(view.reports()).allMatch(r->!r.href().endsWith("/excel")&&!r.href().endsWith("/pdf"));
-        verifyNoInteractions(reviews,loans,vouchers,accounts,clients,credit,administration,admin);
-    }
     @Test void reviewQueuesDelegateOnceWithTheActorAndSelectedOffice() {
         var a=actor(StaffOffice.CREDIT_OFFICER,UserClaim.LOAN_RECORDING_VIEW,UserClaim.LOAN_RECORDING_REJECT);
         when(reviews.officeReviews(any(),eq(Position.CREDIT_OFFICER),eq("LN-2"),eq("oldest"),eq(2)))
             .thenReturn(OfficeWork.Page.empty(2));
-        var view=service.read(a,"credit-officer","queue","loan-reviews","LN-2","oldest",2);
+        var view=service.queue(a,"credit-officer","loan-reviews","LN-2","oldest",2);
         assertThat(view.work().page()).isEqualTo(2);
         verify(reviews).officeReviews(argThat(p->p.getMemberId().equals(a.getMemberId())&&p.getSaccoId().equals("I1")&&p.getStationId().equals("B1")),eq(Position.CREDIT_OFFICER),eq("LN-2"),eq("oldest"),eq(2));
         verifyNoInteractions(loans,vouchers,accounts,clients,credit,administration,admin);
     }
     @Test void forgedSourcesAndOversizedFiltersNeverReachBusinessServices() {
         var a=actor(StaffOffice.CUSTOMER_CARE);
-        assertThatThrownBy(()->service.read(a,"customer-care","queue","loan-reviews","","",0)).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(()->service.read(a,"customer-care","queue","","x".repeat(101),"",0)).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(()->service.read(a,"customer-care","queue","","","",10001)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->service.queue(a,"customer-care","loan-reviews","","",0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.queue(a,"customer-care","","x".repeat(101),"",0)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->service.queue(a,"customer-care","","","",10001)).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(reviews,loans,vouchers,accounts,clients,credit,administration,admin);
     }
     @Test void personalDashboardDeduplicatesSharedWorkAndRetainsEveryReviewGroup() {
@@ -157,8 +147,8 @@ class StaffOfficeServiceTest {
         var a=actor(StaffOffice.LOAN_OFFICER,UserClaim.LOAN_RECORDING_VIEW);
         assertThat(service.dashboard(a).activities()).extracting(s->s.key()).doesNotContain("loan-reviews","loans");
         assertThatThrownBy(()->service.activity(a,"loan-reviews")).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(()->service.read(a,"loan-officer","queue","loan-reviews","","",0)).isInstanceOf(AccessDeniedException.class);
-        assertThatThrownBy(()->service.read(a,"loan-officer","queue","loans","","",0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.queue(a,"loan-officer","loan-reviews","","",0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->service.queue(a,"loan-officer","loans","","",0)).isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(reviews);
     }
     @Test void loanReviewCardIsIncludedBeforeOtherFinanceWorkAndOpensTheReviewerQueue() {
@@ -174,7 +164,7 @@ class StaffOfficeServiceTest {
         assertThat(dashboard.activities()).hasSize(5);
         var summary=service.activity(a,"loan-reviews");
         assertThat(summary.entries().getFirst().shown()).isEqualTo(1);
-        var queue=service.read(a,"finance-manager","queue","","","",0);
+        var queue=service.queue(a,"finance-manager","","","",0);
         assertThat(queue.source().key()).isEqualTo("loan-reviews");
         assertThat(queue.work().rows().getFirst().href()).contains("office=finance-manager","officeSource=loan-reviews");
     }

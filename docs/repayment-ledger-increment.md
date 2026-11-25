@@ -12,7 +12,7 @@
 
 ## Access And Records
 
-- Staff routes: `/repayments`, `/repayments/loans/{applicationId}`, and loan-specific receipt routes. Access requires a staff session and an exact institution/branch match.
+- Staff record payments through Receipt vouchers. Historical repayment details, loan-specific receipts and linked corrections retain their record-specific routes and exact institution and branch checks.
 - Assign `LOAN_REPAYMENTS_VIEW`, `LOAN_REPAYMENTS_CREATE`, and `LOAN_REPAYMENTS_REVERSE` through the existing access matrix. Roles do not receive these new claims automatically. Give view permission to officers who post or reverse so they can inspect the result.
 - Client reads require `MEMBER_LOANS_VIEW`, institution match, and ownership. No global repayment registry is exposed to clients.
 - CSRF, session authentication, existing access controls, approval stages, and quorum rules remain in place.

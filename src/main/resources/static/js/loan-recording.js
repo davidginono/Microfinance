@@ -162,7 +162,6 @@
         if(schedule){schedule.hidden=true;rows.replaceChildren();summary.textContent='';}
         return;
       }
-      description.hidden=true;
       const current = version;
       timer = setTimeout(async () => {
         controller = new AbortController();
@@ -174,6 +173,7 @@
           if(response.redirected)throw new Error(region.dataset.error);
           const quote = await response.json();if(current !== version)return;
           if(!response.ok)throw new Error(quote.error || region.dataset.error);
+          description.hidden=true;
           recordForm.dispatchEvent(new CustomEvent('loan:quote',{detail:quote}));output.textContent = money(quote.interest);
           const approvedRate=recordForm.querySelector('[data-approved-rate]');if(approvedRate){approvedRate.hidden=custom;if(!custom)approvedRate.textContent=approvedRate.dataset.label+': '+quote.ratePercent+'% · '+approvedRate.dataset.basis;}
           if(schedule && quote.schedule?.length){

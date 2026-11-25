@@ -63,11 +63,16 @@ class CustomLoanChargeEntryTest {
         f.setEvidence("");
         assertThat(service.quote(actor,f,product,true).terms()).allSatisfy(t->assertThat(t.evidence()).startsWith("Loan charge entry / "));
         f.setInsuranceEvidence("Actual premium document");f.setTopUpSourceLoanId(UUID.randomUUID());
-        assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.topUpFee");
+        assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::kind).containsExactly("INSURANCE");
     }
     @Test void configuredProductsRetainTheirCalculatedFees(){
         var f=form();f.setLoanMode("CONFIGURED");f.setCustomApplicationCharge(money("99"));f.setCustomProcessingCharge(money("99"));f.setInsurancePremium(null);f.setInsuranceEvidence(null);
         assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::amount).containsExactly(money("10.00"),money("20.00"),money("10.00"));
+    }
+    @Test void topUpUsesTheConfiguredProductWithoutCopyingItsOrdinaryLoanFees(){
+        var f=form();f.setLoanMode("CONFIGURED");f.setTopUpSourceLoanId(UUID.randomUUID());
+        assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::kind).containsExactly("INSURANCE");
+        assertThat(service.quoteView(actor,f,product).fields()).extracting(field->field.code()).containsExactly("INSURANCE");
     }
     @Test void zeroInsuranceCeilingStillRejectsPositiveCustomPremiums(){
         product.setInsuranceRate(BigDecimal.ZERO);

@@ -81,7 +81,8 @@ public class LoanPrepaymentController {
     @PostMapping({"/repayments/loans/{id}/interest-waivers","/finance/loan-records/{id}/interest-waivers"})
     @PreAuthorize("@access.has(principal,'LOAN_INTEREST_WAIVE')")
     public String waiver(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@ModelAttribute("waiverForm") WaiverForm f,
-        org.springframework.validation.BindingResult errors,Model model,RedirectAttributes redirect,jakarta.servlet.http.HttpServletRequest request){
+        org.springframework.validation.BindingResult errors,@RequestParam(defaultValue="0") int waiverPage,
+        Model model,RedirectAttributes redirect,jakarta.servlet.http.HttpServletRequest request){
         String destination=loanDetails(id,request)+"/interest-waivers";
         if(!f.isConfirmed())model.addAttribute("prepaymentError","prepayment.error.confirmation");
         else if(!errors.hasErrors())try{
@@ -102,7 +103,12 @@ public class LoanPrepaymentController {
         else model.addAttribute("prepaymentError","prepayment.error.input");
         redirect.addFlashAttribute("prepaymentError",model.getAttribute("prepaymentError"));
         redirect.addFlashAttribute("waiverForm",f);
-        return "redirect:"+destination+(f.getReverses()==null?"":"?waiverId="+f.getReverses());
+        if(f.getReverses()!=null){
+            redirect.addAttribute("waiverId",f.getReverses());
+            if(waiverPage>0)redirect.addAttribute("waiverPage",waiverPage);
+            destination+="#waiver-activity";
+        }
+        return "redirect:"+destination;
     }
     @PostMapping({"/repayments/loans/{id}/prepayment-terms","/finance/loan-records/{id}/prepayment-terms"})
     @PreAuthorize("@access.has(principal,'LOAN_INTEREST_WAIVE')")

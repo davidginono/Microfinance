@@ -33,7 +33,7 @@ public class StaffOfficeService {
     private final AdminOfficeWorkService administration;
     private final AdminService admin;
 
-    public record View(StaffOffice office,String section,List<Source> sources,Source source,Page work,List<Report> reports) {}
+    public record View(StaffOffice office,List<Source> sources,Source source,Page work) {}
 
     /** Validate the live assignment even for staff with an explicitly empty permission set. */
     private AppUserPrincipal authorize(AppUserPrincipal actor) {
@@ -101,11 +101,11 @@ public class StaffOfficeService {
     }
 
     @Transactional(readOnly=true)
-    public View read(AppUserPrincipal principal,String slug,String section,String source,String search,String sort,int page) {
+    public View queue(AppUserPrincipal principal,String slug,String source,String search,String sort,int page) {
         var office=StaffOffice.fromSlug(slug).orElseThrow(()->new AccessDeniedException("Office unavailable"));
         var actor=authorize(principal);
         if(!StaffOffice.assigned(actor.getStaffRoles()).contains(office))throw new AccessDeniedException("Office unavailable");
-        if(!Set.of("queue","reports").contains(section) || search==null || search.length()>100
+        if(search==null || search.length()>100
             || page<0 || page>10000 || !Set.of("","number","number_desc","newest","oldest").contains(sort))
             throw new IllegalArgumentException("office.invalidFilter");
         var sources=sources(actor,office,reviewGroups(actor));
@@ -113,14 +113,12 @@ public class StaffOfficeService {
             :sources.stream().filter(s->s.key().equals(source)).findFirst().orElseThrow(()->new AccessDeniedException("Queue unavailable"));
         if(selected!=null && !selected.chronological() && !sort.isBlank() && !Set.of("number","number_desc").contains(sort))
             throw new IllegalArgumentException("office.invalidFilter");
-        var work=section.equals("queue")&&selected!=null?work(actor,office,selected.key(),search,sort.isBlank()?"number":sort,page):Page.empty(page);
-        if(section.equals("queue")&&selected!=null) {
+        var work=selected!=null?work(actor,office,selected.key(),search,sort.isBlank()?"number":sort,page):Page.empty(page);
+        if(selected!=null) {
             var navigation=new Navigation(office,selected.key(),search,sort.isBlank()?"number":sort,page);
             work=new Page(work.rows().stream().map(t->new Task(t.number(),t.name(),t.stateKey(),t.amount(),t.href()==null?null:navigation.attach(t.href()))).toList(),page,work.hasNext());
         }
-        var reportNavigation=new Navigation(office,"reports","","number",0);
-        var catalogue=reports(actor,office).stream().map(r->new Report(r.labelKey(),reportNavigation.attach(r.href()))).toList();
-        return new View(office,section,sources,selected,work,catalogue);
+        return new View(office,sources,selected,work);
     }
 
     private Set<Position> reviewGroups(AppUserPrincipal a) {
@@ -170,25 +168,4 @@ public class StaffOfficeService {
         };
     }
 
-    private List<Report> reports(AppUserPrincipal a,StaffOffice office) {
-        var result=new ArrayList<Report>();
-        if(has(a,"STAFF_ANALYTICS_VIEW"))result.add(new Report("menu.staffReportsAnalytics","/staff/analytics"));
-        if(has(a,"FINANCIAL_REPORTS_VIEW")) {
-            if(has(a,"ACCOUNTING_BUSINESS_VIEW"))report(result,"DAILY_COLLECTIONS");
-            if(has(a,"ACCOUNTING_JOURNALS_VIEW"))report(result,"CASHBOOK");
-            if(has(a,"LOAN_REPORTS_VIEW")) {
-                for(var kind:List.of("LOAN_PORTFOLIO","PORTFOLIO_RISK","PORTFOLIO_ANALYSIS","DISBURSED_LOANS_AUDIT","EXPECTED_REPAYMENTS","LOAN_REPAYMENT_TRANSACTIONS"))report(result,kind);
-                if(has(a,"ACCOUNTING_RECONCILIATION_VIEW"))result.add(new Report("reconciliation.title","/reports/financial/sl-gl-reconciliation"));
-            }
-            result.add(new Report("fs.workspace","/reports/financial/statements"));
-            result.add(new Report("fs.history","/reports/financial/statements/history"));
-        }
-        if(hasAny(a,"DISBURSEMENT_QUEUE_VIEW","DISBURSEMENT_QUEUE_DISBURSE")&&has(a,"DISBURSEMENT_QUEUE_EXPORT"))
-            result.add(new Report("menu.disbursementReports","/disbursement/reports"));
-        // Presentation order only; all access checks remain at the existing report endpoint.
-        if(office==StaffOffice.FINANCE_MANAGER||office==StaffOffice.CHIEF_ACCOUNTANT)
-            result.sort(Comparator.comparingInt(r->r.href().startsWith("/reports/financial/statements")?0:1));
-        return List.copyOf(result);
-    }
-    private static void report(List<Report> list,String kind) {list.add(new Report("management.nav."+kind,"/reports/financial/operations/"+kind.toLowerCase(Locale.ROOT).replace('_','-')));}
 }
