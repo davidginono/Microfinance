@@ -24,7 +24,7 @@ public enum AccessFeature {
     PLATFORM_SETTINGS("Platform Settings"),
     WORKSPACE_SETTINGS("Workspace Settings"),
     LOAN_PRODUCTS("Loan Products"),
-    APPROVAL_FLOW("Approval Flow"),
+    APPROVAL_FLOW("Loan approval workflow setup"),
     SMS_USAGE("SMS Usage"),
     OUTBOX("Outbox"),
     MEMBER_SETTINGS("Member Settings"),

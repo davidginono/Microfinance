@@ -10,6 +10,9 @@ import org.apache.jasper.servlet.JasperInitializer;
 import org.apache.jasper.servlet.JspServlet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.context.support.StaticWebApplicationContext;
 
@@ -31,8 +34,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AccessMatrixJspRenderingTest {
     @TempDir Path temporary;
 
-    @Test
-    void savedClaimsRenderCheckedWhileUnassignedClaimsStayUnchecked() throws Exception {
+    @ParameterizedTest
+    @CsvSource({"en,Loan approval workflow setup","sw,Mipangilio ya hatua za kuidhinisha mikopo"})
+    void savedClaimsRenderCheckedWhileUnassignedClaimsStayUnchecked(String language,String approvalLabel) throws Exception {
         String source=Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/admin/user-edit.jsp"));
         int start=source.indexOf("<c:set var=\"matrixColumns\"");
         String matrix=source.substring(start,source.indexOf("</section>",start)+"</section>".length());
@@ -42,7 +46,8 @@ class AccessMatrixJspRenderingTest {
             """+matrix;
         Set<UserClaim> assigned=EnumSet.of(UserClaim.MANAGER_QUEUE_VIEW,UserClaim.VOUCHER_RULE_CONFIGURE);
         var user=AdminService.UserAccessView.builder().claims(assigned).build();
-        var response=render(page,Map.of("user",user,"accessMatrixRows",UserClaim.matrixRows(),"canGrantBranchView",true));
+        var response=render(page,Map.of("user",user,"accessMatrixRows",UserClaim.matrixRows(),"canGrantBranchView",true),language);
+        assertThat(response.body()).contains("<span class=\"access-matrix-name\">"+approvalLabel+"</span>");
         for(var claim:UserClaim.matrixRows().stream().flatMap(row->row.claimsByAction().values().stream()).toList()){
             var input=Pattern.compile("<input[^>]*data-access-claim=\""+claim.name()+"\"[^>]*>").matcher(response.body());
             assertThat(input.find()).as(claim.name()).isTrue();
@@ -58,13 +63,13 @@ class AccessMatrixJspRenderingTest {
             .fullName("Synthetic staff").membershipLabel("Staff").roleSummary("Credit Officer")
             .status(com.sacco.mvp.domain.MemberStatus.ACTIVE).displayStatus("ACTIVE").build();
         var response=render(source,Map.of("users",List.of(user),"usersPage",new org.springframework.data.domain.PageImpl<>(List.of(user)),
-            "staffPositions",List.of(com.sacco.mvp.domain.Position.CREDIT_OFFICER),"canEditUsers",true,"selectedPageSize",25));
+            "staffPositions",List.of(com.sacco.mvp.domain.Position.CREDIT_OFFICER),"canEditUsers",true,"selectedPageSize",25),"en");
         assertThat(response.body()).contains("STAFF-10001","Synthetic staff","/admin/users/"+user.getAccountId()+"/edit");
-        assertThat(response.body()).contains("data-staff-registration", "staffRegistration.fullName", "staff-email-status", "staff-phone-status", "data-staff-csrf")
+        assertThat(response.body()).contains("data-staff-registration", "Full name (three names)", "staff-email-status", "staff-phone-status", "data-staff-csrf")
             .doesNotContain("/profile/complete", "kyc.workspaceRequired");
     }
 
-    private HttpResponse<String> render(String source,Map<String,Object> attributes) throws Exception {
+    private HttpResponse<String> render(String source,Map<String,Object> attributes,String language) throws Exception {
         Files.writeString(temporary.resolve("matrix.jsp"),source);
         var tomcat=new Tomcat();tomcat.setBaseDir(temporary.resolve("tomcat").toString());tomcat.setPort(0);
         var context=tomcat.addContext("",temporary.toString());
@@ -72,6 +77,8 @@ class AccessMatrixJspRenderingTest {
         context.addServletContainerInitializer(new JasperInitializer(),null);
         var spring=new StaticWebApplicationContext();
         context.addServletContainerInitializer((classes,servletContext)->{
+            var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+            spring.getStaticMessageSource().setParentMessageSource(messages);
             spring.setServletContext(servletContext);spring.getStaticMessageSource().setUseCodeAsDefaultMessage(true);spring.refresh();
             servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE,spring);
         },null);
@@ -85,7 +92,7 @@ class AccessMatrixJspRenderingTest {
         try {
             tomcat.getConnector();tomcat.start();
             var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/matrix"))
-                .timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
+                .header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
             assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
             return response;
         } finally {tomcat.stop();tomcat.destroy();spring.close();}

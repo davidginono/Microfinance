@@ -36,12 +36,13 @@ test('voucher approval rules have a separate row and remain independently editab
 });
 test('search matches claim-name words and ranks close names without matching generic action labels',async()=>{
  const {dom,w,d}=await setup([
-  {name:'Approval Flow',key:'APPROVAL_FLOW',actions:{VIEW:{key:'APPROVAL_FLOW_VIEW'}}},
+  {name:'Loan approval workflow setup',key:'APPROVAL_FLOW',actions:{VIEW:{key:'APPROVAL_FLOW_VIEW'},CONFIGURE:{key:'APPROVAL_FLOW_CONFIGURE'}}},
   {name:'Accountant Queue',key:'ACCOUNTANT_QUEUE',actions:{APPROVE:{key:'ACCOUNTANT_QUEUE_APPROVE'}}},
   {name:'Ínstitution account approvals',key:'ACCOUNT_APPROVAL',actions:{VIEW:{key:'ACCOUNT_APPROVAL_VIEW'}}}
  ]);try{
   const visible=()=>[...d.querySelectorAll('[data-claim-row]:not([hidden])')].map(row=>row.dataset.claimKey),before=[...new w.FormData(d.querySelector('form')).getAll('claims')].sort();
-  search(w,d,'APPRO');assert.deepEqual(visible(),['APPROVAL_FLOW','ACCOUNT_APPROVAL','VOUCHER_APPROVAL']);
+  search(w,d,'APPRO');assert.deepEqual(visible(),['ACCOUNT_APPROVAL','APPROVAL_FLOW','VOUCHER_APPROVAL']);
+  search(w,d,'loan approval setup');assert.deepEqual(visible(),['APPROVAL_FLOW']);
   search(w,d,'actions voucher');assert.deepEqual(visible(),['VOUCHER_APPROVAL']);
   search(w,d,'institution appro');assert.deepEqual(visible(),['ACCOUNT_APPROVAL']);
   search(w,d,'ACCOUNTANT_QUEUE_APPROVE');assert.deepEqual(visible(),['ACCOUNTANT_QUEUE']);
