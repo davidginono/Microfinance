@@ -28,6 +28,7 @@
         </dl>
         </div>
     </section>
+    <c:if test="${statement.loans > 0 || empty statement.groupLoans.rows}">
     <section class="erp-table-wrap" data-resource-table="client-statement-loans" data-table-preserve-page-query="true" data-aws-table-region>
         <div class="app-table-titlebar"><h2><spring:message code="recording.register.LOAN" /></h2></div>
         <div class="erp-table-scroll" tabindex="0" role="region" aria-label="<spring:message code='recording.register.LOAN' />">
@@ -41,6 +42,7 @@
                         <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><span data-resource-status="${l.status}"><spring:message code="recording.status.${l.status}" /></span></td>
                         <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.charges}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.##;(#,##0.##)" /></td>
                     </tr></c:forEach>
+                    <c:if test="${empty statement.page.rows}"><tr><td colspan="7"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
                 </tbody>
             </table>
         </div>
@@ -50,6 +52,7 @@
                     <c:url value="/finance/client-ledgers/${clientId}" var="statementPageUrl">
                         <c:param name="page" value="${statement.page.page+(direction=='previous'?-1:1)}" />
                         <c:param name="movementPage" value="${movements.page}" />
+                        <c:param name="groupPage" value="${statement.groupLoans.page}" />
                         <c:param name="from" value="${movementFilter.from}" /><c:param name="through" value="${movementFilter.through}" />
                         <c:param name="loanId" value="${movementFilter.loanId}" /><c:param name="productId" value="${movementFilter.productId}" />
                     </c:url>
@@ -58,6 +61,49 @@
             </c:forEach>
         </div>
     </section>
+    </c:if>
+    <c:if test="${statement.client.kind == 'CLIENT' && (not empty statement.groupLoans.rows || statement.groupLoans.page > 0)}">
+        <section class="erp-table-wrap" data-resource-table="client-statement-group-loans" data-table-page-param="groupPage"
+                 data-table-preserve-page-query="true" data-aws-table-region>
+            <div class="app-table-titlebar"><h2><spring:message code="recording.statement.groupLoans" /></h2></div>
+            <div class="erp-table-scroll" tabindex="0" role="region" aria-label="<spring:message code='recording.statement.groupLoans' />">
+                <table class="erp-table">
+                    <thead><tr>
+                        <th scope="col" data-table-order="loan"><spring:message code="recording.statement.loan" /></th>
+                        <th scope="col" data-table-order="group"><spring:message code="simpleGroup.group" /></th>
+                        <th scope="col" data-table-order="product"><spring:message code="recording.product" /></th>
+                        <th scope="col" data-table-order="status"><spring:message code="voucher.status" /></th>
+                    </tr></thead>
+                    <tbody>
+                        <c:forEach items="${statement.groupLoans.rows}" var="loan">
+                            <tr>
+                                <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${loan.groupId}/loans/${loan.id}/statement' />"><c:out value="${loan.number}" /></a></td>
+                                <td><c:out value="${loan.group}" /></td>
+                                <td><c:out value="${loan.product}" /></td>
+                                <td><span data-resource-status="${loan.status}"><spring:message code="recording.status.${loan.status}" /></span></td>
+                            </tr>
+                        </c:forEach>
+                        <c:if test="${empty statement.groupLoans.rows}"><tr><td colspan="4"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
+                    </tbody>
+                </table>
+            </div>
+            <div class="voucher-pagination" data-table-pagination data-page="${statement.groupLoans.page}" data-table-for="client-statement-group-loans">
+                <c:forEach items="${['previous','next']}" var="direction">
+                    <c:if test="${direction=='previous'?statement.groupLoans.page>0:statement.groupLoans.hasNext}">
+                        <c:url value="/finance/client-ledgers/${clientId}" var="groupPageUrl">
+                            <c:param name="groupPage" value="${statement.groupLoans.page+(direction=='previous'?-1:1)}" />
+                            <c:param name="detailTab" value="detail-section-client-statement-group-loans" />
+                            <c:param name="page" value="${statement.page.page}" />
+                            <c:param name="movementPage" value="${movements.page}" />
+                            <c:param name="from" value="${movementFilter.from}" /><c:param name="through" value="${movementFilter.through}" />
+                            <c:param name="loanId" value="${movementFilter.loanId}" /><c:param name="productId" value="${movementFilter.productId}" />
+                        </c:url>
+                        <a data-page-direction="${direction}" href="<c:out value='${groupPageUrl}' />"><spring:message code="common.${direction}" /></a>
+                    </c:if>
+                </c:forEach>
+            </div>
+        </section>
+    </c:if>
     <section class="erp-table-wrap statement-movements" data-resource-table="client-statement-movements"
              data-table-page-param="movementPage" data-table-preserve-page-query="true" data-table-sync-query="true"
              data-loan-statement-base="<c:out value='${statementUrl}' />" data-aws-table-region>
@@ -79,6 +125,7 @@
         </div>
         <form class="voucher-filters" method="get" action="<c:out value='${statementUrl}' />">
             <input type="hidden" name="page" value="${statement.page.page}" />
+            <input type="hidden" name="groupPage" value="${statement.groupLoans.page}" />
             <input type="hidden" name="detailTab" value="detail-section-client-statement-movements" />
             <label><spring:message code="voucher.from" />
                 <input class="aws-control" type="date" name="from" value="${movementFilter.from}" />
@@ -107,7 +154,7 @@
                 <%@ include file="choice-search.jspf" %>
             </label>
             <button class="app-btn btn-neutral" type="submit"><spring:message code="voucher.filter" /></button>
-            <c:url value="/finance/client-ledgers/${clientId}" var="clearMovementsUrl"><c:param name="page" value="${statement.page.page}" /><c:param name="detailTab" value="detail-section-client-statement-movements" /></c:url>
+            <c:url value="/finance/client-ledgers/${clientId}" var="clearMovementsUrl"><c:param name="page" value="${statement.page.page}" /><c:param name="groupPage" value="${statement.groupLoans.page}" /><c:param name="detailTab" value="detail-section-client-statement-movements" /></c:url>
             <a class="app-btn btn-neutral" data-table-query-for="client-statement-movements" href="<c:out value='${clearMovementsUrl}' />">
                 <spring:message code="voucher.clear" />
             </a>
@@ -133,6 +180,7 @@
                     <c:url value="/finance/client-ledgers/${clientId}" var="statementPageUrl">
                         <c:param name="movementPage" value="${movements.page+(direction=='previous'?-1:1)}" />
                         <c:param name="page" value="${statement.page.page}" />
+                        <c:param name="groupPage" value="${statement.groupLoans.page}" />
                         <c:param name="from" value="${movementFilter.from}" /><c:param name="through" value="${movementFilter.through}" />
                         <c:param name="loanId" value="${movementFilter.loanId}" /><c:param name="productId" value="${movementFilter.productId}" />
                     </c:url>

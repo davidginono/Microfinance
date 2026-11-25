@@ -109,6 +109,43 @@ class SimpleGroupLoanPostgresTest {
     UUID fund(){UUID loan=record();var post=f.post(loan,"5000000.00","D-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY);post.setFirstPaymentDate(DAY.plusDays(1));f.service.disburse(f.actor,post);return loan;}
     void nextDay(){var day=DAY.plusDays(2);var clock=f.context.getBean(ApplicationClock.class);when(clock.today()).thenReturn(day);when(clock.now()).thenReturn(day.atTime(12,0).atOffset(ZoneOffset.ofHours(3)));}
     Posting pay(UUID loan,String amount,String payer){var post=f.post(loan,amount,"P-SIMPLE-"+UUID.randomUUID());post.setEffectiveDate(DAY.plusDays(2));post.setSharedPayer(payer);return f.service.repay(f.actor,post);}
+    @Test void signedBorrowersSeeTheGroupLoanInTheirOwnLedgers() {
+        UUID loan=record();
+        var groupLoan=f.service.detail(f.actor,loan).loan();
+        UUID laterMember=client("Baraka",true);
+        for (UUID client : clients) {
+            var statement=f.service.statement(f.actor,client,0);
+            assertThat(statement.groupLoans().rows()).containsExactly(new StatementGroupLoan(
+                loan,groupLoan.number(),groupLoan.clientId(),groupLoan.client(),groupLoan.product(),"RECORDED"));
+            assertThat(statement.page().rows()).isEmpty();
+            assertThat(statement.principal()).isZero();
+            assertThat(f.service.clientLedgers(f.actor,statement.client().number(),0).rows())
+                .singleElement().satisfies(row->assertThat(row.portfolioStatus()).isEqualTo("NOT_FUNDED"));
+        }
+        assertThat(f.service.statement(f.actor,laterMember,0).groupLoans().rows()).isEmpty();
+        assertThat(f.service.statement(f.actor,clients.getFirst(),0,1).groupLoans().rows()).isEmpty();
+        assertThatThrownBy(()->f.service.statement(f.operator("B2"),clients.getFirst(),0))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThat(f.service.loanStatement(f.actor,groupLoan.clientId(),loan,0,false).source().loans())
+            .extracting(LoanRow::id).containsExactly(loan);
+
+        var disbursement=f.post(loan,"5000000.00","D-SIMPLE-"+UUID.randomUUID());
+        disbursement.setEffectiveDate(DAY);disbursement.setFirstPaymentDate(DAY.plusDays(1));
+        f.service.disburse(f.actor,disbursement);
+        var personal=f.service.statement(f.actor,clients.getFirst(),0);
+        assertThat(personal.groupLoans().rows()).extracting(StatementGroupLoan::status).containsExactly("DISBURSED");
+        assertThat(personal.principal()).isZero();
+        assertThat(f.service.statement(f.actor,groupLoan.clientId(),0).principal()).isEqualByComparingTo("5000000.00");
+        assertThat(f.service.clientLedgers(f.actor,personal.client().number(),0).rows())
+            .singleElement().satisfies(row->assertThat(row.portfolioStatus()).isEqualTo("ACTIVE"));
+        nextDay();
+        assertThat(f.service.clientLedgers(f.actor,personal.client().number(),0).rows())
+            .singleElement().satisfies(row->assertThat(row.portfolioStatus()).isEqualTo("OVERDUE"));
+        pay(loan,"5000000.00","Asha");
+        assertThat(f.service.statement(f.actor,clients.getFirst(),0).groupLoans().rows())
+            .extracting(StatementGroupLoan::status).containsExactly("PAID");
+    }
+
     @Test void fivePeopleCreateOneLoanWithoutRulesAuthoritiesOrPersonalShares(){
         assertThat(service.choices(f.actor,"Five borrowers",0)).singleElement().satisfies(choice->assertThat(choice.label()).isEqualTo("Five borrowers"));
         UUID loan=record();

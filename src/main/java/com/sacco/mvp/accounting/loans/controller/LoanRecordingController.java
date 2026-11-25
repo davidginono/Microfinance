@@ -273,12 +273,13 @@ public class LoanRecordingController {
     @GetMapping("/client-ledgers/{id}")
     public String statement(@AuthenticationPrincipal AppUserPrincipal actor, @PathVariable UUID id,
         @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="0") int movementPage,
+        @RequestParam(defaultValue="0") int groupPage,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
         @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,
         @RequestParam(required=false) UUID loanId, @RequestParam(required=false) UUID productId, Locale locale, Model model) {
         var filter = new MovementFilter(from,through,loanId,productId);
         var movements = service.movements(actor,id,filter,movementPage);
-        var statement = service.statement(actor,id,page);
+        var statement = service.statement(actor,id,page,groupPage);
         model.addAttribute("movementFilter",filter);
         model.addAttribute("movementSelection",movements);
         model.addAttribute("movements",movements.page());

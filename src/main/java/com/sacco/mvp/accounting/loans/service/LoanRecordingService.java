@@ -893,16 +893,24 @@ public class LoanRecordingService {
 
     @Transactional(readOnly=true)
     public Statement statement(AppUserPrincipal a, UUID client, int page) {
+        return statement(a,client,page,0);
+    }
+
+    @Transactional(readOnly=true)
+    public Statement statement(AppUserPrincipal a, UUID client, int page, int groupPage) {
         authorize(a,"VIEW");
-        var owner = statementClient(a,client);
+        check(groupPage>=0 && groupPage<=10000,"filter");
         var f = new Filter("",null,null,"","newest",page,client);
         filter(f,false);
+        var owner = statementClient(a,client);
         var today = clock.today();
         var totals = records.clientTotals(a,f,today);
         var rows = records.loans(a,f,today,26,page*25);
+        var groupRows = "CLIENT".equals(owner.kind()) ? records.statementGroupLoans(a,client,26,groupPage*25) : List.<StatementGroupLoan>of();
         return new Statement(owner,(BigDecimal)totals.get("principal"),(BigDecimal)totals.get("interest"),
             (BigDecimal)totals.get("arrears"),(BigDecimal)totals.get("future_interest"),((Number)totals.get("loans")).longValue(),
-            new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25),(BigDecimal)totals.get("charges"));
+            new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25),(BigDecimal)totals.get("charges"),
+            new Page<>(groupRows.stream().limit(25).toList(),groupPage,groupRows.size()>25));
     }
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public List<Posting> report(AppUserPrincipal a,String kind,Filter f){authorize(a,"EXPORT");filter(f,true);kind(kind);var total=records.totals(a,kind,f);check(total.count()<=500,"reportLimit");return records.posts(a,kind,f,500,0);}
     @Transactional(readOnly=true) public Totals totals(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);return records.totals(a,kind,f);}

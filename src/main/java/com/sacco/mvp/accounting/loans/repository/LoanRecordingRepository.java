@@ -421,6 +421,14 @@ public class LoanRecordingRepository {
     }
     public Optional<Choice> client(AppUserPrincipal a,UUID id){return jdbc.query("select id,member_no||' - '||full_name label,case when client_portal_enabled then 'BORROWER' else 'PROVISIONAL' end client_kind from members where id=? and sacco_id=? and station_id=? and status='ACTIVE' and is_member",(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("client_kind")),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     // clientId is the retained UI parameter; an organization selection carries its typed borrower party ID.
+    private static final String GROUP_LEDGER_ROSTER="""
+        select b.client_id,g.loan_id,g.sacco_id,g.station_id
+        from staff_group_borrower b join staff_group_loan g on g.loan_id=b.loan_id
+        union all
+        select b.client_id,g.loan_id,g.sacco_id,g.station_id
+        from lending_group_shared_allocation b join lending_group_shared_facility g on g.cycle_id=b.cycle_id
+        """;
+
     private static final String LEDGER_BORROWERS="""
         select m.id,m.member_no,m.full_name,'CLIENT' kind from members m where m.sacco_id=?
           and ((m.station_id=? and m.is_member) or exists(select 1 from accountant_loan_record r
@@ -439,7 +447,7 @@ public class LoanRecordingRepository {
         String institution=actor.getSaccoId(), branch=actor.getStationId();
         var args=new ArrayList<Object>(List.of(institution,branch,institution,branch,institution,branch,search.toLowerCase(Locale.ROOT)));
         if(!sortByStatus)args.add(page*25);
-        args.add(today);args.add(institution);args.add(branch);
+        args.add(today);args.add(institution);args.add(branch);args.add(institution);args.add(branch);
         if(sortByStatus)args.add(page*25);
         return jdbc.query("""
             with borrowers as materialized (
@@ -464,12 +472,18 @@ public class LoanRecordingRepository {
                     when bool_or(a.status='PAID') then 'PAID_OFF'
                     else 'NO_ACTIVE_LOANS'
                 end status
-                from loan_applications a
+                from (
+                    select a.id,a.sacco_id,a.station_id,a.status from loan_applications a
+                    where a.borrower_party_id=m.id and a.sacco_id=? and a.station_id=?
+                    union all
+                    select a.id,a.sacco_id,a.station_id,a.status from (%s) g
+                    join loan_applications a on a.id=g.loan_id and a.sacco_id=g.sacco_id and a.station_id=g.station_id
+                    where g.client_id=m.id and g.sacco_id=? and g.station_id=?
+                ) a
                 join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id
                 left join loan_ledgers l on l.loan_application_id=a.id and l.sacco_id=a.sacco_id and l.station_id=a.station_id
-                where a.borrower_party_id=m.id and a.sacco_id=? and a.station_id=?
             ) portfolio
-            """.formatted(LEDGER_BORROWERS,sortByStatus?"":orderedPage)+(sortByStatus?orderedPage:" order by "+order),
+            """.formatted(LEDGER_BORROWERS,sortByStatus?"":orderedPage,GROUP_LEDGER_ROSTER)+(sortByStatus?orderedPage:" order by "+order),
             (row,n)->new LedgerClient(row.getObject("id",UUID.class),row.getString("member_no"),row.getString("full_name"),row.getString("status")),
             args.toArray());
     }
@@ -481,6 +495,25 @@ public class LoanRecordingRepository {
         return jdbc.query("select m.member_no,m.full_name,m.kind from ("+LEDGER_BORROWERS+") m where m.id=?",
             (row,n) -> new StatementClient(row.getString(1),row.getString(2),row.getString(3)),
             a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),a.getSaccoId(),a.getStationId(),id).stream().findFirst();
+    }
+
+    public List<StatementGroupLoan> statementGroupLoans(AppUserPrincipal actor, UUID client, int limit, int offset) {
+        String order=com.sacco.mvp.support.ResourceTableSort.order("client-statement-group-loans",
+            Map.of("loan","loan_number","group","g.full_name","product","r.product_name","status","a.status"),"a.id","r.application_date desc,a.id");
+        return jdbc.query("""
+            select a.id,coalesce(a.loan_id,a.application_number::text) loan_number,
+                   g.party_id,g.full_name,r.product_name,a.status
+            from (%s) roster
+            join loan_applications a on a.id=roster.loan_id and a.sacco_id=roster.sacco_id and a.station_id=roster.station_id
+            join accountant_loan_record r on r.loan_id=a.id and r.sacco_id=a.sacco_id and r.station_id=a.station_id
+            join loan_borrower_directory g on g.party_id=a.borrower_party_id and g.sacco_id=a.sacco_id
+                and g.group_station_id=a.station_id and g.kind='JOINT_GROUP'
+            where roster.client_id=? and roster.sacco_id=? and roster.station_id=?
+            order by %s limit ? offset ?
+            """.formatted(GROUP_LEDGER_ROSTER,order), (row,n)->new StatementGroupLoan(
+                row.getObject("id",UUID.class),row.getString("loan_number"),row.getObject("party_id",UUID.class),
+                row.getString("full_name"),row.getString("product_name"),row.getString("status")),
+            client,actor.getSaccoId(),actor.getStationId(),limit,offset);
     }
 
     public List<StatementBalance> statementBalances(AppUserPrincipal a, UUID client, LocalDate today, int limit) {

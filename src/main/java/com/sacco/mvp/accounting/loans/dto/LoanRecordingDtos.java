@@ -209,7 +209,8 @@ public final class LoanRecordingDtos {
         }
     }
     public record Statement(StatementClient client, BigDecimal principal, BigDecimal interest, BigDecimal arrears,
-        BigDecimal futureInterest, long loans, Page<LoanRow> page, BigDecimal charges) {}
+        BigDecimal futureInterest, long loans, Page<LoanRow> page, BigDecimal charges, Page<StatementGroupLoan> groupLoans) {}
+    public record StatementGroupLoan(UUID id, String number, UUID groupId, String group, String product, String status) {}
     public record StatementBalance(LoanRow loan, boolean hasLedger) {}
     public record BalanceExport(StatementClient client, List<StatementBalance> loans, LocalDate asOf) {}
     public record MovementFilter(LocalDate from, LocalDate through, UUID loanId, UUID productId) {}
