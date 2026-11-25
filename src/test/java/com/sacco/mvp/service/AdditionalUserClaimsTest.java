@@ -16,9 +16,11 @@ class AdditionalUserClaimsTest {
     @Test void addsOnlyRequestedClaimsAndPreservesLegacyRowsAndPreferences(){
         when(rows.findByIdMemberId(id)).thenReturn(List.of(row("LEGACY_STORED_PERMISSION"),row("ACCOUNTING_ACCOUNTS_UPDATE")));
         service.addExplicitClaims(id,List.of(UserClaim.ACCOUNTING_ACCOUNTS_VIEW,UserClaim.ACCOUNTING_ACCOUNTS_CREATE));
+        verify(rows).findByIdMemberId(id);
         verify(rows).save(argThat(c->c.getId().getMemberId().equals(id)&&c.getId().getClaimName().equals("ACCOUNTING_ACCOUNTS_VIEW")));
         verify(rows).save(argThat(c->c.getId().getMemberId().equals(id)&&c.getId().getClaimName().equals("ACCOUNTING_ACCOUNTS_CREATE")));
-        verify(rows,never()).deleteByMemberId(any());verifyNoInteractions(settings);
+        verifyNoMoreInteractions(rows);
+        verifyNoInteractions(settings);
     }
     @Test void existingAndRepeatedClaimsAreNotRewritten(){
         when(rows.findByIdMemberId(id)).thenReturn(List.of(row("ACCOUNTING_ACCOUNTS_VIEW")));

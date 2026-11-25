@@ -891,7 +891,7 @@ class AdminServiceTest {
             saved.getStaffRolesResolved().containsAll(staffRoles.stream().map(Position::userGroup).toList())
                 && saved.getPosition() == Position.MINOR_ADMIN
         ));
-        verify(memberAccessClaimRepository).deleteByMemberId(accountId);
+        verify(memberAccessClaimRepository, never()).deleteAll(any());
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.WORKSPACE_SETTINGS_CONFIGURE));
         verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.MANAGER_QUEUE_APPROVE));
         verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.CHAIRPERSON_QUEUE_APPROVE));
@@ -1618,7 +1618,7 @@ class AdminServiceTest {
         contactLocks.verify(memberRepository).lockClientRegistrationIdentity("CLIENT_REGISTRATION_EMAIL/manager@example.com");
         contactLocks.verify(memberRepository).lockClientRegistrationIdentity("CLIENT_REGISTRATION_PHONE/255700000001");
         contactLocks.verify(memberRepository).existsByEmailIgnoreCase("manager@example.com");
-        verify(memberAccessClaimRepository).deleteByMemberId(lastInvitedMember.get().getId());
+        verify(memberAccessClaimRepository, never()).deleteAll(any());
         verify(memberAccessClaimRepository,never()).save(claimNamed(UserClaim.LOAN_RECORDING_APPROVE));
         verify(memberAccessClaimRepository).save(claimNamed(UserClaim.LOAN_DOCUMENTS_VIEW));
     }

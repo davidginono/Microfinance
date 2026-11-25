@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -187,6 +188,9 @@ class UserClaimServiceTest {
     @Test
     void updateClaimsPersistsMatrixRowsAndRemovesLegacyJsonClaims() {
         UUID memberId = UUID.randomUUID();
+        MemberAccessClaim retained = accessClaim(memberId, UserClaim.USER_ACCESS_VIEW.name());
+        MemberAccessClaim revoked = accessClaim(memberId, UserClaim.USER_ACCESS_CREATE.name());
+        when(memberAccessClaimRepository.findByIdMemberId(memberId)).thenReturn(List.of(retained, revoked));
         UserSettings settings = UserSettings.builder()
             .memberId(memberId)
             .language("en")
@@ -198,9 +202,10 @@ class UserClaimServiceTest {
 
         userClaimService.updateClaims(memberId, List.of(UserClaim.USER_ACCESS_VIEW, UserClaim.USER_ACCESS_UPDATE));
 
-        verify(memberAccessClaimRepository).deleteByMemberId(memberId);
-        verify(memberAccessClaimRepository).save(claimNamed(memberId, UserClaim.USER_ACCESS_VIEW.name()));
+        verify(memberAccessClaimRepository).findByIdMemberId(memberId);
+        verify(memberAccessClaimRepository).deleteAll(List.of(revoked));
         verify(memberAccessClaimRepository).save(claimNamed(memberId, UserClaim.USER_ACCESS_UPDATE.name()));
+        verifyNoMoreInteractions(memberAccessClaimRepository);
         verify(userSettingsRepository).save(settings);
         assertThat(settings.getNotificationPrefs()).contains("theme").doesNotContain("claims");
     }

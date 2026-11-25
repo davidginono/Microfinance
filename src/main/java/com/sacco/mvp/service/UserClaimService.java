@@ -14,10 +14,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -133,20 +135,29 @@ public class UserClaimService {
         if (memberId == null) {
             return;
         }
-        memberAccessClaimRepository.deleteByMemberId(memberId);
-        List<UserClaim> normalizedClaims = claims == null ? List.of() : claims.stream()
-            .filter(java.util.Objects::nonNull)
-            .filter(UserClaim::isAvailable)
-            .distinct()
-            .toList();
-        normalizedClaims.forEach(claim -> memberAccessClaimRepository.save(MemberAccessClaim.builder()
-            .id(new MemberAccessClaimId(memberId, claim.name()))
-            .build()));
+        Set<String> toAdd = new LinkedHashSet<>();
+        if (claims != null) {
+            for (UserClaim claim : claims) {
+                if (claim != null && claim.isAvailable()) toAdd.add(claim.name());
+            }
+        }
+        boolean emptyAssignment = toAdd.isEmpty();
+        List<MemberAccessClaim> toRemove = new ArrayList<>();
+        for (MemberAccessClaim stored : memberAccessClaimRepository.findByIdMemberId(memberId)) {
+            if (!toAdd.remove(stored.getId().getClaimName())) {
+                toRemove.add(stored);
+            }
+        }
+        if (!toRemove.isEmpty()) memberAccessClaimRepository.deleteAll(toRemove);
+        for (String name : toAdd) {
+            memberAccessClaimRepository.save(MemberAccessClaim.builder()
+                .id(new MemberAccessClaimId(memberId, name)).build());
+        }
         java.util.Optional<UserSettings> settingsResult = userSettingsRepository.findById(memberId);
         if (settingsResult == null) {
             return;
         }
-        if (settingsResult.isEmpty() && !normalizedClaims.isEmpty()) {
+        if (settingsResult.isEmpty() && !emptyAssignment) {
             return;
         }
         UserSettings settings = settingsResult.orElseGet(() -> UserSettings.builder()
@@ -154,7 +165,7 @@ public class UserClaimService {
             .createdAt(OffsetDateTime.now()).build());
         Map<String, Object> prefs = parsePrefs(settings.getNotificationPrefs());
         // An explicit empty assignment must not fall back to role defaults on the next request.
-        if (normalizedClaims.isEmpty()) prefs.put("claims", List.of());
+        if (emptyAssignment) prefs.put("claims", List.of());
         else prefs.remove("claims");
         settings.setNotificationPrefs(writePrefs(prefs));
         settings.setUpdatedAt(OffsetDateTime.now());
