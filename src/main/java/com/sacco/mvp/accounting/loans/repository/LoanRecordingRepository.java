@@ -401,7 +401,7 @@ public class LoanRecordingRepository {
     private List<LoanRow> queryLoans(AppUserPrincipal a,Filter f,LocalDate today,int limit,int offset,String source,boolean working) {
         var args=new ArrayList<>(Arrays.asList(loanArgs(a,f,today)));args.add(limit);args.add(offset);
         String order=RegisterSort.order(f.sort(),Map.of("number","coalesce(a.loan_id,a.application_number::text)","product","r.product_name","client","m.full_name","loanFor","loan_for","date","r.application_date","amount","a.amount","balance","coalesce(l.principal-l.principal_paid,0)","status","a.status"),"a.id");
-        order=com.sacco.mvp.support.ResourceTableSort.order("client-statement-loans",Map.of("loan","coalesce(a.loan_id,a.application_number::text)","product","r.product_name","status","a.status","principal","outstanding","interest","due_interest","charges","charges","arrears","arrears"),"a.id",order);
+        order=com.sacco.mvp.support.ResourceTableSort.order("client-statement-loans",Map.of("loan","coalesce(a.loan_id,a.application_number::text)","loanFor","loan_for","product","r.product_name","status","a.status","principal","outstanding","interest","due_interest","charges","charges","arrears","arrears"),"a.id",order);
         String lifecycle=working && f.status().isBlank()?" and a.status not in ('WITHDRAWN','DISBURSEMENT_REVERSED')":"";
         return jdbc.query(source+loanWhere()+lifecycle+" order by "+order+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<LoanRow>) this::loan,args.toArray());
     }

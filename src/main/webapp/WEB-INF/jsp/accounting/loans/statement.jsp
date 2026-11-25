@@ -34,15 +34,15 @@
         <div class="erp-table-scroll" tabindex="0" role="region" aria-label="<spring:message code='recording.register.LOAN' />">
             <table class="erp-table">
                 <thead><tr>
-                    <th scope="col" data-table-order="loan"><spring:message code="recording.statement.loan" /></th><th scope="col" data-table-order="product"><spring:message code="recording.product" /></th><th scope="col" data-table-order="status"><spring:message code="voucher.status" /></th>
+                    <th scope="col" data-table-order="loan"><spring:message code="recording.statement.loan" /></th><th scope="col" data-table-order="loanFor"><spring:message code="loan.type" /></th><th scope="col" data-table-order="product"><spring:message code="recording.product" /></th><th scope="col" data-table-order="status"><spring:message code="voucher.status" /></th>
                     <th scope="col" data-table-order="principal"><spring:message code="recording.outstandingPrincipal" /></th><th scope="col" data-table-order="interest"><spring:message code="recording.dueInterest" /></th><th scope="col" data-table-order="charges"><spring:message code="charges.outstanding" /></th><th scope="col" data-table-order="arrears"><spring:message code="recording.arrears" /></th>
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${statement.page.rows}" var="l"><tr>
-                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><c:out value="${l.product}" /></td><td><span data-resource-status="${l.status}"><spring:message code="recording.status.${l.status}" /></span></td>
+                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><spring:message code="recording.loanFor.${l.loanFor}" /></td><td><c:out value="${l.product}" /></td><td><span data-resource-status="${l.status}"><spring:message code="recording.status.${l.status}" /></span></td>
                         <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.charges}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.##;(#,##0.##)" /></td>
                     </tr></c:forEach>
-                    <c:if test="${empty statement.page.rows}"><tr><td colspan="7"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
+                    <c:if test="${empty statement.page.rows}"><tr><td colspan="8"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
                 </tbody>
             </table>
         </div>
@@ -70,6 +70,7 @@
                 <table class="erp-table">
                     <thead><tr>
                         <th scope="col" data-table-order="loan"><spring:message code="recording.statement.loan" /></th>
+                        <th scope="col"><spring:message code="loan.type" /></th>
                         <th scope="col" data-table-order="group"><spring:message code="simpleGroup.group" /></th>
                         <th scope="col" data-table-order="product"><spring:message code="recording.product" /></th>
                         <th scope="col" data-table-order="status"><spring:message code="voucher.status" /></th>
@@ -78,12 +79,13 @@
                         <c:forEach items="${statement.groupLoans.rows}" var="loan">
                             <tr>
                                 <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${loan.groupId}/loans/${loan.id}/statement' />"><c:out value="${loan.number}" /></a></td>
+                                <td><spring:message code="recording.loanFor.GROUP" /></td>
                                 <td><c:out value="${loan.group}" /></td>
                                 <td><c:out value="${loan.product}" /></td>
                                 <td><span data-resource-status="${loan.status}"><spring:message code="recording.status.${loan.status}" /></span></td>
                             </tr>
                         </c:forEach>
-                        <c:if test="${empty statement.groupLoans.rows}"><tr><td colspan="4"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
+                        <c:if test="${empty statement.groupLoans.rows}"><tr><td colspan="5"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
                     </tbody>
                 </table>
             </div>
