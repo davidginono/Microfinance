@@ -69,6 +69,75 @@ class LoanRecordingPostgresTest {
         var run=UUID.randomUUID();var cutoff=OffsetDateTime.now();repository.create(run,actor,period,cutoff,UUID.randomUUID());repository.capture(run,actor,period,cutoff);
         return repository.activity(run,account,period,0,5001);
     }
+    @Test void automaticVouchersUseThePostingSourceAndShareOneNumberAcrossReceiptRows(){
+        chargePolicy("DEDUCT");
+        UUID loan=chargedLoan();
+        var funding=chargedFunding(loan);
+        var funded=service.disburse(actor,funding);
+        assertThat(service.disburse(actor,funding).id()).isEqualTo(funded.id());
+        var assessment=jdbc.queryForObject("select journal_id from loan_charge_command where loan_id=? and kind='ASSESS'",UUID.class,loan);
+        assertSystemVoucher(assessment,"JV","30.00");
+        assertSystemVoucher(funded.journalId(),"PV","970.00");
+
+        var repayment=post(loan,"120.00","DIRECT-RECEIPT");
+        repayment.setInterestAccountId(interest);
+        var paid=service.repay(actor,repayment);
+        var correction=service.reverse(operator("B1"),paid.id(),UUID.randomUUID(),TODAY,"Cash correction");
+        assertSystemVoucher(paid.journalId(),"RV","120.00");
+        assertSystemVoucher(correction.journalId(),"RV","120.00");
+        var receipt=receiptService().find(actor,paid.id()).orElseThrow();
+        var corrected=receiptService().find(actor,correction.id()).orElseThrow();
+        assertThat(receipt.linkedReceiptNumber()).isEqualTo(corrected.header().number());
+        assertThat(corrected.linkedReceiptNumber()).isEqualTo(receipt.header().number());
+        assertThatThrownBy(()->jdbc.update("update accounting_system_voucher set total=1 where journal_id=?",funded.journalId()))
+            .isInstanceOf(org.springframework.dao.DataAccessException.class);
+
+        var envelope=receiptService().post(actor,receiptForm(loan));
+        assertThat(envelope.header().number()).matches("RV-2026-[0-9]{8,}");
+        assertThat(jdbc.queryForObject("""
+            select count(*) from accountant_loan_receipt_row r join accountant_loan_post p on p.id=r.posting_id
+            join accounting_system_voucher v on v.journal_id=p.journal_id where r.receipt_id=?
+            """,Integer.class,envelope.header().id())).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from accounting_system_voucher where sacco_id=?",Integer.class,institution)).isEqualTo(4);
+    }
+
+    @Test void issuedPaymentAndJournalOpenFromTheirRegistersWithTheOriginalPostings() throws Exception {
+        chargePolicy("DEDUCT");
+        var loan=chargedLoan();
+        var funding=service.disburse(actor,chargedFunding(loan));
+        var documents=context.getBean(com.sacco.mvp.accounting.service.VoucherService.class);
+        var paymentType=com.sacco.mvp.accounting.dto.VoucherDtos.Type.PAYMENT;
+        var journalType=com.sacco.mvp.accounting.dto.VoucherDtos.Type.JOURNAL;
+        var payment=documents.view(actor,paymentType,funding.journalId());
+        assertThat(payment.systemIssued()).isTrue();
+        assertThat(payment.number()).matches("PV-2026-[0-9]{8,}");
+        assertThat(payment.total()).isEqualByComparingTo("970");
+        assertThat(payment.transactions()).singleElement().satisfies(t -> {
+            assertThat(t.postings().stream().filter(e->"DEBIT".equals(e.side())).map(e->e.amount()).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("1000");
+        });
+        var filter=new com.sacco.mvp.accounting.dto.VoucherDtos.Filter(payment.number(),null,null,"POSTED","newest",0);
+        assertThat(documents.list(actor,paymentType,filter).rows()).extracting(v->v.id()).containsExactly(payment.id());
+        var journals=documents.list(actor,journalType,new com.sacco.mvp.accounting.dto.VoucherDtos.Filter("",null,null,"POSTED","newest",0));
+        var journal=documents.export(actor,journalType,journals.rows().getFirst().id());
+        assertThat(journal.number()).startsWith("JV-");
+        assertThat(journal.description()).isNotBlank().doesNotContain(journal.journalId().toString());
+        assertThat(service.posting(actor,funding.id()).reference()).isEqualTo(payment.number());
+        assertThatThrownBy(()->documents.view(operator("B2"),paymentType,payment.id())).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->documents.reverse(actor,paymentType,payment.id(),UUID.randomUUID(),TODAY,"Correction")).isInstanceOf(AccessDeniedException.class);
+        var messages=new org.springframework.context.support.ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        var pdf=new com.sacco.mvp.accounting.service.VoucherPdfService(messages,new ReportExportLimiter(1)).render(payment,Locale.ENGLISH);
+        try(var document=org.apache.pdfbox.Loader.loadPDF(pdf.bytes())){
+            assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document)).contains(payment.number(),"970.00","1,000.00");
+        }
+    }
+
+    private void assertSystemVoucher(UUID journal,String prefix,String amount){
+        var document=jdbc.queryForMap("select number,total from accounting_system_voucher where journal_id=? and sacco_id=? and station_id='B1'",journal,institution);
+        assertThat((String)document.get("number")).matches(prefix+"-2026-[0-9]{8,}");
+        assertThat((BigDecimal)document.get("total")).isEqualByComparingTo(amount);
+    }
+
     @Test void frozenLegacyFeesStayDeferredAfterAnApprovedPolicyRevision(){
         chargePolicy("SEPARATE");var deferred=account("LEGACY-DEFERRED","LIABILITY","CREDIT","POSTING","CLEARING");
         var legacyPolicy=UUID.randomUUID();
@@ -95,16 +164,39 @@ class LoanRecordingPostgresTest {
         assertThat(jdbc.queryForObject("select count(*) from gl_journal_line where journal_id in (select journal_id from loan_charge_command where loan_id=?)",Integer.class,loan)).isEqualTo(6);
     }
     @Test void statementAccountNumbersFollowLoansAcrossFundingFeesRepaymentsReversalsAndAdjustments(){
-        chargePolicy("SEPARATE");var loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
+        chargePolicy("SEPARATE");var loan=chargedLoan();var funding=chargedFunding(loan);
+        funding.setNotes(UUID.randomUUID().toString());
+        var disbursement=service.disburse(actor,funding);
         var payment=post(loan,"120.00","STATEMENT-PAYMENT");payment.setInterestAccountId(interest);
         var paid=service.repay(actor,payment);var reversal=service.reverse(operator("B1"),paid.id(),UUID.randomUUID(),TODAY,"Synthetic receipt correction");
         var adjustment=provide(loan,"100.00");String number=service.detail(actor,loan).loan().number();
         var cashActivity=statementActivity(cash);
+        String paymentNumber=jdbc.queryForObject("select number from accounting_system_voucher where journal_id=?",String.class,disbursement.journalId());
+        var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+        var filters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(LocalDate.of(2026,9,1),TODAY,OffsetDateTime.now(),null,null,client,"",0);
+        var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,filters,true);
+        var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,filters,true);
+        assertThat(cashActivity).filteredOn(a->a.journalId().equals(disbursement.journalId())).singleElement().satisfies(a->{
+            assertThat(a.voucherNumber()).isEqualTo(paymentNumber).matches("PV-2026-[0-9]{8,}");
+            assertThat(a.description()).isEqualTo("Loan disbursement");
+        });
+        assertThat(daily.rows()).filteredOn(row->paymentNumber.equals(row.get("documentNumber"))).isNotEmpty()
+            .allSatisfy(row->assertThat(row).containsEntry("transaction","Loan disbursement").doesNotContainKeys("moneyIn","moneyOut"));
+        assertThat(cashbook.rows()).anySatisfy(row->assertThat(row).containsEntry("reference",paymentNumber).containsEntry("particulars","Loan disbursement"));
+        assertThat(daily.rows()).anySatisfy(row->{
+            assertThat((String)row.get("documentNumber")).matches("JV-2026-[0-9]{8,}");
+            assertThat(row).containsEntry("transaction","Loan charges assessed").containsEntry("documentReference",null);
+        });
         for(var posting:List.of(paid,reversal)){
-            String receipt=jdbc.queryForObject("select receipt_reference from loan_repayment_transactions where id=?",String.class,posting.transactionId());
+            String receipt=jdbc.queryForObject("select number from accounting_system_voucher where journal_id=?",String.class,posting.journalId());
+            assertThat(receipt).matches("RV-2026-[0-9]{8,}");
             assertThat(cashActivity).filteredOn(a->a.journalId().equals(posting.journalId())).singleElement()
-                .satisfies(a->assertThat(a.voucherNumber()).isEqualTo(receipt).isNotEqualTo(posting.reference()));
+                .satisfies(a->assertThat(a.voucherNumber()).isEqualTo(receipt));
         }
+        var repayments=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_REPAYMENT_TRANSACTIONS,filters,true);
+        String original=jdbc.queryForObject("select number from accounting_system_voucher where journal_id=?",String.class,paid.journalId());
+        String correction=jdbc.queryForObject("select number from accounting_system_voucher where journal_id=?",String.class,reversal.journalId());
+        assertThat(repayments.rows()).anySatisfy(row->assertThat(row).containsEntry("reference",correction).containsEntry("reversesReference",original));
         for(var account:List.of(cash,principal,chargeAccount)){
             var activity=statementActivity(account);assertThat(activity).isNotEmpty();
             assertThat(activity).extracting(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::accountNumber).containsOnly(number);
@@ -114,7 +206,7 @@ class LoanRecordingPostgresTest {
         }
         var provisionJournal=jdbc.queryForObject("select journal_id from loan_adjustment_decision where request_id=?",UUID.class,adjustment);
         var provisionAccount=jdbc.queryForObject("select debit_account_id from loan_adjustment_request where id=?",UUID.class,adjustment);
-        assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);assertThat(r.voucherNumber()).isNull();});
+        assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);assertThat(r.voucherNumber()).matches("JV-2026-[0-9]{8,}");});
     }
     @Test void outstandingLoansDrillDownIncludesProductAccountsAndProvisionsAndReconcilesLoanIds(){
         UUID root=account("100000","ASSET","DEBIT","HEADING","OTHER");
@@ -312,6 +404,37 @@ class LoanRecordingPostgresTest {
         var after=post(loan,"5.00","AFTER-FEE-CUTOVER");after.setInterestAccountId(interest);service.repay(actor,after);
         assertThat(chargeService().recoveryBalances(actor,loan,TODAY).getFirst().outstanding()).isZero();
     }
+    @Test void standaloneChargeOnlyReceiptsAndTheirCorrectionsHaveIssuedNumbers(){
+        chargePolicy("SEPARATE");
+        var loan=chargedLoan();
+        service.disburse(actor,chargedFunding(loan));
+        var fee=post(loan,"7.00","FEE-ONLY-RECEIPT");
+        fee.setEffectiveDate(LocalDate.of(2026,9,1));
+        var posting=service.repay(actor,fee);
+        assertThat(jdbc.queryForObject("select transaction_id is null from accountant_loan_post where id=?",Boolean.class,posting.id())).isTrue();
+        var original=receiptService().find(actor,posting.id()).orElseThrow();
+        assertThat(original.header().number()).matches("RV-2026-[0-9]{8,}");
+        var corrector=operator("B1");
+        var key=UUID.randomUUID();
+        String reason="Correct fee collection";
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(context.getBean(PlatformTransactionManager.class));
+        String cancelledNumber=transaction.execute(status->{
+            var cancelled=receiptService().reverse(corrector,posting.id(),key,TODAY,reason);
+            status.setRollbackOnly();
+            return cancelled.header().number();
+        });
+        assertThat(jdbc.queryForObject("select count(*) from accounting_system_voucher where number=?",Integer.class,cancelledNumber)).isZero();
+        assertThat(receiptService().find(actor,posting.id()).orElseThrow().header().reversedBy()).isNull();
+        var correction=receiptService().reverse(corrector,posting.id(),key,TODAY,reason);
+        assertThat(correction.header().number()).matches("RV-2026-[0-9]{8,}").isNotEqualTo(original.header().number());
+        assertThat(correction.linkedReceiptNumber()).isEqualTo(original.header().number());
+        assertThat(receiptService().find(actor,posting.id()).orElseThrow().linkedReceiptNumber()).isEqualTo(correction.header().number());
+        assertThat(receiptService().reverse(corrector,posting.id(),key,TODAY,reason).header().number()).isEqualTo(correction.header().number());
+        for(var receipt:List.of(original,correction)){
+            var filter=new com.sacco.mvp.accounting.dto.VoucherDtos.Filter(receipt.header().number(),null,null,"","newest",0);
+            assertThat(receiptService().list(actor,filter).rows()).extracting(v->v.id()).containsExactly(receipt.header().id());
+        }
+    }
     @Test void chargeOnlyReceiptsAreAtomicConcurrentAndDoNotInventPrincipalPayments()throws Exception{
         chargePolicy("SEPARATE");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var f=receiptForm(id);f.setEffectiveDate(LocalDate.of(2026,9,1));f.getRows().getFirst().setAmount(new BigDecimal("7.00"));
         try(var pool=Executors.newFixedThreadPool(2)){var start=new CountDownLatch(1);Callable<UUID> work=()->{start.await();return receiptService().post(actor,f).header().id();};var one=pool.submit(work);var two=pool.submit(work);start.countDown();assertThat(one.get()).isEqualTo(two.get());}
@@ -324,17 +447,17 @@ class LoanRecordingPostgresTest {
         var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS;
         var collected=daily.read(actor,kind,parameters,false);
         assertThat(collected.rows()).filteredOn(row->saved.header().number().equals(row.get("documentNumber")))
-            .hasSize(2).anySatisfy(row->assertThat((BigDecimal)row.get("moneyIn")).isEqualByComparingTo("7.00"));
+            .hasSize(2).anySatisfy(row->assertThat((BigDecimal)row.get("debit")).isEqualByComparingTo("7.00"));
         assertThat(daily.read(actor,kind,parameters,true).totals()).isEqualTo(collected.totals());
         assertThat(daily.read(operator("B2"),kind,parameters,false).count()).isZero();
         var emptyDate=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
             TODAY,TODAY,parameters.cutoff(),null,null,client,"",0);
-        assertThat(daily.read(actor,kind,emptyDate,false).totals().get("moneyIn")).isZero();
+        assertThat(daily.read(actor,kind,emptyDate,false).totals().get("debit")).isZero();
         var other=operator("B1");receiptService().reverse(other,saved.header().id(),UUID.randomUUID(),TODAY,"Synthetic returned collection");assertThat(service.chargeSummary(actor,id).balance().outstanding()).isEqualByComparingTo("30.00");
         var corrected=daily.read(actor,kind,parameters,false);
         assertThat(corrected.count()).isEqualTo(collected.count()+2);
-        assertThat(corrected.totals().get("moneyIn")).isEqualByComparingTo("7.00");
-        assertThat(corrected.totals().get("moneyOut")).isEqualByComparingTo(collected.totals().get("moneyOut").add(new BigDecimal("7.00")));
+        assertThat(corrected.totals().get("debit")).isEqualByComparingTo(collected.totals().get("debit").add(new BigDecimal("7.00")));
+        assertThat(corrected.totals().get("credit")).isEqualByComparingTo(corrected.totals().get("debit"));
     }
     @Test void chargedFundingCorrectionReversesDeductionsAndAssessmentsTogether(){
         chargePolicy("DEDUCT");var id=chargedLoan();service.disburse(actor,chargedFunding(id));var request=adjustments().request(actor,adjustment(id,"DISBURSEMENT_REVERSAL"));var other=operator("B1");adjustments().decide(other,request,UUID.randomUUID(),true,"Synthetic verified cash return");
@@ -425,7 +548,8 @@ class LoanRecordingPostgresTest {
         var parameters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
             TODAY,TODAY,context.getBean(ApplicationClock.class).now(),null,null,client,"",0);
         var audit=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DISBURSED_LOANS_AUDIT,parameters,false);
-        assertThat(audit.rows()).filteredOn(row->f.getReference().equals(row.get("reference"))).singleElement().satisfies(row->{
+        String voucher=jdbc.queryForObject("select number from accounting_system_voucher where journal_id=?",String.class,p.journalId());
+        assertThat(audit.rows()).filteredOn(row->voucher.equals(row.get("reference"))).singleElement().satisfies(row->{
             assertThat((BigDecimal)row.get("disbursed")).isEqualByComparingTo("1500.00");
             assertThat((BigDecimal)row.get("netDisbursed")).isEqualByComparingTo("475.48");
         });
@@ -705,7 +829,8 @@ class LoanRecordingPostgresTest {
             assertThat(reports.read(actor,kind,otherProduct,false).count()).as(kind.name()).isZero();
         }
         var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);
-        assertThat(daily.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(daily.totals().get("moneyOut")).isEqualByComparingTo("2000.00");assertThat(daily.excluded()).isZero();
+        assertThat(daily.totals().get("debit")).isEqualByComparingTo("2240.00");assertThat(daily.totals().get("credit")).isEqualByComparingTo("2240.00");assertThat(daily.excluded()).isZero();
+        assertThat(daily.rows()).filteredOn(row->receipt.header().number().equals(row.get("documentNumber"))).isNotEmpty();
         var portfolio=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_PORTFOLIO,p,false);
         assertThat(portfolio.count()).isEqualTo(2);assertThat(portfolio.excluded()).isZero();assertThat(portfolio.totals().get("principalBalance")).isEqualByComparingTo("1800.00");
         var risk=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_RISK,p,false);assertThat(risk.totals().get("band0")).isEqualByComparingTo("1800.00");
@@ -713,10 +838,10 @@ class LoanRecordingPostgresTest {
         var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,p,false);assertThat(cashbook.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(cashbook.totals().get("moneyOut")).isEqualByComparingTo("2000.00");
         assertThat(reports.read(operator("B2"),com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false).count()).isZero();
         receiptService().reverse(operator("B1"),receipt.header().id(),UUID.randomUUID(),TODAY,"Reference report correction");
-        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(corrected.count()).isGreaterThan(daily.count());assertThat(corrected.totals().get("moneyIn")).isEqualByComparingTo("240.00");assertThat(corrected.totals().get("moneyOut")).isEqualByComparingTo("2240.00");
+        var corrected=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(corrected.count()).isGreaterThan(daily.count());assertThat(corrected.totals().get("debit")).isEqualByComparingTo("2480.00");assertThat(corrected.totals().get("credit")).isEqualByComparingTo("2480.00");
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.PORTFOLIO_ANALYSIS,p,false).totals().get("principalBalance")).isEqualByComparingTo("2000.00");
         for(int n=0;n<26;n++){var extra=receiptForm(first);extra.getRows().getFirst().setAmount(BigDecimal.ONE);receiptService().post(actor,extra);}
-        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("moneyIn")).isEqualByComparingTo("266.00");
+        var all=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,p,false);assertThat(all.count()).isGreaterThanOrEqualTo(34);assertThat(all.rows()).hasSize(26);assertThat(all.totals().get("debit")).isEqualByComparingTo("2506.00");
         var secondPage=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),null,null,null,"",1);
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,secondPage,false).rows()).hasSize((int)Math.min(26,all.count()-25));
         var noAccounts=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(p.from(),p.through(),p.cutoff(),UUID.randomUUID(),null,null,"",0);
@@ -765,7 +890,7 @@ class LoanRecordingPostgresTest {
         assertThat(batches().estimate(actor,batch,item).lines().getFirst().interestAccountId()).isEqualTo(interest);
     }
     @Test void unifiedReceiptPostsAllLoansOnceAndRetainsHistoricalReceipts(){
-        var first=disbursed("D-GROUP-1");var second=disbursed("D-GROUP-2");var f=receiptForm(first,second);
+        var first=disbursed("D-GROUP-1");var second=disbursed("D-GROUP-2");var f=receiptForm(first,second);f.setReference("");
         f.getRows().getFirst().setDescription("X".repeat(501));
         assertThatThrownBy(()->receiptService().preview(actor,f)).hasMessage("voucher.error.text");
         f.getRows().getFirst().setDescription("");
@@ -777,6 +902,8 @@ class LoanRecordingPostgresTest {
         var saved=receiptService().post(actor,f);assertThat(saved.header().total()).isEqualByComparingTo("240.00");assertThat(saved.rows()).hasSize(2);
         assertThat(saved.rows().getFirst().description()).isEmpty();
         assertThat(saved.header().number()).isEqualTo(reserved.number());
+        assertThat(saved.header().reference()).isEqualTo(reserved.number());
+        assertThat(saved.rows()).extracting(row->row.reference()).containsExactly(reserved.number()+"/1",reserved.number()+"/2");
         assertThat(jdbc.queryForObject("select consumed_at is not null from accounting_voucher_number_reservation where request_key=?",Boolean.class,f.getRequestKey())).isTrue();
         assertThat(receiptService().post(actor,f).header().id()).isEqualTo(saved.header().id());
         assertThat(jdbc.queryForObject("select count(*) from gl_journal where sacco_id=?",Integer.class,institution)).isEqualTo(4);
@@ -805,6 +932,8 @@ class LoanRecordingPostgresTest {
         var corrector=new AppUserPrincipal(context.getBean(MemberDirectoryService.class).find(correctionStaff.getMemberId()).orElseThrow(),correctionClaims);
         assertThatThrownBy(()->service.reverse(corrector,saved.rows().getFirst().postingId(),UUID.randomUUID(),TODAY,"Partial correction")).hasMessage("recording.error.receiptCorrection");
         var key=UUID.randomUUID();var reversed=receiptService().reverse(corrector,saved.header().id(),key,TODAY,"Correction");assertThat(reversed.header().reversesId()).isEqualTo(saved.header().id());assertThat(reversed.rows()).hasSize(2);
+        assertThat(reversed.linkedReceiptNumber()).isEqualTo(saved.header().number());
+        assertThat(receiptService().find(actor,saved.header().id()).orElseThrow().linkedReceiptNumber()).isEqualTo(reversed.header().number());
         var activity=statementActivity(cash);
         for(var receipt:List.of(saved,reversed)){
             assertThat(activity).filteredOn(a->receipt.header().number().equals(a.voucherNumber())).hasSize(2)
@@ -1046,14 +1175,14 @@ class LoanRecordingPostgresTest {
         var fromRegister=receiptService().list(actor,new com.sacco.mvp.accounting.dto.VoucherDtos.Filter(
             "Daily collections",null,null,"","reference_asc",0,25)).rows();
         assertThat(fromRegister).extracting(row->row.reference()).containsExactlyInAnyOrder("Daily collections / 1","Daily collections / 2");
-        assertThat(service.posting(actor,receipt.rows().getFirst().postingId()).reference()).isEqualTo("Daily collections / 1 / 1");
+        assertThat(service.posting(actor,receipt.rows().getFirst().postingId()).reference()).isEqualTo(receipt.header().number()+" · Daily collections / 1 / 1");
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
         var reportFilter=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(
             TODAY.minusMonths(1),TODAY,context.getBean(ApplicationClock.class).now(),null,null,client,"",0);
         var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,reportFilter,false);
         assertThat(daily.rows()).extracting(row->row.get("documentReference")).contains("Daily collections / 1","Daily collections / 2");
         var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,reportFilter,false);
-        assertThat(cashbook.rows()).extracting(row->row.get("reference")).contains("Daily collections / 1","Daily collections / 2");
+        assertThat(cashbook.rows()).extracting(row->row.get("reference")).contains(receipt.header().number());
         assertThat(jdbc.queryForObject("select reference from accountant_loan_receipt where id=?",String.class,saved.receiptId())).isEqualTo("BATCH/"+saved.id());
         assertThatThrownBy(()->jdbc.update("update receipt_batch_item set receipt_id=null where id=?",saved.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
@@ -1321,9 +1450,15 @@ class LoanRecordingPostgresTest {
         jdbc.update("update loan_product_settings set manager_review_required=false,loan_officer_review_required=false,chairperson_review_required=false,board_review_required=false,committee_review_required=false,accountant_review_required=false,disbursement_officer_required=true,disbursement_proof_required=false where id=?",other);
         jdbc.update("update loan_product_settings set principal_gl_account_id=?,interest_gl_account_id=? where sacco_id=?",principal,interest,institution);
         var first=service.save(actor,form());var secondForm=form();secondForm.setProductId(other);var second=service.save(actor,secondForm);
-        service.disburse(actor,post(first,"1000.00","D-PRODUCT-1"));service.disburse(actor,post(second,"1000.00","D-PRODUCT-2"));
-        var payment=post(first,"120.00","PRODUCT-R1");payment.setInterestAccountId(interest);service.repay(actor,payment);
-        var secondPayment=post(second,"120.00","PRODUCT-R2");secondPayment.setInterestAccountId(interest);service.repay(actor,secondPayment);
+        var firstFunding=service.disburse(actor,post(first,"1000.00","D-PRODUCT-1"));service.disburse(actor,post(second,"1000.00","D-PRODUCT-2"));
+        var payment=post(first,"120.00","PRODUCT-R1");payment.setInterestAccountId(interest);var firstPaid=service.repay(actor,payment);
+        var secondPayment=post(second,"120.00","PRODUCT-R2");secondPayment.setInterestAccountId(interest);var secondPaid=service.repay(actor,secondPayment);
+        var firstPaymentNumber=service.posting(actor,firstPaid.id()).reference();
+        var secondPaymentNumber=service.posting(actor,secondPaid.id()).reference();
+        var fundingNumber=service.posting(actor,firstFunding.id()).reference();
+        assertThat(firstPaymentNumber).startsWith("RV-");
+        assertThat(secondPaymentNumber).startsWith("RV-").isNotEqualTo(firstPaymentNumber);
+        assertThat(fundingNumber).startsWith("PV-");
         var filter=new Filter("",null,null,"","newest",0,null,product);
         assertThat(service.list(actor,filter).rows()).extracting(LoanRow::id).containsExactly(first);
         for(var kind:List.of("DISBURSEMENT","PAYMENT")){
@@ -1342,14 +1477,14 @@ class LoanRecordingPostgresTest {
         assertThat(service.movementChoices(actor,client,"products","",0)).extracting(Choice::id).containsExactlyInAnyOrder(product,other);
         assertThat(service.movementChoices(actor,client,"loans","",0)).extracting(Choice::id).containsExactlyInAnyOrder(first,second);
         assertThat(service.movements(actor,client,new MovementFilter(TODAY,TODAY,first,product),0).page().rows())
-            .extracting(Posting::reference).containsExactly("PRODUCT-R1");
+            .extracting(Posting::reference).containsExactly(firstPaymentNumber);
         assertThat(service.movements(actor,client,new MovementFilter(TODAY,TODAY,null,other),0).page().rows())
-            .extracting(Posting::reference).containsExactly("PRODUCT-R2");
+            .extracting(Posting::reference).containsExactly(secondPaymentNumber);
         assertThat(service.movements(actor,client,new MovementFilter(null,TODAY.minusDays(1),first,null),0).page().rows())
-            .extracting(Posting::reference).containsExactly("D-PRODUCT-1");
+            .extracting(Posting::reference).containsExactly(fundingNumber);
         assertThat(service.movements(actor,client,new MovementFilter(null,null,first,other),0).page().rows()).isEmpty();
         assertThat(service.loanStatement(actor,client,first,0,true).source().movements())
-            .extracting(row->row.posting().reference()).containsExactlyInAnyOrder("D-PRODUCT-1","PRODUCT-R1");
+            .extracting(row->row.posting().reference()).containsExactlyInAnyOrder(fundingNumber,firstPaymentNumber);
         assertThat(service.exportStatement(actor,client).loans())
             .extracting(balance->balance.loan().id()).containsExactlyInAnyOrder(first,second);
         assertThatThrownBy(()->service.movements(actor,client,new MovementFilter(TODAY,TODAY.minusDays(1),null,null),0))
@@ -1418,6 +1553,7 @@ class LoanRecordingPostgresTest {
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));var f=post(id,"1020.00","R1");f.setPrincipalAccountId(null);f.setInterestAccountId(interest);
         var pool=Executors.newFixedThreadPool(2);try{var first=pool.submit(()->service.repay(actor,f));var second=pool.submit(()->service.repay(actor,f));assertThat(first.get(30,TimeUnit.SECONDS).id()).isEqualTo(second.get(30,TimeUnit.SECONDS).id());}finally{pool.shutdownNow();}
         assertThat(service.detail(actor,id).loan().status()).isEqualTo("PAID");assertThat(service.detail(actor,id).loan().outstandingPrincipal()).isZero();assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=?",Integer.class,id)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from accounting_system_voucher where sacco_id=? and type='RECEIPT'",Integer.class,institution)).isEqualTo(1);
     }
     @Test void ordinaryRepaymentRouteCannotBypassDirectGlAndReferenceUniqueness(){
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));

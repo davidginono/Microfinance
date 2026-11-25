@@ -24,10 +24,12 @@ public class LoanReceiptPdfService {
         }
         else for(var r:receipt.rows()){
             if(r.sharedBenefits().isEmpty()){
-                String description=r.description()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.reference();
+                String description=receipt.displayDescription(r.description(),locale)+"\n"+label("loan.loanId",locale)+": "+r.loanNumber();
+                String reference=receipt.lineReference(r);
+                if(!reference.isBlank())description+="\n"+reference;
                 rows.add(List.of(Integer.toString(rows.size()+1),description,money(r.amount(),locale)));
             }else for(var b:r.sharedBenefits()){
-                String description=label("sharedReceipt.title",locale)+"\n"+label("group.paidFor",locale)+": "+b.clientNumber()+" - "+b.clientName()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+r.description()+"\n"+label("recording.principal",locale)+": "+money(b.principal(),locale)+"; "+label("recording.interest",locale)+": "+money(b.interest(),locale)+"; "+label("charges.title",locale)+": "+money(b.charges(),locale);
+                String description=label("sharedReceipt.title",locale)+"\n"+label("group.paidFor",locale)+": "+b.clientNumber()+" - "+b.clientName()+"\n"+label("loan.loanId",locale)+": "+r.loanNumber()+"\n"+receipt.displayDescription(r.description(),locale)+"\n"+label("recording.principal",locale)+": "+money(b.principal(),locale)+"; "+label("recording.interest",locale)+": "+money(b.interest(),locale)+"; "+label("charges.title",locale)+": "+money(b.charges(),locale);
                 if(b.excludedInterest()!=null&&b.excludedInterest().signum()>0)description+="\n"+label(v.reversesId()==null?"sharedReceipt.excluded":"sharedReceipt.restored",locale)+": "+money(b.excludedInterest(),locale);
                 rows.add(List.of(Integer.toString(rows.size()+1),description,money(b.amount(),locale)));
             }
@@ -39,18 +41,18 @@ public class LoanReceiptPdfService {
         if(receipt.payer()!=null&&!receipt.payer().isBlank())payerFields.add(field("voucher.receivedFrom",receipt.payer(),locale));
         if(receipt.group()==null)payerFields.add(field(receipt.hasSharedBenefits()?"group.code":"voucher.print.clientNumber",receipt.clientNumber(),locale));
         else payerFields.add(field("group.group",receipt.group().code()+" - "+receipt.group().name(),locale));
-        var details=new ArrayList<Field>();details.add(field("voucher.print.reference",v.reference(),locale));details.add(field("voucher.date",date,locale));
-        if(receipt.group()!=null){
-            if(!receipt.group().reversesNumber().isBlank())details.add(field("voucher.reversal",receipt.group().reversesNumber(),locale));
-            if(!receipt.group().reversedByNumber().isBlank())details.add(field("voucher.reversal",receipt.group().reversedByNumber(),locale));
-        }
+        var details=new ArrayList<Field>();
+        if(receipt.hasSeparateReference())details.add(field("voucher.print.reference",v.reference(),locale));
+        details.add(field("voucher.date",date,locale));
+        if(receipt.linkedReceiptNumber()!=null&&!receipt.linkedReceiptNumber().isBlank())
+            details.add(field(v.reversedBy()==null?"voucher.reversal":"voucher.status.REVERSAL",receipt.linkedReceiptNumber(),locale));
         return renderer.renderPosting(new Source(label("voucher.title.RECEIPT",locale),v.institutionName(),v.branchName(),v.number(),label("voucher.status."+v.status(),locale),
             List.of(field("voucher.print.number",v.number(),locale),field("voucher.print.receiptDate",date,locale),field("voucher.print.branch",v.branchName(),locale)),
             label("voucher.print.payerDetails",locale),payerFields,
             label("voucher.print.receiptDetails",locale),details,
             List.of(label("voucher.print.no",locale),label("voucher.print.particulars",locale),label("voucher.amount",locale)+" (TZS)"),new float[]{.06f,.74f,.20f},rows,
             label("voucher.print.amountWords",locale),VoucherPdfService.amountInWords(v.total(),locale),List.of(field("recording.principal",money(principal,locale),locale),field("recording.interest",money(interest,locale),locale),field("charges.title",money(v.total().subtract(principal).subtract(interest),locale),locale),field("voucher.print.totalAmount",money(v.total(),locale),locale)),
-            label("voucher.print.narration",locale),v.description()+"\n"+label("voucher.evidence",locale)+": "+v.evidence(),label("voucher.print.postingRecord",locale),
+            label("voucher.print.narration",locale),receipt.displayDescription(v.description(),locale)+"\n"+label("voucher.evidence",locale)+": "+v.evidence(),label("voucher.print.postingRecord",locale),
             List.of(field("voucher.postedBy",v.postedByName(),locale),field("voucher.postedAt",v.postedAt().atZoneSameInstant(java.time.ZoneId.of("Africa/Dar_es_Salaam")).format(DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss z")),locale),field("voucher.status",label("voucher.status."+v.status(),locale),locale)),
             label("voucher.page",locale),label("voucher.continued",locale),logo,label("voucher.print.method",locale),List.of()));
     }

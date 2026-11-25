@@ -16,6 +16,17 @@ import static org.assertj.core.api.Assertions.*;
 class ManagementReportTest {
     static final LocalDate DAY=LocalDate.of(2026,10,15);
     static final OffsetDateTime NOW=OffsetDateTime.parse("2026-10-15T18:00:00+03:00");
+    @Test void sourceIdsAndIssuedNumbersGiveWayToNarrationOrLocalizedPostingDescriptions(){
+        String id=UUID.randomUUID().toString(),voucher="JV-2026-00000042";
+        assertThat(PostingDescription.resolve(Locale.ENGLISH,"LOAN_CHARGE_ASSESS",id,voucher,id,voucher," "))
+            .isEqualTo("Loan charges assessed");
+        assertThat(PostingDescription.resolve(Locale.forLanguageTag("sw"),"LOAN_CHARGE_ASSESS",id,voucher,UUID.randomUUID().toString()))
+            .isEqualTo("Tozo za mkopo zilizokokotolewa");
+        assertThat(PostingDescription.resolve(Locale.ENGLISH,"LOAN_CHARGE_ASSESS",id,voucher,voucher,"Annual processing fee"))
+            .isEqualTo("Annual processing fee");
+        assertThat(ManagementReports.columns(Kind.DAILY_COLLECTIONS)).extracting(Column::key).doesNotContain("moneyIn","moneyOut");
+        assertThat(ManagementReports.totalFields(Kind.DAILY_COLLECTIONS)).containsExactly("debit","credit");
+    }
     @Test void reportKeepsOnlyTheMostUsefulNote(){
         var kind=Kind.LOAN_REPAYMENT_TRANSACTIONS;
         assertThat(result(kind,0,0,Map.of()).getNoteKey()).isEmpty();

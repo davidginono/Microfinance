@@ -248,7 +248,7 @@ public class ManagementReportRepository {
             return amount+" as "+field;
         }).reduce((x,y)->x+","+y).orElseThrow();
         var total=jdbc.queryForMap(source+" select count(*) count,"+sums+" from report_rows",m);
-        var rows=jdbc.query(source+" select * from report_rows order by \"groupName\",\"rowOrder\" limit :limit offset :offset",m,(r,n)->row(r));
+        var rows=jdbc.query(source+" select * from report_rows order by \"groupName\",\"rowOrder\" limit :limit offset :offset",m,(r,n)->reportRow(r,kind));
         var groups=jdbc.query(source+" select \"groupName\",count(*) count,"+sums+" from report_rows group by \"groupName\" order by \"groupName\" limit 1001",m,(r,n)->new Group(r.getString("groupName"),r.getLong("count"),totals(row(r),money)));
         long excluded=kind==Kind.DAILY_COLLECTIONS?jdbc.queryForObject("""
             select count(*) from loan_repayment_transactions t
@@ -266,41 +266,51 @@ public class ManagementReportRepository {
         return new Data(rows,groups,totals(total,money),((Number)total.get("count")).longValue(),excluded);
     }
     private static Map<String,Object> row(ResultSet r)throws SQLException{var out=new LinkedHashMap<String,Object>();for(int n=1;n<=r.getMetaData().getColumnCount();n++)out.put(r.getMetaData().getColumnLabel(n),r.getObject(n));return out;}
+    private static Map<String,Object> reportRow(ResultSet r,Kind kind)throws SQLException{
+        var values=row(r);
+        if(kind==Kind.DAILY_COLLECTIONS || kind==Kind.CASHBOOK){
+            boolean daily=kind==Kind.DAILY_COLLECTIONS;
+            String source=(String)values.remove("source_type"),reference=(String)values.remove("source_reference");
+            String number=(String)values.get(daily?"documentNumber":"reference");
+            java.sql.Array descriptions=(java.sql.Array)values.remove("descriptions");
+            try {
+                values.put(daily?"transaction":"particulars",PostingDescription.resolve(source,reference,number,(String[])descriptions.getArray()));
+            } finally { descriptions.free(); }
+            if(daily)values.put("documentReference",PostingDescription.externalReference((String)values.get("documentReference"),reference,number));
+        }
+        return values;
+    }
     private static Map<String,BigDecimal> totals(Map<String,Object> row,List<String> fields){var out=new LinkedHashMap<String,BigDecimal>();for(var k:fields)out.put(k,(BigDecimal)row.get(k));return out;}
     private static final String DAILY="""
         with report_rows as (
           select j.effective_date::text as "groupName",j.posted_at::text||j.id::text||b.code||l.id::text as "rowOrder",
             coalesce(v.client_number,r.client_number,m.member_no) as "clientNumber",
             a.loan_id as "loanId",coalesce(nullif(v.party,''),r.party,m.full_name) as name,
-            coalesce(nullif(v.reference,''),(%s),case when %s is null then p.reference else a.loan_id end,j.source_reference) as "documentReference",
-            coalesce(v.number,r.number,j.source_reference) as "documentNumber",j.effective_date as date,
+            coalesce(nullif(v.reference,''),(%s),case when %s is null then p.reference end) as "documentReference",
+            d.number as "documentNumber",j.effective_date as date,j.source_type,j.source_reference,
             b.code||' — '||b.name as "postingAccount",
-            coalesce(
+            array[
               (select case when count(distinct nullif(trim(t.description),''))=1 then min(nullif(trim(t.description),'')) end
                from accounting_voucher_transaction t
                join accounting_voucher_posting e on e.transaction_id=t.id and e.voucher_id=t.voucher_id
                    and e.sacco_id=t.sacco_id and e.station_id=t.station_id
                where t.voucher_id=v.id and t.sacco_id=v.sacco_id and t.station_id=v.station_id and e.account_id=l.account_id
                    and e.side=case when l.debit>0 then 'DEBIT' else 'CREDIT' end and e.amount=l.debit+l.credit),
-              nullif(v.description,''),nullif(x.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as transaction,
-            l.debit,l.credit,
-            case when money.is_money then l.debit else 0 end as "moneyIn",
-            case when money.is_money then l.credit else 0 end as "moneyOut",
-            u.full_name as "recordedBy"
+              v.description,x.description,r.description,p.notes,j.reason]::text[] as descriptions,
+            l.debit,l.credit,u.full_name as "recordedBy"
           from gl_journal j
           join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
           join gl_account b on b.id=l.account_id and b.sacco_id=j.sacco_id
           left join gl_account first_account on first_account.id=:startAccount and first_account.sacco_id=j.sacco_id
           left join gl_account last_account on last_account.id=:endAccount and last_account.sacco_id=j.sacco_id
-          left join gl_cash_bank_group cash_family on cash_family.id=b.parent_id and cash_family.sacco_id=b.sacco_id
-          cross join lateral (select b.purpose in ('CASH','BANK','MOBILE_MONEY')
-              or (b.type='ASSET' and b.purpose='OTHER' and cash_family.id is not null) as is_money) money
+          left join accounting_posted_voucher_document d on d.journal_id=j.id and d.sacco_id=j.sacco_id and d.station_id=j.station_id and d.issued_at<=:cutoff
           left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id and v.posted_at<=:cutoff
           left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=j.sacco_id and p.station_id=j.station_id
               and p.state='POSTED' and p.recorded_at<=:cutoff
           left join loan_adjustment_decision ad on ad.journal_id=j.id
           left join loan_adjustment_request q on q.id=ad.request_id and q.sacco_id=j.sacco_id and q.station_id=j.station_id
-          left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
+          left join loan_charge_command charge on charge.journal_id=j.id and charge.sacco_id=j.sacco_id and charge.station_id=j.station_id
+          left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id,charge.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
           left join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id
           left join accountant_loan_receipt_row x on x.posting_id=p.id and x.sacco_id=p.sacco_id and x.station_id=p.station_id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
@@ -317,8 +327,8 @@ public class ManagementReportRepository {
         report_rows as (
           select l.code||' | '||l.name as "groupName",j.effective_date::text||j.posted_at::text||l.line_key as "rowOrder",
             j.effective_date as date,coalesce(v.client_number,r.client_number,m.member_no) as "clientNumber",coalesce(v.party,r.party,m.full_name,'') as name,
-            coalesce(nullif(v.description,''),nullif(p.notes,''),nullif(j.reason,''),j.source_reference) as particulars,
-            coalesce(v.reference,(%s),case when %s is null then p.reference else a.loan_id end,j.source_reference) as reference,
+            j.source_type,j.source_reference,array[t.description,v.description,x.description,r.description,p.notes,j.reason]::text[] as descriptions,
+            d.number as reference,
             l.debit as "moneyIn",l.credit as "moneyOut",
             case when q.kind='DISBURSEMENT_REVERSAL' then q.amount when p.id is not null then case when l.debit>0 then p.principal_amount else 0 end else null end as "principalIn",
             case when p.id is not null then case when l.credit>0 then p.principal_amount else 0 end else null end as "principalOut",
@@ -331,6 +341,7 @@ public class ManagementReportRepository {
             case when l.cash_count=1 or l.creditors=0 then l.creditors
                  when l.creditors=l.total and l.cash_debit=l.total then l.debit end as "otherCreditorsCr"
           from gl_journal j
+          left join accounting_posted_voucher_document d on d.journal_id=j.id and d.sacco_id=j.sacco_id and d.station_id=j.station_id and d.issued_at<=:cutoff
           left join accounting_voucher v on v.journal_id=j.id and v.sacco_id=j.sacco_id and v.station_id=j.station_id
           left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=j.sacco_id and p.station_id=j.station_id and p.state='POSTED' and p.recorded_at<=:cutoff
           left join loan_adjustment_decision ad on ad.journal_id=j.id
@@ -370,15 +381,15 @@ public class ManagementReportRepository {
           ) l
           left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
           left join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=j.sacco_id and m.station_id=j.station_id
-          left join accountant_loan_receipt_row x on x.posting_id=p.id
+          left join accounting_voucher_transaction t on t.id=l.transaction_id and t.voucher_id=v.id and t.sacco_id=j.sacco_id and t.station_id=j.station_id
+          left join accountant_loan_receipt_row x on x.posting_id=p.id and x.sacco_id=p.sacco_id and x.station_id=p.station_id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
-          %s
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
             and j.effective_date between :from and :through
             and (l.account_id in(select id from cash_range) or (not :bounded and l.purpose in ('CASH','BANK','MOBILE_MONEY')))
             and (cast(:clientId as uuid) is null or coalesce(v.client_id,r.borrower_party_id,m.id)=:clientId)
         )
-        """.formatted(RECEIPT_REFERENCE,POST_ITEM_ID,RECEIPT_JOINS);
+        """;
     private static final String CLIENT_JOINS="""
         join loan_applications a on a.id=e.loan_application_id and a.sacco_id=:institution and a.station_id=:branch
         join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=a.sacco_id and m.station_id=a.station_id
@@ -401,12 +412,13 @@ public class ManagementReportRepository {
                 case when e.complete then e.periodic_payment end as instalment,
                 a.repayment_frequency as frequency,e.disbursement_date as "disbursementDate",
                 case when e.complete then e.maturity end as maturity,case when e.complete then e.installments end as periods,
-                p.reference,p.money_account_name as "disbursementAccount"
+                d.number as reference,p.money_account_name as "disbursementAccount"
               from exposure e
             """+CLIENT_JOINS+"""
               left join accountant_loan_post p on p.loan_id=a.id and p.sacco_id=a.sacco_id and p.station_id=a.station_id
                 and p.kind='DISBURSEMENT' and p.state='POSTED' and p.recorded_at<=:cutoff
                 and exists(select 1 from gl_journal j where j.id=p.journal_id and j.state='POSTED' and j.posted_at<=:cutoff)
+              left join accounting_posted_voucher_document d on d.journal_id=p.journal_id and d.sacco_id=p.sacco_id and d.station_id=p.station_id and d.issued_at<=:cutoff
             ) """;
     }
     private static String expected(){
@@ -454,13 +466,22 @@ public class ManagementReportRepository {
               join gl_journal j on j.id=d.journal_id and j.state='POSTED'
               join exposure e on e.loan_application_id=q.loan_id and e.complete
               where q.sacco_id=:institution and q.station_id=:branch and q.effective_date<=:through and j.posted_at<=:cutoff
+            ), receipt_numbers as (
+              select t.id,coalesce(d.number,t.receipt_reference) as number
+              from transactions t
+              left join accountant_loan_post p on p.transaction_id=t.id and p.loan_id=t.loan_application_id
+                and p.sacco_id=t.sacco_id and p.station_id=t.station_id and p.state='POSTED' and p.recorded_at<=:cutoff
+              left join accounting_archive.gl_operational_bridge bridge on p.id is null and bridge.voucher_id=t.id
+                and bridge.sacco_id=t.sacco_id and bridge.station_id=t.station_id
+              left join accounting_posted_voucher_document d on d.journal_id=coalesce(p.journal_id,bridge.journal_id)
+                and d.sacco_id=t.sacco_id and d.station_id=t.station_id and d.issued_at<=:cutoff
             ), running_principal as (
               select v.*,e.original_principal+sum(v.change) over(partition by v.loan_application_id order by v.date,v.posted_at,v.sequence,v.id rows unbounded preceding) balance
               from principal_events v join exposure e on e.loan_application_id=v.loan_application_id
             ), report_rows as (
               select m.member_no||' | '||m.full_name||' | '||e.loan_id||' | '||coalesce(r.product_name,a.loan_type) as "groupName",
                 t.payment_date::text||t.posted_at::text||lpad(t.sequence::text,20,'0')||t.id::text as "rowOrder",
-                t.payment_date date,t.receipt_reference reference,t.kind as "entryKind",original.receipt_reference as "reversesReference",
+                t.payment_date date,receipt.number reference,t.kind as "entryKind",original.number as "reversesReference",
                 v.balance-v.change as "openingPrincipal",t.sign*t.principal_amount as "principalPaid",t.sign*t.interest_amount as "interestPaid",
                 t.sign*t.amount as payment,t.sign*t.future_interest_excluded as "interestExcluded",v.balance as "closingPrincipal",e.original_principal disbursed,e.principal as "principalBalance",
                 m.member_no as "clientNumber",m.full_name name,e.loan_id as "loanId",coalesce(r.product_name,a.loan_type) product,initial.due_date as "startDate"
@@ -469,8 +490,8 @@ public class ManagementReportRepository {
               join transactions t on t.loan_application_id=e.loan_application_id
               join running_principal v on v.transaction_id=t.id
               left join loan_ledger_installments initial on initial.loan_application_id=e.loan_application_id and initial.installment_number=1
-              left join loan_repayment_transactions original on original.id=t.reverses_transaction_id
-                and original.sacco_id=:institution and original.station_id=:branch
+              join receipt_numbers receipt on receipt.id=t.id
+              left join receipt_numbers original on original.id=t.reverses_transaction_id
               where e.complete and t.payment_date>=:from
             ) """;
     }

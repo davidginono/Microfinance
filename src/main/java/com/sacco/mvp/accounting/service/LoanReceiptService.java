@@ -61,8 +61,22 @@ public class LoanReceiptService {
         return new Selected(labels,payerRequired);
     }
     @Transactional(readOnly=true)
-    public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);var rows=new ArrayList<LoanReceiptRow>();var allocations=loans.receiptPreview(a,f);var selection=selected(a,f);requirePayer(f,selection.payerRequired());var names=selection.labels();int n=0;
-        for(var row:f.getRows()){var p=allocations.get(n++);rows.add(new LoanReceiptRow(n,null,row.getLoanId(),names.get(row.getLoanId()),row.getDescription(),row.getAmount(),p.principal(),p.interest(),p.principalBalance(),"","","",reference(f,n)).withRecoveredFees(p.feesRecovered()));}return loans.sharedReceiptRows(a,rows,true,f.getLoanPayer());}
+    public List<LoanReceiptRow> preview(AppUserPrincipal a,Form f){
+        authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);
+        var allocations=loans.receiptPreview(a,f);
+        var selection=selected(a,f);
+        requirePayer(f,selection.payerRequired());
+        var rows=new ArrayList<LoanReceiptRow>();
+        for(var row:f.getRows()){
+            var allocation=allocations.get(rows.size());
+            int line=rows.size()+1;
+            String reference=f.getReference().isBlank()?"":rowReference(f.getReference().strip(),line);
+            rows.add(new LoanReceiptRow(line,null,row.getLoanId(),selection.labels().get(row.getLoanId()),
+                row.getDescription(),row.getAmount(),allocation.principal(),allocation.interest(),allocation.principalBalance(),
+                "","","",reference).withRecoveredFees(allocation.feesRecovered()));
+        }
+        return loans.sharedReceiptRows(a,rows,true,f.getLoanPayer());
+    }
     @Transactional
     public LoanReceipt post(AppUserPrincipal a,Form f){
         authorize(a,"POST");validate(f);loans.receiptDefaults(a,f);String hash=hash(f);vouchers.lockRequest(a.getSaccoId(),a.getStationId(),f.getRequestKey());var retry=receipts.retry(a,f.getRequestKey(),hash);if(retry.isPresent())return find(a,retry.get()).orElseThrow();
@@ -72,15 +86,23 @@ public class LoanReceiptService {
         String borrowerKind=loans.receiptClient(a,f.getClientId()).purpose();
         requirePayer(f,requiresPayer(borrowerKind));
         var result=new ArrayList<LoanReceiptRow>();var client=loans.receiptLoan(a,f.getRows().getFirst().getLoanId());int n=0;
+        String number=ordinary.reserveNumber(a,Type.RECEIPT,f.getEffectiveDate(),f.getRequestKey()).number();
+        String reference=f.postingReference(number);
         boolean sharedBorrower="JOINT_GROUP".equals(borrowerKind);
-        for(var row:f.getRows()){var request=command(f,row,++n);if(sharedBorrower)request.setSharedPayer(f.getLoanPayer());var p=loans.repay(a,request);result.add(new LoanReceiptRow(n,p.id(),p.loanId(),p.loanNumber(),row.getDescription(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
-        var v=header(a,f,client.client(),total(result),null);receipts.insert(a,v,f.getRequestKey(),f.getClientId(),client.clientNumber(),hash,result,f.getLoanPayer());ordinary.consumeNumber(a,Type.RECEIPT,f.getRequestKey());event(a,v);return find(a,v.id()).orElseThrow();
+        for(var row:f.getRows()){var request=command(f,row,++n,reference);if(sharedBorrower)request.setSharedPayer(f.getLoanPayer());var p=loans.repay(a,request);result.add(new LoanReceiptRow(n,p.id(),p.loanId(),p.loanNumber(),row.getDescription(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
+        var v=header(a,f,number,client.client(),total(result),null);receipts.insert(a,v,f.getRequestKey(),f.getClientId(),client.clientNumber(),hash,result,f.getLoanPayer());ordinary.consumeNumber(a,Type.RECEIPT,f.getRequestKey());event(a,v);return find(a,v.id()).orElseThrow();
     }
     @Transactional
     public LoanReceipt reverse(AppUserPrincipal a,UUID id,UUID key,LocalDate date,String reason){
         authorize(a,"REVERSE");check(key!=null && date!=null && !date.isAfter(clock.today()),"","request");text(reason,500,true,"description");
         vouchers.lockRequest(a.getSaccoId(),a.getStationId(),key);var aggregate=receipts.find(a,id,true);
-        if(aggregate.isEmpty()){var legacy=receipts.legacy(a,id);if(legacy.isEmpty())return groups.reverse(a,id,key,date,reason);var p=loans.reverse(a,legacy.get().rows().getFirst().postingId(),key,date,reason);return find(a,p.id()).orElseThrow();}
+        if(aggregate.isEmpty()){
+            var legacy=receipts.legacy(a,id);
+            if(legacy.isEmpty())return groups.reverse(a,id,key,date,reason);
+            var correction=loans.reverse(a,legacy.get().rows().getFirst().postingId(),key,date,reason);
+            receipts.issueStandaloneReceiptBeforeReload();
+            return find(a,correction.id()).orElseThrow();
+        }
         var source=aggregate.get();
         var original=source.header();check(!a.getMemberId().equals(original.postedBy()),"","independentCorrection");
         String hash=hash(List.of(id,key,date,reason));var prior=receipts.retry(a,key,hash);if(prior.isPresent())return find(a,prior.get()).orElseThrow();
@@ -88,17 +110,18 @@ public class LoanReceiptService {
         var rows=receipts.rows(a,id);loans.lockReceiptLoans(a,rows.stream().map(LoanReceiptRow::loanId).sorted().toList(),null);
         var reversed=new ArrayList<LoanReceiptRow>();for(var r:rows){var p=loans.reverseReceiptRow(a,id,r.postingId(),rowKey(key,r.lineNo()),date,reason);reversed.add(new LoanReceiptRow(r.lineNo(),p.id(),r.loanId(),r.loanNumber(),r.description(),p.amount(),p.principal(),p.interest(),p.principalBalance(),p.moneyAccount(),p.principalAccount(),p.interestAccount(),p.reference()));}
         var f=new Form();f.setRequestKey(key);f.setEffectiveDate(date);f.setMoneyAccountId(original.moneyAccountId());f.setReference(original.reference());f.setDescription(reason);f.setEvidence(original.evidence());
-        var v=header(a,f,original.party(),original.total(),id);var client=loans.receiptLoan(a,rows.getFirst().loanId());receipts.insert(a,v,key,client.clientId(),source.clientNumber(),hash,reversed,source.payer());event(a,v);return find(a,v.id()).orElseThrow();
+        String number=vouchers.number(Type.RECEIPT,date);
+        var v=header(a,f,number,original.party(),original.total(),id);var client=loans.receiptLoan(a,rows.getFirst().loanId());receipts.insert(a,v,key,client.clientId(),source.clientNumber(),hash,reversed,source.payer());event(a,v);return find(a,v.id()).orElseThrow();
     }
-    private LoanReceipt benefits(AppUserPrincipal a,LoanReceipt receipt,List<LoanReceiptRow> rows){var enriched=loans.sharedReceiptRows(a,loans.postedReceiptRecoveries(a,rows),false,receipt.payer());String payer=receipt.payer();if(payer==null||payer.isBlank())payer=enriched.stream().flatMap(r->r.sharedBenefits().stream()).map(SharedReceiptBenefit::payer).filter(Objects::nonNull).findFirst().orElse("");return new LoanReceipt(receipt.header(),receipt.clientNumber(),enriched,receipt.group(),payer);}
+    private LoanReceipt benefits(AppUserPrincipal a,LoanReceipt receipt,List<LoanReceiptRow> rows){var enriched=loans.sharedReceiptRows(a,loans.postedReceiptRecoveries(a,rows),false,receipt.payer());String payer=receipt.payer();if(payer==null||payer.isBlank())payer=enriched.stream().flatMap(r->r.sharedBenefits().stream()).map(SharedReceiptBenefit::payer).filter(Objects::nonNull).findFirst().orElse("");return new LoanReceipt(receipt.header(),receipt.clientNumber(),enriched,receipt.group(),payer,receipt.linkedReceiptNumber());}
     private boolean hasSharedBenefits(LoanReceipt receipt){return receipt.rows().stream().anyMatch(r->!r.sharedBenefits().isEmpty());}
-    private Voucher header(AppUserPrincipal a,Form f,String party,BigDecimal total,UUID reverses){var number=reverses==null?ordinary.reserveNumber(a,Type.RECEIPT,f.getEffectiveDate(),f.getRequestKey()).number():vouchers.number(Type.RECEIPT,f.getEffectiveDate());return new Voucher(UUID.randomUUID(),number,Type.RECEIPT,f.getEffectiveDate(),party,f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),total,f.getRows().size(),null,a.getMemberId(),a.getFullName(),clock.now(),reverses,null,"","",List.of());}
+    private Voucher header(AppUserPrincipal a,Form f,String number,String party,BigDecimal total,UUID reverses){return new Voucher(UUID.randomUUID(),number,Type.RECEIPT,f.getEffectiveDate(),party,f.postingReference(number),f.getDescription().strip(),f.getEvidence().strip(),f.getMoneyAccountId(),total,f.getRows().size(),null,a.getMemberId(),a.getFullName(),clock.now(),reverses,null,"","",List.of());}
     private void event(AppUserPrincipal a,Voucher v){audit.logEvent("ACCOUNTING",v.id(),v.reversesId()==null?"LOAN_RECEIPT_POSTED":"LOAN_RECEIPT_REVERSED",a.getMemberId(),AuditEventStatus.SUCCESS,"Loan receipt","VOUCHER",v.number(),a.getSaccoId(),a.getStationId(),Map.of("amount",v.total()));}
-    private PostForm command(Form f,RowForm row,int n){var p=new PostForm();p.setRequestKey(rowKey(f.getRequestKey(),n));p.setLoanId(row.getLoanId());p.setAmount(row.getAmount());p.setEffectiveDate(f.getEffectiveDate());p.setMoneyAccountId(f.getMoneyAccountId());p.setInterestAccountId(f.getInterestAccountId());p.setReference(reference(f,n));p.setEvidence(f.getEvidence());p.setNotes(row.getDescription());return p;}
+    private PostForm command(Form f,RowForm row,int n,String reference){var p=new PostForm();p.setRequestKey(rowKey(f.getRequestKey(),n));p.setLoanId(row.getLoanId());p.setAmount(row.getAmount());p.setEffectiveDate(f.getEffectiveDate());p.setMoneyAccountId(f.getMoneyAccountId());p.setInterestAccountId(f.getInterestAccountId());p.setReference(rowReference(reference,n));p.setEvidence(f.getEvidence());p.setNotes(row.getDescription());return p;}
     private static UUID rowKey(UUID key,int n){return UUID.nameUUIDFromBytes(("LOAN_RECEIPT/"+key+"/"+n).getBytes(StandardCharsets.UTF_8));}
-    private static String reference(Form f,int n){return f.getReference().strip()+"/"+n;}
+    private static String rowReference(String reference,int line){return reference+"/"+line;}
     private BigDecimal total(List<LoanReceiptRow> rows){var total=rows.stream().map(LoanReceiptRow::amount).reduce(new BigDecimal("0.00"),BigDecimal::add);check(total.precision()<=18,"","amount");return total;}
-    private void validate(Form f){check(f!=null && "LOAN_REPAYMENT".equals(f.getReceiptPurpose()) && f.selectedActivityIds().isEmpty() && !f.isEquity() && f.getEquityMovement()==null && f.getEquityRow()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()) && f.getRequestKey()!=null,"","request");check(f.getClientId()!=null,"clientId","loanClient");check(f.getMoneyAccountId()!=null,"moneyAccountId","moneyAccount");check(f.getEffectiveDate()!=null && !f.getEffectiveDate().isAfter(clock.today()),"effectiveDate","date");text(f.getReference(),80,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");if(f.getLoanPayer()!=null)text(f.getLoanPayer(),160,false,"loanPayer");check(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");var ids=new HashSet<UUID>();
+    private void validate(Form f){check(f!=null && "LOAN_REPAYMENT".equals(f.getReceiptPurpose()) && f.selectedActivityIds().isEmpty() && !f.isEquity() && f.getEquityMovement()==null && f.getEquityRow()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()) && f.getRequestKey()!=null,"","request");check(f.getClientId()!=null,"clientId","loanClient");check(f.getMoneyAccountId()!=null,"moneyAccountId","moneyAccount");check(f.getEffectiveDate()!=null && !f.getEffectiveDate().isAfter(clock.today()),"effectiveDate","date");text(f.getReference(),80,false,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");if(f.getLoanPayer()!=null)text(f.getLoanPayer(),160,false,"loanPayer");check(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");var ids=new HashSet<UUID>();
         for(int n=0;n<f.getRows().size();n++){var r=f.getRows().get(n);String field="rows["+n+"]";check(r!=null && r.getLoanId()!=null && ids.add(r.getLoanId()),field+".loanId","loanRow");check(r.getTransactionId()==null && r.getDebitAccountId()==null && r.getCreditAccountId()==null,"","request");text(r.getDescription(),500,false,field+".description");var v=r.getAmount();check(v!=null && v.signum()>0 && v.scale()<=2 && v.precision()-v.scale()<=16,field+".amount","amount");}
     }
     private static boolean requiresPayer(String kind){return "ORGANIZATION".equals(kind)||"JOINT_GROUP".equals(kind);}

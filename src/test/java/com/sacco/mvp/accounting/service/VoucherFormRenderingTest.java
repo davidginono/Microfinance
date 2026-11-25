@@ -83,7 +83,7 @@ class VoucherFormRenderingTest {
             for(String language:List.of("en","sw"))for(Type type:Type.values())for(String split:List.of("","&split=true","&equity=true","&activities=true")){
                 var response=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+tomcat.getConnector().getLocalPort()+"/form?type="+type+split)).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
                 assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
-                assertThat(response.body()).doesNotContain("<spring:message","&lt;spring:message");
+                assertThat(response.body()).doesNotContain("<spring:message","&lt;spring:message","name=\"reference\"");
                 var locale=Locale.forLanguageTag(language);
                 assertThat(response.body()).contains("data-voucher-balance-error",messages.getMessage("voucher.balanceError",null,locale),messages.getMessage("voucher.error.balance",null,locale));
                 assertThat(response.body()).contains("data-debit-label=\""+messages.getMessage("accounting.debit",null,locale)+"\"","data-credit-label=\""+messages.getMessage("accounting.credit",null,locale)+"\"","data-remove-entry-label=\""+messages.getMessage("voucher.removeEntry",null,locale)+"\"");

@@ -104,7 +104,6 @@ function update(){
   payerInput.disabled=!required;
   payerInput.required=required;
  }
- form.querySelector('[name="reference"]').maxLength=loan?80:160;
  const all=[...rows.children];
  all.forEach((r,i)=>{r.querySelector('[data-row-number]').textContent=i+1;r.querySelectorAll('[name]').forEach(el=>{el.name=el.name.replace(/rows\[\d+\]/,'rows['+i+']');el.removeAttribute('id');});r.querySelectorAll('[data-account-for]').forEach(b=>b.dataset.accountFor=b.dataset.accountFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelectorAll('[data-choice-for]').forEach(b=>b.dataset.choiceFor=b.dataset.choiceFor.replace(/rows\[\d+\]/,'rows['+i+']'));r.querySelector('[data-remove-row]').disabled=all.length===1;const mapped=!!field(r,'transactionId').value;const choices=r.querySelector('[data-configured-transactions]');if(choices)choices.hidden=loan||!configured;const mapping=r.querySelector('[data-mapping]');mapping.disabled=loan||!configured;r.querySelectorAll('[data-manual-accounts]').forEach(el=>{el.hidden=loan||mapped||configured||form.dataset.newVoucher==='true';el.querySelectorAll('input,button,select').forEach(c=>c.disabled=loan||mapped||configured||form.dataset.newVoucher==='true');});r.querySelectorAll('[data-loan-choice="loans"]').forEach(b=>b.disabled=!loan||!form.elements.clientId.value);});
  all.forEach(r=>{

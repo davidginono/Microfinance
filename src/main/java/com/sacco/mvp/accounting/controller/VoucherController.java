@@ -38,7 +38,7 @@ public class VoucherController {
     public static Type type(String kind){return switch(kind){case "receipts"->Type.RECEIPT;case "payments"->Type.PAYMENT;case "journals"->Type.JOURNAL;default->throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);};}
     @InitBinder("voucherForm") void binder(WebDataBinder binder){
         binder.setAutoGrowCollectionLimit(50);
-        binder.setAllowedFields("equity","equityMovement","equityChoice","equityReason","pettyCash","requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","activityId","activityIds","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
+        binder.setAllowedFields("equity","equityMovement","equityChoice","equityReason","pettyCash","requestKey","effectiveDate","party","description","evidence","moneyAccountId","activityId","activityIds","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @GetMapping
     public String list(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,

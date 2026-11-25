@@ -123,8 +123,8 @@ public final class ManagementReports {
                 money("principalBalance"),money("principalDue"),money("interestDue"),money("expectedTotal"));
             case LOAN_REPAYMENT_TRANSACTIONS -> List.of(text("date",1.4f),money("openingPrincipal"),money("principalPaid"),money("interestPaid"),
                 money("payment"),money("closingPrincipal"),money("interestExcluded"));
-            case DAILY_COLLECTIONS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.6f),text("documentReference",1),text("documentNumber",1),
-                text("date",1),text("postingAccount",1.4f),text("transaction",1.65f),money("debit"),money("credit"),money("moneyIn"),money("moneyOut"),text("recordedBy",1));
+            case DAILY_COLLECTIONS -> List.of(text("clientNumber",.8f),text("loanId",.9f),text("name",1.6f),text("documentNumber",1.25f),text("documentReference",1),
+                text("date",1),text("postingAccount",1.4f),text("transaction",1.65f),money("debit"),money("credit"),text("recordedBy",1));
             case CASHBOOK -> List.of(text("date",1),text("clientNumber",.8f),text("name",1.4f),text("particulars",2),text("reference",1.2f),
                 new Column("moneyIn",true,1,"receiptsDr"),new Column("moneyOut",true,1,"paymentCr"),
                 money("principalIn"),money("principalOut"),money("interestIn"),money("interestOut"),

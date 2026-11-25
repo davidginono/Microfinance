@@ -109,6 +109,7 @@ public class VoucherWorkflowService {
         var form=gate.canonical(source,item);
         require(form.isEquity()==prior.form().isEquity(),"changed");
         vouchers.authorizeEquitySelection(a,form);
+        form.setReference(prior.form().getReference());
         form.setActivityId(prior.form().getActivityId());
         form.setActivityIds(prior.form().getActivityIds());
         repository.save(w,a,item,prior.line(),form,false);repository.invalidate(id);changed(w,w.itemCount());event(a,w,"CORRECTED","");return item;
@@ -178,7 +179,6 @@ public class VoucherWorkflowService {
         var result=new ArrayList<Issue>();
         if(f.getEffectiveDate()==null || f.getEffectiveDate().isAfter(clock.today()))result.add(new Issue("effectiveDate","voucher.error.date"));
         if(type!=Type.JOURNAL && f.getParty().isBlank())result.add(new Issue("party","approval.error.requiredField"));
-        if(f.getReference().isBlank())result.add(new Issue("reference","approval.error.requiredField"));
         if(type!=Type.JOURNAL && f.getMoneyAccountId()==null && f.getRows().stream().anyMatch(r->r.getEntries()==null || r.getEntries().isEmpty()))result.add(new Issue("moneyAccountId","voucher.error.moneyAccount"));
         for(int n=0;n<f.getRows().size();n++) {var r=f.getRows().get(n);String p="rows["+n+"].";
             if(r.getDescription().isBlank())result.add(new Issue(p+"description","approval.error.requiredField"));

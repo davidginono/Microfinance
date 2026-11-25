@@ -270,13 +270,15 @@ public class LoanRecordingRepository {
             Boolean.class,actor.getSaccoId(),actor.getStationId(),key));
     }
     private static final String POST_REFERENCE = """
-        case when %s is null then p.reference
-             else coalesce(batch.title||' / '||item.line_no||' / '||receipt_row.line_no,receipt.number,a.loan_id,'') end
+        case when %s is null then coalesce(doc.number,p.reference)
+             else concat_ws(' · ',doc.number,batch.title||' / '||item.line_no||' / '||receipt_row.line_no) end
         """.formatted(POST_ITEM_ID);
     private static final String POST_FROM="""
         from accountant_loan_movement p join loan_applications a on a.id=p.loan_id
         join accountant_loan_record r on r.loan_id=p.loan_id and r.sacco_id=p.sacco_id and r.station_id=p.station_id
         join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id join members u on u.id=p.actor_id
+        left join gl_journal j on j.id=p.journal_id and j.sacco_id=p.sacco_id and j.station_id=p.station_id
+        left join accounting_posted_voucher_document doc on doc.journal_id=p.journal_id and doc.sacco_id=p.sacco_id and doc.station_id=p.station_id
         left join accountant_loan_receipt_row receipt_row on receipt_row.posting_id=p.id
             and receipt_row.sacco_id=p.sacco_id and receipt_row.station_id=p.station_id and %s is not null
         left join accountant_loan_receipt receipt on receipt.id=receipt_row.receipt_id
@@ -286,7 +288,7 @@ public class LoanRecordingRepository {
         left join receipt_batch batch on batch.id=item.batch_id and batch.sacco_id=p.sacco_id and batch.station_id=p.station_id
         """.formatted(POST_ITEM_ID,POST_ITEM_ID);
     private static final String POSTS="""
-        select p.*,%s display_reference,coalesce((select cash from accountant_loan_topup where id=p.id),p.amount-case when p.kind in ('DISBURSEMENT','FUNDING_UNDO') then coalesce((select sum(amount) from loan_charge_event where journal_id=p.journal_id and kind in ('DEDUCT','DEDUCT_UNDO')),0) else 0 end) cash_amount,a.loan_id loan_number,m.full_name,m.member_no,case when m.kind='CLIENT' then 'INDIVIDUAL' else 'GROUP' end loan_for,u.full_name actor_name,r.product_name,
+        select p.*,j.source_type,j.source_reference,doc.number voucher_number,%s display_reference,coalesce((select cash from accountant_loan_topup where id=p.id),p.amount-case when p.kind in ('DISBURSEMENT','FUNDING_UNDO') then coalesce((select sum(amount) from loan_charge_event where journal_id=p.journal_id and kind in ('DEDUCT','DEDUCT_UNDO')),0) else 0 end) cash_amount,a.loan_id loan_number,m.full_name,m.member_no,case when m.kind='CLIENT' then 'INDIVIDUAL' else 'GROUP' end loan_for,u.full_name actor_name,r.product_name,
         coalesce((select x.id from accountant_loan_movement x where x.reverses_id=p.id),(select x.id from accountant_loan_topup x where x.reverses_id=p.id)) reversed_by
         """.formatted(POST_REFERENCE)+POST_FROM;
     public void lockRequest(AppUserPrincipal a,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_RECORD/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);}
@@ -688,11 +690,12 @@ public class LoanRecordingRepository {
     }
     private String postWhere(){return """
         where p.sacco_id=? and p.station_id=? and (p.kind=? or (?='PAYMENT' and p.kind='REVERSAL') or (?='DISBURSEMENT' and p.kind='FUNDING_UNDO')) and p.state='POSTED'
-        and (?='' or strpos(lower(coalesce(a.loan_id,a.application_number::text)||' '||m.full_name||' '||m.member_no||' '||(%s)),?)>0)
+        and (?='' or strpos(lower(concat_ws(' ',coalesce(a.loan_id,a.application_number::text),m.full_name,m.member_no,(%s),
+                case when %s is null then p.reference end)),?)>0)
         and (?::date is null or p.effective_date>=?::date) and (?::date is null or p.effective_date<=?::date)
         and (?='' or (case when p.reverses_id is not null then 'REVERSAL' when (exists(select 1 from accountant_loan_post x where x.reverses_id=p.id) or exists(select 1 from accountant_loan_topup x where x.reverses_id=p.id)) then 'REVERSED' else 'POSTED' end)=?)
         and (?::uuid is null or a.loan_product_setting_id=?::uuid)
-        """.formatted(POST_REFERENCE);}
+        """.formatted(POST_REFERENCE,POST_ITEM_ID);}
     private Object[] postArgs(AppUserPrincipal a,String kind,Filter f){return new Object[]{a.getSaccoId(),a.getStationId(),kind,kind,kind,f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.productId(),f.productId()};}
     public List<Posting> posts(AppUserPrincipal a,String kind,Filter f,int limit,int offset){
         var args=new ArrayList<>(Arrays.asList(postArgs(a,kind,f)));args.add(limit);args.add(offset);
@@ -715,7 +718,11 @@ public class LoanRecordingRepository {
     public UUID principalAccount(UUID loan){return jdbc.queryForObject("select principal_account_id from accountant_loan_post where loan_id=? and kind='DISBURSEMENT'",UUID.class,loan);}
     private LoanRow loan(ResultSet r,int n)throws SQLException{return new LoanRow(r.getObject("id",UUID.class),r.getString("loan_id"),r.getObject("client_id",UUID.class),r.getString("full_name"),r.getString("member_no"),r.getString("product_name"),r.getObject("application_date",LocalDate.class),r.getBigDecimal("requested_principal"),r.getBigDecimal("amount"),r.getString("status"),r.getBigDecimal("outstanding"),r.getBigDecimal("due_interest"),r.getBigDecimal("arrears"),r.getBigDecimal("future_interest"),r.getBigDecimal("principal_paid"),r.getBigDecimal("interest_paid"),r.getBoolean("topup_eligible"),r.getBigDecimal("charges"),r.getBoolean("cancel_eligible"),r.getString("loan_for"));}
     private Posting posting(ResultSet r,int n)throws SQLException{return posting(r,"display_reference");}
-    private Posting posting(ResultSet r,String referenceColumn)throws SQLException{return new Posting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("full_name"),r.getString("member_no"),r.getString("kind"),r.getObject("effective_date",LocalDate.class),r.getString(referenceColumn),r.getBigDecimal("cash_amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("evidence"),r.getString("notes"),r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("journal_id",UUID.class),r.getObject("transaction_id",UUID.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getBigDecimal("principal_balance"),r.getString("product_name"),r.getString("loan_for"));}
+    private Posting posting(ResultSet r,String referenceColumn)throws SQLException{
+        String notes=r.getString("notes");
+        if("display_reference".equals(referenceColumn) && r.getString("source_type")!=null)
+            notes=com.sacco.mvp.accounting.reports.PostingDescription.resolve(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),notes);
+        return new Posting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("full_name"),r.getString("member_no"),r.getString("kind"),r.getObject("effective_date",LocalDate.class),r.getString(referenceColumn),r.getBigDecimal("cash_amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("evidence"),notes,r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("journal_id",UUID.class),r.getObject("transaction_id",UUID.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getBigDecimal("principal_balance"),r.getString("product_name"),r.getString("loan_for"));}
 
     public boolean recorded(AppUserPrincipal actor,UUID loan) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_record where loan_id=? and sacco_id=? and station_id=?)",Boolean.class,loan,actor.getSaccoId(),actor.getStationId()));

@@ -19,7 +19,7 @@ class VoucherValidationTest {
   assertThat(new Filter("",null,null,"","newest",0).size()).isEqualTo(25);
  }
  final LocalDate today=LocalDate.of(2026,10,8);
- Form form(){var f=new Form();f.setEffectiveDate(today);f.setParty("Payer");f.setReference("REF");f.getRows().getFirst().setDescription("Transaction");f.getRows().getFirst().setAmount(new BigDecimal("1.01"));return f;}
+ Form form(){var f=new Form();f.setEffectiveDate(today);f.setParty("Payer");f.getRows().getFirst().setDescription("Transaction");f.getRows().getFirst().setAmount(new BigDecimal("1.01"));return f;}
  @Test void equityRequiresItsSystemActivityTypeAndReasonForEveryVoucher(){
   for(var type:Type.values()){
    var f=form();f.setEquity(true);
@@ -47,7 +47,7 @@ class VoucherValidationTest {
   f.setEquityMovement(com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.ADJUSTMENT);assertThat(copy.getEquityMovement()).isNotEqualTo(f.getEquityMovement());
  }
  @Test void decimalAmountsMustBePositivePreciseAndWithinStorageLimit(){for(String value:List.of("0","-1","1.001","10000000000000000")){var f=form();f.getRows().getFirst().setAmount(new BigDecimal(value));assertThatThrownBy(()->VoucherService.validate(f,Type.JOURNAL,today)).hasMessage("voucher.error.amount");}}
- @Test void datesRowsAndTextAreBounded(){var future=form();future.setEffectiveDate(today.plusDays(1));assertThatThrownBy(()->VoucherService.validate(future,Type.JOURNAL,today)).hasMessage("voucher.error.date");var many=form();many.setRows(Collections.nCopies(51,many.getRows().getFirst()));assertThatThrownBy(()->VoucherService.validate(many,Type.JOURNAL,today)).hasMessage("voucher.error.rows");var blank=form();blank.setReference("");assertThatThrownBy(()->VoucherService.validate(blank,Type.JOURNAL,today)).hasMessage("voucher.error.text");}
+ @Test void datesRowsAndTextAreBounded(){var future=form();future.setEffectiveDate(today.plusDays(1));assertThatThrownBy(()->VoucherService.validate(future,Type.JOURNAL,today)).hasMessage("voucher.error.date");var many=form();many.setRows(Collections.nCopies(51,many.getRows().getFirst()));assertThatThrownBy(()->VoucherService.validate(many,Type.JOURNAL,today)).hasMessage("voucher.error.rows");var longReference=form();longReference.setReference("x".repeat(161));assertThatThrownBy(()->VoucherService.validate(longReference,Type.JOURNAL,today)).hasMessage("voucher.error.text");}
  @Test void journalsOmitPartyWhileReceiptsAndPaymentsStillRequirePayerOrPayee(){
   var f=form();f.setParty("");assertThatCode(()->VoucherService.validate(f,Type.JOURNAL,today)).doesNotThrowAnyException();
   for(Type type:List.of(Type.RECEIPT,Type.PAYMENT))assertThatThrownBy(()->VoucherService.validate(f,type,today)).hasMessage("voucher.error.text");

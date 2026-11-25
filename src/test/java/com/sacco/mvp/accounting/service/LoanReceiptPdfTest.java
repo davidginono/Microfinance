@@ -35,11 +35,28 @@ class LoanReceiptPdfTest {
         for(boolean reversal:List.of(false,true))for(var principal:List.of(new BigDecimal("100.00"),BigDecimal.ZERO)){
             var row=new LoanReceiptRow(1,UUID.randomUUID(),UUID.randomUUID(),"LN-1","Synthetic repayment",principal.add(new BigDecimal("20.01")),principal,new BigDecimal("20.01"),new BigDecimal("900.00"),"111001 - QA Cash","111002 - QA Loan Principal","210001 - QA Interest","REF-1");
             var voucher=new Voucher(UUID.randomUUID(),"RV-ROWS",Type.RECEIPT,LocalDate.of(2026,10,16),"Synthetic client","REF-1","Synthetic demonstration only.","Reference",UUID.randomUUID(),row.amount(),1,null,UUID.randomUUID(),"Synthetic accountant",OffsetDateTime.parse("2026-10-16T10:30:00+03:00"),reversal?UUID.randomUUID():null,null,"Example Microfinance Limited","Main branch",List.of());
-            try(var doc=Loader.loadPDF(renderer.render(new LoanReceipt(voucher,"CLIENT-001",List.of(row)),Locale.ENGLISH,null))){
+            var receipt=new LoanReceipt(voucher,"CLIENT-001",List.of(row),null,"",reversal?"RV-ORIGINAL-124":null);
+            try(var doc=Loader.loadPDF(renderer.render(receipt,Locale.ENGLISH,null))){
                 String text=new PDFTextStripper().getText(doc);
                 assertThat(text).contains("Synthetic repayment","LN-1",row.amount().toPlainString()).doesNotContain("111001","111002","210001","QA Cash","QA Loan Principal","QA Interest","DEBIT","CREDIT","ACCOUNT / LEDGER");
                 assertThat(text.split("Synthetic repayment",-1)).hasSize(2);
+                if(reversal)assertThat(text).contains("RV-ORIGINAL-124").doesNotContain(voucher.reversesId().toString());
             }
+        }
+    }
+    @Test void generatedReferencesGiveWayToNarrationAndTheLinkedReceiptNumber()throws Exception{
+        var messages=new ResourceBundleMessageSource();messages.setBasename("messages");messages.setDefaultEncoding("UTF-8");
+        var renderer=new LoanReceiptPdfService(new LoanRecordingPdfService(new ReportExportLimiter(1)),messages);
+        String number="RV-2026-00000341",correction="RV-2026-00000342",technical=UUID.randomUUID().toString();
+        var row=new LoanReceiptRow(1,UUID.randomUUID(),UUID.randomUUID(),"LN-11",technical,BigDecimal.TEN,BigDecimal.TEN,
+            BigDecimal.ZERO,BigDecimal.ZERO,"Cash","Principal","Interest",number+"/1");
+        var voucher=new Voucher(UUID.randomUUID(),number,Type.RECEIPT,LocalDate.of(2026,11,25),"Client",number,technical,"Checked",
+            UUID.randomUUID(),BigDecimal.TEN,1,null,UUID.randomUUID(),"Staff",OffsetDateTime.now(),null,UUID.randomUUID(),"Institution","Branch",List.of());
+        var receipt=new LoanReceipt(voucher,"CL-1",List.of(row),null,"",correction);
+        for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw")))try(var doc=Loader.loadPDF(renderer.render(receipt,locale,null))){
+            var text=new PDFTextStripper().getText(doc);
+            assertThat(text).contains(number,correction,messages.getMessage("posting.description.repayment",null,locale))
+                .doesNotContain(technical,number+"/1",voucher.reversedBy().toString(),messages.getMessage("voucher.print.reference",null,locale).toUpperCase(locale));
         }
     }
     @Test void bilingualSingleAndFiftyLoanReceiptsRetainAllocationsAndLastRow()throws Exception{

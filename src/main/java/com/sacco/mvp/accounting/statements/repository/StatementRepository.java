@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.statements.repository;
 
 import com.sacco.mvp.accounting.statements.dto.StatementModels.*;
+import com.sacco.mvp.accounting.reports.PostingDescription;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -119,22 +120,28 @@ public class StatementRepository {
     public void save(UUID id,AppUserPrincipal a,OffsetDateTime now){jdbc.update("update statement_run set saved_at=? where id=? and sacco_id=? and station_id=? and saved_at is null",now,id,a.getSaccoId(),a.getStationId());}
     public List<Activity> activity(UUID run,UUID account,Parameters p,int page,int limit){return jdbc.query("""
         with snapshot as (select id,generated_at from statement_run where id=?), activity as (
-         select j.id,j.sacco_id,j.station_id,j.effective_date,j.reason,sum(l.debit) debit,sum(l.credit) credit,
+         select j.id,j.sacco_id,j.station_id,j.effective_date,j.source_type,j.source_reference,j.reason,l.account_id,sum(l.debit) debit,sum(l.credit) credit,
           sum(sum(l.debit-l.credit)) over(order by j.effective_date,j.id) running
          from snapshot s join statement_run_journal c on c.run_id=s.id join gl_journal j on j.id=c.journal_id
          join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
          where l.account_id=? and j.effective_date between ? and ?
-         group by j.id order by j.effective_date,j.id limit ? offset ?
+         group by j.id,l.account_id order by j.effective_date,j.id limit ? offset ?
         )
         select activity.*,v.id voucher_id,v.type voucher_type,coalesce(subledger.account_number,v.client_number) account_number,
-         coalesce(v.number,r.number,g.number,t.receipt_reference) voucher_number
+         coalesce(d.number,t.receipt_reference) voucher_number, v.description voucher_description,entries.narration,
+         case when r.id is not null then x.description end receipt_line,r.description receipt_description,p.notes
         from activity cross join snapshot s
+        left join accounting_posted_voucher_document d on d.journal_id=activity.id and d.sacco_id=activity.sacco_id and d.station_id=activity.station_id and d.issued_at<=s.generated_at
         left join accounting_voucher v on v.journal_id=activity.id and v.sacco_id=activity.sacco_id and v.station_id=activity.station_id and v.posted_at<=s.generated_at
+        left join lateral (
+         select case when count(distinct nullif(trim(t.description),''))=1 then min(nullif(trim(t.description),'')) end narration
+         from accounting_voucher_transaction t join accounting_voucher_posting e on e.transaction_id=t.id and e.voucher_id=t.voucher_id
+          and e.sacco_id=t.sacco_id and e.station_id=t.station_id and e.account_id=activity.account_id
+         where t.voucher_id=v.id and t.sacco_id=v.sacco_id and t.station_id=v.station_id
+        ) entries on true
         left join accountant_loan_post p on p.journal_id=activity.id and p.sacco_id=activity.sacco_id and p.station_id=activity.station_id and p.state='POSTED'
         left join accountant_loan_receipt_row x on x.posting_id=p.id and x.sacco_id=p.sacco_id and x.station_id=p.station_id
         left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=x.sacco_id and r.station_id=x.station_id and r.posted_at<=s.generated_at
-        left join lending_group_receipt_loan y on y.posting_id=p.id and y.sacco_id=p.sacco_id and y.station_id=p.station_id
-        left join lending_group_receipt g on g.id=y.receipt_id and g.sacco_id=y.sacco_id and g.station_id=y.station_id and g.posted_at<=s.generated_at
         left join accounting_archive.gl_operational_bridge bridge on bridge.journal_id=activity.id and bridge.sacco_id=activity.sacco_id and bridge.station_id=activity.station_id
         left join loan_repayment_transactions t on t.id=coalesce(p.transaction_id,bridge.voucher_id) and t.sacco_id=activity.sacco_id and t.station_id=activity.station_id
          and t.kind in ('PAYMENT','REVERSAL') and t.posted_at<=s.generated_at
@@ -156,11 +163,14 @@ public class StatementRepository {
          join loan_applications a on a.id=linked.loan_id and a.sacco_id=activity.sacco_id and a.station_id=activity.station_id
         ) subledger on true
         order by activity.effective_date,activity.id
-        """,(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("voucher_number"),r.getString("reason"),r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r)),run,account,p.from(),p.through(),limit,page*30);}
+        """,(r,n)->new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("voucher_number"),
+            PostingDescription.resolve(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),r.getString("narration"),r.getString("voucher_description"),
+                r.getString("receipt_line"),r.getString("receipt_description"),r.getString("notes"),r.getString("reason")),
+            r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r)),run,account,p.from(),p.through(),limit,page*30);}
     // Keep earlier immutable documents while serving the current, simplified layout.
     public Optional<Artifact> artifact(UUID id,Kind kind,String format,String language){return jdbc.query("select bytes,checksum from statement_run_artifact where run_id=? and kind=? and format=? and language=?",(r,n)->new Artifact(r.getBytes(1),r.getString(2)),id,artifactKind(kind),format,language).stream().findFirst();}
     public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,artifactKind(kind),format,language,bytes,checksum);}
-    private static String artifactKind(Kind kind){return kind.name()+switch(kind){case EQUITY->"_V8";case LEDGER->"_V5";default->"_V4";};}
+    private static String artifactKind(Kind kind){return kind.name()+switch(kind){case EQUITY->"_V8";case LEDGER->"_V6";default->"_V4";};}
     private Stored stored(ResultSet r,int n)throws SQLException{return new Stored(r.getObject("id",UUID.class),r.getObject("date_from",LocalDate.class),r.getObject("date_through",LocalDate.class),r.getObject("generated_at",OffsetDateTime.class),r.getBoolean("institution_wide"),r.getObject("saved_at")!=null,r.getString("payload"),r.getString("checksum"));}
     private Mapping mapping(ResultSet r)throws SQLException{return new Mapping(r.getObject("id",UUID.class),r.getString("line_name"),r.getString("section"),r.getString("cash_section"),r.getString("equity_component"),r.getInt("note_no"),r.getString("note_text"),r.getObject("group_id",UUID.class),r.getString("group_code"));}
     private String source(ResultSet r)throws SQLException{if(r.getObject("voucher_id")!=null)return "/finance/vouchers/"+switch(r.getString("voucher_type")){case "RECEIPT"->"receipts";case "PAYMENT"->"payments";default->"journals";}+"/"+r.getObject("voucher_id");return null;}

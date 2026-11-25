@@ -99,7 +99,7 @@ class StatementWorkspacePostgresTest {
         jdbc.update("update members set member_no=?,station_id='B2' where id=?","CHANGED-"+client,client);
         for(UUID account:List.of(bank,capital))assertThat(statements.activity(actor,run,account,0)).filteredOn(a->a.journalId().equals(posted.journalId())).singleElement().satisfies(a->{
             assertThat(a.accountNumber()).isEqualTo(clientNumber);
-            assertThat(a.voucherNumber()).isEqualTo(posted.number()).isNotEqualTo(posted.reference());
+            assertThat(a.voucherNumber()).isEqualTo(posted.number());
         });
     }
     @Test void retriesMappingsSavingAndDatabaseEvidenceProtections(){UUID key=UUID.randomUUID();UUID id=statements.generate(actor,new Parameters(from,through,false),key);assertThat(statements.generate(actor,new Parameters(from,through,false),key)).isEqualTo(id);assertThatThrownBy(()->statements.generate(actor,new Parameters(from.plusDays(1),through,false),key)).hasMessage("fs.error.retry");statements.save(actor,id);assertThat(statements.get(actor,id).saved()).isTrue();
@@ -113,10 +113,10 @@ class StatementWorkspacePostgresTest {
     @Test void concurrentIdenticalRequestsReturnOneFrozenSnapshot()throws Exception{UUID key=UUID.randomUUID();try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){var tasks=List.<java.util.concurrent.Callable<UUID>>of(()->statements.generate(actor,new Parameters(from,through,false),key),()->statements.generate(actor,new Parameters(from,through,false),key));var results=pool.invokeAll(tasks);assertThat(results.getFirst().get()).isEqualTo(results.getLast().get());}}
     @Test void ledgerArtifactsRetainThePreviousLayoutWhenAddingVoucherNumbers(){
         UUID id=preview();var repository=new StatementRepository(jdbc);byte[] old="Account number column".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,'LEDGER_V4','PDF','en',?,?)",id,old,StatementService.sha(old));
+        jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,'LEDGER_V5','PDF','en',?,?)",id,old,StatementService.sha(old));
         assertThat(repository.artifact(id,Kind.LEDGER,"PDF","en")).isEmpty();byte[] current="Voucher / receipt number column".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         repository.artifact(id,Kind.LEDGER,"PDF","en",current,StatementService.sha(current));assertThat(repository.artifact(id,Kind.LEDGER,"PDF","en").orElseThrow().bytes()).isEqualTo(current);
-        assertThat(jdbc.queryForObject("select bytes from statement_run_artifact where run_id=? and kind='LEDGER_V4'",byte[].class,id)).isEqualTo(old);
+        assertThat(jdbc.queryForObject("select bytes from statement_run_artifact where run_id=? and kind='LEDGER_V5'",byte[].class,id)).isEqualTo(old);
     }
     @Test void simplifiedLayoutKeepsEarlierArtifactsAndServesNewDocuments(){
         UUID id=preview();byte[] previous="previous layout".getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -161,12 +161,10 @@ class StatementWorkspacePostgresTest {
         var all=reports.read(actor,daily,filters,false);
         assertThat(all.rows()).filteredOn(line->payment.number().equals(line.get("documentNumber"))).hasSize(2)
             .allSatisfy(line->assertThat(line).containsEntry("transaction","Transportation expense"))
-            .anySatisfy(line->assertThat((BigDecimal)line.get("moneyOut")).isEqualByComparingTo("25.00"));
+            .anySatisfy(line->assertThat((BigDecimal)line.get("credit")).isEqualByComparingTo("25.00"));
         assertThat(all.rows()).filteredOn(line->journal.number().equals(line.get("documentNumber"))).hasSize(2)
-            .allSatisfy(line->{
-                assertThat((BigDecimal)line.get("moneyIn")).isZero();
-                assertThat((BigDecimal)line.get("moneyOut")).isZero();
-            });
+            .allSatisfy(line->assertThat(line).doesNotContainKeys("moneyIn","moneyOut"));
+        assertThat(all.totals()).containsOnlyKeys("debit","credit");
         assertThat(all.totals().get("debit")).isEqualByComparingTo(baseline.totals().get("debit").add(new BigDecimal("35.00")));
         assertThat(all.totals().get("credit")).isEqualByComparingTo(baseline.totals().get("credit").add(new BigDecimal("35.00")));
         var accountOnly=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(

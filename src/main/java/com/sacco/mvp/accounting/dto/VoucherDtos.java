@@ -25,6 +25,12 @@ public final class VoucherDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_EMPTY)
         private List<UUID> activityIds = new ArrayList<>();
 
+        // Imports and frozen approval records may carry an external reference.
+        // Staff-entered vouchers use their server-issued number.
+        public String postingReference(String number) {
+            return reference.isBlank() ? number : reference.strip();
+        }
+
         public List<UUID> selectedActivityIds() {
             if (activityIds != null && !activityIds.isEmpty()) return activityIds;
             return activityId == null ? List.of() : List.of(activityId);
@@ -95,7 +101,14 @@ public final class VoucherDtos {
     public record Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
                           String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
                           String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
-                          String branchName,List<Transaction> transactions,UUID clientId,String clientNumber,Category equityMovement) {
+                          String branchName,List<Transaction> transactions,UUID clientId,String clientNumber,Category equityMovement,
+                          boolean systemIssued,String reversedByNumber) {
+        public Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
+                       String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
+                       String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
+                       String branchName,List<Transaction> transactions,UUID clientId,String clientNumber,Category equityMovement) {
+            this(id,number,type,effectiveDate,party,reference,description,evidence,moneyAccountId,total,transactionCount,journalId,postedBy,postedByName,postedAt,reversesId,reversedBy,institutionName,branchName,transactions,clientId,clientNumber,equityMovement,false,null);
+        }
         public Voucher(UUID id,String number,Type type,LocalDate effectiveDate,String party,String reference,String description,
                        String evidence,UUID moneyAccountId,BigDecimal total,int transactionCount,UUID journalId,UUID postedBy,
                        String postedByName,OffsetDateTime postedAt,UUID reversesId,UUID reversedBy,String institutionName,
@@ -117,12 +130,30 @@ public final class VoucherDtos {
     public record Preview(List<Transaction> rows,BigDecimal total,Classification equityClassification) {
         public Preview(List<Transaction> rows,BigDecimal total){this(rows,total,null);}
     }
-    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group,String payer) {
+    public record LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group,String payer,String linkedReceiptNumber) {
+        public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group,String payer) {
+            this(header,clientNumber,rows,group,payer,group==null?null:group.linkedNumber());
+        }
+        public boolean hasSeparateReference(){
+            String reference=header.reference();
+            return reference!=null&&!reference.isBlank()&&!reference.equals(header.number())&&!reference.equals(linkedReceiptNumber);
+        }
+        public String lineReference(LoanReceiptRow row){
+            String reference=row.reference();
+            if(reference==null||reference.equals(header.number())||reference.equals(header.number()+"/"+row.lineNo()))return "";
+            if(linkedReceiptNumber!=null&&reference.equals(linkedReceiptNumber+"/"+row.lineNo()))return "";
+            return reference;
+        }
+        public String displayDescription(String description,Locale locale){
+            return com.sacco.mvp.accounting.reports.PostingDescription.resolve(locale,
+                header.reversesId()==null?"LOAN_RECORD_PAYMENT":"LOAN_RECORD_REVERSAL", header.reference(), header.number(), description);
+        }
         public boolean hasSharedBenefits(){return rows.stream().anyMatch(r->!r.sharedBenefits().isEmpty());}
         public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows){this(header,clientNumber,rows,null,"");}
         public LoanReceipt(Voucher header,String clientNumber,List<LoanReceiptRow> rows,GroupReceipt group){this(header,clientNumber,rows,group,"");}
     }
     public record GroupReceipt(UUID cycleId,String code,String name,List<ReceiptContribution> contributions,String reversesNumber,String reversedByNumber) {
+        public String linkedNumber(){return reversesNumber!=null&&!reversesNumber.isBlank()?reversesNumber:reversedByNumber;}
         public GroupReceipt(UUID cycleId,String code,String name,List<ReceiptContribution> contributions){this(cycleId,code,name,contributions,"","");}
     }
     public record ReceiptContribution(UUID id,int lineNo,UUID loanId,String loanNumber,UUID payerId,String payerNumber,String payer,

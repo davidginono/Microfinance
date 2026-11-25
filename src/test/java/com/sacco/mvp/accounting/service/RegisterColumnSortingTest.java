@@ -36,11 +36,11 @@ class RegisterColumnSortingTest {
                 var jdbc = mock(JdbcTemplate.class);
                 var filter = new VoucherDtos.Filter("payer", null, null, "POSTED", column+"_"+direction, 2, 30);
                 VoucherService.validateFilter(filter);
-                new VoucherRepository(jdbc).list("institution", "branch", VoucherDtos.Type.RECEIPT, filter);
+                new VoucherRepository(jdbc).list("institution", "branch", VoucherDtos.Type.PAYMENT, filter, true);
                 var call = mockingDetails(jdbc).getInvocations().iterator().next();
                 assertThat((String)call.getArgument(0)).contains("where v.sacco_id=? and v.station_id=? and v.type=?")
                     .contains("order by ").endsWith(" "+direction+",v.id "+direction+" limit ? offset ?");
-                assertThat(call.getArguments()).contains("institution", "branch", "RECEIPT", "payer", "POSTED", 31, 60);
+                assertThat(call.getArguments()).contains("institution", "branch", "PAYMENT", "payer", "POSTED", 31, 60);
             }
         }
     }

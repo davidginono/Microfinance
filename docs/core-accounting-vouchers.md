@@ -19,6 +19,10 @@ User mandate: 2026-10-08. Receipt, payment and journal vouchers post directly, i
 
 ## Posting boundaries
 
+Automatic loan postings issue a numbered voucher in the same database transaction as the journal. Loan funding uses a payment voucher, collections use a receipt, and non-cash charge assessments and adjustments use a journal voucher. A correction has its own number and stays linked to the original posting. An existing individual, group or batch receipt can cover several posted journals under one receipt number. The source workflow still owns corrections.
+
+The voucher registers and financial reports use the shared RV, PV and JV number series. Staff voucher entry supplies the document number automatically. Genuine bank and import references remain available as supporting information. V182 issues documents for earlier automatic postings that lacked a voucher, records the actual issue time, and preserves the posted journals. V183 provides the shared document lookup for reports.
+
 All monetary arithmetic is decimal, server-calculated and limited to two fractional digits. Each transaction creates a debit/credit pair. Both journal and voucher are append-only and must agree. A stable request key with exact payload/actor matching returns the original posting on retries; changed payloads are rejected. Receipt/payment references are unique within the branch and money account. A linked reversal is permitted once. Audit failure rolls the entire transaction back, including outbox and document records.
 
 Accounts are active, institution-scoped ordinary `POSTING` accounts, not headings or loan controls. Receipts debit a CASH/BANK/MOBILE_MONEY account; payments credit it. Transfers between money accounts use journals. Configured transaction templates may be selected per row/component; mappings are resolved and locked on the server, the selected template revision must still match, and the actual account names/codes are snapshotted. No client-supplied total, mapping or approval is authoritative.

@@ -65,14 +65,30 @@ public class VoucherService {
     @Transactional(readOnly=true)
     public Page list(AppUserPrincipal actor,Type type,Filter filter){
         authorize(actor,type,"VIEW");validateFilter(filter);
-        var rows=vouchers.list(actor.getSaccoId(),actor.getStationId(),type,filter);
+        var rows=vouchers.list(actor.getSaccoId(),actor.getStationId(),type,filter,type!=Type.RECEIPT && canViewLoanVouchers(actor));
         return new Page(rows.stream().limit(filter.size()).toList(),filter.page(),rows.size()>filter.size());
     }
     @Transactional(readOnly=true)
-    public Voucher view(AppUserPrincipal actor,Type type,UUID id){authorize(actor,type,"VIEW");return details(scoped(actor,type,id,false));}
+    public Voucher view(AppUserPrincipal actor,Type type,UUID id){authorize(actor,type,"VIEW");return readDocument(actor,type,id,false);}
     @Transactional(readOnly=true)
     public Voucher export(AppUserPrincipal actor,Type type,UUID id){
-        authorize(actor,type,"VIEW");ledger.requireActor(actor,"FINANCIAL_REPORTS_EXPORT");return details(scoped(actor,type,id,false));
+        authorize(actor,type,"VIEW");requireExport(actor);return readDocument(actor,type,id,true);
+    }
+    private boolean canViewLoanVouchers(AppUserPrincipal actor){
+        try{ledger.requireActor(actor,"LOAN_RECORDING_VIEW");return true;}
+        catch(AccessDeniedException denied){return false;}
+    }
+    private Voucher readDocument(AppUserPrincipal actor,Type type,UUID id,boolean export){
+        var ordinary=vouchers.find(actor.getSaccoId(),actor.getStationId(),type,id,false);
+        if(ordinary.isPresent())return details(ordinary.get());
+        if(type==Type.RECEIPT)throw new AccessDeniedException("Receipt outside your workspace");
+        ledger.requireActor(actor,"LOAN_RECORDING_VIEW");
+        if(export)ledger.requireActor(actor,"LOAN_RECORDING_EXPORT");
+        var v=vouchers.findSystem(actor.getSaccoId(),actor.getStationId(),type,id)
+            .orElseThrow(()->new AccessDeniedException("Voucher outside your workspace"));
+        var entries=vouchers.systemEntries(actor.getSaccoId(),actor.getStationId(),v.journalId());
+        var transaction=new Transaction(v.journalId(),1,null,null,"","TOTAL",v.description(),v.total(),null,null,entries);
+        return withTransactions(v,List.of(transaction));
     }
     @Transactional(readOnly=true)
     public List<Account> accounts(AppUserPrincipal actor,Type type,String search,int page){authorize(actor,type,"CREATE");query(search,page);return accounts(actor,type,search,page,"");}
@@ -224,7 +240,7 @@ public class VoucherService {
         String number=reverses==null?reserveNumber(actor,type,f.getEffectiveDate(),f.getRequestKey()).number():vouchers.number(type,f.getEffectiveDate());
         UUID moneyId=f.getMoneyAccountId();
         if(type!=Type.JOURNAL && reverses==null)moneyId=plan.rows().stream().flatMap(t->t.postings().stream()).filter(e->e.side().equals(type==Type.RECEIPT?"DEBIT":"CREDIT")).map(e->e.account().id()).findFirst().orElseThrow();
-        var v=new Voucher(UUID.randomUUID(),number,type,f.getEffectiveDate(),f.getParty().strip(),f.getReference().strip(),f.getDescription().strip(),f.getEvidence().strip(),moneyId,plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
+        var v=new Voucher(UUID.randomUUID(),number,type,f.getEffectiveDate(),f.getParty().strip(),f.postingReference(number),f.getDescription().strip(),f.getEvidence().strip(),moneyId,plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
         vouchers.insert(v,actor.getSaccoId(),actor.getStationId(),f,hash,period,journal);
         if(reverses!=null)equityMovements.inheritReversal(actor,type,journal,v.journalId(),f.getDescription());
         else if(plan.equityClassification()!=null)equityMovements.classifyPosted(actor,v.journalId(),plan.equityClassification(),f.getEquityReason());
@@ -325,7 +341,7 @@ public class VoucherService {
         }
         require(f.getRows()!=null && f.getRows().stream().allMatch(r->r!=null && r.getLoanId()==null),"","request");
         require(f!=null && f.getRequestKey()!=null,"","request");require(f.getEffectiveDate()!=null && f.getEffectiveDate().getYear()>=1 && !f.getEffectiveDate().isAfter(today),"effectiveDate","date");
-        text(f.getParty(),160,type!=Type.JOURNAL,"party");text(f.getReference(),160,true,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
+        text(f.getParty(),160,type!=Type.JOURNAL,"party");text(f.getReference(),160,false,"reference");text(f.getDescription(),500,false,"description");text(f.getEvidence(),500,false,"evidence");
         require(type!=Type.JOURNAL || f.getMoneyAccountId()==null,"moneyAccountId","moneyAccount");require(f.getRows()!=null && !f.getRows().isEmpty() && f.getRows().size()<=50,"","rows");
         int entryCount=0;
         for(int n=0;n<f.getRows().size();n++){
@@ -350,7 +366,8 @@ public class VoucherService {
     }
     private Voucher scoped(AppUserPrincipal actor,Type type,UUID id,boolean lock){return vouchers.find(actor.getSaccoId(),actor.getStationId(),type,id,lock).orElseThrow(()->new AccessDeniedException("Voucher outside your workspace"));}
     private Client client(AppUserPrincipal actor,Form f){return f.getClientId()==null?null:vouchers.client(actor.getSaccoId(),actor.getStationId(),f.getClientId(),true).orElseThrow(()->new Invalid("clientId","client"));}
-    private Voucher details(Voucher v){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),vouchers.transactions(v.id()),v.clientId(),v.clientNumber(),v.equityMovement());}
+    private Voucher details(Voucher v){return withTransactions(v,vouchers.transactions(v.id()));}
+    private Voucher withTransactions(Voucher v,List<Transaction> transactions){return new Voucher(v.id(),v.number(),v.type(),v.effectiveDate(),v.party(),v.reference(),v.description(),v.evidence(),v.moneyAccountId(),v.total(),v.transactionCount(),v.journalId(),v.postedBy(),v.postedByName(),v.postedAt(),v.reversesId(),v.reversedBy(),v.institutionName(),v.branchName(),transactions,v.clientId(),v.clientNumber(),v.equityMovement(),v.systemIssued(),v.reversedByNumber());}
     private String hash(Type type,Form f){try{
         // Keep ordinary-voucher retry hashes compatible with the pre-unification form.
         var payload=(tools.jackson.databind.node.ObjectNode)json.valueToTree(f);

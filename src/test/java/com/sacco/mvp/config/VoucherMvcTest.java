@@ -43,7 +43,7 @@ class VoucherMvcTest {
   mvc.perform(post("/finance/vouchers/receipts").with(user(actor)).with(csrf()).param("effectiveDate","2026-10-08").param("party","Payer").param("reference","REF")
    .param("rows[0].description","First").param("rows[0].amount","1.01").param("rows[1].description","Second").param("rows[1].amount","2.02").param("saccoId","FOREIGN").param("total","999"))
    .andExpect(redirectedUrl("/finance/vouchers/receipts")).andExpect(flash().attribute("successMessageCode","voucher.posted"));
-  verify(service).post(eq(actor),eq(Type.RECEIPT),argThat(f->f.getRows().size()==2 && f.getRows().get(1).getAmount().compareTo(new BigDecimal("2.02"))==0));
+  verify(service).post(eq(actor),eq(Type.RECEIPT),argThat(f->f.getReference().isEmpty() && f.getRows().size()==2 && f.getRows().get(1).getAmount().compareTo(new BigDecimal("2.02"))==0));
  }
  @Test void postedJournalReturnsToJournalRegisterAndExistingDetailsStillOpen()throws Exception{
   when(service.post(eq(actor),eq(Type.JOURNAL),any())).thenReturn(voucher());
@@ -144,7 +144,7 @@ class VoucherMvcTest {
  @Test void unknownEquityTypeKeepsEnteredValuesAndCannotPost()throws Exception{
   var result=mvc.perform(post("/finance/vouchers/journals").with(user(actor)).with(csrf()).param("equity","true").param("equityMovement","ARBITRARY").param("equityReason","Keep this reason").param("reference","EQUITY-REF"))
    .andExpect(view().name("accounting/vouchers/form")).andExpect(model().attributeHasFieldErrors("voucherForm","equityMovement")).andReturn();
-  var form=(Form)result.getModelAndView().getModel().get("voucherForm");assertThat(form.isEquity()).isTrue();assertThat(form.getEquityReason()).isEqualTo("Keep this reason");assertThat(form.getReference()).isEqualTo("EQUITY-REF");verify(service,never()).post(any(),any(),any());
+  var form=(Form)result.getModelAndView().getModel().get("voucherForm");assertThat(form.isEquity()).isTrue();assertThat(form.getEquityReason()).isEqualTo("Keep this reason");assertThat(form.getReference()).isEmpty();verify(service,never()).post(any(),any(),any());
  }
  @Test void csrfClientsAndOversizedRowsCannotPost()throws Exception{
   mvc.perform(post("/finance/vouchers/receipts").with(user(actor))).andExpect(status().isForbidden());

@@ -27,25 +27,65 @@ public class VoucherRepository {
     }
     private static final String ORDINARY_ACCOUNT=" and not gl_account_requires_loan_source(gl_account.id)";
     private static final String HEAD="""
-        select v.*,m.full_name posted_by_name,i.sacco_name institution_name,
+        select v.id,v.sacco_id,v.station_id,v.type,v.number,v.effective_date,v.party,v.reference,v.description,v.evidence,
+        v.money_account_id,v.total,v.transaction_count,v.journal_id,v.posted_by,v.posted_at,v.reverses_id,v.client_id,v.client_number,
+        m.full_name posted_by_name,i.sacco_name institution_name,
         (select c.category from statement_equity_classification c where c.sacco_id=v.sacco_id and c.station_id=v.station_id and c.journal_id=v.journal_id order by c.version desc limit 1) equity_movement,
         coalesce((select nullif(s.address_location,'') from sacco_stations s where s.sacco_id=v.sacco_id and s.station_id=v.station_id),v.station_id) branch_name,
-        (select r.id from accounting_voucher r where r.reverses_id=v.id) reversed_by
+        r.id reversed_by,r.number reversed_by_number,null::text source_type,null::text source_reference
         from accounting_voucher v join members m on m.id=v.posted_by join registered_saccos i on i.sacco_id=v.sacco_id
+        left join accounting_voucher r on r.reverses_id=v.id
+        """;
+    private static final String SYSTEM_HEAD="""
+        select v.journal_id id,v.sacco_id,v.station_id,v.type,v.number,v.effective_date,coalesce(b.full_name,'') party,
+        coalesce(original.number,'') reference,coalesce(nullif(p.notes,''),j.reason) description,j.evidence_reference evidence,
+        v.money_account_id,v.total,1 transaction_count,v.journal_id,j.maker_id posted_by,j.posted_at,original.journal_id reverses_id,
+        null::uuid client_id,b.member_no client_number,m.full_name posted_by_name,i.sacco_name institution_name,null::text equity_movement,
+        coalesce(nullif(s.address_location,''),v.station_id) branch_name,
+        correction.journal_id reversed_by,correction.number reversed_by_number,j.source_type,j.source_reference
+        from accounting_system_voucher v join gl_journal j on j.id=v.journal_id
+        join members m on m.id=j.maker_id join registered_saccos i on i.sacco_id=v.sacco_id
+        join sacco_stations s on s.sacco_id=v.sacco_id and s.station_id=v.station_id
+        left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=v.sacco_id and p.station_id=v.station_id
+        left join loan_charge_command c on c.journal_id=j.id and c.sacco_id=v.sacco_id and c.station_id=v.station_id
+        left join loan_applications a on a.id=coalesce(p.loan_id,c.loan_id) and a.sacco_id=v.sacco_id and a.station_id=v.station_id
+        left join loan_borrower_directory b on b.party_id=a.borrower_party_id and b.sacco_id=a.sacco_id
+        left join accounting_system_voucher original on original.journal_id=j.reverses_id
+        left join gl_journal undo on undo.reverses_id=j.id and undo.state='POSTED'
+        left join accounting_system_voucher correction on correction.journal_id=undo.id
         """;
     public void lockRequest(String institution,String branch,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","CORE/"+institution+"/"+branch+"/"+key);}
     public Optional<Voucher> byRequest(String institution,String branch,UUID key){return jdbc.query(HEAD+" where v.sacco_id=? and v.station_id=? and v.request_key=?",this::voucher,institution,branch,key).stream().findFirst();}
     public boolean sameRequest(UUID id,String hash,UUID actor){return Boolean.TRUE.equals(jdbc.queryForObject("select payload_hash=? and posted_by=? from accounting_voucher where id=?",Boolean.class,hash,actor,id));}
     public boolean loanRequestExists(String institution,String branch,UUID key){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_receipt where sacco_id=? and station_id=? and request_key=?)",Boolean.class,institution,branch,key));}
     public Optional<Voucher> find(String institution,String branch,Type type,UUID id,boolean lock){return jdbc.query(HEAD+" where v.sacco_id=? and v.station_id=? and v.type=? and v.id=?"+(lock?" for update of v":""),this::voucher,institution,branch,type.name(),id).stream().findFirst();}
-    public List<Voucher> list(String institution,String branch,Type type,Filter f){
-        String order=RegisterSort.order(f.sort(),Map.of("number","v.number","date","v.effective_date","party","v.party","reference","v.reference","transactions","v.transaction_count","amount","v.total","status","case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher r where r.reverses_id=v.id) then 'REVERSED' else 'POSTED' end"),"v.id");
-        return jdbc.query(HEAD+"""
+    public Optional<Voucher> findSystem(String institution,String branch,Type type,UUID id){
+        return jdbc.query(SYSTEM_HEAD+" where v.sacco_id=? and v.station_id=? and v.type=? and v.journal_id=?",this::voucher,institution,branch,type.name(),id).stream().findFirst();
+    }
+    public List<Entry> systemEntries(String institution,String branch,UUID journal){
+        return jdbc.query("""
+            select l.account_id,coalesce(av.snapshot->>'code',a.code) code,coalesce(av.snapshot->>'name',a.name) name,
+                   a.purpose,l.debit,l.credit
+            from gl_journal_line l join gl_account a on a.id=l.account_id and a.sacco_id=l.sacco_id
+            left join gl_account_version av on av.id=l.account_version_id and av.sacco_id=l.sacco_id and av.account_id=l.account_id
+            where l.sacco_id=? and l.station_id=? and l.journal_id=?
+            order by (l.debit=0),a.code,l.id
+            """,(r,n)->{
+                var account=new Account(r.getObject("account_id",UUID.class),r.getString("code"),r.getString("name"),r.getString("purpose"));
+                boolean debit=r.getBigDecimal("debit").signum()>0;
+                return new Entry(debit?"DEBIT":"CREDIT",account,r.getBigDecimal(debit?"debit":"credit"));
+            },institution,branch,journal);
+    }
+    public List<Voucher> list(String institution,String branch,Type type,Filter f,boolean includeSystem){
+        String status="case when v.reverses_id is not null then 'REVERSAL' when v.reversed_by is not null then 'REVERSED' else 'POSTED' end";
+        String order=RegisterSort.order(f.sort(),Map.of("number","v.number","date","v.effective_date","party","v.party","reference","nullif(v.reference,v.number)","transactions","v.transaction_count","amount","v.total","status",status),"v.id");
+        String headers=includeSystem?HEAD+" union all "+SYSTEM_HEAD:HEAD;
+        return jdbc.query("select v.* from ("+headers+") v "+"""
             where v.sacco_id=? and v.station_id=? and v.type=?
             and (?='' or strpos(lower(v.number||' '||v.party||' '||v.reference),?)>0)
             and (?::date is null or v.effective_date>=?::date) and (?::date is null or v.effective_date<=?::date)
-            and (?='' or (case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher r where r.reverses_id=v.id) then 'REVERSED' else 'POSTED' end)=?)
-            """+" order by "+order+" limit ? offset ?",this::voucher,institution,branch,type.name(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
+            and (?='' or (%s)=?)
+            """.formatted(status)+" order by "+order+" limit ? offset ?",this::voucher,institution,branch,type.name(),f.search().toLowerCase(Locale.ROOT),f.search().toLowerCase(Locale.ROOT),f.from(),f.from(),f.through(),f.through(),f.status(),f.status(),f.size()+1,f.page()*f.size());
     }
     public List<Account> accounts(String institution,String search,int offset){return accounts(institution,search,offset,"");}
     public List<Account> accounts(String institution,String search,int offset,String purpose){
@@ -133,7 +173,9 @@ public class VoucherRepository {
         // A one-day initial period never overlaps an existing institution period.
         UUID id=UUID.randomUUID();jdbc.update("insert into accounting_period(id,sacco_id,starts_on,ends_on,state,created_by,created_at) values(?,?,?,?,'OPEN',?,?)",id,institution,date,date,actor,now);return id;
     }
-    public String number(Type type,LocalDate date){long n=jdbc.queryForObject("select nextval('accounting_voucher_number_seq')",Long.class);return (type==Type.RECEIPT?"RV":type==Type.PAYMENT?"PV":"JV")+"-"+date.getYear()+"-"+String.format(Locale.ROOT,"%08d",n);}
+    public String number(Type type,LocalDate date){
+        return jdbc.queryForObject("select accounting_next_voucher_number(?,?)",String.class,type.name(),date);
+    }
     public NumberReservation reserveNumber(String institution,String branch,Type type,LocalDate date,UUID requestKey,OffsetDateTime now){
         var existing=jdbc.query("select sacco_id,station_id,voucher_type,effective_date,voucher_number,consumed_at from accounting_voucher_number_reservation where request_key=? for update",(r,n)->new ReservationRow(r.getString("sacco_id"),r.getString("station_id"),r.getString("voucher_type"),r.getObject("effective_date",LocalDate.class),r.getString("voucher_number"),r.getObject("consumed_at",OffsetDateTime.class)),requestKey).stream().findFirst();
         if(existing.isPresent()){
@@ -192,6 +234,10 @@ public class VoucherRepository {
         return jdbc.query("select * from accounting_voucher_transaction where voucher_id=? order by line_no limit 50",(r,n)->new Transaction(r.getObject("id",UUID.class),r.getInt("line_no"),r.getObject("transaction_id",UUID.class),r.getObject("template_key",UUID.class),r.getString("transaction_name"),r.getString("component"),r.getString("description"),r.getBigDecimal("amount"),r.getObject("debit_account_id")==null?null:new Account(r.getObject("debit_account_id",UUID.class),r.getString("debit_code"),r.getString("debit_name"),""),r.getObject("credit_account_id")==null?null:new Account(r.getObject("credit_account_id",UUID.class),r.getString("credit_code"),r.getString("credit_name"),""),List.copyOf(entries.getOrDefault(r.getObject("id",UUID.class),List.of()))),id);
     }
     private Account account(ResultSet r,int n)throws SQLException{return new Account(r.getObject("id",UUID.class),r.getString("code"),r.getString("name"),r.getString("purpose"),r.getBoolean("money_eligible"),r.getString("type"));}
-    private Voucher voucher(ResultSet r,int n)throws SQLException{return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.valueOf(r.getString("type")),r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),r.getString("description"),r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("client_id",UUID.class),r.getString("client_number"),r.getString("equity_movement")==null?null:com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.valueOf(r.getString("equity_movement")));}
+    private Voucher voucher(ResultSet r,int n)throws SQLException{
+        String source=r.getString("source_type");
+        String description=r.getString("description");
+        if(source!=null)description=com.sacco.mvp.accounting.reports.PostingDescription.resolve(source,r.getString("source_reference"),r.getString("number"),description);
+        return new Voucher(r.getObject("id",UUID.class),r.getString("number"),Type.valueOf(r.getString("type")),r.getObject("effective_date",LocalDate.class),r.getString("party"),r.getString("reference"),description,r.getString("evidence"),r.getObject("money_account_id",UUID.class),r.getBigDecimal("total"),r.getInt("transaction_count"),r.getObject("journal_id",UUID.class),r.getObject("posted_by",UUID.class),r.getString("posted_by_name"),r.getObject("posted_at",OffsetDateTime.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getString("institution_name"),r.getString("branch_name"),List.of(),r.getObject("client_id",UUID.class),r.getString("client_number"),r.getString("equity_movement")==null?null:com.sacco.mvp.accounting.statements.dto.StatementSetupModels.Category.valueOf(r.getString("equity_movement")),source!=null,r.getString("reversed_by_number"));}
     private record ReservationRow(String institution,String branch,String type,LocalDate date,String number,OffsetDateTime consumedAt){}
 }

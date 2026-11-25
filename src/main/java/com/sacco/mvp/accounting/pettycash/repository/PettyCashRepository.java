@@ -1,6 +1,7 @@
 package com.sacco.mvp.accounting.pettycash.repository;
 
 import com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.*;
+import com.sacco.mvp.accounting.reports.PostingDescription;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -46,17 +47,19 @@ public class PettyCashRepository {
         boolean movements=q.view().equals("movements");
         String source=movements?"""
             select j.id,j.id journal_id,j.posted_at,j.effective_date date,v.id voucher_id,lower(v.type)||'s' voucher_kind,
-             coalesce(v.number,j.source_reference) number,coalesce(v.party,'') party,'' account,
-             coalesce(nullif(v.description,''),nullif(j.reason,''),(select string_agg(t.description,'; ' order by t.line_no) from accounting_voucher_transaction t where t.voucher_id=v.id),'') description,
+             doc.number,coalesce(v.party,'') party,'' account,j.source_type,j.source_reference,
+             array[v.description,j.reason] || array(select t.description from accounting_voucher_transaction t where t.voucher_id=v.id order by t.line_no) notes,
              sum(l.credit-l.debit) paid,sum(l.debit) money_in,sum(l.credit) money_out,
              sum(sum(l.debit-l.credit)) over(order by j.effective_date,j.posted_at,j.id) balance,
              case when j.reverses_id is not null then 'REVERSAL' when exists(select 1 from gl_journal rev where rev.reverses_id=j.id and rev.state='POSTED' and rev.posted_at<=?) then 'REVERSED' else 'POSTED' end state
             from gl_journal j join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
-             left join accounting_voucher v on v.journal_id=j.id
-            where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.posted_at<=? and l.account_id=? group by j.id,v.id
+             left join accounting_voucher v on (v.journal_id,v.sacco_id,v.station_id)=(j.id,j.sacco_id,j.station_id)
+             left join accounting_posted_voucher_document doc on (doc.journal_id,doc.sacco_id,doc.station_id)=(j.id,j.sacco_id,j.station_id) and doc.issued_at<=?
+            where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.posted_at<=? and l.account_id=? group by j.id,v.id,doc.number
             """:"""
             select t.id,j.id journal_id,j.posted_at,v.effective_date date,v.id voucher_id,'payments' voucher_kind,v.number,v.party,
-             d.account,t.description,p.paid,0::numeric money_in,0::numeric money_out,null::numeric balance,
+             d.account,j.source_type,j.source_reference,array[t.description,v.description,j.reason] notes,
+             p.paid,0::numeric money_in,0::numeric money_out,null::numeric balance,
              case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher rev where rev.reverses_id=v.id and rev.posted_at<=?) then 'REVERSED' else 'POSTED' end state
             from accounting_voucher v join gl_journal j on j.id=v.journal_id and j.state='POSTED'
              join accounting_voucher_transaction t on t.voucher_id=v.id
@@ -70,12 +73,34 @@ public class PettyCashRepository {
             where v.sacco_id=? and v.station_id=? and v.type='PAYMENT' and j.posted_at<=?
             """;
         var args=new ArrayList<Object>();args.add(cutoff);
-        if(!movements)args.add(f.accountId());args.add(a.getSaccoId());args.add(a.getStationId());args.add(cutoff);if(movements)args.add(f.accountId());
+        args.add(movements?cutoff:f.accountId());args.add(a.getSaccoId());args.add(a.getStationId());args.add(cutoff);if(movements)args.add(f.accountId());
+        var defaults=PostingDescription.localizedDefaults();
+        String[] sourceTypes=defaults.keySet().toArray(String[]::new);
+        args.add(sourceTypes);
+        args.add(Arrays.stream(sourceTypes).map(defaults::get).toArray(String[]::new));
+        args.add(PostingDescription.resolve("CORE_JOURNAL",null,null));
+        args.add(PostingDescription.internalReferencePattern());
         args.add(q.from());args.add(q.through());args.add(q.search().toLowerCase(Locale.ROOT));args.add(q.size()+1);args.add(q.page()*q.size());
         String[] sort=q.sort().split("_");String column=switch(sort[0]){case "date"->"date";case "number"->"number";case "party"->"party";case "account"->"account";case "description"->"description";case "paid"->"paid";case "in"->"money_in";case "out"->"money_out";case "balance"->"balance";case "state"->"state";default->throw new IllegalArgumentException("petty.error.filter");};
         String direction=sort[1].equals("asc")?" asc":" desc";
         String ordering=column+direction+(column.equals("date")?",posted_at"+direction+",journal_id"+direction:"")+",id"+direction;
-        return jdbc.query("with entries as ("+source+") select * from entries where date between ? and ? and strpos(lower(number||' '||party||' '||account||' '||description),?)>0 order by "+ordering+" limit ? offset ?",
+        String entries="""
+            , labels as (select jsonb_object(?::text[],?::text[]) by_source,?::text fallback,?::text reference_pattern),
+            entries as (
+              select e.*,coalesce(n.description,labels.by_source->>e.source_type,labels.fallback) description
+              from raw_entries e cross join labels
+              cross join lateral (
+                select coalesce(max(btrim(note)) filter(where ord=1),max(btrim(note)) filter(where ord=2),
+                           string_agg(btrim(note),'; ' order by ord) filter(where ord>2)) description
+                from unnest(e.notes) with ordinality as notes(note,ord)
+                where nullif(btrim(note),'') is not null and btrim(note) !~* labels.reference_pattern
+                  and lower(btrim(note)) is distinct from lower(e.source_reference)
+                  and lower(btrim(note)) is distinct from lower(e.number)
+              ) n
+            )
+            select * from entries where date between ? and ? and strpos(lower(concat_ws(' ',number,party,account,description)),?)>0
+            """;
+        return jdbc.query("with raw_entries as ("+source+")"+entries+" order by "+ordering+" limit ? offset ?",
             (r,n)->new Row(r.getObject("id",UUID.class),r.getObject("date",LocalDate.class),r.getObject("voucher_id",UUID.class),r.getString("voucher_kind"),r.getString("number"),r.getString("party"),r.getString("account"),r.getString("description"),r.getBigDecimal("paid"),r.getBigDecimal("money_in"),r.getBigDecimal("money_out"),r.getBigDecimal("balance"),r.getString("state")),args.toArray());
     }
     public List<Pending> pending(AppUserPrincipal a,Fund fund,int page,int size,String sort,String search){

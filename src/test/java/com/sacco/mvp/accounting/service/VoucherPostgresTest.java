@@ -82,6 +82,8 @@ class VoucherPostgresTest {
  @Test void pettyCashPostsOnceAndReadsExactSplitAmountsAndLinkedReversals(){
   pettySetup();var topup=pettyTopup("100");UUID bank=account("SPLIT_BANK","ASSET","DEBIT","POSTING","BANK");
   var f=pettyForm(Type.PAYMENT,"50");f.getRows().getFirst().setDebitAccountId(null);f.getRows().getFirst().setCreditAccountId(null);f.getRows().getFirst().setEntries(List.of(entry("DEBIT",expense,"50"),entry("CREDIT",cash,"30"),entry("CREDIT",bank,"20")));
+  f.setDescription(UUID.randomUUID().toString());
+  f.getRows().getFirst().setDescription("PV-2026-00001234");
   var payment=service.post(actor,Type.PAYMENT,f);assertThat(service.post(actor,Type.PAYMENT,f).id()).isEqualTo(payment.id());
   var q=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(now.toLocalDate(),now.toLocalDate(),"expenses","","date_asc",0,10);
   var result=petty().workspace(actor,q);assertThat(result.rows()).hasSize(1);assertThat(result.rows().getFirst().paid()).isEqualByComparingTo("30");
@@ -92,7 +94,12 @@ class VoucherPostgresTest {
   var movement=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(q.from(),q.through(),"movements","","date_asc",0,10);
   assertThat(petty().workspace(actor,movement).rows()).hasSize(3);
   var searched=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(q.from(),q.through(),"movements",payment.number(),"date_asc",0,10);
-  assertThat(petty().workspace(actor,searched).balances()).isEqualTo(petty().workspace(actor,movement).balances());
+  var found=petty().workspace(actor,searched);
+  assertThat(found.balances()).isEqualTo(petty().workspace(actor,movement).balances());
+  String description=com.sacco.mvp.accounting.reports.PostingDescription.resolve("CORE_PAYMENT",null,null);
+  assertThat(found.rows()).singleElement().satisfies(r->{assertThat(r.number()).isEqualTo(payment.number());assertThat(r.description()).isEqualTo(description);});
+  var byDescription=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(q.from(),q.through(),"movements",description,"description_asc",0,10);
+  assertThat(petty().workspace(actor,byDescription).rows()).extracting(r->r.number()).contains(payment.number());
  }
  @Test void pettyCashBlocksNonExpensesAmbiguousSplitsCrossBranchAndFundingRemoval(){
   pettySetup();var topup=pettyTopup("100");
@@ -455,8 +462,10 @@ class VoucherPostgresTest {
  @Test void voucherNumberReservationIsScopedStableAndConsumedByThePostedVoucher(){
   UUID key=UUID.randomUUID();var reserved=service.reserveNumber(actor,Type.JOURNAL,day,key);
   assertThat(service.reserveNumber(actor,Type.JOURNAL,day,key)).isEqualTo(reserved);
-  var f=form(Type.JOURNAL);f.setRequestKey(key);var posted=service.post(actor,Type.JOURNAL,f);
+  var f=form(Type.JOURNAL);f.setRequestKey(key);f.setReference("");var posted=service.post(actor,Type.JOURNAL,f);
   assertThat(posted.number()).isEqualTo(reserved.number());
+  assertThat(posted.reference()).isEqualTo(reserved.number());
+  assertThat(service.post(actor,Type.JOURNAL,f).id()).isEqualTo(posted.id());
   assertThat(jdbc.queryForObject("select consumed_at is not null from accounting_voucher_number_reservation where request_key=?",Boolean.class,key)).isTrue();
   assertThatThrownBy(()->service.reserveNumber(actor,Type.JOURNAL,day.minusDays(1),key)).hasMessage("voucher.error.retry");
   assertThatThrownBy(()->service.reserveNumber(operator("B2"),Type.JOURNAL,day,key)).hasMessage("voucher.error.request");
@@ -647,9 +656,11 @@ class VoucherPostgresTest {
    assertThat(workflows.transactions(actor,workflow,item.id(),"",0)).extracting(Mapping::transactionId)
     .containsExactlyInAnyOrder(first.transactionId(),second.transactionId());
    form.setActivityIds(List.of(first.activity().id()));
+   form.setReference("");
    workflows.save(actor,workflow,item.id(),details.workflow().version(),item.version(),form);
    var saved=workflows.details(actor,workflow);
    assertThat(saved.items().getFirst().form().getActivityIds()).containsExactlyInAnyOrderElementsOf(activityIds);
+   assertThat(saved.items().getFirst().form().getReference()).isEqualTo("Draft "+type);
    workflows.validate(actor,workflow,saved.workflow().version());
    assertThat(workflows.details(actor,workflow).workflow().validation()).isEqualTo("VALIDATED");
    var rules=new RuleForm();rules.setType(type);rules.setRules(List.of(rule("SINGLE",false,Position.MANAGER,1)));
@@ -851,8 +862,14 @@ class VoucherPostgresTest {
   var reviewer=approver(Position.MANAGER);
   for(var type:Type.values()){
    var rules=new RuleForm();rules.setType(type);rules.setRules(List.of(rule("SINGLE",false,Position.MANAGER,1)));workflows.configure(actor,rules);
-   UUID id=workflows.capture(actor,type,form(type));assertThat(workflows.details(actor,id).workflow().type()).isEqualTo(type);command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
-   assertThat(workflows.details(actor,id).workflow().posting()).isEqualTo("POSTED");
+   var form=form(type);form.setReference("");
+   UUID id=workflows.capture(actor,type,form);
+   assertThat(workflows.details(actor,id).workflow().type()).isEqualTo(type);
+   command(reviewer,id,"APPROVE");workflowPosting.post(actor,id,version(id));
+   var approved=workflows.details(actor,id);
+   assertThat(approved.workflow().posting()).isEqualTo("POSTED");
+   var posted=service.view(actor,type,approved.items().getFirst().voucherId());
+   assertThat(posted.reference()).isEqualTo(posted.number());
   }
  }
  @Test void removingDraftBatchItemsRequiresOwnerAndReusesAvailableLines(){

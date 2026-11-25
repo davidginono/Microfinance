@@ -22,7 +22,7 @@ public class VoucherWorkflowController {
     private final VoucherDocumentService documents;
     private final VoucherAutomaticPostingService automatic;
     @InitBinder("voucherForm") void formBinder(WebDataBinder b) {
-        b.setAutoGrowCollectionLimit(50);b.setAllowedFields("equity","equityMovement","equityChoice","equityReason","requestKey","effectiveDate","party","reference","description","evidence","moneyAccountId","clientId",
+        b.setAutoGrowCollectionLimit(50);b.setAllowedFields("equity","equityMovement","equityChoice","equityReason","requestKey","effectiveDate","party","description","evidence","moneyAccountId","clientId",
             "rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @InitBinder("ruleForm") void ruleBinder(WebDataBinder b) {b.setAutoGrowCollectionLimit(20);b.setAllowedFields("type","version","rules[*].minimum","rules[*].maximum","rules[*].scope","rules[*].autoPost","rules[*].stages[*].role","rules[*].stages[*].approvals");}
