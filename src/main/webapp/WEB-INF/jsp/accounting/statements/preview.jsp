@@ -4,7 +4,7 @@
 <%@ include file="support.jspf" %>
 <%@ include file="preview-urls.jspf" %>
 <div class="accounting-workspace">
- <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a href="<c:url value='/reports/financial/statements' />"><spring:message code="fs.workspace" /></a><span>/</span><span aria-current="page"><spring:message code="fs.previewTitle" text="Reports Preview" /></span></nav>
+ <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a data-fs-parent href="<c:url value='${kind=="LEDGER"?"/reports/financial/statements/ledger":"/reports/financial/statements"}' />"><spring:message code="${kind=='LEDGER'?'fs.title.LEDGER':'fs.workspace'}" /></a><span>/</span><span aria-current="page"><spring:message code="fs.previewTitle" text="Reports Preview" /></span></nav>
  <div class="erp-page-header erp-detail-header" data-aws-page-header>
   <h1 class="erp-page-title"><spring:message code="fs.previewTitle" text="Reports Preview" /></h1>
   <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_EXPORT')"><form method="get" action="<c:url value='${base}/export' />" data-fs-export class="report-page-actions" data-aws-action-pin="true">

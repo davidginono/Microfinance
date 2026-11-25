@@ -97,8 +97,14 @@ class LoanRecordingPostgresTest {
     @Test void statementAccountNumbersFollowLoansAcrossFundingFeesRepaymentsReversalsAndAdjustments(){
         chargePolicy("SEPARATE");var loan=chargedLoan();service.disburse(actor,chargedFunding(loan));
         var payment=post(loan,"120.00","STATEMENT-PAYMENT");payment.setInterestAccountId(interest);
-        var paid=service.repay(actor,payment);service.reverse(operator("B1"),paid.id(),UUID.randomUUID(),TODAY,"Synthetic receipt correction");
+        var paid=service.repay(actor,payment);var reversal=service.reverse(operator("B1"),paid.id(),UUID.randomUUID(),TODAY,"Synthetic receipt correction");
         var adjustment=provide(loan,"100.00");String number=service.detail(actor,loan).loan().number();
+        var cashActivity=statementActivity(cash);
+        for(var posting:List.of(paid,reversal)){
+            String receipt=jdbc.queryForObject("select receipt_reference from loan_repayment_transactions where id=?",String.class,posting.transactionId());
+            assertThat(cashActivity).filteredOn(a->a.journalId().equals(posting.journalId())).singleElement()
+                .satisfies(a->assertThat(a.voucherNumber()).isEqualTo(receipt).isNotEqualTo(posting.reference()));
+        }
         for(var account:List.of(cash,principal,chargeAccount)){
             var activity=statementActivity(account);assertThat(activity).isNotEmpty();
             assertThat(activity).extracting(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::accountNumber).containsOnly(number);
@@ -108,7 +114,7 @@ class LoanRecordingPostgresTest {
         }
         var provisionJournal=jdbc.queryForObject("select journal_id from loan_adjustment_decision where request_id=?",UUID.class,adjustment);
         var provisionAccount=jdbc.queryForObject("select debit_account_id from loan_adjustment_request where id=?",UUID.class,adjustment);
-        assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);});
+        assertThat(statementActivity(provisionAccount)).anySatisfy(r->{assertThat(r.journalId()).isEqualTo(provisionJournal);assertThat(r.accountNumber()).isEqualTo(number);assertThat(r.voucherNumber()).isNull();});
     }
     @Test void outstandingLoansDrillDownIncludesProductAccountsAndProvisionsAndReconcilesLoanIds(){
         UUID root=account("100000","ASSET","DEBIT","HEADING","OTHER");
@@ -799,6 +805,12 @@ class LoanRecordingPostgresTest {
         var corrector=new AppUserPrincipal(context.getBean(MemberDirectoryService.class).find(correctionStaff.getMemberId()).orElseThrow(),correctionClaims);
         assertThatThrownBy(()->service.reverse(corrector,saved.rows().getFirst().postingId(),UUID.randomUUID(),TODAY,"Partial correction")).hasMessage("recording.error.receiptCorrection");
         var key=UUID.randomUUID();var reversed=receiptService().reverse(corrector,saved.header().id(),key,TODAY,"Correction");assertThat(reversed.header().reversesId()).isEqualTo(saved.header().id());assertThat(reversed.rows()).hasSize(2);
+        var activity=statementActivity(cash);
+        for(var receipt:List.of(saved,reversed)){
+            assertThat(activity).filteredOn(a->receipt.header().number().equals(a.voucherNumber())).hasSize(2)
+                .extracting(com.sacco.mvp.accounting.statements.dto.StatementModels.Activity::accountNumber)
+                .containsExactlyInAnyOrderElementsOf(receipt.rows().stream().map(row->service.detail(actor,row.loanId()).loan().number()).toList());
+        }
         assertThat(receiptService().reverse(corrector,saved.header().id(),key,TODAY,"Correction").header().id()).isEqualTo(reversed.header().id());
         assertThat(service.detail(actor,first).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(service.detail(actor,second).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
         assertThat(receiptService().find(actor,saved.header().id()).orElseThrow().header().status()).isEqualTo("REVERSED");

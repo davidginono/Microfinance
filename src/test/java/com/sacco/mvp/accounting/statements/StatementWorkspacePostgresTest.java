@@ -58,6 +58,25 @@ class StatementWorkspacePostgresTest {
     // Historical mappings remain read-only compatibility for cash-flow/notes; their line and section no longer govern reports.
     void map(UUID id,String line,String section,String cash,int note){jdbc.update("insert into statement_account_mapping(account_id,sacco_id,line_name,section,cash_section,equity_component,note_no,note_text,revision,updated_by,updated_at) values(?,?,?,?,?,'Owner capital',?,'Synthetic legacy note',?,?,now())",id,institution,line,section,cash,note,UUID.randomUUID(),actor.getMemberId());}
     VoucherDtos.Voucher post(UUID debit,UUID credit,String amount,String description){var f=new VoucherDtos.Form();f.setEffectiveDate(LocalDate.of(2026,1,10));f.setParty("Synthetic counterparty");f.setDescription(description);f.setReference(UUID.randomUUID().toString());f.setEvidence("Synthetic test evidence");var row=new VoucherDtos.RowForm();row.setDebitAccountId(debit);row.setCreditAccountId(credit);row.setAmount(new BigDecimal(amount));row.setDescription(description);f.setRows(List.of(row));return vouchers.post(actor,VoucherDtos.Type.JOURNAL,f);}
+    @Test void directGeneralLedgerUsesTheScopedPostingAccountAndBranch(){
+        var choices=statements.ledgerAccounts(actor,"111",0,null);
+        assertThat(choices).containsExactly(new LedgerAccount(bank,"111001 — Bank"));
+        UUID heading=jdbc.queryForObject("select parent_id from gl_account where id=?",UUID.class,bank);
+        var outside=mock(AppUserPrincipal.class);
+        when(outside.getSaccoId()).thenReturn("OTHER-"+institution);
+        assertThat(statements.ledgerAccounts(outside,"",0,bank)).isEmpty();
+        assertThatThrownBy(()->statements.generateLedger(outside,from,through,bank,UUID.randomUUID())).hasMessage("fs.error.selection");
+        assertThatThrownBy(()->statements.generateLedger(actor,from,through,heading,UUID.randomUUID())).hasMessage("fs.error.selection");
+        assertThat(jdbc.queryForObject("select count(*) from statement_run where sacco_id=?",Integer.class,institution)).isZero();
+
+        UUID key=UUID.randomUUID(),run=statements.generateLedger(actor,from,through,bank,key);
+        assertThat(statements.generateLedger(actor,from,through,bank,key)).isEqualTo(run);
+        assertThat(statements.get(actor,run).institutionWide()).isFalse();
+        assertThat(statements.activity(actor,run,bank,0)).hasSize(3);
+        doThrow(new AccessDeniedException("Revoked")).when(guard).requireActor(actor,"FINANCIAL_REPORTS_VIEW");
+        assertThatThrownBy(()->statements.ledgerAccounts(actor,"",0,null)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(()->statements.generateLedger(actor,from,through,bank,key)).isInstanceOf(AccessDeniedException.class);
+    }
     UUID preview(){return statements.generate(actor,new Parameters(from,through,false),UUID.randomUUID());}
     @Test void figuresReconcileAndFreezeMembershipAcrossLateBackdatedPostings(){UUID id=preview();var initial=statements.get(actor,id).snapshot();assertThat(initial.version()).isEqualTo(5);assertThat(initial.cashFlow().getFirst().key()).isEqualTo("cashSurplus");assertThat(initial.cashFlow().getFirst().current()).isEqualByComparingTo("416.67");assertThat(initial.position().getLast().current()).isEqualByComparingTo("1416.67");assertThat(initial.income().getLast().current()).isEqualByComparingTo("416.67");assertThat(initial.equity().getLast().total()).isEqualByComparingTo("1416.67");assertThat(initial.checks()).extracting(Check::key).contains("coverage","equityMovements","notesSetup");
         post(bank,income,"10.00","Later backdated receipt");assertThat(statements.get(actor,id).snapshot()).isEqualTo(initial);assertThat(statements.activity(actor,id,income,0)).hasSize(1);assertThat(statements.get(actor,preview()).snapshot().income().getLast().current()).isEqualByComparingTo("426.67");
@@ -78,7 +97,10 @@ class StatementWorkspacePostgresTest {
         assertThat(reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,selected,false).rows())
             .singleElement().satisfies(row->assertThat(row.get("clientNumber")).isEqualTo(clientNumber));
         jdbc.update("update members set member_no=?,station_id='B2' where id=?","CHANGED-"+client,client);
-        for(UUID account:List.of(bank,capital))assertThat(statements.activity(actor,run,account,0)).filteredOn(a->a.journalId().equals(posted.journalId())).singleElement().satisfies(a->assertThat(a.accountNumber()).isEqualTo(clientNumber));
+        for(UUID account:List.of(bank,capital))assertThat(statements.activity(actor,run,account,0)).filteredOn(a->a.journalId().equals(posted.journalId())).singleElement().satisfies(a->{
+            assertThat(a.accountNumber()).isEqualTo(clientNumber);
+            assertThat(a.voucherNumber()).isEqualTo(posted.number()).isNotEqualTo(posted.reference());
+        });
     }
     @Test void retriesMappingsSavingAndDatabaseEvidenceProtections(){UUID key=UUID.randomUUID();UUID id=statements.generate(actor,new Parameters(from,through,false),key);assertThat(statements.generate(actor,new Parameters(from,through,false),key)).isEqualTo(id);assertThatThrownBy(()->statements.generate(actor,new Parameters(from.plusDays(1),through,false),key)).hasMessage("fs.error.retry");statements.save(actor,id);assertThat(statements.get(actor,id).saved()).isTrue();
         jdbc.update("update statement_account_mapping set line_name='Ignored override',section='CURRENT_ASSETS' where account_id=?",investments);
@@ -89,12 +111,12 @@ class StatementWorkspacePostgresTest {
     @Test void branchTenantAndRevokedExportChecksApplyToSavedRuns(){UUID id=preview();var foreign=new AppUserPrincipal(Member.builder().id(actor.getMemberId()).saccoId(institution).stationId("B2").position(Position.ACCOUNTANT).status(com.sacco.mvp.domain.MemberStatus.ACTIVE).staffAccessStatus(com.sacco.mvp.domain.StaffAccessStatus.ACTIVE).build(),EnumSet.allOf(UserClaim.class));assertThatThrownBy(()->statements.get(foreign,id)).isInstanceOf(AccessDeniedException.class);doThrow(new AccessDeniedException("revoked")).when(guard).requireActor(actor,"FINANCIAL_REPORTS_EXPORT");assertThatThrownBy(()->statements.artifact(actor,id,Kind.POSITION,"PDF","en")).isInstanceOf(AccessDeniedException.class);}
     @Test void institutionAggregationDoesNotGrantCrossBranchLedgerAccess(){UUID id=statements.generate(actor,new Parameters(from,through,true),UUID.randomUUID());assertThatThrownBy(()->statements.activity(actor,id,bank,0)).isInstanceOf(AccessDeniedException.class);doThrow(new AccessDeniedException("revoked institution grant")).when(guard).requireActor(actor,"FINANCIAL_REPORTS_INSTITUTION");assertThat(statements.history(actor,0,"newest")).extracting(com.sacco.mvp.accounting.statements.repository.StatementRepository.Stored::id).doesNotContain(id);}
     @Test void concurrentIdenticalRequestsReturnOneFrozenSnapshot()throws Exception{UUID key=UUID.randomUUID();try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)){var tasks=List.<java.util.concurrent.Callable<UUID>>of(()->statements.generate(actor,new Parameters(from,through,false),key),()->statements.generate(actor,new Parameters(from,through,false),key));var results=pool.invokeAll(tasks);assertThat(results.getFirst().get()).isEqualTo(results.getLast().get());}}
-    @Test void ledgerLayoutRetainsEarlierReferencesButRegeneratesAccountNumberExports(){
-        UUID id=preview();var repository=new StatementRepository(jdbc);byte[] old="Reference column".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,'LEDGER_V2','PDF','en',?,?)",id,old,StatementService.sha(old));
-        assertThat(repository.artifact(id,Kind.LEDGER,"PDF","en")).isEmpty();byte[] current="Account number column".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    @Test void ledgerArtifactsRetainThePreviousLayoutWhenAddingVoucherNumbers(){
+        UUID id=preview();var repository=new StatementRepository(jdbc);byte[] old="Account number column".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,'LEDGER_V4','PDF','en',?,?)",id,old,StatementService.sha(old));
+        assertThat(repository.artifact(id,Kind.LEDGER,"PDF","en")).isEmpty();byte[] current="Voucher / receipt number column".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         repository.artifact(id,Kind.LEDGER,"PDF","en",current,StatementService.sha(current));assertThat(repository.artifact(id,Kind.LEDGER,"PDF","en").orElseThrow().bytes()).isEqualTo(current);
-        assertThat(jdbc.queryForObject("select bytes from statement_run_artifact where run_id=? and kind='LEDGER_V2'",byte[].class,id)).isEqualTo(old);
+        assertThat(jdbc.queryForObject("select bytes from statement_run_artifact where run_id=? and kind='LEDGER_V4'",byte[].class,id)).isEqualTo(old);
     }
     @Test void simplifiedLayoutKeepsEarlierArtifactsAndServesNewDocuments(){
         UUID id=preview();byte[] previous="previous layout".getBytes(java.nio.charset.StandardCharsets.UTF_8);

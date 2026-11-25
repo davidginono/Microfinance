@@ -122,8 +122,12 @@
                         <c:set var="reportSlug" value="${fn:toLowerCase(fn:replace(reportKind,'_','-'))}" /><c:set var="reportPath" value="/reports/financial/operations/${reportSlug}" />
                         <a href="<c:url value='${reportPath}' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri==reportPath?'shell-nav-active':''}"><spring:message code="management.nav.${reportKind}" /></a>
                     </sec:authorize>
+                    <c:if test="${reportKind=='CASHBOOK'}">
+                        <c:set var="ledgerActive" value="${requestUri=='/reports/financial/statements/ledger' or (fn:startsWith(requestUri,'/reports/financial/statements/') and fn:contains(requestUri,'/ledger/'))}" />
+                        <a data-fs-nav="ledger" href="<c:url value='/reports/financial/statements/ledger' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${ledgerActive?'shell-nav-active':''}"><spring:message code="fs.title.LEDGER" /></a>
+                    </c:if>
                 </c:forEach>
-                <a href="<c:url value='/reports/financial/statements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/reports/financial/statements' ? 'shell-nav-active' : ''}"><spring:message code="fs.workspace" /></a>
+                <a data-fs-nav="statements" href="<c:url value='/reports/financial/statements' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${requestUri=='/reports/financial/statements' ? 'shell-nav-active' : ''}"><spring:message code="fs.workspace" /></a>
                 <a href="<c:url value='/reports/financial/statements/history' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/history') ? 'shell-nav-active' : ''}"><spring:message code="fs.history" /></a>
                 <sec:authorize access="@access.has(principal, 'FINANCIAL_REPORTS_CONFIGURE')">
                     <a href="<c:url value='/reports/financial/statements/layout' />" class="shell-sidebar-subitem block px-3 py-2 text-sm font-semibold ${fn:contains(requestUri,'/statements/layout')?'shell-nav-active':''}"><spring:message code="fs.layout.title" /></a>

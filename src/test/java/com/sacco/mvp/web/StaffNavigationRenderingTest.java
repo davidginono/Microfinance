@@ -55,7 +55,8 @@ class StaffNavigationRenderingTest {
                 try{
                     request.setAttribute("currentMember",CurrentUserView.builder().position(role).fullName(actor.getFullName()).staffSession(true).build());
                     request.setAttribute("staffOffices",StaffOffice.assigned(actor.getStaffRoles()));
-                    request.setAttribute("isPlatformAdminIdentity",actor.isPlatformIdentity());request.setAttribute("jakarta.servlet.forward.request_uri",ARCHIVE);
+                    request.setAttribute("isPlatformAdminIdentity",actor.isPlatformIdentity());
+                    request.setAttribute("jakarta.servlet.forward.request_uri",Objects.requireNonNullElse(request.getParameter("path"),ARCHIVE));
                     request.setAttribute("pettyCashAvailable",Boolean.parseBoolean(request.getParameter("petty")));
                     request.getRequestDispatcher("/navigation.jsp").forward(request,response);
                 }finally{SecurityContextHolder.clearContext();}
@@ -88,7 +89,15 @@ class StaffNavigationRenderingTest {
                 }
             }
             assertThat(render(client,base,Position.ADMIN,all,"en")).doesNotContain("Office activities","href=\""+CLIENT+"\"","href=\""+QUEUE+"\"","href=\""+ARCHIVE+"\"");
+            String ledger="/reports/financial/statements/ledger";
+            String ledgerLink="href=\""+ledger+"\"";
+            assertThat(render(client,base,Position.ACCOUNTANT,"ACCOUNTING_JOURNALS_VIEW","en")).doesNotContain(ledgerLink);
+            assertThat(render(client,base,Position.ACCOUNTANT,"FINANCIAL_REPORTS_VIEW","en")).containsOnlyOnce(ledgerLink);
             for(String language:List.of("en","sw")){
+                String reports=render(client,base,Position.ACCOUNTANT,"FINANCIAL_REPORTS_VIEW,ACCOUNTING_JOURNALS_VIEW,LOAN_REPORTS_VIEW",language,false,ledger);
+                var links=java.util.regex.Pattern.compile("<a\\b[^>]*?\\shref=\"([^\"]+)\"").matcher(reports).results().map(match->match.group(1)).toList();
+                assertThat(links).containsSequence("/reports/financial/operations/cashbook",ledger,"/reports/financial/operations/loan-portfolio");
+                assertThat(reports).containsPattern(ledgerLink+"[^>]*shell-nav-active[^>]*>\\s*"+(language.equals("en")?"General ledger":"Leja kuu")+"\\s*</a>");
                 String claims="ACCOUNTING_BUSINESS_VIEW,ACCOUNTING_ACCOUNTS_VIEW";
                 assertThat(render(client,base,Position.ACCOUNTANT,claims,language)).contains("href=\"/finance/petty-cash/setup\"").doesNotContain("href=\"/finance/petty-cash\"");
                 assertThat(render(client,base,Position.ACCOUNTANT,claims,language,true)).containsOnlyOnce("href=\"/finance/petty-cash\"");
@@ -100,7 +109,10 @@ class StaffNavigationRenderingTest {
         return render(client,base,role,claims,language,false);
     }
     private String render(HttpClient client,String base,Position role,String claims,String language,boolean configured) throws Exception {
-        var response=client.send(HttpRequest.newBuilder(URI.create(base+"?role="+role+"&claims="+claims+"&petty="+configured)).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
+        return render(client,base,role,claims,language,configured,ARCHIVE);
+    }
+    private String render(HttpClient client,String base,Position role,String claims,String language,boolean configured,String path) throws Exception {
+        var response=client.send(HttpRequest.newBuilder(URI.create(base+"?role="+role+"&claims="+claims+"&petty="+configured+"&path="+path)).header("Accept-Language",language).timeout(Duration.ofSeconds(60)).GET().build(),HttpResponse.BodyHandlers.ofString());
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);return response.body();
     }
     // JSP tags use FilterInvocation; Spring Security 7's engine uses RequestAuthorizationContext.

@@ -8,6 +8,7 @@ import java.util.*;
 public final class StatementModels {
     private StatementModels() {}
     public enum Kind { POSITION, INCOME, CASH_FLOW, EQUITY, NOTES, TRIAL, LEDGER }
+    public record LedgerAccount(UUID id,String label) {}
     public record Parameters(LocalDate from,LocalDate through,boolean institutionWide) {
         public LocalDate previousFrom(){return from.minusYears(1);}
         public LocalDate previousThrough(){return through.minusYears(1);}
@@ -43,5 +44,5 @@ public final class StatementModels {
         }
     }
     public record Run(UUID id,LocalDate from,LocalDate through,OffsetDateTime createdAt,boolean institutionWide,boolean saved,Snapshot snapshot) {}
-    public record Activity(UUID journalId,LocalDate date,String accountNumber,String description,BigDecimal debit,BigDecimal credit,BigDecimal running,String sourceUrl) {}
+    public record Activity(UUID journalId,LocalDate date,String accountNumber,String voucherNumber,String description,BigDecimal debit,BigDecimal credit,BigDecimal running,String sourceUrl) {}
 }

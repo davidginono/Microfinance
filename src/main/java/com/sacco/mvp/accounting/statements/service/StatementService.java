@@ -32,11 +32,23 @@ public class StatementService {
     public void authorize(AppUserPrincipal a,boolean wide){access.requireActor(a,"FINANCIAL_REPORTS_VIEW");if(wide)access.requireActor(a,"FINANCIAL_REPORTS_INSTITUTION");}
     @Transactional(isolation=Isolation.READ_COMMITTED,timeout=40)
     public UUID generate(AppUserPrincipal a,Parameters p,UUID key){
-        return limiter.run(()->request(a,p,key));
+        return limiter.run(()->request(a,p,key,null));
     }
-    private UUID request(AppUserPrincipal a,Parameters p,UUID key){
+    @Transactional(readOnly=true)
+    public List<LedgerAccount> ledgerAccounts(AppUserPrincipal actor,String search,int page,UUID selected){
+        authorize(actor,false);page(page);
+        require(search!=null&&search.length()<=100,"filter");
+        return repository.ledgerAccounts(actor.getSaccoId(),search.strip(),page*25,selected);
+    }
+    @Transactional(isolation=Isolation.READ_COMMITTED,timeout=40)
+    public UUID generateLedger(AppUserPrincipal actor,LocalDate from,LocalDate through,UUID account,UUID key){
+        require(account!=null,"selection");
+        return limiter.run(()->request(actor,new Parameters(from,through,false),key,account));
+    }
+    private UUID request(AppUserPrincipal a,Parameters p,UUID key,UUID account){
         require(p!=null&&p.from()!=null&&p.through()!=null&&key!=null,"dates");authorize(a,p.institutionWide());
         require(!p.through().isBefore(p.from())&&!p.through().isAfter(clock.today())&&!p.through().isAfter(p.from().plusDays(366))&&p.from().getYear()>=1901,"dates");
+        if(account!=null)require(!repository.ledgerAccounts(a.getSaccoId(),"",0,account).isEmpty(),"selection");
         repository.lockRequest(a,key);var duplicate=repository.duplicate(a,key);
         if(duplicate.isPresent()){var old=duplicate.get();require(old.from().equals(p.from())&&old.through().equals(p.through())&&old.wide()==p.institutionWide(),"retry");return old.id();}
         // Take the coherent snapshot only after the retry lock is acquired. An RR snapshot taken

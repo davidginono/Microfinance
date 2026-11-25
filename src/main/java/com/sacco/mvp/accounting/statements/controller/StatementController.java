@@ -28,6 +28,28 @@ public class StatementController {
     private final ApplicationClock clock;
     @ModelAttribute void noCache(jakarta.servlet.http.HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
     @GetMapping public String configure(@AuthenticationPrincipal AppUserPrincipal actor,Model model){statements.authorize(actor,false);defaults(model);return "accounting/statements/configure";}
+    @GetMapping("/ledger") public String configureLedger(@AuthenticationPrincipal AppUserPrincipal actor,Model model){
+        statements.authorize(actor,false);defaults(model);model.addAttribute("ledgerForm",true);
+        return "accounting/statements/configure";
+    }
+    @GetMapping("/ledger/accounts") @ResponseBody
+    public List<LedgerAccount> ledgerAccounts(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="0") int page){
+        return statements.ledgerAccounts(actor,search,page,null);
+    }
+    @PostMapping("/ledger") public String generateLedger(@AuthenticationPrincipal AppUserPrincipal actor,
+            @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,
+            @RequestParam(required=false) UUID account,@RequestParam UUID requestKey,Model model){
+        try{
+            UUID run=statements.generateLedger(actor,from,through,account,requestKey);
+            return "redirect:/reports/financial/statements/"+run+"/ledger/"+account;
+        }catch(IllegalArgumentException failure){
+            configureLedger(actor,model);
+            model.addAttribute("from",from);model.addAttribute("through",through);model.addAttribute("requestKey",requestKey);
+            model.addAttribute("year",null);model.addAttribute("errorKey",key(failure));
+            if(account!=null)statements.ledgerAccounts(actor,"",0,account).stream().findFirst().ifPresent(choice->model.addAttribute("ledgerAccount",choice));
+            return "accounting/statements/configure";
+        }
+    }
     private void defaults(Model model){model.addAttribute("from",clock.today().withDayOfYear(1));model.addAttribute("through",clock.today());model.addAttribute("today",clock.today());model.addAttribute("year",clock.today().getYear());model.addAttribute("years",java.util.stream.IntStream.rangeClosed(clock.today().getYear()-10,clock.today().getYear()).boxed().sorted(Comparator.reverseOrder()).toList());model.addAttribute("requestKey",UUID.randomUUID());model.addAttribute("kinds",List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL));}
     @PostMapping public String generate(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate through,@RequestParam(defaultValue="false") boolean institutionWide,@RequestParam UUID requestKey,@RequestParam(defaultValue="POSITION") Kind kind,Model model){
         try{if(!List.of(Kind.POSITION,Kind.INCOME,Kind.CASH_FLOW,Kind.EQUITY,Kind.NOTES,Kind.TRIAL).contains(kind))throw new IllegalArgumentException("fs.error.selection");return "redirect:/reports/financial/statements/"+statements.generate(actor,new Parameters(from,through,institutionWide),requestKey)+"?kind="+kind;}

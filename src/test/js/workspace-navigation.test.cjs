@@ -298,8 +298,11 @@ test('Details requests a statement fragment and carries its selection into expor
  const {dom,w,d,pages,requests}=await setup();
  try{
   const base='/reports/financial/statements/example';
-  pages.set(statementUrl('POSITION'),statementPage('POSITION'));
-  pages.set(base+'/trial?kind=POSITION&line=assets',statementPage('TRIAL'));
+  const trial=base+'/trial?kind=POSITION&line=assets',ledger=base+'/ledger/account';
+  const nav='<a data-fs-nav="ledger" href="/reports/financial/statements/ledger">General ledger</a><a data-fs-nav="statements" href="/reports/financial/statements">Financial statements</a>';
+  pages.set(statementUrl('POSITION'),statementPage('POSITION').replace('</aside>',nav+'</aside>').replace('<div class="fs-workspace"','<a data-fs-parent></a><div class="fs-workspace"'));
+  pages.set(trial,statementPage('TRIAL').replace('href="'+trial+'"','href="'+ledger+'"'));
+  pages.set(ledger,statementPage('LEDGER'));
   await w.WorkspaceNavigation.visit(statementUrl('POSITION'));
   const main=d.querySelector('main'), tabs=d.querySelector('.fs-tabs');
   d.querySelector('[data-fs-drilldown]').click();
@@ -310,6 +313,14 @@ test('Details requests a statement fragment and carries its selection into expor
   assert.equal(d.querySelector('.fs-tabs'),tabs);
   assert.equal(d.querySelector('[data-fs-export] [name=line]').value,'assets');
   assert.equal(d.querySelector('[data-fs-save] [name=selectionKind]').value,'POSITION');
+  d.querySelector('[data-fs-drilldown]').click();
+  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='LEDGER');
+  assert.equal(d.querySelector('[data-fs-nav][aria-current="page"]').dataset.fsNav,'ledger');
+  assert.equal(d.querySelector('[data-fs-parent]').textContent,'General ledger');
+  w.history.back();
+  await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='TRIAL');
+  assert.equal(d.querySelector('[data-fs-nav][aria-current="page"]').dataset.fsNav,'statements');
+  assert.equal(d.querySelector('[data-fs-parent]').textContent,'Financial statements');
   w.history.back();
   await until(()=>d.querySelector('[data-fs-paper]').dataset.kind==='POSITION');
   assert.equal(d.querySelector('[data-fs-export] [name=line]'),null);

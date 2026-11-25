@@ -57,13 +57,14 @@ class StatementExportTest {
         var controller=new StatementController(service,presentation,exporter,clock);
         var run=new Run(s.id(),s.parameters().from(),s.parameters().through(),s.generatedAt(),false,true,s);
         when(service.get(actor,s.id())).thenReturn(run);
-        var activity=java.util.stream.IntStream.range(0,35).mapToObj(i->new Activity(UUID.randomUUID(),PERIOD.from(),"JV-"+i,"Investment transaction",n("1"),n("0"),n(Integer.toString(i+1)),null)).toList();
+        var activity=java.util.stream.IntStream.range(0,35).mapToObj(i->new Activity(UUID.randomUUID(),PERIOD.from(),null,"JV-"+i,"Investment transaction",n("1"),n("0"),n(Integer.toString(i+1)),null)).toList();
         when(service.activityExport(actor,s.id(),account.id())).thenReturn(activity);
         var model=new ExtendedModelMap();
         assertThat(controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),model,Locale.ENGLISH,new MockHttpServletResponse())).isEqualTo("accounting/statements/print");
         verify(service).exportAccess(actor,run);verify(service).activityExport(actor,s.id(),account.id());
         var document=(StatementPresentation.Document)model.get("document");
         assertThat(document.rows()).hasSize(37);
+        assertThat(document.rows().get(35).cells().get(2).text()).isEqualTo("JV-34");
         doThrow(new AccessDeniedException("Export denied")).when(service).exportAccess(actor,run);
         clearInvocations(service);
         assertThatThrownBy(()->controller.print(actor,s.id(),Kind.LEDGER,Kind.POSITION,null,account.id(),new ExtendedModelMap(),Locale.ENGLISH,new MockHttpServletResponse())).isInstanceOf(AccessDeniedException.class);
@@ -86,28 +87,35 @@ class StatementExportTest {
             if(document.style().equals("trial"))assertThat(pdf.getPage(0).getMediaBox().getWidth()).isGreaterThan(pdf.getPage(0).getMediaBox().getHeight());
         }
     }
-    @Test void ledgerAccountNumbersMatchAcrossPreviewPdfAndExcelInBothLanguages()throws Exception{
+    @Test void ledgerAccountAndVoucherNumbersMatchAcrossPreviewPdfAndExcelInBothLanguages()throws Exception{
         var s=snapshot();var account=s.balances().getFirst();
-        var activity=List.of(new Activity(UUID.randomUUID(),PERIOD.from(),"LN-000123","Loan transaction",n("10"),n("0"),n("10"),null),
-            new Activity(UUID.randomUUID(),PERIOD.from(),"CL-000045","Client transaction",n("0"),n("2"),n("8"),null),
-            new Activity(UUID.randomUUID(),PERIOD.from(),null,"Unlinked transaction",n("1"),n("0"),n("9"),null),
-            new Activity(UUID.randomUUID(),PERIOD.from(),"","Empty account number",n("0"),n("1"),n("8"),null),
-            new Activity(UUID.randomUUID(),PERIOD.from(),"  ","Blank account number",n("2"),n("0"),n("10"),null));
+        var activity=List.of(new Activity(UUID.randomUUID(),PERIOD.from(),"LN-000123","RV-2026-00000123","Loan transaction",n("10"),n("0"),n("10"),null),
+            new Activity(UUID.randomUUID(),PERIOD.from(),"CL-000045","PV-2026-00000045","Client transaction",n("0"),n("2"),n("8"),null),
+            new Activity(UUID.randomUUID(),PERIOD.from(),null,null,"Unlinked transaction",n("1"),n("0"),n("9"),null),
+            new Activity(UUID.randomUUID(),PERIOD.from(),"",null,"Empty account number",n("0"),n("1"),n("8"),null),
+            new Activity(UUID.randomUUID(),PERIOD.from(),"  ",null,"Blank account number",n("2"),n("0"),n("10"),null));
         for(var locale:List.of(Locale.ENGLISH,Locale.forLanguageTag("sw"))){
             var document=presentation.ledger(s,account,activity,locale);String heading=presentation.label("fs.accountNumber",locale);
-            assertThat(document.columns().get(1).label()).isEqualTo(heading);
+            String voucherHeading=locale.getLanguage().equals("sw")?"Namba ya vocha / risiti":"Voucher / receipt number";
+            assertThat(document.columns().subList(1,3)).extracting(StatementPresentation.Column::label).containsExactly(heading,voucherHeading);
             assertThat(document.rows().get(1).cells().get(1).text()).isEqualTo("LN-000123");
             assertThat(document.rows().get(2).cells().get(1).text()).isEqualTo("CL-000045");
             for(int row=3;row<=5;row++)assertThat(document.rows().get(row).cells().get(1).text()).isEqualTo(account.code());
-            assertThat(document.rows().get(3).cells().get(3).amount()).isEqualByComparingTo("1.00");
-            assertThat(document.rows().get(3).cells().get(5).amount()).isEqualByComparingTo(account.opening().add(n("9")));
+            assertThat(document.rows()).extracting(r->r.cells().get(2).text()).containsExactly("","RV-2026-00000123","PV-2026-00000045","","","","");
+            assertThat(document.rows().get(3).cells().get(4).amount()).isEqualByComparingTo("1.00");
+            assertThat(document.rows().get(3).cells().get(6).amount()).isEqualByComparingTo(account.opening().add(n("9")));
             try(var pdf=Loader.loadPDF(exporter.export(s,document,"PDF",locale))){
                 String text=new PDFTextStripper().getText(pdf).replaceAll("\\s+"," ").toLowerCase(locale);
-                assertThat(text).contains(heading.toLowerCase(locale),"ln-000123","cl-000045",account.code().toLowerCase(locale)).doesNotContain(presentation.label("fs.reference",locale).toLowerCase(locale),presentation.label("fs.unavailable",locale).toLowerCase(locale));
+                assertThat(text).contains(heading.toLowerCase(locale),voucherHeading.toLowerCase(locale),"ln-000123","cl-000045","rv-2026-00000123","pv-2026-00000045",account.code().toLowerCase(locale)).doesNotContain(presentation.label("fs.reference",locale).toLowerCase(locale),presentation.label("fs.unavailable",locale).toLowerCase(locale));
             }
             try(var book=new XSSFWorkbook(new ByteArrayInputStream(exporter.export(s,document,"XLSX",locale)))){
                 var numbers=new ArrayList<String>();for(var row:book.getSheetAt(0)){var cell=row.getCell(1);if(cell!=null&&cell.getCellType()==CellType.STRING)numbers.add(cell.getStringCellValue());}
                 assertThat(numbers).contains(heading,"LN-000123","CL-000045",account.code()).doesNotContain(presentation.label("fs.reference",locale),presentation.label("fs.unavailable",locale));
+                var sheet=book.getSheetAt(0);int header=sheet.getPaneInformation().getHorizontalSplitPosition()-1;
+                assertThat(sheet.getRow(header).getCell(2).getStringCellValue()).isEqualTo(voucherHeading);
+                assertThat(sheet.getRow(header+2).getCell(2).getStringCellValue()).isEqualTo("RV-2026-00000123");
+                assertThat(sheet.getRow(header+3).getCell(2).getStringCellValue()).isEqualTo("PV-2026-00000045");
+                assertThat(sheet.getRow(header+4).getCell(2).getStringCellValue()).isEmpty();
             }
         }
     }

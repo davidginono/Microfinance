@@ -35,6 +35,15 @@
   const section=()=>workspace.querySelector('[data-fs-report-section]');
   const applyContext=current=>{
    const kind=current.querySelector('[data-fs-paper]').dataset.kind;
+   for(const link of document.querySelectorAll('[data-fs-nav]')){
+    const active=link.dataset.fsNav===(kind==='LEDGER'?'ledger':'statements');
+    link.classList.toggle('shell-nav-active',active);
+    if(active){
+     link.setAttribute('aria-current','page');
+     const parent=document.querySelector('[data-fs-parent]');
+     if(parent){parent.href=link.href;parent.textContent=link.textContent.trim();}
+    }else link.removeAttribute('aria-current');
+   }
    for(const tab of workspace.querySelectorAll('[data-fs-tab]')){
     if(tab.dataset.fsTab===kind)tab.setAttribute('aria-current','page');
     else tab.removeAttribute('aria-current');
