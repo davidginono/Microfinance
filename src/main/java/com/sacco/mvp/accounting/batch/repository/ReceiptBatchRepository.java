@@ -23,6 +23,22 @@ public class ReceiptBatchRepository {
     private final ObjectMapper json;
     public boolean payrollLinked(UUID batch){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from payroll_remittance where receipt_batch_id=?)",Boolean.class,batch));}
     public UUID create(AppUserPrincipal a,String title,OffsetDateTime now){UUID id=UUID.randomUUID();jdbc.update("insert into receipt_batch(id,sacco_id,station_id,created_by,title,created_at,updated_at) values(?,?,?,?,?,?,?)",id,a.getSaccoId(),a.getStationId(),a.getMemberId(),title,now,now);return id;}
+
+    public void lockNaming(AppUserPrincipal actor) {
+        jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))",
+            "RECEIPT_BATCH_NAME/" + actor.getSaccoId() + "/" + actor.getStationId());
+    }
+
+    public boolean createWithAvailableName(AppUserPrincipal actor, UUID id, String title, OffsetDateTime now) {
+        return jdbc.update("""
+            insert into receipt_batch(id,sacco_id,station_id,created_by,title,created_at,updated_at)
+            select ?,?,?,?,?,?,?
+            where not exists (
+                select 1 from receipt_batch where sacco_id=? and station_id=? and upper(title)=?
+            )
+            """, id, actor.getSaccoId(), actor.getStationId(), actor.getMemberId(), title, now, now,
+            actor.getSaccoId(), actor.getStationId(), title) == 1;
+    }
     public List<Batch> list(AppUserPrincipal a,String search,int page){return jdbc.query("select * from receipt_batch where sacco_id=? and station_id=? and strpos(lower(title),?)>0 order by "+com.sacco.mvp.support.ResourceTableSort.order("receipt-batches",Map.of("title","title","created","created_at","status","state"),"id","created_at desc,id")+" limit 26 offset ?",this::batch,a.getSaccoId(),a.getStationId(),search.toLowerCase(Locale.ROOT),page*25);}
     public Optional<Batch> find(AppUserPrincipal a,UUID id,boolean lock){return jdbc.query("select * from receipt_batch where id=? and sacco_id=? and station_id=?"+(lock?" for update":""),this::batch,id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public Summary summary(Batch b){return jdbc.query("select count(*) receipts,count(*) filter(where state='POSTED') posted,count(*) filter(where state='READY') ready,count(*) filter(where state='FAILED') failed,coalesce(sum(total),0) total,coalesce(sum(total) filter(where state='POSTED'),0) posted_total from receipt_batch_item where batch_id=?",(r,n)->new Summary(b,r.getInt("receipts"),r.getInt("posted"),r.getInt("ready"),r.getInt("failed"),r.getBigDecimal("total"),r.getBigDecimal("posted_total")),b.id()).getFirst();}

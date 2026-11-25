@@ -4,6 +4,7 @@
 <link rel="stylesheet" href="<c:url value='/css/accounting-ledger.css' />" /><link rel="stylesheet" href="<c:url value='/css/receipt-batches.css' />" />
 <meta name="_csrf" content="${_csrf.token}" /><meta name="_csrf_header" content="${_csrf.headerName}" />
 <sec:authorize access="@access.has(principal,'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal,'LOAN_RECORDING_POST')" var="canPostBatch" />
+<%@ include file="../../fragments/alerts.jspf" %>
 <nav class="erp-page-path" aria-label="<spring:message code='common.breadcrumb' />"><a class="erp-page-path__item erp-page-path__link" href="<c:url value='/finance/batches/receipts' />"><spring:message code="batch.receipts" /></a><span class="erp-page-path__separator" aria-hidden="true">›</span><span class="erp-page-path__item" aria-current="page"><c:out value="${summary.batch.title}" /></span></nav>
 <div class="erp-page-header" data-aws-page-header><h1 class="erp-page-title"><c:out value="${summary.batch.title}" /></h1></div>
 <div class="accounting-workspace batch-workspace" data-receipt-batch="${summary.batch.id}" data-payroll-sealed="${payrollLinked}" data-today="${today}" data-can-edit="${canPostBatch and summary.batch.owner==pageContext.request.userPrincipal.principal.memberId}">

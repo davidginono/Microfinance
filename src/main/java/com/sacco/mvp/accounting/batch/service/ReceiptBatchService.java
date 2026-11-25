@@ -17,6 +17,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -32,6 +33,28 @@ public class ReceiptBatchService {
     public void authorize(AppUserPrincipal a,boolean post){vouchers.authorize(a,Type.RECEIPT,post?"CREATE":"VIEW");loans.authorize(a,"VIEW");if(post)loans.authorize(a,"POST");}
     @Transactional(readOnly=true)
     public Page<Batch> list(AppUserPrincipal a,String search,int page){authorize(a,false);query(search,page);var rows=repository.list(a,search,page);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
+    @Transactional
+    public UUID create(AppUserPrincipal actor, UUID requestKey) {
+        authorize(actor, true);
+        require(requestKey != null, "input");
+        UUID id = UUID.nameUUIDFromBytes(("RECEIPT_BATCH/" + actor.getMemberId() + "/" + actor.getSaccoId()
+            + "/" + actor.getStationId() + "/" + requestKey).getBytes(StandardCharsets.UTF_8));
+        // Keep the retry lookup and short-name allocation atomic within the branch.
+        repository.lockNaming(actor);
+        if (repository.find(actor, id, false).filter(batch -> batch.owner().equals(actor.getMemberId())).isPresent()) {
+            return id;
+        }
+        var now = clock.now();
+        for (int attempt = 0; attempt < 5; attempt++) {
+            String title = "BP-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
+            if (repository.createWithAvailableName(actor, id, title, now)) {
+                event(actor, id, "RECEIPT_BATCH_CREATED");
+                return id;
+            }
+        }
+        throw new IllegalArgumentException("batch.error.create");
+    }
+
     @Transactional
     public UUID create(AppUserPrincipal a,String title){authorize(a,true);require(title!=null && !title.isBlank() && title.length()<=120 && title.chars().noneMatch(c->c<32),"input");UUID id=repository.create(a,title.strip(),clock.now());event(a,id,"RECEIPT_BATCH_CREATED");return id;}
     @Transactional(readOnly=true)

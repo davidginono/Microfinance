@@ -31,9 +31,23 @@ public class ReceiptBatchController {
     private final ApplicationClock clock;
     private final MessageSource messages;
     @ModelAttribute void cache(HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
-    @GetMapping public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="")String search,@RequestParam(defaultValue="0")int page,Model m){m.addAttribute("batches",batches.list(a,search,page));m.addAttribute("search",search);return "accounting/batches/register";}
-    @GetMapping("/new") public String createForm(@AuthenticationPrincipal AppUserPrincipal a){batches.authorize(a,true);return "accounting/batches/new";}
-    @PostMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam String title){return "redirect:/finance/batches/receipts/"+batches.create(a,title);}
+    @GetMapping
+    public String register(@AuthenticationPrincipal AppUserPrincipal a, @RequestParam(defaultValue="") String search,
+                           @RequestParam(defaultValue="0") int page, Model m) {
+        m.addAttribute("batches", batches.list(a, search, page));
+        m.addAttribute("search", search);
+        m.addAttribute("createRequestKey", UUID.randomUUID());
+        return "accounting/batches/register";
+    }
+
+    @PostMapping
+    @PreAuthorize("@access.has(principal,'ACCOUNTING_BUSINESS_VIEW') and @access.has(principal,'LOAN_RECORDING_VIEW')"
+        + " and @access.has(principal,'ACCOUNTING_BUSINESS_CREATE') and @access.has(principal,'LOAN_RECORDING_POST')")
+    public String create(@AuthenticationPrincipal AppUserPrincipal a, @RequestParam UUID requestKey, RedirectAttributes flash) {
+        UUID id = batches.create(a, requestKey);
+        flash.addFlashAttribute("successMessageCode", "batch.createSuccess");
+        return "redirect:/finance/batches/receipts/" + id;
+    }
     @GetMapping("/{id}") public String editor(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,Model m){m.addAttribute("summary",batches.get(a,id));m.addAttribute("payrollLinked",batches.payrollLinked(a,id));m.addAttribute("today",clock.today());return "accounting/batches/editor";}
     @GetMapping("/{id}/posted")
     public String posted(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,RedirectAttributes flash){

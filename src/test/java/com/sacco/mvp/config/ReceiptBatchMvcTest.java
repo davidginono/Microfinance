@@ -43,6 +43,30 @@ class ReceiptBatchMvcTest {
         var client=com.sacco.mvp.config.MvcSecurityTestConfiguration.formerClient(Member.builder().id(UUID.randomUUID()).saccoId("I1").stationId("B1").status(MemberStatus.ACTIVE).build(),Set.of());
         mvc.perform(get("/finance/batches/receipts").with(user(client))).andExpect(status().isForbidden());verifyNoInteractions(batches);
     }
+    @Test void registerCreatesADraftDirectlyWithScopedClaimsAndCsrf() throws Exception {
+        String path = "/finance/batches/receipts";
+        var register = mvc.perform(get(path).with(user(actor)))
+            .andExpect(status().isOk()).andExpect(view().name("accounting/batches/register")).andReturn();
+        UUID requestKey = (UUID) register.getModelAndView().getModel().get("createRequestKey");
+        when(batches.create(actor, requestKey)).thenReturn(batch);
+        var staff = Member.builder().id(actor.getMemberId()).saccoId(actor.getSaccoId()).stationId(actor.getStationId())
+            .memberNo(actor.getMemberNo()).position(Position.ACCOUNTANT).staffAccessStatus(StaffAccessStatus.ACTIVE)
+            .status(MemberStatus.ACTIVE).build();
+        var readOnly = new AppUserPrincipal(staff, EnumSet.of(UserClaim.ACCOUNTING_BUSINESS_VIEW, UserClaim.LOAN_RECORDING_VIEW));
+        mvc.perform(post(path).with(user(actor)).param("requestKey", requestKey.toString()))
+            .andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(readOnly)).with(csrf()).param("requestKey", requestKey.toString()))
+            .andExpect(status().isForbidden());
+        mvc.perform(post(path).with(user(actor)).with(csrf()).param("requestKey", requestKey.toString())
+                .param("title", "Ignored manual title"))
+            .andExpect(redirectedUrl(path + "/" + batch)).andExpect(flash().attribute("successMessageCode", "batch.createSuccess"));
+        mvc.perform(get(path + "/new").with(user(actor))).andExpect(status().is4xxClientError());
+        mvc.perform(post(path + "/new").with(user(actor)).with(csrf()).param("title", "Retired form"))
+            .andExpect(status().is4xxClientError());
+        verify(batches).list(actor, "", 0);
+        verify(batches).create(actor, requestKey);
+        verifyNoMoreInteractions(batches);
+    }
     @Test void jsonMoneyKeepsExactDecimalInputAndScopeComesFromPrincipal()throws Exception{
         mvc.perform(put("/finance/batches/receipts/"+batch+"/items/"+item).with(user(actor)).with(csrf()).contentType("application/json").content("{\"expectedVersion\":2,\"form\":{\"rows\":[{\"amount\":\"9999999999999999.99\"}]}}" )).andExpect(status().isOk());
         verify(batches).save(eq(actor),eq(batch),eq(item),argThat(f->f.expectedVersion()==2 && f.form().getRows().getFirst().getAmount().toPlainString().equals("9999999999999999.99")));

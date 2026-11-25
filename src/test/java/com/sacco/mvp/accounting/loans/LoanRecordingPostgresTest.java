@@ -989,6 +989,35 @@ class LoanRecordingPostgresTest {
         assertThat(batches().get(actor,batch).posted()).isZero();assertThat(batches().get(actor,batch).failed()).isEqualTo(1);
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");
     }
+    @Test void receiptBatchCreationAssignsDistinctNamesAndReusesTheDraftOnConcurrentRetry() throws Exception {
+        UUID requestKey = UUID.randomUUID();
+        UUID first;
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            Callable<UUID> create = () -> {
+                start.await();
+                return batches().create(actor, requestKey);
+            };
+            var original = pool.submit(create);
+            var retry = pool.submit(create);
+            start.countDown();
+            first = original.get(15, TimeUnit.SECONDS);
+            assertThat(retry.get(15, TimeUnit.SECONDS)).isEqualTo(first);
+        }
+        UUID second = batches().create(actor, UUID.randomUUID());
+        var draft = batches().get(actor, first);
+        assertThat(draft.batch().title()).matches("BP-[0-9A-F]{6}");
+        assertThat(draft.batch().state()).isEqualTo("DRAFT");
+        assertThat(draft.receipts()).isZero();
+        assertThat(batches().get(actor, second).batch().title()).matches("BP-[0-9A-F]{6}")
+            .isNotEqualTo(draft.batch().title());
+        assertThat(batches().list(actor, "", 0).rows()).hasSize(2);
+        verify(context.getBean(AuditService.class)).logEvent("ACCOUNTING", first, "RECEIPT_BATCH_CREATED",
+            actor.getMemberId(), AuditEventStatus.SUCCESS, "Receipt batch", "RECEIPT_BATCH", first.toString(),
+            institution, "B1", Map.of());
+        assertThat(batches().list(operator("B2"), "", 0).rows()).isEmpty();
+    }
+
     @Test void receiptBatchStagesRepeatedLoansAndPostsEachReceiptExactlyOnce(){
         seedHistoricalPolicy();var first=disbursed("D-BATCH-1");var second=disbursed("D-BATCH-2");var batch=batches().create(actor,"Daily collections");
         batchItem(batch,receiptForm(first,second));batchItem(batch,receiptForm(first));processBatch(batch,false);

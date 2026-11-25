@@ -4,6 +4,8 @@
 
 The staff sidebar provides **Batch Processing → Receipt Batch Processing** at `/finance/batches/receipts`. This increment covers verified TZS repayments for directly recorded, disbursed loans with an existing ledger opening.
 
+Choose **Create batch** in the register to open a new draft. The system assigns its name in `BP-XXXXXX` format.
+
 ## Excel entry
 
 Open a batch you own and choose **Import repayments**. **Download template** lists eligible individual loans in your branch. Search by Loan ID or client to narrow the list. The Loan ID dropdown updates the client and first unpaid scheduled instalment shown for reference. Fill in the actual amount received, payment date and collection reference. Enter dates as YYYY-MM-DD and keep references as text to preserve leading zeros. Leave payment cells blank on rows you are skipping.
@@ -48,7 +50,7 @@ Payments before a loan's latest unreversed payment, before disbursement, in a cl
 
 ## Verification
 
-Use the existing opt-in `LoanRecordingPostgresTest` only with the disposable loopback `microfinance_recording_test` database and its `MICROFINANCE_RECORDING_TEST_URL` guard. Added scenarios cover staged repeated loans, multi-transaction atomicity, stale balances, independent corrections, current access checks and protected system definitions. `RepaymentAllocationPolicyTest` exercises priorities and cents; `ReceiptBatchMvcTest` covers CSRF, access, decimal input, reviewed versions and localised failures. The shared Jasper test can compile `batches/register.jsp,batches/new.jsp,batches/editor.jsp` using `microfinance.jsp.pages`.
+Use the existing opt-in `LoanRecordingPostgresTest` only with the disposable loopback `microfinance_recording_test` database and its `MICROFINANCE_RECORDING_TEST_URL` guard. Added scenarios cover staged repeated loans, multi-transaction atomicity, stale balances, independent corrections, current access checks and protected system definitions. `RepaymentAllocationPolicyTest` exercises priorities and cents; `ReceiptBatchMvcTest` covers CSRF, access, decimal input, reviewed versions and localised failures. The shared Jasper test can compile `batches/register.jsp,batches/editor.jsp` using `microfinance.jsp.pages`.
 
 Executed on 15 October 2026:
 
