@@ -10,6 +10,7 @@
         const label=key=>labels[key]||labels['dashboard.work.open']||'';
         const l=key=>label('dashboard.work.'+key);
         const canvas=root.querySelector('[data-work-cards]'),chart=root.querySelector('[data-work-chart]'),status=root.querySelector('[data-work-status]');
+        canvas.dataset.uiLoadingRegion='';
         const entries=new Map(),lifetime=new AbortController();let request=null,version=0,timer=null,loaded=false;
         const format=value=>new Intl.NumberFormat(document.documentElement.lang||'en',{maximumFractionDigits:2}).format(value);
         const urlFor=path=>{const url=new URL((root.dataset.contextPath||'')+path,location.origin);if(url.origin!==location.origin)throw new Error('scope');return url.href;};
@@ -38,12 +39,12 @@
             const heading=node('header'),title=node('h3'),tools=node('div','dashboard-infolet-tools'),expand=button(l('expand'),'dashboard-infolet-command'),filter=button(l('filters'),'dashboard-infolet-command');
             expand.prepend(icon('resize-area'));expand.setAttribute('aria-expanded','false');filter.prepend(icon('ellipsis'));tools.append(expand,filter);heading.append(title,tools);
             const body=node('div','dashboard-infolet-body'),summary=node('div','dashboard-infolet-summary'),link=node('a','dashboard-infolet-count'),amount=node('p','dashboard-infolet-amount'),age=node('p','dashboard-infolet-age'),open=node('a','dashboard-infolet-open',l('open')),breakdown=node('div','dashboard-infolet-breakdown');
-            breakdown.hidden=true;summary.append(link,amount,age,open);body.append(summary,breakdown);const criteria=node('footer','dashboard-infolet-criteria');front.append(heading,body,criteria);
+            body.dataset.uiLoadingRegion='';breakdown.hidden=true;summary.append(link,amount,age,open);body.append(summary,breakdown);const criteria=node('footer','dashboard-infolet-criteria');front.append(heading,body,criteria);
             const backHeader=node('header'),backTitle=node('h3','',l('filters')),cancel=button(l('back'),'dashboard-infolet-command');backHeader.append(backTitle,cancel);
             const fields=node('div','dashboard-infolet-fields'),daysLabel=node('label','',l('minimumDays')),days=node('input'),amountLabel=node('label','',l('minimumAmount')),minimum=node('input');
             days.type=minimum.type='number';minimum.dataset.amountInput='true';days.min=minimum.min='0';days.max='3650';minimum.max='9999999999999999.99';days.step='1';minimum.step='0.01';days.value=minimum.value='0';days.required=minimum.required=true;
             daysLabel.append(days);amountLabel.append(minimum);fields.append(daysLabel,amountLabel);const footer=node('footer'),reset=button(l('reset')),apply=button(l('apply'),'app-btn btn-launch');apply.type='submit';footer.append(reset,apply);back.append(backHeader,fields,footer);inner.append(front,back);widget.append(inner);canvas.append(widget);
-            const e={widget,front,back,title,link,open,amount,age,breakdown,filter,days,minimum,criteria,minimumDays:0,minimumAmount:0,version:0,request:null};entries.set(data.id,e);update(e,data);
+            const e={widget,front,back,body,title,link,open,amount,age,breakdown,filter,days,minimum,criteria,minimumDays:0,minimumAmount:0,version:0,request:null};entries.set(data.id,e);update(e,data);
             expand.addEventListener('click',()=>{
                 const boxes=new Map([...canvas.children].map(el=>[el,el.getBoundingClientRect()]));const expanded=widget.classList.toggle('is-expanded');breakdown.hidden=!expanded;expand.setAttribute('aria-expanded',String(expanded));expand.lastChild.textContent=expanded?l('collapse'):l('expand');
                 if(!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)for(const el of canvas.children){const old=boxes.get(el),now=el.getBoundingClientRect();if(old&&el.animate)el.animate([{transform:`translate(${old.left-now.left}px,${old.top-now.top}px)`},{transform:'translate(0,0)'}],{duration:240,easing:'ease-out'});}
@@ -60,15 +61,15 @@
         }
         async function loadCard(e){
             e.request?.abort();const controller=new AbortController(),current=++e.version;e.request=controller;const timeout=setTimeout(()=>controller.abort(),20000);
-            window.AppLoading?.begin(e.front,{replace:true,table:false,label:general.loading});
+            window.AppLoading?.begin(e.body,{replace:true,table:false,label:general.loading});
             try{const data=await fetchWork(controller,e.minimumDays,e.minimumAmount);if(e.version!==current||!root.isConnected)return;const item=data.infolets.find(item=>item.id===e.data.id);if(!item){e.widget.remove();entries.delete(e.data.id);return;}update(e,item);}
             catch(error){if(e.version===current){status.textContent=general.loadError;status.setAttribute('role','alert');}}
-            finally{clearTimeout(timeout);if(e.version===current){window.AppLoading?.end(e.front);e.request=null;}}
+            finally{clearTimeout(timeout);if(e.version===current){window.AppLoading?.end(e.body);e.request=null;}}
         }
         async function load(){
             if(!visible()||request)return;const controller=new AbortController(),current=++version;request=controller;const timeout=setTimeout(()=>controller.abort(),20000);root.setAttribute('aria-busy','true');
             // An empty result is loaded content too. Keep its message and height during polling.
-            if(!loaded){status.textContent='';status.setAttribute('role','status');window.AppLoading?.begin(canvas,{replace:true,table:false,label:general.loading});}
+            if(!loaded){status.textContent='';status.setAttribute('role','status');window.AppLoading?.begin(canvas,{table:false,label:general.loading,size:'large'});}
             try{
                 const data=await fetchWork(controller);if(current!==version||!visible())return;
                 const ids=new Set(data.infolets.map(item=>item.id));for(const [id,e] of entries)if(!ids.has(id)){e.widget.remove();entries.delete(id);}
@@ -80,9 +81,11 @@
             }catch(error){if(current===version){status.textContent=general.loadError;status.setAttribute('role','alert');}}
             finally{clearTimeout(timeout);if(current===version){request=null;root.removeAttribute('aria-busy');window.AppLoading?.end(canvas);clearTimeout(timer);if(visible())timer=setTimeout(load,5000);}}
         }
-        const stop=()=>{version++;request?.abort();request=null;clearTimeout(timer);window.AppLoading?.end(canvas);for(const e of entries.values()){e.version++;e.request?.abort();window.AppLoading?.end(e.front);}};
+        const stop=()=>{version++;request?.abort();request=null;clearTimeout(timer);root.removeAttribute('aria-busy');window.AppLoading?.end(canvas);for(const e of entries.values()){e.version++;e.request?.abort();e.request=null;window.AppLoading?.end(e.body);}};
         root.addEventListener('dashboard:visibility',()=>{stop();if(visible())void load();},{signal:lifetime.signal});
         document.addEventListener('visibilitychange',()=>{stop();if(visible())void load();},{signal:lifetime.signal});
+        window.addEventListener('pagehide',stop,{signal:lifetime.signal});
+        window.addEventListener('pageshow',event=>{if(event.persisted && visible())void load();},{signal:lifetime.signal});
         regions.set(root,{destroy(){stop();lifetime.abort();}});void load();
     }
     function scan(){for(const [root,state] of regions)if(!root.isConnected){state.destroy();regions.delete(root);}document.querySelectorAll('[data-dashboard-work]').forEach(init);}

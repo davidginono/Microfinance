@@ -5,9 +5,9 @@ const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/receipt-batches.js','utf8');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const settle=async()=>{for(let n=0;n<6;n++)await tick();};
-async function setup(estimate,patch={},realWidgets=false,initialState='DRAFT'){
+async function setup(estimate,patch={},realWidgets=false,initialState='DRAFT',requestRows){
   const messages=Object.fromEntries(readFileSync('src/main/resources/messages_en.properties','utf8').split(/\r?\n/).filter(line=>/^batch\.(?:field\.|(?:balances|viewBalances|totalLoanOutstanding|principalOutstanding|interestDue|chargesOutstanding)=)/.test(line)).map(line=>{const split=line.indexOf('=');return [line.slice(6,split),line.slice(split+1)];}));Object.assign(messages,{saveFailed:'Could not save draft.',checking:'Checking receipt...',client:'Client',status:'Status','state.DRAFT':'Draft',receipts:'Receipts',total:'Total',posted:'Posted',ready:'Ready',failed:'Needs attention',remaining:'Remaining',select:'Select',selected:'Selected','state.POSTED':'Posted','state.READY':'Ready','state.POSTING':'Posting','state.COMPLETED':'Completed'});
-  const dom=new JSDOM(`<body><h1>Repayment 1</h1><main data-receipt-batch="batch" data-can-edit="true" data-today="2026-10-19">
+  const dom=new JSDOM(`<body data-shell-loading="Loading"><h1>Repayment 1</h1><main data-receipt-batch="batch" data-can-edit="true" data-today="2026-10-19">
     <section class="erp-resource-section"><h2>Batch details</h2><dl class="erp-detail-facts" data-batch-summary></dl></section><div data-batch-error hidden></div>
     <section class="erp-table-wrap" data-resource-table="receipt-batch-entries" data-table-pagination-mode="external" data-table-selection="single"><div class="app-table-titlebar"><h2>Receipts</h2><div class="accounting-actions"><button data-batch-refresh data-aws-table-refresh>Refresh</button><button data-table-command data-batch-view disabled>View</button><button data-batch-add></button><button data-batch-save></button></div></div><button data-batch-validate></button><button data-batch-post></button><button data-batch-stop></button><span data-save-status></span>
     <div class="erp-table-toolbar aws-filter-toolbar batch-defaults"><label>Date<input data-default-date value="2026-10-19"></label><label>Account<select data-default-account data-batch-choice="money"></select></label><label>Show<select data-batch-filter></select></label></div>
@@ -28,7 +28,7 @@ async function setup(estimate,patch={},realWidgets=false,initialState='DRAFT'){
   const response=(data,ok=true)=>({ok,redirected:false,headers:{get:()=> 'application/json'},json:async()=>data});
   w.fetch=async(url,options)=>{
     if(url.endsWith('/summary'))return response({batch:{state:initialState,version:0},receipts:1,posted:0,ready:0,failed:1,total:'500.00',remainingTotal:'500.00'});
-    if(url.includes('/items?'))return response({rows:[structuredClone(item)],hasNext:false});
+    if(url.includes('/items?')){const result=response({rows:[structuredClone(item)],hasNext:false});return requestRows?requestRows(result,options.signal):result;}
     if(options?.method==='PUT')return response({...item,version:1});
     if(url.endsWith('/estimate'))return estimate(response);
     if(url.includes('/loan-context?'))return response([{outstandingPrincipal:'1000.00',duePrincipal:'100.00',dueInterest:'25.50',totalLoanOutstanding:'1025.50'}]);
@@ -39,6 +39,26 @@ async function setup(estimate,patch={},realWidgets=false,initialState='DRAFT'){
   return {dom,w,d,poll,response,async edit(value){const input=d.querySelector('input[type="number"]');input.value=value;input.dispatchEvent(new w.Event('input'));},async save(){const callback=autosave;autosave=undefined;callback();await settle();}};
 }
 const visible=d=>[...d.querySelectorAll('.batch-field-error:not([hidden])')];
+
+test('receipt rows load beneath the live editor and recover locally on failure or page exit',async()=>{
+  const requests=[];
+  const {dom,w,d}=await setup(response=>Promise.resolve(response({lines:[]})),{},true,'DRAFT',(result,signal)=>new Promise((resolve,reject)=>requests.push({result,signal,resolve,reject})));
+  try{
+    const date=d.querySelector('[data-default-date]'),table=d.querySelector('[data-resource-table]'),body=table.querySelector('tbody');
+    assert.equal(table.querySelectorAll('thead th').length,9);assert.equal(date.disabled,false);assert.equal(d.querySelector('[data-batch-post]').disabled,true);
+    assert.equal(body.querySelector('tr.app-loading-row td').colSpan,9);assert.equal(d.querySelector('[data-batch-summary]').textContent.includes('500.00'),true);
+    date.value='2026-10-18';requests[0].resolve(requests[0].result);await settle();
+    assert.equal(body.querySelector('.app-loading-row'),null);const original=body.querySelector('.batch-row');assert.ok(original);
+    const refresh=()=>table.dispatchEvent(new w.Event('resource-table:refresh',{cancelable:true}));
+    refresh();await settle();assert.equal(original.hidden,true);assert.ok(body.querySelector('.app-loading-row'));
+    requests[1].reject(Error('Could not load receipts'));await settle();
+    assert.equal(body.querySelector('.batch-row'),original);assert.equal(original.hidden,false);assert.equal(body.querySelector('.app-loading-row'),null);
+    assert.equal(d.querySelector('[data-batch-error]').textContent,'Could not load receipts');assert.equal(date.value,'2026-10-18');
+    refresh();await settle();w.dispatchEvent(new w.PageTransitionEvent('pagehide'));
+    assert.equal(requests[2].signal.aborted,true);assert.equal(body.querySelector('.app-loading-row'),null);
+    requests[2].resolve(requests[2].result);await settle();assert.equal(body.querySelector('.batch-row'),original);
+  }finally{dom.window.close();}
+});
 
 test('batch editor initializes its real account selector and loads summary and receipt rows',async()=>{
   const {dom,d}=await setup(response=>Promise.resolve(response({lines:[]})),{},true);

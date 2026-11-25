@@ -2,7 +2,6 @@
 (() => {
     'use strict';
     const boards=new Map();
-    const ready=()=>{for(const root of boards.keys())if(!root.querySelector('[data-dashboard-chart]:not([data-chart-ready])')){root.dataset.dashboardReady='true';root.setAttribute('aria-busy','false');}};
     const node=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;};
     const context=()=>document.getElementById('dashboard-labels')?.dataset || {};
     const hash=value=>{let h=14695981039346656037n;for(const c of value){h^=BigInt(c.codePointAt(0));h=BigInt.asUintN(64,h*1099511628211n);}return h.toString(16);};
@@ -299,10 +298,10 @@
         for(const e of entries.values())if(e.auto)observer?.observe(e.widget);
         window.addEventListener('resize',reflow,{signal});reflow();updatePalette();
         boards.set(root,{destroy(){unlock();header?.classList.remove('dashboard-palette-heading-open');lifetime.abort();for(const e of entries.values())e.motion?.cancel();observer?.disconnect();palette.remove();scrim.remove();toolbar.remove();}});
-        document.dispatchEvent(new Event('dashboard:updated'));ready();
+        document.dispatchEvent(new Event('dashboard:updated'));
     }
     const scan=()=>{if(!window.document)return;for(const [root,board] of boards)if(!root.isConnected){board.destroy();boards.delete(root);}document.querySelectorAll('[data-dashboard-board]').forEach(init);};
-    window.DashboardBoard={init:scan,ready};
+    window.DashboardBoard={init:scan};
     const start=()=>{scan();let queued=false;new MutationObserver(records=>{if(!window.document)return;if(queued || !records.some(r=>[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1 && (n.matches?.('[data-dashboard-board]') || n.querySelector?.('[data-dashboard-board]')))))return;queued=true;queueMicrotask(()=>{queued=false;scan();});}).observe(document.body,{childList:true,subtree:true});};
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+    if(window.WorkspaceNavigation?.onReady)window.WorkspaceNavigation.onReady(start);else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();

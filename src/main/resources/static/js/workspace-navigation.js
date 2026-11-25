@@ -3,12 +3,12 @@
     'use strict';
     if (window.WorkspaceNavigation) return;
     const ownScript = document.currentScript || document.querySelector('script[data-workspace-navigation]');
-    const native = {add:EventTarget.prototype.addEventListener, fetch:window.fetch.bind(window), ResizeObserver:window.ResizeObserver,
+    const native = {add:EventTarget.prototype.addEventListener, fetch:window.fetch.bind(window),
         push:history.pushState.bind(history), replace:history.replaceState.bind(history)};
     let scope, booting=false, committing=false, queued, request, generation=0, serial=Date.now(), collapsed;
     let viewKey=history.state?.workspaceNavigation?.key || ++serial;
     let entry={url:location.href,index:history.state?.workspaceNavigation?.index || 0};
-    let reversing=false, pendingDestination, pendingSidebarLink, layoutObserver;
+    let reversing=false, pendingSidebarLink;
     const submissions=new WeakSet();
     const timers = {};
     for (const [schedule,cancel] of [['setTimeout','clearTimeout'],['setInterval','clearInterval'],['requestAnimationFrame','cancelAnimationFrame'],['requestIdleCallback','cancelIdleCallback']]) {
@@ -33,17 +33,27 @@
         else if(!documentReady)document.addEventListener('DOMContentLoaded',callback,{once:true});
         else callback();
     }
+    function loadingStatus(){
+        const status=document.createElement('div');status.className='workspace-loading-status';
+        status.setAttribute('role','status');status.setAttribute('aria-label',document.body.dataset.navigationLoading || '');
+        const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='workspace';
+        spinner.setAttribute('aria-hidden','true');status.append(spinner);return status;
+    }
     function prepare(main){
         if(!main || main.hasAttribute('data-workspace-initializing'))return;
-        main.dataset.workspaceInitializing='true';main.inert=true;main.setAttribute('aria-busy','true');
-        const status=document.createElement('div');status.dataset.workspaceBootStatus='true';status.className='workspace-initializing-status';
-        status.setAttribute('role','status');status.setAttribute('aria-label',document.body.dataset.navigationLoading || '');
-        const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='large';spinner.setAttribute('aria-hidden','true');status.append(spinner);main.prepend(status);
+        main.dataset.workspaceInitializing='true';main.setAttribute('aria-busy','true');
+        const content=main.querySelector(':scope > .shell-content-frame');if(content)content.inert=true;
+        const status=loadingStatus();status.dataset.workspaceBootStatus='true';main.prepend(status);
     }
     function reveal(){
         document.documentElement.removeAttribute('data-workspace-booting');
         const main=document.querySelector('[data-workspace-initializing]');
-        if(main){main.querySelector('[data-workspace-boot-status]')?.remove();main.inert=false;main.removeAttribute('aria-busy');delete main.dataset.workspaceInitializing;}
+        if(main){
+            main.querySelector('[data-workspace-boot-status]')?.remove();
+            const content=main.querySelector(':scope > .shell-content-frame');if(content)content.inert=false;
+            if(!main.classList.contains('is-workspace-pending'))main.removeAttribute('aria-busy');
+            delete main.dataset.workspaceInitializing;
+        }
     }
     native.add.call(document,'DOMContentLoaded',()=>{documentReady=true;timers.requestAnimationFrame(()=>{if(!committing)reveal();});},{once:true});
     EventTarget.prototype.addEventListener=function(type,callback,options){
@@ -106,59 +116,14 @@
         if(url.origin===location.origin && /\/print(?:\/|$)/i.test(url.pathname) && window.printExport)return window.printExport(url.href);
         location.assign(url.href);
     }
-    // Geometry only, never cloned page HTML or business data. First visits use the
-    // normal workspace spinner until the authorized destination HTML arrives.
-    const layouts=new Map();
     const scrollPositions=new Map();
-    const sections='.dashboard-widget,.erp-panel,.erp-resource-section,.erp-detail-card,.accounting-section,.loan-flow-panel,[data-resource-table],.erp-table-wrap,.erp-stat-card';
-    function layoutSpace(main){
-        const rect=main.getBoundingClientRect(),css=getComputedStyle(main),number=name=>parseFloat(css[name]) || 0;
-        return {x:rect.left+number('borderLeftWidth')+number('paddingLeft'),y:rect.top+number('borderTopWidth')+number('paddingTop')-main.scrollTop,
-            width:Math.round(rect.width-number('borderLeftWidth')-number('borderRightWidth')-number('paddingLeft')-number('paddingRight'))};
-    }
-    function layoutKey(url,main){
-        const target=new URL(url,location.href);target.hash='';
-        return [target.href,innerWidth,layoutSpace(main).width,document.documentElement.lang].join('|');
-    }
-    function rememberLayout(){
-        const main=document.querySelector('.shell-main');
-        if(!main || main.hasAttribute('aria-busy') || main.hasAttribute('data-workspace-initializing'))return;
-        const space=layoutSpace(main);if(space.width<200)return;
-        const blocks=[];
-        for(const element of [...main.querySelectorAll(sections)].slice(0,128)){
-            if(element.parentElement.closest(sections) || element.closest('[hidden],[aria-hidden="true"],dialog'))continue;
-            const rect=element.getBoundingClientRect();
-            if(rect.width<80 || rect.height<48 || rect.top-space.y<0 || rect.top-space.y>16000)continue;
-            const header=element.querySelector('table thead') || element.querySelector(':scope > .erp-panel-header,:scope > .app-table-titlebar,:scope > h2,:scope > summary');
-            blocks.push({x:rect.left-space.x,y:rect.top-space.y,width:rect.width,height:Math.min(4000,rect.height),
-                header:header?Math.min(rect.height,Math.max(0,header.getBoundingClientRect().bottom-rect.top)):0});
-            if(blocks.length===32)break;
-        }
-        if(!blocks.length)return;
-        const title=main.querySelector('.erp-page-title,h1')?.getBoundingClientRect();
-        const heading=title && title.height>0?{x:title.left-space.x,y:Math.max(0,title.top-space.y),width:Math.min(280,title.width),height:title.height}:null;
-        const key=layoutKey(entry.url,main);layouts.delete(key);
-        layouts.set(key,{blocks,heading,height:Math.max(...blocks.map(block=>block.y+block.height))});
-        if(layouts.size>12)layouts.delete(layouts.keys().next().value);
-    }
-    function layoutPreview(main,url,box){
-        const layout=layouts.get(layoutKey(url,main));if(!layout)return false;
-        box.classList.add('workspace-layout-preview');box.style.height=layout.height+'px';
-        const position=(element,rect)=>{for(const name of ['width','height'])element.style[name]=rect[name]+'px';element.style.left=rect.x+'px';element.style.top=rect.y+'px';};
-        if(layout.heading){const heading=document.createElement('div');heading.className='workspace-layout-heading';heading.setAttribute('aria-hidden','true');position(heading,layout.heading);box.append(heading);}
-        for(const block of layout.blocks){
-            const card=document.createElement('div');card.className='workspace-layout-card';card.setAttribute('aria-hidden','true');position(card,block);
-            if(block.header){const header=document.createElement('div');header.className='workspace-layout-card-header';header.style.height=block.header+'px';card.append(header);}
-            const body=document.createElement('div');body.className='workspace-layout-card-body';body.style.top=block.header+'px';
-            const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='medium';body.append(spinner);card.append(body);box.append(card);
-        }
-        main.classList.add('is-workspace-preview');return true;
-    }
     function clearFeedback(){
-        layoutObserver?.disconnect();layoutObserver=null;pendingDestination=null;
         document.getElementById('workspace-navigation-feedback')?.remove();
         const main=document.querySelector('.shell-main.is-workspace-pending');
-        if(main){main.classList.remove('is-workspace-pending','is-workspace-preview');main.removeAttribute('aria-busy');}
+        if(main){
+            main.classList.remove('is-workspace-pending');main.removeAttribute('aria-busy');
+            const position=scrollPositions.get(viewKey);if(position)main.scrollTo({...position,behavior:'instant'});
+        }
     }
     function highlightSidebarLink(link){
         // Keep aria-current on the displayed page until its replacement arrives.
@@ -167,25 +132,13 @@
         pendingSidebarLink?.setAttribute('data-workspace-nav-pending','');
     }
     const feedback=(failed,url,options={})=>{
-        if(!failed)rememberLayout();
         clearFeedback();
         const main=document.querySelector('.shell-main');if(!main)return;
-        pendingDestination=failed?null:url;
-        const box=document.createElement('div');box.id='workspace-navigation-feedback';box.className='workspace-navigation-feedback';box.setAttribute('role',failed?'alert':'status');
+        const box=failed?document.createElement('div'):loadingStatus();box.id='workspace-navigation-feedback';
         if(!failed){
             main.classList.add('is-workspace-pending');main.setAttribute('aria-busy','true');
-            box.classList.add('workspace-navigation-pending');box.setAttribute('aria-label',document.body.dataset.navigationLoading);
-            if(!layoutPreview(main,url,box)){
-                box.classList.add('workspace-navigation-spinner');
-                const spinner=document.createElement('span');spinner.className='app-loading-spinner';spinner.dataset.loadingSize='large';spinner.setAttribute('aria-hidden','true');box.append(spinner);
-            }
-            else if(native.ResizeObserver){
-                const key=layoutKey(url,main);
-                layoutObserver=new native.ResizeObserver(()=>{
-                    if(box.isConnected && layoutKey(url,main)!==key)feedback(false,url);
-                });layoutObserver.observe(main);
-            }
         }else{
+            box.className='workspace-navigation-feedback';box.setAttribute('role','alert');
             const label=document.createElement('span');label.textContent=document.body.dataset.navigationError;
             const actions=document.createElement('div');actions.className='workspace-navigation-actions';
             const retry=document.createElement('button');retry.type='button';retry.className='app-btn btn-neutral';retry.textContent=document.body.dataset.navigationRetry;
@@ -207,10 +160,6 @@
         }
         main.prepend(box);
     };
-    native.add.call(window,'resize',()=>{
-        if(document.getElementById('workspace-navigation-feedback')?.getAttribute('role')==='status')feedback(false,pendingDestination);
-    });
-    native.add.call(document,'session:logout',()=>layouts.clear());
     const allowed=(url,resume)=>document.dispatchEvent(new CustomEvent('workspace:before-navigate',{cancelable:true,detail:{url,resume}}));
     function formError(form,message){
         clearFeedback();
@@ -430,7 +379,7 @@
             if(didCommit){
                 booting=false;committing=false;
                 if(initialized)reveal();
-                else{const main=document.querySelector('[data-workspace-initializing]');if(main){main.inert=false;main.removeAttribute('aria-busy');main.querySelector('[data-workspace-boot-status]')?.remove();}}
+                else{const main=document.querySelector('[data-workspace-initializing]');if(main){main.removeAttribute('aria-busy');main.querySelector('[data-workspace-boot-status]')?.remove();}}
             }
             if(version===generation && !didCommit)highlightSidebarLink();
             if(version===generation && document.getElementById('workspace-navigation-feedback')?.getAttribute('role')==='status')clearFeedback();

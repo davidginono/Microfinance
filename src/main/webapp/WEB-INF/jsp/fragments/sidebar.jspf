@@ -246,6 +246,6 @@
     </div>
 </aside>
 <main id="main-content" class="app-main shell-main box-border" tabindex="-1">
-    <script>window.WorkspaceNavigation?.prepare(document.getElementById('main-content'));</script>
     <div class="shell-content-frame mx-auto min-w-0 space-y-4">
+        <script hidden>window.WorkspaceNavigation?.prepare(document.getElementById('main-content'));</script>
         <%@ include file="office-return.jspf" %>

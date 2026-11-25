@@ -105,9 +105,8 @@
         });
         for(const [root,state] of states)if(!root.isConnected){state.observer?.disconnect();states.delete(root);}
         if(window.ResizeObserver)for(const state of states.values())if(!state.observer){state.observer=new ResizeObserver(()=>{if(state.width!==Math.max(200,Math.round(state.root.getBoundingClientRect().width || 640)))draw(state);});state.observer.observe(state.root);}
-        window.DashboardBoard?.ready();
     }
     window.DashboardCharts={render,init,palette};
-    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>init(),{once:true});else init();
+    if(window.WorkspaceNavigation?.onReady)window.WorkspaceNavigation.onReady(()=>init());else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>init(),{once:true});else init();
     document.addEventListener('dashboard:updated',()=>init());
 })();

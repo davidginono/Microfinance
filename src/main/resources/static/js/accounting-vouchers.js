@@ -224,23 +224,35 @@ update();
 window.VoucherBalance.bind(form);
 const numberOutput=form.querySelector('[data-voucher-number]');
 if(numberOutput){
- const numberValue=numberOutput.querySelector('[data-voucher-number-value]'),retry=form.querySelector('[data-retry-voucher-number]'),date=form.querySelector('[name="effectiveDate"]');
+ const numberValue=numberOutput.querySelector('[data-voucher-number-value]'),spinner=numberOutput.querySelector('[data-voucher-number-spinner]');
+ const retry=form.querySelector('[data-retry-voucher-number]'),date=form.querySelector('[name="effectiveDate"]');
  let requestVersion=0,requestController=null;
+ function finishNumber(value,failed=false){
+  numberValue.textContent=value;numberValue.classList.remove('sr-only');
+  spinner.hidden=true;numberOutput.setAttribute('aria-busy','false');retry.hidden=!failed;
+ }
  async function loadNumber(){
-  const version=++requestVersion;requestController?.abort();requestController=new AbortController();
-  numberOutput.setAttribute('aria-busy','true');numberValue.classList.add('sr-only');numberValue.textContent=form.dataset.numberLoading;numberOutput.querySelector('.voucher-number-spinner').hidden=false;retry.hidden=true;
+  const version=++requestVersion;requestController?.abort();requestController=null;
   const url=new URL(form.dataset.base+'/number',location.origin),key=form.elements.namedItem('requestKey')?.value;
-  if(!key||!date.value){numberValue.classList.remove('sr-only');numberValue.textContent=form.dataset.numberError;numberOutput.setAttribute('aria-busy','false');numberOutput.querySelector('.voucher-number-spinner').hidden=true;retry.hidden=false;return;}
+  if(!key||!date.value){finishNumber(form.dataset.numberError,true);return;}
+  requestController=new AbortController();
+  numberOutput.setAttribute('aria-busy','true');numberValue.classList.add('sr-only');numberValue.textContent=form.dataset.numberLoading;spinner.hidden=false;retry.hidden=true;
   url.searchParams.set('requestKey',key);url.searchParams.set('effectiveDate',date.value);
   const headers={'Accept':'application/json','Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'};
   if(form.dataset.numberCsrfHeader&&form.dataset.numberCsrfToken)headers[form.dataset.numberCsrfHeader]=form.dataset.numberCsrfToken;
   try{
    const response=await fetch(url,{method:'POST',headers,body:new URLSearchParams({requestKey:key,effectiveDate:date.value}),credentials:'same-origin',cache:'no-store',signal:requestController.signal});
    if(!response.ok)throw new Error('Voucher number request failed');
-   const result=await response.json();if(typeof result.number!=='string'||version!==requestVersion){if(version===requestVersion)throw new Error('Voucher number was not returned');return;}
-   numberValue.classList.remove('sr-only');numberValue.textContent=result.number;numberOutput.setAttribute('aria-busy','false');numberOutput.querySelector('.voucher-number-spinner').hidden=true;
-  }catch(error){if(error.name==='AbortError'||version!==requestVersion)return;numberValue.classList.remove('sr-only');numberValue.textContent=form.dataset.numberError;numberOutput.setAttribute('aria-busy','false');numberOutput.querySelector('.voucher-number-spinner').hidden=true;retry.hidden=false;}
+   const result=await response.json();if(version!==requestVersion)return;
+   if(typeof result.number!=='string')throw new Error('Voucher number was not returned');
+   finishNumber(result.number);
+  }catch(error){if(version===requestVersion)finishNumber(form.dataset.numberError,true);}
+  finally{if(version===requestVersion)requestController=null;}
  }
+ window.addEventListener('pagehide',()=>{
+  if(!requestController)return;
+  ++requestVersion;requestController.abort();requestController=null;finishNumber(form.dataset.numberError,true);
+ });
  date.addEventListener('change',loadNumber);retry.addEventListener('click',loadNumber);loadNumber();
 }
 })();

@@ -106,10 +106,11 @@
     const mode = recordForm.querySelector('#loanMode'), entry = recordForm.querySelector('#interestEntry'), unit = recordForm.querySelector('#tenureUnit'), method = recordForm.querySelector('#customMethod'), basis = recordForm.querySelector('#interestBasis');
     const product = recordForm.querySelector('#productId'), tenureType = recordForm.querySelector('[data-tenure-type]');
     const initialProduct = product.value, initialUnit = unit.value;
-    const region = recordForm.querySelector('[data-interest-preview]'), spinner = region.querySelector('.loan-interest-spinner'), output = region.querySelector('[data-interest-value]'), description = region.querySelector('[data-interest-description]');
+    const region = recordForm.querySelector('[data-interest-preview]'), spinner = region.querySelector('[data-interest-spinner]'), output = region.querySelector('[data-interest-value]'), description = region.querySelector('[data-interest-description]');
     const schedule = recordForm.querySelector('[data-schedule-preview]'), rows = schedule?.querySelector('[data-schedule-rows]'), summary = schedule?.querySelector('[data-schedule-summary]');
     const money = value => new Intl.NumberFormat(document.documentElement.lang || 'en', {minimumFractionDigits:2,maximumFractionDigits:2}).format(value);
     let timer, controller, version = 0;
+    const quoteLoading = waiting => {spinner.hidden = !waiting;region.setAttribute('aria-busy',String(waiting));};
     const show = (box, visible) => {box.hidden = !visible;box.querySelectorAll('input,select').forEach(input => input.disabled = !visible);};
     function refresh() {
       const custom = mode.value === 'CUSTOM', reducing = custom && method.value === 'REDUCING_BALANCE';
@@ -151,18 +152,21 @@
         tenureLimits.querySelector('[data-limit-unit]').textContent = region.dataset[unit.value.toLowerCase()] || '';
       }
       clearTimeout(timer); controller?.abort(); ++version;
+      if(!spinner.hidden)recordForm.dispatchEvent(new CustomEvent('loan:quote-settled'));
+      quoteLoading(false);
       const ready=recordForm.querySelector('#principal').value && unit.value && recordForm.querySelector('#tenureValue').value
         && (custom ? recordForm.querySelector(amount ? '#interestAmount' : '#interestPercent').value : recordForm.querySelector('#productId').value);
       if (!ready) {
         recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));
-        spinner.hidden=true;region.setAttribute('aria-busy','false');output.textContent='—';description.hidden=true;
+        output.textContent='—';description.hidden=true;
         if(schedule){schedule.hidden=true;rows.replaceChildren();summary.textContent='';}
         return;
       }
-      spinner.hidden=false;region.setAttribute('aria-busy','true');description.hidden=true;
+      description.hidden=true;
       const current = version;
       timer = setTimeout(async () => {
         controller = new AbortController();
+        quoteLoading(true);
         recordForm.dispatchEvent(new CustomEvent('loan:quote-pending'));
         const data = new URLSearchParams();new FormData(recordForm).forEach((value,key) => {if(typeof value === 'string')data.append(key,value);});
         try {
@@ -191,14 +195,14 @@
             recordForm.dispatchEvent(new CustomEvent('loan:quote-error',{detail:description.textContent}));
           }
         }
-        finally {if(current === version){spinner.hidden = true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-settled'));}}
+        finally {if(current === version){controller=null;quoteLoading(false);recordForm.dispatchEvent(new CustomEvent('loan:quote-settled'));}}
       }, 150);
     }
     const pricing = new Set(['loanMode','productId','principal','topUpAdditionalAmount','tenureUnit','tenureValue','interestEntry','interestBasis','interestPercent','interestAmount','customFrequency','customMethod','applicationDate','customApplicationCharge','customProcessingCharge','insurancePremium','customProcessingPercent','customInsurancePercent','evidence']);
     const changed = event => {if(pricing.has(event.target.name))refresh();};
     recordForm.addEventListener('input', changed); recordForm.addEventListener('change', changed);
     recordForm.addEventListener('loan:quote-retry',refresh);
-    window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;spinner.hidden=true;region.setAttribute('aria-busy','false');recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));});
+    window.addEventListener('pagehide', () => {clearTimeout(timer);controller?.abort();++version;quoteLoading(false);recordForm.dispatchEvent(new CustomEvent('loan:quote-reset'));});
     window.addEventListener('pageshow', refresh);refresh();
   }
   document.querySelectorAll('[data-loan-form]').forEach(form => {

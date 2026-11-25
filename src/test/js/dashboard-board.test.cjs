@@ -35,16 +35,16 @@ test('revoked widgets cannot be restored through saved layout data',async t=>{
  assert.equal(updated.d.querySelector('[data-dashboard-widget=Activity]'),null);assert.equal(updated.d.querySelectorAll('.dashboard-palette-item').length,2);
 });
 
-for(const chartsFirst of [false,true])test('initial dashboard hides source cards and tables until board and charts are ready: '+(chartsFirst?'charts first':'board first'),async()=>{
+for(const chartsFirst of [false,true])test('board layout and charts initialize independently: '+(chartsFirst?'charts first':'board first'),async()=>{
  const css=readFileSync('src/main/resources/static/css/ui-loading.css','utf8'),charts=readFileSync('src/main/resources/static/js/dashboard-charts.js','utf8');
  const chart='<div data-dashboard-chart><table data-chart-source><thead><tr><th>Status</th><th>Applications</th></tr></thead><tbody><tr><th>Waiting</th><td>3</td></tr></tbody></table></div>';
- const html='<style>'+css+'</style>'+labels+'<main class="shell-content-frame"><header class="erp-page-header"><h1>Dashboard</h1></header><div data-dashboard-board="staff" aria-busy="true">'+widget('Overview','<a href="/authorized/queue">Review queue</a>')+widget('Applications',chart)+'</div></main>';
+ const html='<style>'+css+'</style>'+labels+'<main class="shell-content-frame"><header class="erp-page-header"><h1>Dashboard</h1></header><div data-dashboard-board="staff">'+widget('Overview','<a href="/authorized/queue">Review queue</a>')+widget('Applications',chart)+'</div></main>';
  const dom=new JSDOM(html,{url:'http://localhost/accountant/dashboard',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,d=w.document,root=d.querySelector('[data-dashboard-board]'),link=d.querySelector('a');
- assert.equal(w.getComputedStyle(link).visibility,'hidden');assert.equal(w.getComputedStyle(d.querySelector('[data-chart-source]')).visibility,'hidden');
  w.eval(chartsFirst?charts:source);await settle();
- assert.equal(root.hasAttribute('data-dashboard-ready'),false);assert.equal(root.getAttribute('aria-busy'),'true');assert.equal(w.getComputedStyle(link).visibility,'hidden');
+ assert.equal(root.hasAttribute('aria-busy'),false);assert.equal(w.getComputedStyle(link).visibility,'visible');
+ assert.equal(Boolean(root.querySelector('.dashboard-grid')),!chartsFirst);
  w.eval(chartsFirst?source:charts);await settle();
- assert.equal(root.dataset.dashboardReady,'true');assert.equal(root.getAttribute('aria-busy'),'false');assert.equal(w.getComputedStyle(link).visibility,'visible');
+ assert.equal(root.hasAttribute('aria-busy'),false);assert.equal(w.getComputedStyle(link).visibility,'visible');
  assert.equal(d.querySelector('a'),link);assert.equal(d.querySelector('[data-chart-source]'),null);assert.ok(d.querySelector('.dashboard-chart svg'));assert.equal(d.querySelectorAll('.dashboard-grid').length,1);dom.window.close();
 });
 

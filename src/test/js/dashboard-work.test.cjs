@@ -3,6 +3,7 @@ const assert=require('node:assert/strict');
 const {readFileSync}=require('node:fs');
 const {JSDOM}=require('jsdom');
 const source=readFileSync('src/main/resources/static/js/dashboard-work.js','utf8');
+const loading=readFileSync('src/main/resources/static/js/ui-loading.js','utf8');
 const settle=()=>new Promise(resolve=>setTimeout(resolve,0));
 const card=(count=4)=>({id:'voucher-INCOMPLETE',labelKey:'dashboard.work.voucher.INCOMPLETE',tone:'neutral',count,amount:120000,oldestDays:3,href:'/finance/approval?category=INCOMPLETE',groups:[{labelKey:'voucher.title.RECEIPT',count,amount:120000,href:'/finance/approval?category=INCOMPLETE&type=RECEIPT'}]});
 async function setup(fetcher,configure){
@@ -15,6 +16,21 @@ async function setup(fetcher,configure){
 }
 test('draft count and chart use live payload; native workspace links remain direct',async()=>{
  const {dom,d,calls}=await setup();try{assert.equal(d.querySelectorAll('article').length,1);assert.equal(d.querySelector('.dashboard-infolet-count').textContent,'4');assert.equal(d.querySelector('.dashboard-infolet-open').getAttribute('href'),'http://localhost/finance/approval?category=INCOMPLETE');assert.equal(d.querySelector('.dashboard-infolet-bar').href,'http://localhost/finance/approval?category=INCOMPLETE&type=RECEIPT');assert.equal(d.querySelector('[data-work-chart]').textContent,'Pending work');assert.equal(calls[0][1].credentials,'same-origin');assert.equal(calls[0][1].cache,'no-store');}finally{dom.window.close();}
+});
+test('initial and filtered work requests spin only inside the pending data region',async()=>{
+ const pending=[];
+ const {dom,w,d}=await setup((url,options)=>new Promise(resolve=>pending.push({resolve,signal:options.signal})),w=>w.eval(loading));
+ try{
+  const canvas=d.querySelector('[data-work-cards]');assert.equal(canvas.querySelectorAll('.app-loading-spinner').length,1);
+  pending[0].resolve({ok:true,json:async()=>({infolets:[card()],capturedAt:'2026-10-22T09:42:00Z'})});await settle();
+  const widget=canvas.querySelector('article'),filter=widget.querySelector('.dashboard-infolet-tools button:last-child'),count=widget.querySelector('.dashboard-infolet-count');
+  assert.equal(canvas.querySelector('.app-loading-spinner'),null);
+  filter.click();widget.querySelector('input').value='3';widget.querySelector('form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  const body=widget.querySelector('.dashboard-infolet-body');assert.ok(body.querySelector('.app-loading-spinner'));assert.equal(d.activeElement,filter);
+  assert.equal(widget.querySelector('header').contains(filter),true);assert.equal(widget.querySelector('header .app-loading-spinner'),null);
+  pending[1].resolve({ok:false});await settle();assert.equal(body.querySelector('.app-loading-spinner'),null);assert.equal(widget.querySelector('.dashboard-infolet-count'),count);
+  assert.equal(count.textContent,'4');assert.equal(d.querySelector('[data-work-status]').textContent,'Unavailable');
+ }finally{dom.window.close();}
 });
 test('expansion and flip preserve the original card and return focus after server-filtered results',async()=>{
  const {dom,d,calls}=await setup();try{const original=d.querySelector('article'),buttons=original.querySelectorAll('.dashboard-infolet-tools button');buttons[0].click();assert.equal(original.classList.contains('is-expanded'),true);assert.equal(original.querySelector('.dashboard-infolet-breakdown').hidden,false);buttons[1].click();assert.equal(original.classList.contains('is-flipped'),true);assert.equal(original.querySelector('.dashboard-infolet-front').inert,true);const fields=original.querySelectorAll('input');assert.equal(d.activeElement,fields[0]);fields[0].value='3';fields[1].value='9999999999999999.99';original.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();assert.equal(d.querySelector('article'),original);assert.equal(original.classList.contains('is-expanded'),true);assert.equal(original.classList.contains('is-flipped'),false);assert.equal(d.activeElement,buttons[1]);const url=new URL(calls[1][0]);assert.equal(url.searchParams.get('days'),'3');assert.equal(url.searchParams.get('amount'),'9999999999999999.99');}finally{dom.window.close();}

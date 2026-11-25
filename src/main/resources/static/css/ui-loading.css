@@ -1,8 +1,9 @@
 /* Keep ready content sharp; pending indicators occupy only their own component. */
 html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):not(#workspace-navigation-feedback),
 .shell-main[data-workspace-initializing] > :not([data-workspace-boot-status]):not(#workspace-navigation-feedback) {visibility:hidden!important;opacity:0!important;}
-.shell-main[data-workspace-initializing] {position:relative;min-height:55vh;}
-.workspace-initializing-status {position:absolute;top:24px;left:var(--shell-workspace-inset,12px);display:flex;align-items:center;justify-content:center;}
+.shell-main:is([data-workspace-initializing],.is-workspace-pending) {position:relative;min-height:55vh;}
+.shell-main.is-workspace-pending > :not(#workspace-navigation-feedback) {display:none!important;}
+.workspace-loading-status {position:absolute;inset-block-start:var(--shell-workspace-inset,12px);inset-inline-start:var(--shell-workspace-inset,12px);display:flex;}
 .app-loading-status {display:flex;align-items:center;justify-content:center;min-height:64px;gap:8px;color:#545b64;}
 .app-loading-error {display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:12px 0;padding:8px 12px;border:1px solid #d13212;background:#fff3f1;color:#16191f;font-size:14px;line-height:20px;}
 @property --app-spinner-sweep {
@@ -15,7 +16,7 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
     50% { --app-spinner-sweep: 330deg; }
 }
 
-.app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before {
+.app-loading-spinner {
     display: inline-block;
     flex: none;
     width: 20px;
@@ -23,12 +24,11 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
     border-radius: 50%;
     color: #687078;
     background: conic-gradient(currentColor var(--app-spinner-sweep, 90deg), transparent 0);
-    mask-image: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+    mask-image: radial-gradient(farthest-side, transparent calc(100% - var(--app-spinner-stroke, 2px)), #000 calc(100% - var(--app-spinner-stroke, 2px) + .5px));
     animation: aws-console-spin .7s linear infinite, app-spinner-sweep 1.5s ease-in-out infinite;
 }
-[data-dashboard-board]:not([data-dashboard-ready]) {position:relative;min-height:180px;}
-[data-dashboard-board]:not([data-dashboard-ready]) > * {visibility:hidden;}
-[data-dashboard-board]:not([data-dashboard-ready])::before {content:"";position:absolute;top:80px;left:calc(50% - 10px);}
+.app-loading-spinner[hidden] {display:none;}
+.app-loading-spinner[data-loading-size=workspace] {width:40px;height:40px;color:#16191f;--app-spinner-stroke:3px;}
 .app-loading-status[data-loading-size=small] {display:inline-flex;min-height:20px;vertical-align:middle;}
 .app-loading-spinner[data-loading-size=small] {width:16px;height:16px;}
 .app-loading-status[data-loading-size=large] {min-height:180px;}
@@ -50,15 +50,15 @@ html[data-workspace-booting] .shell-main > :not([data-workspace-boot-status]):no
 .neo-select-loading {display:flex;justify-content:center;align-items:center;min-height:40px;flex:none;border-top:1px solid #eaeded;}
 .neo-select-loading .app-loading-status {min-height:40px;}
 @media (forced-colors: active) {
-    .app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before {
+    .app-loading-spinner {
         forced-color-adjust: none;
         box-sizing: border-box;
-        border: 2px solid transparent;
+        border: var(--app-spinner-stroke, 2px) solid transparent;
         border-block-start-color: CanvasText;
         border-inline-end-color: CanvasText;
         background: none;
         mask-image: none;
     }
 }
-@media(prefers-reduced-motion:reduce){.app-loading-spinner,[data-dashboard-board]:not([data-dashboard-ready])::before{animation:none;}}
-@media print{.app-loading-status,.app-loading-row,.neo-select-loading{display:none!important;}}
+@media(prefers-reduced-motion:reduce){.app-loading-spinner{animation:none;}}
+@media print{.workspace-loading-status,.app-loading-status,.app-loading-row,.neo-select-loading{display:none!important;}}

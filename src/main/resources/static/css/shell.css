@@ -4791,16 +4791,6 @@ body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([
 .app-navigation-search-results a:hover, .app-navigation-search-results a:focus {background: #414d5c; color: #fff;}
 .workspace-navigation-feedback {display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px 12px;background:#f2f8fc;color:#414d5c;font-size:14px;line-height:20px;}
 .workspace-navigation-feedback[role=alert] {border:1px solid #d13212;background:#fff3f1;}
-.shell-main.is-workspace-pending {position:relative;}
-.shell-main.is-workspace-pending > :not(#workspace-navigation-feedback) {display:none!important;}
-.workspace-navigation-feedback.workspace-navigation-pending {display:block;background:transparent;padding:0;min-width:0;}
-.workspace-navigation-feedback.workspace-navigation-spinner {display:flex;align-items:flex-start;justify-content:flex-start;min-height:55vh;padding:24px 12px;box-sizing:border-box;}
-.workspace-layout-preview {position:relative;width:100%;overflow:hidden;pointer-events:none;}
-.workspace-layout-card {position:absolute;box-sizing:border-box;background:#fff;border:1px solid #d5dbdb;box-shadow:0 1px 1px #879596;overflow:hidden;}
-.workspace-layout-heading {position:absolute;background:#e1e5e8;border-radius:2px;max-height:24px;}
-.workspace-layout-card-header {box-sizing:border-box;background:#fafafa;border-bottom:1px solid #eaeded;display:flex;align-items:center;padding:12px 20px;}
-.workspace-layout-card-header::before {content:"";width:35%;max-width:180px;height:12px;background:#e1e5e8;border-radius:2px;}
-.workspace-layout-card-body {position:absolute;bottom:0;left:0;right:0;display:flex;align-items:center;justify-content:center;}
 
 /* Classic AWS navigation: navy identity bar and a white, text-led service tree. */
 

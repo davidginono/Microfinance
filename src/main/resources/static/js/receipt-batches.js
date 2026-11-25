@@ -9,9 +9,9 @@ function initializeReceiptBatches() {
     const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content || 'X-CSRF-TOKEN';
     const el = (tag, text, cls) => {const node = document.createElement(tag);if(text != null)node.textContent = text;if(cls)node.className = cls;return node;};
     const money = value => {const [whole, fraction = ''] = String(value ?? '0').split('.');return whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + fraction.padEnd(2, '0').slice(0, 2);};
-    async function api(url, method = 'GET', body) {
+    async function api(url, method = 'GET', body, signal) {
         const headers = {Accept:'application/json'};if(csrf)headers[csrfHeader] = csrf;if(body !== undefined)headers['Content-Type'] = 'application/json';
-        const response = await fetch(url, {method, headers, body:body === undefined ? undefined : JSON.stringify(body), cache:'no-store', credentials:'same-origin'});
+        const response = await fetch(url, {method, headers, body:body === undefined ? undefined : JSON.stringify(body), cache:'no-store', credentials:'same-origin', signal});
         if(response.redirected || !response.headers.get('Content-Type')?.includes('application/json'))throw new Error(t('error.failed'));
         const data = await response.json();if(!response.ok){const error = new Error(data.message || t('error.failed'));error.code = data.code;throw error;}return data;
     }
@@ -53,7 +53,9 @@ function initializeReceiptBatches() {
     document.querySelectorAll('[data-batch-choice]').forEach(select => picker(select,select.dataset.batchChoice,()=>null,()=>{},globalError));
     if(!editor)return;
     const id = editor.dataset.receiptBatch, url = base + '/' + id, body = editor.querySelector('[data-batch-rows]'), tableRegion = editor.querySelector('[data-resource-table]');
+    const batchFilter = editor.querySelector('[data-batch-filter]'), defaultAccount = editor.querySelector('[data-default-account]');
     let summary, page = 0, filter = '', hasNext = false, canEdit = false, loadedBusy = false, loading = false, removing = false;
+    let rowRequest, loadedRows = false;
     let activeAction, selectedReceipt, awaitingPost = false, leaving = false;
     const actionButtons = Object.fromEntries(['validate','post','stop'].map(name=>[name,editor.querySelector('[data-batch-'+name+']')]));
     const spinners = new Map(), viewReceipt = tableRegion.querySelector('[data-batch-view]');
@@ -344,7 +346,8 @@ function initializeReceiptBatches() {
         editor.querySelector('[data-batch-save]').disabled = updating || !editable() || editor.dataset.payrollSealed === 'true' || (!dirty.size && !pending.size);
         actionButtons.validate.disabled = updating || !editable() || !summary || summary.receipts === summary.posted || pending.size>0;
         actionButtons.post.disabled = updating || !editable() || dirty.size>0 || pending.size>0 || summary?.batch.state !== 'READY';
-        editor.querySelector('[data-batch-filter]').disabled = removing;
+        batchFilter.disabled = loading || removing;
+        defaultAccount.disabled = loading || removing || editor.dataset.payrollSealed === 'true';
         for(const item of rows.values())if(item.removeButton)item.removeButton.disabled = updating || !canRemove(item);
         const stop = actionButtons.stop;
         stop.hidden = !busy() || !canEdit;
@@ -361,13 +364,34 @@ function initializeReceiptBatches() {
         leaving = true;
         editor.querySelector('[data-batch-completed]').click();
     }
-    async function refreshSummary(){summary = await api(url + '/summary');canEdit = editor.dataset.canEdit === 'true';
+    async function refreshSummary(signal){const data = await api(url + '/summary','GET',undefined,signal);if(signal?.aborted || !editor.isConnected)return;summary = data;canEdit = editor.dataset.canEdit === 'true';
         finishPosting();if(leaving)return;
         const area = editor.querySelector('[data-batch-summary]');area.replaceChildren();for(const [label,value] of [['status',t('state.' + summary.batch.state)],['receipts',summary.receipts],['total',money(summary.total)],['posted',summary.posted],['ready',summary.ready],['failed',summary.failed]]){const fact = el('div'),valueNode=el('dd');if(label==='status'){const state=el('span',String(value));state.dataset.resourceStatus=summary.batch.state;valueNode.append(state);}else valueNode.textContent=String(value);fact.append(el('dt',t(label)),valueNode);area.append(fact);}editor.querySelector('[data-batch-progress]').textContent = busy()?t('state.' + summary.batch.state):'';controls();}
-    async function load(){if(loading || leaving)return;loading = true;selectReceipt(null);try{controls();await flush();await refreshSummary();if(leaving)return;const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}));rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));hasNext = data.hasNext;rerender();loadedBusy = busy();globalError('');}catch(error){body.querySelector('[data-batch-loading]')?.replaceWith(document.createTextNode(t('error.failed')));globalError(error.message);}finally{loading = false;controls();}}
-    editor.querySelector('[data-default-account]').addEventListener('change',event=>{
+    async function load(){
+        if(loading || leaving)return;
+        const controller = new AbortController(), {signal} = controller;
+        rowRequest = controller;loading = true;selectReceipt(null);controls();
+        try{
+            await flush();if(signal.aborted)return;
+            window.AppLoading?.begin(tableRegion);
+            await refreshSummary(signal);if(leaving || signal.aborted)return;
+            const data = await api(url + '/items?' + new URLSearchParams({page,state:filter}),'GET',undefined,signal);
+            if(signal.aborted || !editor.isConnected)return;
+            window.AppLoading?.end(tableRegion);
+            rows.clear();data.rows.forEach(item=>rows.set(item.id,{...item,persisted:true}));
+            hasNext = data.hasNext;rerender();loadedRows = true;loadedBusy = busy();globalError('');
+        }catch(error){
+            if(!signal.aborted && editor.isConnected)globalError(error.message);
+        }finally{
+            if(rowRequest === controller){
+                rowRequest = null;loading = false;window.AppLoading?.end(tableRegion);
+                if(editor.isConnected)controls();
+            }
+        }
+    }
+    defaultAccount.addEventListener('change',event=>{
         const account = event.target;if(!editable() || editor.dataset.payrollSealed === 'true' || !account.value)return;
-        if(removing)return;
+        if(removing || loading)return;
         for(const item of rows.values())if(item.form.rows.length === 1 && item.state !== 'POSTED' && !item.form.moneyAccountId){item.form.moneyAccountId = account.value;item.labels ||= {};item.labels[account.value] = account.selectedOptions[0].textContent;mark(item);}
         rerender();
     });
@@ -375,7 +399,7 @@ function initializeReceiptBatches() {
     editor.querySelector('[data-batch-save]').addEventListener('click',()=>flush().catch(error=>globalError(error.message)));
     tableRegion.addEventListener('resource-table:refresh',event=>{event.preventDefault();if(removing)return;if(!dirty.size && !pending.size){load();return;}openConfirm(t('reloadTitle'),t('reloadMessage'),t('reload'),async()=>{for(const item of rows.values()){item.discarding = true;clearTimeout(item.timer);}await Promise.allSettled([...rows.values()].map(item=>item.saving).filter(Boolean));dirty.clear();await load();});});
     tableRegion.addEventListener('resource-table:page',async event=>{if(loading || removing)return;try{await flush();page = event.detail.page;await load();}catch(error){globalError(error.message);}});
-    editor.querySelector('[data-batch-filter]').addEventListener('change',async event=>{try{await flush();filter = event.target.value;page = 0;await load();}catch(error){globalError(error.message);}});
+    batchFilter.addEventListener('change',async event=>{if(loading || removing)return;try{await flush();filter = event.target.value;page = 0;await load();}catch(error){globalError(error.message);}});
     async function action(kind,version){
         if(activeAction || leaving)return;
         activeAction = kind;
@@ -409,7 +433,11 @@ function initializeReceiptBatches() {
     document.addEventListener('click',event=>{const a = event.target.closest('a[href]');if(!a || a.target === '_blank' || (!dirty.size && !pending.size && !removing) || event.ctrlKey || event.metaKey)return;event.preventDefault();if(!removing)flush().then(()=>a.click()).catch(error=>globalError(error.message));});
     document.addEventListener('workspace:before-navigate',event=>{if(dirty.size || pending.size || removing){event.preventDefault();if(!removing)flush().then(event.detail.resume).catch(error=>globalError(error.message));}});
     const poll = setInterval(async()=>{if(!editor.isConnected){clearInterval(poll);return;}if(loading || removing || activeAction || leaving || dirty.size || pending.size || document.hidden)return;try{await refreshSummary();if(!removing && !leaving && (busy() || loadedBusy))await load();}catch(error){globalError(error.message);}},2500);
-    window.addEventListener('pagehide',()=>{clearInterval(poll);cleanups.forEach(fn=>fn());rows.forEach(item=>clearTimeout(item.timer));});
+    window.addEventListener('pagehide',()=>{
+        rowRequest?.abort();rowRequest = null;loading = false;window.AppLoading?.end(tableRegion);
+        clearInterval(poll);cleanups.forEach(fn=>fn());rows.forEach(item=>clearTimeout(item.timer));
+    });
+    window.addEventListener('pageshow',event=>{if(event.persisted){controls();if(!loadedRows)void load();}});
     load();
 }
 if (window.WorkspaceNavigation) window.WorkspaceNavigation.onReady(initializeReceiptBatches);

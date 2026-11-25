@@ -79,7 +79,7 @@ function fixture(withCharges=false) {
     <label data-custom-percentage><input id="interestPercent" name="interestPercent"></label>
     <label data-custom-percentage><select id="interestBasis" name="interestBasis"><option value="WHOLE_LOAN">For the whole loan</option><option value="ANNUAL">Annual rate</option></select><small data-reducing-terms-note hidden>Reducing balance uses an annual percentage. For whole-loan interest, select Flat rate.</small></label>
     <label data-custom-amount><input id="interestAmount" name="interestAmount"></label><select id="customFrequency" name="customFrequency"><option>MONTHLY</option></select></div>
-    <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span class="loan-interest-spinner" hidden></span><output data-interest-value></output><p data-interest-description></p></div>
+    <div data-interest-preview data-error="Check the loan terms" data-days="Days" data-months="Months" data-years="Years"><span data-interest-spinner hidden><span class="app-loading-spinner" data-loading-size="small"></span></span><output data-interest-value></output><p data-interest-description></p></div>
     <section data-schedule-preview hidden><span data-schedule-summary data-monthly="Monthly" data-weekly="Weekly" data-monthly-period="Month {0}" data-weekly-period="Week {0}"></span><table><tbody data-schedule-rows></tbody></table></section>
     ${withCharges ? '<section data-charge-preview data-custom-allowed="true"><h2>Charges<span data-charge-loading data-ui-loading-region hidden></span></h2><div data-charge-kind="APPLICATION"><input name="customApplicationCharge" data-charge-amount></div></section><p data-charge-error hidden></p>' : ''}
     <button name="action" value="save">Save</button><button disabled>Restricted</button>
@@ -102,19 +102,20 @@ test('progressive tenure, custom modes and percentage basis send only active fie
   assert.equal(d.querySelector('[data-tenure-type]').hidden,true);
   set('loanMode','CUSTOM');set('tenureUnit','DAYS');set('tenureValue','14');assert.equal(d.getElementById('tenureValue').disabled,false);assert.equal(d.getElementById('tenureValue').max,'18250');
   set('loanMode','CUSTOM');set('interestBasis','ANNUAL');set('interestPercent','12');set('principal','1000');
-  const calculation=run();assert.equal(d.querySelector('.loan-interest-spinner').hidden,false);assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
+  const spinner=d.querySelector('[data-interest-spinner]');assert.equal(spinner.hidden,true);
+  const calculation=run();assert.equal(spinner.hidden,false);assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
   assert.equal(requests[0].options.body.get('productId'),null);assert.equal(requests[0].options.body.get('_csrf'),'token');assert.equal(requests[0].options.body.get('interestBasis'),'ANNUAL');
-  respond(0,'60.00');await calculation;assert.equal(d.querySelector('[data-interest-value]').textContent,'60.00');assert.equal(d.querySelector('.loan-interest-spinner').hidden,true);
+  respond(0,'60.00');await calculation;assert.equal(d.querySelector('[data-interest-value]').textContent,'60.00');assert.equal(spinner.hidden,true);
   set('interestEntry','AMOUNT');set('interestAmount','17.03');const amount=run();assert.equal(requests[1].options.body.get('interestPercent'),null);assert.equal(requests[1].options.body.get('interestAmount'),'17.03');respond(1,'17.03');await amount;
   assert.equal(d.querySelector('[data-interest-value]').textContent,'17.03');dom.window.close();
 });
 
 test('stale quotes cannot overwrite the latest amount and failures end the spinner',async()=>{
   const {w,set,run,respond,requests,dom}=fixture();set('tenureUnit','MONTHS');set('tenureValue','6');set('principal','1000');const first=run();set('principal','2000');const second=run();
-  assert.equal(requests[0].options.signal.aborted,true);respond(0,'100.00');await first;assert.equal(w.document.querySelector('.loan-interest-spinner').hidden,false);
+  assert.equal(requests[0].options.signal.aborted,true);respond(0,'100.00');await first;assert.equal(w.document.querySelector('[data-interest-spinner]').hidden,false);
   respond(1,'200.00');await second;assert.equal(w.document.querySelector('[data-interest-value]').textContent,'200.00');
   set('principal','3000');const failed=run();respond(2,null,false);await failed;
-  assert.equal(w.document.querySelector('[data-interest-description]').textContent,'Invalid loan terms');assert.equal(w.document.querySelector('.loan-interest-spinner').hidden,true);
+  assert.equal(w.document.querySelector('[data-interest-description]').textContent,'Invalid loan terms');assert.equal(w.document.querySelector('[data-interest-spinner]').hidden,true);
   dom.window.close();
 });
 
@@ -134,8 +135,9 @@ test('schedule and interest stay visible during refresh and clear on error',asyn
   set('tenureValue','12');
   assert.equal(preview.hidden,false);assert.equal(d.querySelector('[data-schedule-rows]').children.length,1);
   assert.equal(d.querySelector('[data-interest-value]').textContent,'17.03');
-  assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
-  const failed=run();respond(1,null,false);await failed;assert.equal(preview.hidden,true);
+  assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'false');
+  const failed=run();assert.equal(d.querySelector('[data-interest-preview]').getAttribute('aria-busy'),'true');
+  respond(1,null,false);await failed;assert.equal(preview.hidden,true);
   dom.window.close();
 });
 

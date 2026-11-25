@@ -164,6 +164,8 @@
 .aws-console .dashboard-infolet-tools .dashboard-infolet-command{font-size:0!important;}
 .dashboard-infolet-command:focus-visible{outline:2px solid #0972d3;outline-offset:2px;}
 .dashboard-infolet-body{display:flex;flex:1;min-height:0;min-width:0;gap:20px;padding:18px 20px;}
+.dashboard-infolet-grid > .app-loading-status{grid-column:1 / -1;}
+.dashboard-infolet-body > .app-loading-status{flex:1;}
 .dashboard-infolet-summary{min-width:0;}
 .dashboard-infolet-count{display:inline-block;color:#16191f;font-size:36px;font-weight:700;line-height:42px;font-variant-numeric:tabular-nums;text-decoration:none;}
 .dashboard-infolet[data-tone=error] .dashboard-infolet-count{color:#b12704;}

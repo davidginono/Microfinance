@@ -9,7 +9,7 @@
 <c:choose><c:when test="${empty personalDashboard.activities and empty personalDashboard.administration}">
     <section class="erp-panel"><div class="erp-panel-body"><p><spring:message code="office.noWorkAssigned" /></p></div></section>
 </c:when><c:otherwise>
-<div data-dashboard-board="personal" aria-busy="true">
+<div data-dashboard-board="personal">
     <c:forEach items="${personalDashboard.activities}" var="activity">
         <section class="erp-panel" data-dashboard-widget="activity-${activity.key}" data-widget-width="2" data-widget-height="320" data-personal-activity="${activity.key}" data-activity-url="<c:url value='/api/dashboard/activities/${activity.key}' />">
             <div class="erp-panel-header"><h2 class="erp-panel-title"><spring:message code="${activity.labelKey}" /></h2></div>
