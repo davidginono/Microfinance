@@ -59,14 +59,27 @@ public class OnboardingService {
         return new ContactCheck(true,registration.contactRegistered(a,client,field,normalized));
     }
     @Transactional(readOnly=true)
+    public Page<RegistryClient> registry(AppUserPrincipal actor,String search,String status,int page,String sort) {
+        authorize(actor,"VIEW");check(search!=null&&search.length()<=100,"query");page(page);
+        check(Set.of("","ACTIVE","INACTIVE").contains(status),"query");
+        var order=clientOrder(sort,Map.of("number","m.member_no","name","m.full_name","state","client_status","group","group_names"));
+        var rows=records.registry(actor,search,status,page,order,today());
+        return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
+    @Transactional(readOnly=true)
     public Page<Client> clients(AppUserPrincipal a,String search,String state,int page,String sort) {
         authorize(a,"VIEW");check(search!=null&&search.length()<=100,"query");page(page);
         check(Set.of("","NOT_STARTED","DRAFT","RECORDED","SUBMITTED","VERIFY","RETURN","REJECT","REVOKE","EXPIRED","STALE").contains(state),"query");
-        var columns=Map.of("number","member_no","name","full_name","state","state","due","review_due");
-        String value=sort==null||sort.isBlank()?"number_asc":sort;int split=value.lastIndexOf('_');check(split>0,"query");
-        String column=columns.get(value.substring(0,split)),direction=value.substring(split+1);check(column!=null&&Set.of("asc","desc").contains(direction),"query");
-        var rows=records.clients(a,search,state,page,column+" "+direction+" nulls last",today());
+        var order=clientOrder(sort,Map.of("number","member_no","name","full_name","state","state","due","review_due"));
+        var rows=records.clients(a,search,state,page,order,today());
         return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
+    private static String clientOrder(String sort, Map<String,String> columns) {
+        String value=sort==null||sort.isBlank()?"number_asc":sort;
+        int split=value.lastIndexOf('_');check(split>0,"query");
+        String column=columns.get(value.substring(0,split)),direction=value.substring(split+1);
+        check(column!=null&&Set.of("asc","desc").contains(direction),"query");
+        return column+" "+direction+" nulls last";
     }
     @Transactional(readOnly=true)
     public Page<Client> branchClients(com.sacco.mvp.branches.service.BranchService.ReadScope scope,String search,int page,String sort) {

@@ -3,6 +3,8 @@ package com.sacco.mvp.accounting.loans;
 import com.sacco.mvp.clients.onboarding.dto.OnboardingDtos.*;
 import com.sacco.mvp.clients.onboarding.service.OnboardingService;
 import com.sacco.mvp.domain.*;
+import com.sacco.mvp.grouplending.dto.GroupLendingDtos.MemberForm;
+import com.sacco.mvp.grouplending.service.GroupLendingService;
 import com.sacco.mvp.service.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -55,6 +57,30 @@ class ClientOnboardingPostgresTest {
     UUID group(String branch) {
         UUID id=UUID.randomUUID();var maker=branch.equals("B1")?f.actor:f.operator(branch);
         f.jdbc.update("insert into lending_group(id,sacco_id,station_id,request_key,payload_hash,code,name,legal_form,identity_evidence,created_by,created_at) values(?,?,?,?,?,?,?,'INFORMAL','Synthetic evidence',?,now())",id,f.institution,branch,UUID.randomUUID(),"a".repeat(64),id.toString().substring(0,8),"Synthetic group "+id,maker.getMemberId());return id;
+    }
+    @Test void registryFiltersByClientStatusAndListsCurrentGroupsWithinTheBranch() {
+        UUID inactive=otherClient("B1"), foreign=otherClient("B2");
+        f.jdbc.update("update members set status='INACTIVE' where id=?",inactive);
+        var groups=f.context.getBean(GroupLendingService.class);
+        UUID first=group("B1"), second=group("B1"), ended=group("B1");
+        for (UUID group : List.of(first,second,ended)) {
+            var member=new MemberForm();member.setClientId(f.client);member.setStartsOn(day);
+            member.setEvidence("Synthetic membership");
+            UUID membership=groups.addMember(f.actor,group,member);
+            if (group.equals(ended)) groups.endMember(f.actor,group,membership,day,"Synthetic end of membership");
+        }
+        String groupNames=String.join(", ",List.of(first,second).stream().map(id->"Synthetic group "+id).sorted().toList());
+        var all=service.registry(f.actor,"","",0,"group_asc").rows();
+        assertThat(all).extracting(RegistryClient::id).containsExactly(f.client,inactive);
+        assertThat(all.getFirst().groupNames()).isEqualTo(groupNames);
+        assertThat(all.getFirst().status()).isEqualTo("ACTIVE");
+        assertThat(all.getLast().groupNames()).isNull();
+        assertThat(all.getLast().status()).isEqualTo("INACTIVE");
+        assertThat(service.registry(f.actor,"","ACTIVE",0,"state_asc").rows()).containsExactly(all.getFirst());
+        assertThat(service.registry(f.actor,"","INACTIVE",0,"state_desc").rows()).containsExactly(all.getLast());
+        assertThat(service.registry(f.operator("B2"),"","",0,"number_asc").rows())
+            .extracting(RegistryClient::id).containsExactly(foreign);
+        assertThat(service.client(f.actor,f.client).state()).isEqualTo("NOT_STARTED");
     }
     @Test void loanProfileUsesRecordedFiguresAndIgnoresLaterDraftsWithinTheCurrentBranch() {
         var form=profile(f.client,"SYNTHETIC-"+UUID.randomUUID());form.setAction("RECORDED");

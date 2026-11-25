@@ -26,6 +26,24 @@ public class OnboardingRepository {
     public boolean photo(AppUserPrincipal a,UUID client,UUID id) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from client_onboarding_document where id=? and client_id=? and sacco_id=? and station_id=? and category in('PROFILE_PHOTO','SPOUSE_PHOTO'))",Boolean.class,id,client,a.getSaccoId(),a.getStationId()));
     }
+    public List<RegistryClient> registry(AppUserPrincipal actor,String search,String status,int page,String order,LocalDate day) {
+        String matching=pattern(search);
+        return jdbc.query("""
+            select m.id,m.member_no,m.full_name,case when m.status='ACTIVE' then 'ACTIVE' else 'INACTIVE' end client_status,
+                (select string_agg(g.name, ', ' order by g.name,g.id)
+                 from lending_group_member gm join lending_group g
+                   on g.id=gm.group_id and g.sacco_id=gm.sacco_id and g.station_id=gm.station_id
+                 where gm.sacco_id=m.sacco_id and gm.station_id=m.station_id and gm.client_id=m.id
+                   and gm.ends_on is null and gm.starts_on<=?) group_names
+            from members m
+            where m.sacco_id=? and m.station_id=? and (m.is_member or (m.is_member is null and m.position='MEMBER'))
+              and (m.member_no ilike ? escape '!' or m.full_name ilike ? escape '!')
+              and (?='' or (m.status='ACTIVE')=(?='ACTIVE'))
+            order by %s,m.id limit 26 offset ?
+            """.formatted(order),(r,n)->new RegistryClient(r.getObject("id",UUID.class),r.getString("member_no"),
+                r.getString("full_name"),r.getString("client_status"),r.getString("group_names")),
+            day,actor.getSaccoId(),actor.getStationId(),matching,matching,status,status,page*25);
+    }
     private static final String CLIENT_SELECT="""
         select m.id,m.member_no,m.full_name,m.phone,m.email,(m.position<>'MEMBER' or exists(select 1 from member_staff_roles sr where sr.member_id=m.id)) staff_user,c.id revision_id,coalesce((select max(sequence) from client_onboarding_revision r where r.client_id=m.id),0) sequence,c.review_due,
           case when c.state='VERIFY' and (m.full_name is distinct from c.profile->>'fullName' or m.phone is distinct from c.profile->>'phone' or m.email is distinct from c.profile->>'email') then 'STALE' when c.state='VERIFY' and ((c.profile->>'identityExpiresOn')::date<? or (c.profile->>'retentionReviewOn')::date<?

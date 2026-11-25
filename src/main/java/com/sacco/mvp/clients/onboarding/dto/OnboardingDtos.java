@@ -16,6 +16,7 @@ public final class OnboardingDtos {
                               java.math.BigDecimal monthlyDebtRepayments, String businessName,
                               String businessType, String activity, String incomeSource, String employerName) {}
     public record ProfileDraft(String profile,UUID actor,String institution,String branch,UUID requestKey) implements java.io.Serializable {}
+    public record RegistryClient(UUID id, String number, String name, String status, String groupNames) {}
     public record Client(UUID id, String number, String name, String phone, String email, String state,
                          UUID revisionId, int sequence, LocalDate reviewDue, boolean staffUser) {
         public Client(UUID id,String number,String name,String phone,String email,String state,UUID revisionId,int sequence,LocalDate reviewDue) {

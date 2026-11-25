@@ -40,6 +40,15 @@ class ClientOnboardingMvcTest {
         when(service.latest(actor,client)).thenReturn(Optional.empty());when(service.documents(actor,client)).thenReturn(List.of());
         when(service.history(actor,client,0)).thenReturn(new Page<>(List.of(),0,false));when(service.today()).thenReturn(LocalDate.of(2026,11,13));
     }
+    @Test void registryPassesClientStatusAndGroupSortToTheService() throws Exception {
+        var records=new Page<>(List.of(new RegistryClient(client,"CL-TEST","Example client","INACTIVE","Example group")),1,true);
+        when(service.registry(actor,"Example","INACTIVE",1,"group_desc")).thenReturn(records);
+        mvc.perform(get("/finance/clients/onboarding").with(user(actor)).param("search","Example")
+                .param("status","INACTIVE").param("page","1").param("sort","group_desc"))
+            .andExpect(status().isOk()).andExpect(view().name("onboarding/register"))
+            .andExpect(model().attribute("records",records)).andExpect(model().attribute("status","INACTIVE"))
+            .andExpect(model().attribute("sort","group_desc"));
+    }
     @Test void currentDetailsKeepPastDecisionsWithoutCreatingAReviewForm() throws Exception {
         var past=new Decision(UUID.randomUUID(),"VERIFY","Earlier recorded decision","","UNAVAILABLE","",LocalDate.of(2026,11,1),null,"",actor.getMemberId(),"Earlier reviewer",OffsetDateTime.now());
         when(service.decisions(actor,client)).thenReturn(List.of(past));

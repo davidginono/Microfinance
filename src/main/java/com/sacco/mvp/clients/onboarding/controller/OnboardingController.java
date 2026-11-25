@@ -34,8 +34,8 @@ public class OnboardingController {
     @GetMapping("/{id}/photos/{document}") public ResponseEntity<byte[]> photo(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@PathVariable UUID document) {var f=service.photo(a,id,document);return ResponseEntity.ok().cacheControl(CacheControl.noStore()).header("X-Content-Type-Options","nosniff").header("Content-Security-Policy","sandbox").contentType(MediaType.parseMediaType(f.contentType())).body(f.bytes());}
     @GetMapping("/notice") public String retiredNotice(@AuthenticationPrincipal AppUserPrincipal a) {service.authorize(a,"VIEW");return "redirect:"+ROOT;}
 
-    @GetMapping public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String state,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="number_asc") String sort,Model m) {
-        m.addAttribute("records",service.clients(a,search,state,page,sort));m.addAttribute("search",search);m.addAttribute("state",state);m.addAttribute("sort",sort);return "onboarding/register";
+    @GetMapping public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,@RequestParam(defaultValue="") String status,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="number_asc") String sort,Model m) {
+        m.addAttribute("records",service.registry(a,search,status,page,sort));m.addAttribute("search",search);m.addAttribute("status",status);m.addAttribute("sort",sort);return "onboarding/register";
     }
     @GetMapping("/new") public String create(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(required=false) UUID groupId,Model m) {
         service.authorize(a,"CREATE");var f=new CreateForm();f.setEnrollGroupId(groupId);f.getProfile().setGroupId(groupId);m.addAttribute("createForm",f);return form(m,"create");
