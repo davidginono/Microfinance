@@ -81,17 +81,29 @@
                         <fieldset class="col-span-full space-y-2 min-w-0" data-loan-top-up-settings>
                             <legend class="font-semibold"><spring:message code="loanTopUp.settings" /></legend>
                             <input type="hidden" name="topUpSettingsPresent" value="true" />
+                            <c:set var="topUpAllowedError" value="${loanSettingsFieldErrors['topUpAllowed']}" />
+                            <c:set var="topUpFeesError" value="${loanSettingsFieldErrors['topUpFeesEnabled']}" />
                             <label class="flex items-center gap-2">
-                                <input type="checkbox" class="admin-cloud-checkbox" name="topUpAllowed" value="true"
+                                <input type="checkbox" class="admin-cloud-checkbox ${empty topUpAllowedError ? '' : 'field-error-input'}" name="topUpAllowed" value="true"
+                                       aria-invalid="${not empty topUpAllowedError}"
+                                       aria-describedby="${empty topUpAllowedError ? '' : 'loan-top-up-allowed-error'}"
                                        ${creatingLoanProduct or product.topUpAllowed ? 'checked' : ''} />
                                 <spring:message code="loanTopUp.allow" />
                             </label>
+                            <c:if test="${not empty topUpAllowedError}">
+                                <p id="loan-top-up-allowed-error" class="field-error-text" role="alert"><c:out value="${topUpAllowedError}" /></p>
+                            </c:if>
                             <div class="space-y-2" data-top-up-fees-toggle ${creatingLoanProduct or product.topUpAllowed ? '' : 'hidden'}>
                                 <label class="flex items-center gap-2">
-                                    <input type="checkbox" class="admin-cloud-checkbox" name="topUpFeesEnabled" value="true"
+                                    <input type="checkbox" class="admin-cloud-checkbox ${empty topUpFeesError ? '' : 'field-error-input'}" name="topUpFeesEnabled" value="true"
+                                           aria-invalid="${not empty topUpFeesError}"
+                                           aria-describedby="${empty topUpFeesError ? '' : 'loan-top-up-fees-error'}"
                                            ${product.topUpFeesEnabled ? 'checked' : ''} />
                                     <spring:message code="loanTopUp.chargeFees" />
                                 </label>
+                                <c:if test="${not empty topUpFeesError}">
+                                    <p id="loan-top-up-fees-error" class="field-error-text" role="alert"><c:out value="${topUpFeesError}" /></p>
+                                </c:if>
                                 <div class="space-y-2" data-top-up-fee-choices ${product.topUpFeesEnabled ? '' : 'hidden'}>
                                     <label class="flex items-center gap-2">
                                         <input type="checkbox" class="admin-cloud-checkbox" name="topUpApplicationFee" value="true"
