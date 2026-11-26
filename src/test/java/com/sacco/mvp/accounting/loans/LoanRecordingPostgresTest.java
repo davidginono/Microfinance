@@ -1243,8 +1243,14 @@ class LoanRecordingPostgresTest {
 
     @Test void receiptBatchStagesRepeatedLoansAndPostsEachReceiptExactlyOnce(){
         seedHistoricalPolicy();var first=disbursed("D-BATCH-1");var second=disbursed("D-BATCH-2");var batch=batches().create(actor,"Daily collections");
-        batchItem(batch,receiptForm(first,second));batchItem(batch,receiptForm(first));processBatch(batch,false);
+        var form=receiptForm(first,second);
+        var firstLoan=service.detail(actor,first).loan();
+        String oldPickerLabel=firstLoan.number()+" - "+firstLoan.product();
+        form.getRows().getFirst().setDescription(oldPickerLabel);
+        form.getRows().getLast().setDescription("");
+        batchItem(batch,form);batchItem(batch,receiptForm(first));processBatch(batch,false);
         var validated=batches().items(actor,batch,0,"").rows();assertThat(validated).allMatch(i->i.state().equals("READY"));
+        assertThat(validated.getFirst().form().getRows().getLast().getDescription()).isEmpty();
         assertThat(validated.getFirst().preview().interest()).isEqualByComparingTo("40.00");assertThat(validated.getLast().preview().interest()).isZero();assertThat(validated.getLast().preview().principal()).isEqualByComparingTo("120.00");
         assertThat(jdbc.queryForObject("select count(*) from accountant_loan_receipt where sacco_id=?",Integer.class,institution)).isZero();
         processBatch(batch,true);var result=batches().get(actor,batch);assertThat(result.batch().state()).isEqualTo("COMPLETED");assertThat(result.posted()).isEqualTo(2);assertThat(result.postedTotal()).isEqualByComparingTo("360.00");
@@ -1264,7 +1270,28 @@ class LoanRecordingPostgresTest {
         var daily=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,reportFilter,false);
         assertThat(daily.rows()).extracting(row->row.get("documentReference")).contains("Daily collections / 1","Daily collections / 2");
         var cashbook=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK,reportFilter,false);
-        assertThat(cashbook.rows()).extracting(row->row.get("reference")).contains(receipt.header().number());
+        String number=receipt.header().number();
+        assertThat(daily.rows()).filteredOn(row->number.equals(row.get("documentNumber"))).isNotEmpty()
+            .allSatisfy(row->assertThat(row).containsEntry("transaction","Loan repayment"));
+        assertThat(daily.rows()).anySatisfy(row->assertThat(row).containsEntry("transaction","Loan collection"));
+        assertThat(cashbook.rows()).filteredOn(row->number.equals(row.get("reference"))).isNotEmpty()
+            .allSatisfy(row->assertThat(row).containsEntry("particulars","Loan repayment"));
+        assertThat(statementActivity(cash)).filteredOn(row->number.equals(row.voucherNumber())).isNotEmpty()
+            .allSatisfy(row->assertThat(row.description()).isEqualTo("Loan repayment"));
+        assertThat(service.posting(actor,receipt.rows().getFirst().postingId()).notes()).isEqualTo("Loan repayment");
+        assertThat(jdbc.queryForObject("select description from accountant_loan_receipt_row where receipt_id=? and line_no=1",String.class,receipt.header().id()))
+            .isEqualTo(oldPickerLabel);
+        var priorLocale=org.springframework.context.i18n.LocaleContextHolder.getLocaleContext();
+        try {
+            org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.forLanguageTag("sw"));
+            var repayments=reports.read(actor,com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.LOAN_REPAYMENT_TRANSACTIONS,reportFilter,false);
+            assertThat(repayments.rows()).filteredOn(row->number.equals(row.get("reference"))).isNotEmpty()
+                .allSatisfy(row->assertThat(row).containsEntry("entryDescription","Marejesho ya mkopo"));
+            assertThat(statementActivity(cash)).filteredOn(row->number.equals(row.voucherNumber())).isNotEmpty()
+                .allSatisfy(row->assertThat(row.description()).isEqualTo("Marejesho ya mkopo"));
+        } finally {
+            org.springframework.context.i18n.LocaleContextHolder.setLocaleContext(priorLocale);
+        }
         assertThat(jdbc.queryForObject("select reference from accountant_loan_receipt where id=?",String.class,saved.receiptId())).isEqualTo("BATCH/"+saved.id());
         assertThatThrownBy(()->jdbc.update("update receipt_batch_item set receipt_id=null where id=?",saved.id())).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }

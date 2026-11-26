@@ -59,7 +59,7 @@
                   <c:otherwise><c:out value="${appTime:referenceDate(row[column.key],referenceLocale)}" /></c:otherwise>
                 </c:choose>
                 <c:if test="${report.kind=='LOAN_REPAYMENT_TRANSACTIONS' and column.key=='date' and not empty row.entryKind}">
-                  <span class="reference-entry"><spring:message code="management.entry.${row.entryKind}" /> <c:out value="${row.reference}" /></span>
+                  <span class="reference-entry"><c:choose><c:when test="${not empty row.entryDescription}"><c:out value="${row.entryDescription}" /></c:when><c:otherwise><spring:message code="management.entry.${row.entryKind}" /></c:otherwise></c:choose> <c:out value="${row.reference}" /></span>
                   <c:if test="${not empty row.reversesReference}"><span class="reference-entry"><spring:message code="management.field.reversesReference" />: <c:out value="${row.reversesReference}" /></span></c:if>
                 </c:if>
               </td>

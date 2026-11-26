@@ -133,7 +133,6 @@ public class ReceiptBatchService {
             var payment = new RowForm();
             payment.setLoanId(loan.id());
             payment.setAmount(input.amount());
-            payment.setDescription(loanLabel);
             form.setRows(List.of(payment));
             drafts.add(new ImportedDraft(canonical(UUID.randomUUID(), form, input.reference()), loan.clientNumber() + " - " + loan.client(),
                 Map.of(loan.id(), loanLabel, accountId, account.label())));
@@ -157,7 +156,6 @@ public class ReceiptBatchService {
         String reference=prior.map(p->p.form().getReference()).filter(r->!r.isBlank()).orElse("BATCH/"+id);
         Form f=canonical(id,input.form(),reference);int existing=prior.map(p->p.form().getRows().size()).orElse(0);require(repository.transactions(batch)-existing+f.getRows().size()<=2000,"limit");
         var labels=new HashMap<>(receipts.selected(a,f).labels());if(f.getMoneyAccountId()!=null)labels.put(f.getMoneyAccountId(),loans.receiptMoneyAccount(a,f.getMoneyAccountId()).label());String client=f.getClientId()==null?"":loans.receiptClient(a,f.getClientId()).label();
-        for(var row:f.getRows())if(row.getLoanId()!=null && row.getDescription().isBlank())row.setDescription(labels.getOrDefault(row.getLoanId(),""));
         BigDecimal total=f.getRows().stream().map(RowForm::getAmount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);require(total.precision()-total.scale()<=16,"input");
         repository.save(b,id,prior.map(Item::lineNo).orElseGet(()->repository.nextLine(batch)),input.expectedVersion(),f,client,labels,total,prior.isEmpty());repository.invalidate(batch);repository.state(batch,"DRAFT",clock.now());return repository.item(batch,id).orElseThrow();
     }

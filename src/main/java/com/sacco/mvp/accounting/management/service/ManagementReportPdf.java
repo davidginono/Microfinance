@@ -126,7 +126,10 @@ public class ManagementReportPdf {
         Object amount=row.get(c.key());
         String text=r.isReferenceLayout()?sourceValue(amount,locale):value(amount,locale);
         if(r.kind()==Kind.LOAN_REPAYMENT_TRANSACTIONS && c.key().equals("date")){
-            if(row.get("entryKind")!=null)text+="\n"+message("entry."+row.get("entryKind"),locale)+" "+value(row.get("reference"),locale);
+            if(row.get("entryKind")!=null){
+                String description=(String)row.get("entryDescription");
+                text+="\n"+(description!=null?description:message("entry."+row.get("entryKind"),locale))+" "+value(row.get("reference"),locale);
+            }
             if(row.get("reversesReference")!=null)text+="\n"+message("field.reversesReference",locale)+": "+value(row.get("reversesReference"),locale);
         }else if(c.key().equals("frequency") && Set.of("MONTHLY","WEEKLY").contains(Objects.toString(row.get(c.key()),"")))return messages.getMessage("recording.frequency."+row.get(c.key()),null,locale);
         else if(c.key().equals("transaction") && Set.of("PRINCIPAL","INTEREST","CHARGES").contains(Objects.toString(row.get("component"),"")))return message("component."+row.get("component"),locale)+" — "+text;

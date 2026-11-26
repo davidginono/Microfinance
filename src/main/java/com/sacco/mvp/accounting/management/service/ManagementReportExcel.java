@@ -232,7 +232,8 @@ public class ManagementReportExcel {
         for (int column = result.columns().size(); column < keys.size(); column++)
             if (Set.of("disbursed", "principalBalance").contains(keys.get(column))) amounts.add(column);
         for (var row : result.rows())
-            book.row(data, keys.stream().map(key -> value(row.get(key), key, locale)).toList(), amounts, false);
+            book.row(data, keys.stream().map(key -> key.equals("entryKind") ? repaymentDescription(row, locale)
+                : value(row.get(key), key, locale)).toList(), amounts, false);
         book.filter(data, header, keys.size());
         return data;
     }
@@ -265,10 +266,15 @@ public class ManagementReportExcel {
         Object date = value(row.get("date"), "date", locale);
         var text = new StringBuilder(date instanceof LocalDate day ? LoanReportReferenceText.date(day, locale) : Objects.toString(date, "—"));
         if (row.get("entryKind") != null)
-            text.append('\n').append(value(row.get("entryKind"), "entryKind", locale)).append(' ').append(Objects.toString(row.get("reference"), "—"));
+            text.append('\n').append(repaymentDescription(row, locale)).append(' ').append(Objects.toString(row.get("reference"), "—"));
         if (row.get("reversesReference") != null)
             text.append('\n').append(field("reversesReference", locale)).append(": ").append(row.get("reversesReference"));
         return text.toString();
+    }
+
+    private Object repaymentDescription(Map<String, Object> row, Locale locale) {
+        Object description = row.get("entryDescription");
+        return description != null ? description : value(row.get("entryKind"), "entryKind", locale);
     }
 
     private String scope(Result result) {

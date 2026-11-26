@@ -142,7 +142,8 @@ class ReportTotalsTest {
                 assertThat(response.statusCode()).as(kind+" "+response.body()).isEqualTo(200);
                 assertThat(response.body().split("<tr class=\"reference-total\"",-1)).as(kind+" HTML "+language).hasSize(2);
                 assertThat(response.body()).contains(LoanReportExcelTest.messages().getMessage("management.total",null,Locale.forLanguageTag(language)));
-                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS)assertThat(response.body()).doesNotContain(new LoanReportExcelTest().result(kind,1).clientSelection());
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS)assertThat(response.body()).contains("Configured loan repayment")
+                    .doesNotContain(new LoanReportExcelTest().result(kind,1).clientSelection());
             }
             var empty=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+tomcat.getConnector().getLocalPort()
                 +"/preview?kind=LOAN_REPAYMENT_TRANSACTIONS&empty=true")).header("Accept-Language","en").GET().build(),HttpResponse.BodyHandlers.ofString());

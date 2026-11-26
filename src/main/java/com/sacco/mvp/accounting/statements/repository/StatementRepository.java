@@ -2,6 +2,7 @@ package com.sacco.mvp.accounting.statements.repository;
 
 import com.sacco.mvp.accounting.statements.dto.StatementModels.*;
 import com.sacco.mvp.accounting.reports.PostingDescription;
+import com.sacco.mvp.accounting.reports.PostingDescriptionSql;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -145,7 +146,7 @@ public class StatementRepository {
         with snapshot as (select id,generated_at from statement_run where id=?),
         selected as (select account_id,ordinality from unnest(?::uuid[]) with ordinality a(account_id,ordinality)),
         movement as (
-         select j.id,j.sacco_id,j.station_id,j.effective_date,j.source_type,j.source_reference,j.reason,l.account_id,
+         select j.id,j.sacco_id,j.station_id,j.effective_date,j.source_type,j.source_reference,j.reason,j.reverses_id,l.account_id,
           sum(l.debit) debit,sum(l.credit) credit,
           sum(sum(l.debit-l.credit)) over(partition by l.account_id order by j.effective_date,j.id) running
          from snapshot s join statement_run_journal c on c.run_id=s.id join gl_journal j on j.id=c.journal_id
@@ -166,17 +167,24 @@ public class StatementRepository {
         )
         select activity.*,v.id voucher_id,v.type voucher_type,coalesce(subledger.account_number,v.client_number) account_number,
          coalesce(d.number,t.receipt_reference) voucher_number, v.description voucher_description,entries.narration,
-         case when r.id is not null then x.description end receipt_line,r.description receipt_description,p.notes
+         coalesce(repayment_activity.name,entries.name) activity_name,
+         coalesce(repayment_activity.name_sw,entries.name_sw) activity_name_sw,
+         case when r.id is not null then %s end receipt_line,r.description receipt_description,
+         %s posting_notes,%s journal_reason,case when activity.reverses_id is not null then %s end correction_reason
         from activity cross join snapshot s
         left join accounting_posted_voucher_document d on d.journal_id=activity.id and d.sacco_id=activity.sacco_id and d.station_id=activity.station_id and d.issued_at<=s.generated_at
         left join accounting_voucher v on v.journal_id=activity.id and v.sacco_id=activity.sacco_id and v.station_id=activity.station_id and v.posted_at<=s.generated_at
         left join lateral (
-         select case when count(distinct nullif(trim(t.description),''))=1 then min(nullif(trim(t.description),'')) end narration
+         select %s narration,%s name,%s name_sw
          from accounting_voucher_transaction t join accounting_voucher_posting e on e.transaction_id=t.id and e.voucher_id=t.voucher_id
           and e.sacco_id=t.sacco_id and e.station_id=t.station_id and e.account_id=activity.account_id
+         left join gl_transaction_code def on def.id=t.transaction_id and def.sacco_id=t.sacco_id
          where t.voucher_id=v.id and t.sacco_id=v.sacco_id and t.station_id=v.station_id
         ) entries on true
         left join accountant_loan_post p on p.journal_id=activity.id and p.sacco_id=activity.sacco_id and p.station_id=activity.station_id and p.state='POSTED'
+        left join loan_applications posted_loan on posted_loan.id=p.loan_id and posted_loan.sacco_id=p.sacco_id and posted_loan.station_id=p.station_id
+        left join accountant_loan_record lr on lr.loan_id=p.loan_id and lr.sacco_id=p.sacco_id and lr.station_id=p.station_id
+        %s
         left join accountant_loan_receipt_row x on x.posting_id=p.id and x.sacco_id=p.sacco_id and x.station_id=p.station_id
         left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=x.sacco_id and r.station_id=x.station_id and r.posted_at<=s.generated_at
         left join accounting_archive.gl_operational_bridge bridge on bridge.journal_id=activity.id and bridge.sacco_id=activity.sacco_id and bridge.station_id=activity.station_id
@@ -200,14 +208,24 @@ public class StatementRepository {
          join loan_applications a on a.id=linked.loan_id and a.sacco_id=activity.sacco_id and a.station_id=activity.station_id
         ) subledger on true
         order by activity.ordinality,activity.effective_date,activity.id
-        """,(r,n)->new LedgerRow(r.getObject("selected_account",UUID.class),r.getObject("id")==null?null:new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("voucher_number"),
-            PostingDescription.resolve(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),r.getString("narration"),r.getString("voucher_description"),
-                r.getString("receipt_line"),r.getString("receipt_description"),r.getString("notes"),r.getString("reason")),
+        """.formatted(
+            PostingDescriptionSql.withoutLoanPickerLabel("x.description","posted_loan.loan_id","lr.product_name"),
+            PostingDescriptionSql.withoutLoanPickerLabel("p.notes","posted_loan.loan_id","lr.product_name"),
+            PostingDescriptionSql.withoutLoanPickerLabel("activity.reason","posted_loan.loan_id","lr.product_name"),
+            PostingDescriptionSql.withoutLoanPickerLabel("activity.reason","posted_loan.loan_id","lr.product_name"),
+            PostingDescriptionSql.singleValue(PostingDescriptionSql.withoutTransactionPickerLabel("t")),
+            PostingDescriptionSql.singleValue(PostingDescriptionSql.transactionName("t","def")),
+            PostingDescriptionSql.singleValue(PostingDescriptionSql.transactionNameSw("t","def")),
+            PostingDescriptionSql.repaymentActivity("activity")),
+            (r,n)->new LedgerRow(r.getObject("selected_account",UUID.class),r.getObject("id")==null?null:new Activity(r.getObject("id",UUID.class),r.getObject("effective_date",LocalDate.class),r.getString("account_number"),r.getString("voucher_number"),
+            PostingDescription.resolveWithActivity(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),
+                r.getString("activity_name"),r.getString("activity_name_sw"),r.getString("narration"),r.getString("voucher_description"),
+                r.getString("correction_reason"),r.getString("receipt_line"),r.getString("receipt_description"),r.getString("posting_notes"),r.getString("journal_reason")),
             r.getBigDecimal("debit"),r.getBigDecimal("credit"),r.getBigDecimal("running"),source(r))),run,accountIds,p.from(),p.through(),search,matches,limit,page*30);}
     // Keep earlier immutable documents while serving the current, simplified layout.
     public Optional<Artifact> artifact(UUID id,Kind kind,String format,String language){return jdbc.query("select bytes,checksum from statement_run_artifact where run_id=? and kind=? and format=? and language=?",(r,n)->new Artifact(r.getBytes(1),r.getString(2)),id,artifactKind(kind),format,language).stream().findFirst();}
     public void artifact(UUID id,Kind kind,String format,String language,byte[] bytes,String checksum){jdbc.update("insert into statement_run_artifact(run_id,kind,format,language,bytes,checksum) values(?,?,?,?,?,?) on conflict do nothing",id,artifactKind(kind),format,language,bytes,checksum);}
-    private static String artifactKind(Kind kind){return kind.name()+switch(kind){case EQUITY->"_V8";case LEDGER->"_V6";default->"_V4";};}
+    private static String artifactKind(Kind kind){return kind.name()+switch(kind){case EQUITY->"_V8";case LEDGER->"_V7";default->"_V4";};}
     private Stored stored(ResultSet r,int n)throws SQLException{return new Stored(r.getObject("id",UUID.class),r.getObject("date_from",LocalDate.class),r.getObject("date_through",LocalDate.class),r.getObject("generated_at",OffsetDateTime.class),r.getBoolean("institution_wide"),r.getObject("saved_at")!=null,r.getString("payload"),r.getString("checksum"));}
     private Mapping mapping(ResultSet r)throws SQLException{return new Mapping(r.getObject("id",UUID.class),r.getString("line_name"),r.getString("section"),r.getString("cash_section"),r.getString("equity_component"),r.getInt("note_no"),r.getString("note_text"),r.getObject("group_id",UUID.class),r.getString("group_code"));}
     private String source(ResultSet r)throws SQLException{if(r.getObject("voucher_id")!=null)return "/finance/vouchers/"+switch(r.getString("voucher_type")){case "RECEIPT"->"receipts";case "PAYMENT"->"payments";default->"journals";}+"/"+r.getObject("voucher_id");return null;}

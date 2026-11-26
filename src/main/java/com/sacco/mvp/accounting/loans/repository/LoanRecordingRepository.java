@@ -2,6 +2,8 @@ package com.sacco.mvp.accounting.loans.repository;
 
 import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
 import com.sacco.mvp.accounting.dto.RegisterSort;
+import com.sacco.mvp.accounting.reports.PostingDescription;
+import com.sacco.mvp.accounting.reports.PostingDescriptionSql;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -290,9 +292,12 @@ public class LoanRecordingRepository {
         left join receipt_batch batch on batch.id=item.batch_id and batch.sacco_id=p.sacco_id and batch.station_id=p.station_id
         """.formatted(POST_ITEM_ID,POST_ITEM_ID);
     private static final String POSTS="""
-        select p.*,j.source_type,j.source_reference,doc.number voucher_number,%s display_reference,coalesce((select cash from accountant_loan_topup where id=p.id),p.amount-case when p.kind in ('DISBURSEMENT','FUNDING_UNDO') then coalesce((select sum(amount) from loan_charge_event where journal_id=p.journal_id and kind in ('DEDUCT','DEDUCT_UNDO')),0) else 0 end) cash_amount,a.loan_id loan_number,m.full_name,m.member_no,case when m.kind='CLIENT' then 'INDIVIDUAL' else 'GROUP' end loan_for,u.full_name actor_name,r.product_name,
+        select p.*,j.source_type,j.source_reference,doc.number voucher_number,%s display_reference,
+        repayment_activity.name activity_name,repayment_activity.name_sw activity_name_sw,%s display_notes,
+        coalesce((select cash from accountant_loan_topup where id=p.id),p.amount-case when p.kind in ('DISBURSEMENT','FUNDING_UNDO') then coalesce((select sum(amount) from loan_charge_event where journal_id=p.journal_id and kind in ('DEDUCT','DEDUCT_UNDO')),0) else 0 end) cash_amount,a.loan_id loan_number,m.full_name,m.member_no,case when m.kind='CLIENT' then 'INDIVIDUAL' else 'GROUP' end loan_for,u.full_name actor_name,r.product_name,
         coalesce((select x.id from accountant_loan_movement x where x.reverses_id=p.id),(select x.id from accountant_loan_topup x where x.reverses_id=p.id)) reversed_by
-        """.formatted(POST_REFERENCE)+POST_FROM;
+        """.formatted(POST_REFERENCE,PostingDescriptionSql.withoutLoanPickerLabel("p.notes","a.loan_id","r.product_name"))
+        +POST_FROM+PostingDescriptionSql.repaymentActivity("j");
     public void lockRequest(AppUserPrincipal a,UUID key){jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_RECORD/"+a.getSaccoId()+"/"+a.getStationId()+"/"+key);}
     public UUID disbursementCorrection(AppUserPrincipal a,UUID posting){return jdbc.query("select q.id from loan_adjustment_request q join loan_adjustment_decision d on d.request_id=q.id join gl_journal j on j.id=d.journal_id and j.state='POSTED' join accountant_loan_post p on p.journal_id=q.reverses_journal_id where p.id=? and q.sacco_id=? and q.station_id=? and q.kind='DISBURSEMENT_REVERSAL'",(r,n)->r.getObject(1,UUID.class),posting,a.getSaccoId(),a.getStationId()).stream().findFirst().orElse(null);}
     public Optional<UUID> receiptForPosting(AppUserPrincipal a,UUID id){return jdbc.query("select receipt_id from accountant_loan_receipt_row where posting_id=? and sacco_id=? and station_id=? union all select receipt_id from lending_group_receipt_loan where posting_id=? and sacco_id=? and station_id=?",(r,n)->r.getObject(1,UUID.class),id,a.getSaccoId(),a.getStationId(),id,a.getSaccoId(),a.getStationId()).stream().findFirst();}
@@ -730,7 +735,8 @@ public class LoanRecordingRepository {
     private Posting posting(ResultSet r,String referenceColumn)throws SQLException{
         String notes=r.getString("notes");
         if("display_reference".equals(referenceColumn) && r.getString("source_type")!=null)
-            notes=com.sacco.mvp.accounting.reports.PostingDescription.resolve(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),notes);
+            notes=PostingDescription.resolveWithActivity(r.getString("source_type"),r.getString("source_reference"),r.getString("voucher_number"),
+                r.getString("activity_name"),r.getString("activity_name_sw"),r.getString("display_notes"));
         return new Posting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getString("loan_number"),r.getString("full_name"),r.getString("member_no"),r.getString("kind"),r.getObject("effective_date",LocalDate.class),r.getString(referenceColumn),r.getBigDecimal("cash_amount"),r.getBigDecimal("principal_amount"),r.getBigDecimal("interest_amount"),r.getString("money_account_name"),r.getString("principal_account_name"),r.getString("interest_account_name"),r.getString("evidence"),notes,r.getObject("actor_id",UUID.class),r.getString("actor_name"),r.getObject("recorded_at",OffsetDateTime.class),r.getObject("journal_id",UUID.class),r.getObject("transaction_id",UUID.class),r.getObject("reverses_id",UUID.class),r.getObject("reversed_by",UUID.class),r.getBigDecimal("principal_balance"),r.getString("product_name"),r.getString("loan_for"));}
 
     public boolean recorded(AppUserPrincipal actor,UUID loan) {

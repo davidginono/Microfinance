@@ -2,6 +2,7 @@ package com.sacco.mvp.accounting.pettycash.repository;
 
 import com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.*;
 import com.sacco.mvp.accounting.reports.PostingDescription;
+import com.sacco.mvp.accounting.reports.PostingDescriptionSql;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -48,21 +49,39 @@ public class PettyCashRepository {
         String source=movements?"""
             select j.id,j.id journal_id,j.posted_at,j.effective_date date,v.id voucher_id,lower(v.type)||'s' voucher_kind,
              doc.number,coalesce(v.party,'') party,'' account,j.source_type,j.source_reference,
-             array[v.description,j.reason] || array(select t.description from accounting_voucher_transaction t where t.voucher_id=v.id order by t.line_no) notes,
+             coalesce(repayment_activity.name,entries.name) activity_name,
+             coalesce(repayment_activity.name_sw,entries.name_sw) activity_name_sw,
+             array[v.description,%s] || coalesce(entries.notes,array[]::text[]) notes,
              sum(l.credit-l.debit) paid,sum(l.debit) money_in,sum(l.credit) money_out,
              sum(sum(l.debit-l.credit)) over(order by j.effective_date,j.posted_at,j.id) balance,
              case when j.reverses_id is not null then 'REVERSAL' when exists(select 1 from gl_journal rev where rev.reverses_id=j.id and rev.state='POSTED' and rev.posted_at<=?) then 'REVERSED' else 'POSTED' end state
             from gl_journal j join gl_journal_line l on l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id
              left join accounting_voucher v on (v.journal_id,v.sacco_id,v.station_id)=(j.id,j.sacco_id,j.station_id)
              left join accounting_posted_voucher_document doc on (doc.journal_id,doc.sacco_id,doc.station_id)=(j.id,j.sacco_id,j.station_id) and doc.issued_at<=?
-            where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.posted_at<=? and l.account_id=? group by j.id,v.id,doc.number
-            """:"""
+             left join accountant_loan_post p on (p.journal_id,p.sacco_id,p.station_id)=(j.id,j.sacco_id,j.station_id)
+             left join loan_applications loan on (loan.id,loan.sacco_id,loan.station_id)=(p.loan_id,p.sacco_id,p.station_id)
+             left join accountant_loan_record lr on (lr.loan_id,lr.sacco_id,lr.station_id)=(p.loan_id,p.sacco_id,p.station_id)
+             %s
+             left join lateral (
+               select array_agg(%s order by t.line_no) notes,%s name,%s name_sw
+               from accounting_voucher_transaction t
+               left join gl_transaction_code def on def.id=t.transaction_id and def.sacco_id=t.sacco_id
+               where (t.voucher_id,t.sacco_id,t.station_id)=(v.id,v.sacco_id,v.station_id)
+             ) entries on true
+            where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.posted_at<=? and l.account_id=?
+            group by j.id,v.id,doc.number,repayment_activity.name,repayment_activity.name_sw,entries.name,entries.name_sw,entries.notes,loan.loan_id,lr.product_name
+            """.formatted(PostingDescriptionSql.withoutLoanPickerLabel("j.reason","loan.loan_id","lr.product_name"),
+                PostingDescriptionSql.repaymentActivity("j"),PostingDescriptionSql.withoutTransactionPickerLabel("t"),
+                PostingDescriptionSql.singleValue(PostingDescriptionSql.transactionName("t","def")),
+                PostingDescriptionSql.singleValue(PostingDescriptionSql.transactionNameSw("t","def"))):"""
             select t.id,j.id journal_id,j.posted_at,v.effective_date date,v.id voucher_id,'payments' voucher_kind,v.number,v.party,
-             d.account,j.source_type,j.source_reference,array[t.description,v.description,j.reason] notes,
+             d.account,j.source_type,j.source_reference,%s activity_name,def.name_sw activity_name_sw,
+             array[%s,v.description,j.reason] notes,
              p.paid,0::numeric money_in,0::numeric money_out,null::numeric balance,
              case when v.reverses_id is not null then 'REVERSAL' when exists(select 1 from accounting_voucher rev where rev.reverses_id=v.id and rev.posted_at<=?) then 'REVERSED' else 'POSTED' end state
             from accounting_voucher v join gl_journal j on j.id=v.journal_id and j.state='POSTED'
              join accounting_voucher_transaction t on t.voucher_id=v.id
+             left join gl_transaction_code def on def.id=t.transaction_id and def.sacco_id=t.sacco_id
              join accounting_voucher original on original.id=coalesce(v.reverses_id,v.id)
              join accounting_voucher_transaction ot on ot.voucher_id=original.id and ot.line_no=t.line_no
              join lateral (select sum(case e.side when 'CREDIT' then e.amount else -e.amount end) paid
@@ -71,7 +90,7 @@ public class PettyCashRepository {
               bool_and(a.type='EXPENSE') expense from accounting_voucher_posting e join gl_account a on a.id=e.account_id
               where e.transaction_id=ot.id and e.side='DEBIT') d on d.expense
             where v.sacco_id=? and v.station_id=? and v.type='PAYMENT' and j.posted_at<=?
-            """;
+            """.formatted(PostingDescriptionSql.transactionName("t","def"),PostingDescriptionSql.withoutTransactionPickerLabel("t"));
         var args=new ArrayList<Object>();args.add(cutoff);
         args.add(movements?cutoff:f.accountId());args.add(a.getSaccoId());args.add(a.getStationId());args.add(cutoff);if(movements)args.add(f.accountId());
         var defaults=PostingDescription.localizedDefaults();
@@ -80,14 +99,16 @@ public class PettyCashRepository {
         args.add(Arrays.stream(sourceTypes).map(defaults::get).toArray(String[]::new));
         args.add(PostingDescription.resolve("CORE_JOURNAL",null,null));
         args.add(PostingDescription.internalReferencePattern());
+        args.add("sw".equals(org.springframework.context.i18n.LocaleContextHolder.getLocale().getLanguage()));
         args.add(q.from());args.add(q.through());args.add(q.search().toLowerCase(Locale.ROOT));args.add(q.size()+1);args.add(q.page()*q.size());
         String[] sort=q.sort().split("_");String column=switch(sort[0]){case "date"->"date";case "number"->"number";case "party"->"party";case "account"->"account";case "description"->"description";case "paid"->"paid";case "in"->"money_in";case "out"->"money_out";case "balance"->"balance";case "state"->"state";default->throw new IllegalArgumentException("petty.error.filter");};
         String direction=sort[1].equals("asc")?" asc":" desc";
         String ordering=column+direction+(column.equals("date")?",posted_at"+direction+",journal_id"+direction:"")+",id"+direction;
         String entries="""
-            , labels as (select jsonb_object(?::text[],?::text[]) by_source,?::text fallback,?::text reference_pattern),
+            , labels as (select jsonb_object(?::text[],?::text[]) by_source,?::text fallback,?::text reference_pattern,?::boolean sw),
             entries as (
-              select e.*,coalesce(n.description,labels.by_source->>e.source_type,labels.fallback) description
+              select e.*,coalesce(n.description,case when labels.sw then nullif(e.activity_name_sw,'') end,
+                     e.activity_name,labels.by_source->>e.source_type,labels.fallback) description
               from raw_entries e cross join labels
               cross join lateral (
                 select coalesce(max(btrim(note)) filter(where ord=1),max(btrim(note)) filter(where ord=2),

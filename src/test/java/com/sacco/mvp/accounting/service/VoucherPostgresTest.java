@@ -117,6 +117,42 @@ class VoucherPostgresTest {
   var transfer=pettyForm(Type.JOURNAL,"1");transfer.getRows().getFirst().setDebitAccountId(capital);transfer.getRows().getFirst().setCreditAccountId(cash);
   assertThatThrownBy(()->service.preview(actor,Type.JOURNAL,transfer)).hasMessage("voucher.error.pettyTopup");
  }
+ @Test void configuredTransactionNamesReplacePickerLabelsInFinancialReports(){
+  pettySetup();
+  pettyTopup("100");
+  var configClock=mock(ApplicationClock.class);
+  when(configClock.now()).thenReturn(now);
+  when(configClock.today()).thenReturn(now.toLocalDate());
+  var library=new AccountingCodeLibraryService(new AccountingCodeLibraryRepository(jdbc),
+   new GeneralLedgerService(new GeneralLedgerRepository(jdbc),new AccessControlService(),audit,configClock,claims,directory,institutions),audit,configClock);
+  var mapping=configuredMapping(library,Type.PAYMENT,"Transport","EXPENSE","CASH");
+  jdbc.update("update gl_transaction_code set name_sw=? where id=?","Usafiri",mapping.transactionId());
+  var form=pettyForm(Type.PAYMENT,"25");
+  form.setActivityId(mapping.activity().id());
+  var row=form.getRows().getFirst();
+  row.setTransactionId(mapping.transactionId());
+  row.setTemplateKey(mapping.templateKey());
+  row.setDescription(mapping.transactionName());
+  var voucher=service.post(actor,Type.PAYMENT,form);
+  var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
+  var date=now.toLocalDate();
+  var filters=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(date,date,now,null,null,null,"",0);
+  var prior=org.springframework.context.i18n.LocaleContextHolder.getLocaleContext();
+  try{
+   for(var language:List.of("en","sw")){
+    org.springframework.context.i18n.LocaleContextHolder.setLocale(Locale.forLanguageTag(language));
+    String expected=language.equals("sw")?"Usafiri":"Transport transaction";
+    for(var kind:List.of(com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS,
+                          com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK)){
+     boolean daily=kind==com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.DAILY_COLLECTIONS;
+     assertThat(reports.read(actor,kind,filters,false).rows()).filteredOn(record->voucher.number().equals(record.get(daily?"documentNumber":"reference")))
+      .isNotEmpty().allSatisfy(record->assertThat(record).containsEntry(daily?"transaction":"particulars",expected));
+    }
+    var query=new com.sacco.mvp.accounting.pettycash.dto.PettyCashDtos.Query(date,date,"expenses",expected,"description_asc",0,10);
+    assertThat(petty().workspace(actor,query).rows()).singleElement().satisfies(entry->assertThat(entry.description()).isEqualTo(expected));
+   }
+  }finally{org.springframework.context.i18n.LocaleContextHolder.setLocaleContext(prior);}
+ }
  @Test void pettyCashRejectsMissingOpeningHistoryAndFreezesDesignation(){
   service.post(actor,Type.RECEIPT,form(Type.RECEIPT));
   assertThatThrownBy(this::pettySetup).hasMessage("petty.error.coverage");

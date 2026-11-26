@@ -34,11 +34,23 @@ public final class PostingDescription {
     }
 
     public static String resolve(Locale locale, String sourceType, String sourceReference, String voucherNumber, String... candidates) {
+        return resolveWithActivity(locale,sourceType,sourceReference,voucherNumber,null,null,candidates);
+    }
+
+    public static String resolveWithActivity(String sourceType, String sourceReference, String voucherNumber,
+                                             String activityName, String activityNameSw, String... candidates) {
+        return resolveWithActivity(LocaleContextHolder.getLocale(),sourceType,sourceReference,voucherNumber,activityName,activityNameSw,candidates);
+    }
+
+    private static String resolveWithActivity(Locale locale, String sourceType, String sourceReference, String voucherNumber,
+                                              String activityName, String activityNameSw, String... candidates) {
         for (String candidate : candidates) {
             if (candidate == null) continue;
             String value = candidate.strip();
             if (!INTERNAL_REFERENCE.matcher(value).matches() && externalReference(value, sourceReference, voucherNumber) != null) return value;
         }
+        if ("sw".equals(locale.getLanguage()) && activityNameSw!=null && !activityNameSw.isBlank()) return activityNameSw.strip();
+        if (activityName!=null && !activityName.isBlank()) return activityName.strip();
         return bundle(locale).getString("posting.description." + KEYS.getOrDefault(sourceType == null ? "" : sourceType,"journal"));
     }
 

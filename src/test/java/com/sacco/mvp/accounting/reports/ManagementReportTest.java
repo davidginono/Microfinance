@@ -96,7 +96,7 @@ class ManagementReportTest {
                 var row=new LinkedHashMap<String,Object>();row.put("groupName",kind==Kind.DAILY_COLLECTIONS?"2026-10-15 | Loan repayments":"Business loans");
                 for(var c:columns)if(c.money()){row.put(c.key(),new BigDecimal("99999999999999.99"));if(ManagementReports.totalFields(kind).contains(c.key()))totals.merge(c.key(),(BigDecimal)row.get(c.key()),BigDecimal::add);}else row.put(c.key(),c.key().equals("name")?"Synthetic client with a long readable name — sample "+n:c.key().equals("particulars")?"Long collection description ".repeat(2):"REF-"+n);
                 if(kind==Kind.DISBURSED_LOANS_AUDIT){row.put("month","2026-10");row.put("product","Business loans");row.put("disbursementAccount","Bank");}
-                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){row.put("clientNumber","CL-0041");row.put("name","Synthetic client with a long readable name");row.put("loanId","LN-0102");row.put("product","Business loans");row.put("startDate",DAY);row.put("disbursed",new BigDecimal("2000000.00"));row.put("principalBalance",new BigDecimal("1500000.00"));row.put("reference","REF-"+n);row.put("entryKind","PAYMENT");}
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){row.put("clientNumber","CL-0041");row.put("name","Synthetic client with a long readable name");row.put("loanId","LN-0102");row.put("product","Business loans");row.put("startDate",DAY);row.put("disbursed",new BigDecimal("2000000.00"));row.put("principalBalance",new BigDecimal("1500000.00"));row.put("reference","REF-"+n);row.put("entryKind","PAYMENT");row.put("entryDescription",language.equals("sw")?"Marejesho ya mkopo":"Loan repayment");}
                 rows.add(row);
             }
             var group=new Group(rows.getFirst().get("groupName").toString(),rows.size(),totals);
@@ -106,6 +106,8 @@ class ManagementReportTest {
                 if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(612);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(792);}
                 if(kind==Kind.DISBURSED_LOANS_AUDIT || kind==Kind.EXPECTED_REPAYMENTS){assertThat(doc.getPage(0).getMediaBox().getWidth()).isEqualTo(1008);assertThat(doc.getPage(0).getMediaBox().getHeight()).isEqualTo(612);}
                 String text=new PDFTextStripper().getText(doc);assertThat(text).contains("REF-59","15/10/2026").doesNotContain("2026-10-15").contains("5,999,999,999,999,999.4").doesNotContain("5,999,999,999,999,999.40");
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS)
+                    assertThat(text.replaceAll("\\s+"," ")).contains(language.equals("sw")?"Marejesho ya mkopo":"Loan repayment");
                 if(kind==Kind.EXPECTED_REPAYMENTS){
                     String productLabel=exporter.message("pdf.loanTypeName",Locale.forLanguageTag(language)).toUpperCase(Locale.ROOT);
                     assertThat(text.replaceAll("\\s+","")).contains(productLabel.replace(" ",""))

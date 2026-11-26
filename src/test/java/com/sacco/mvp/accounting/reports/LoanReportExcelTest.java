@@ -25,6 +25,7 @@ class LoanReportExcelTest {
             var row=new LinkedHashMap<String,Object>();row.put("groupName",group);row.put("product","Business loans");row.put("month","2026-10");row.put("disbursementAccount","001100 - Bank");
             row.put("institutionCode","0001");row.put("branchCode","B1");row.put("productCode","01");
             row.put("clientNumber","00007");row.put("name","=HYPERLINK(\"bad\")");row.put("loanId","000031");row.put("startDate",ManagementReportTest.DAY);row.put("disbursed",new BigDecimal("1000.01"));row.put("principalBalance",new BigDecimal("800.00"));row.put("reference","RC-"+n);row.put("entryKind",n==0?"PAYMENT":"REVERSAL");row.put("reversesReference",n==0?null:"RC-0");
+            if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS && n==0)row.put("entryDescription","Configured loan repayment");
             for(var col:ManagementReports.columns(kind))if(col.money()){row.put(col.key(),n==0?new BigDecimal("100.01"):new BigDecimal("-0.01"));if(ManagementReports.totalFields(kind).contains(col.key()))totals.merge(col.key(),(BigDecimal)row.get(col.key()),BigDecimal::add);}else if(col.key().toLowerCase().contains("date")||col.key().equals("maturity"))row.put(col.key(),ManagementReportTest.DAY);else if(!row.containsKey(col.key()))row.put(col.key(),col.key().equals("frequency")?"MONTHLY":"REF-"+n);
             rows.add(row);
         }
@@ -47,7 +48,13 @@ class LoanReportExcelTest {
                 assertThat(data.getRow(header+1).getCell(client).getCellStyle().getDataFormatString()).isEqualTo("@");
                 int money=source.columns().indexOf(source.columns().stream().filter(Column::money).findFirst().orElseThrow());assertThat(data.getRow(header+1).getCell(money).getNumericCellValue()).isEqualTo(100.01);assertThat(data.getRow(header+2).getCell(money).getNumericCellValue()).isEqualTo(-.01);
                 for(var row:data)for(var cell:row)assertThat(cell.getCellType()).isNotEqualTo(CellType.FORMULA);
-                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){assertThat(DateUtil.isCellDateFormatted(data.getRow(header+1).getCell(0))).isTrue();int correction=column(data,header,m.getMessage("management.field.reversesReference",null,l));assertThat(data.getRow(header+2).getCell(correction).getStringCellValue()).isEqualTo("RC-0");}
+                if(kind==Kind.LOAN_REPAYMENT_TRANSACTIONS){
+                    assertThat(DateUtil.isCellDateFormatted(data.getRow(header+1).getCell(0))).isTrue();
+                    int correction=column(data,header,m.getMessage("management.field.reversesReference",null,l));
+                    assertThat(data.getRow(header+2).getCell(correction).getStringCellValue()).isEqualTo("RC-0");
+                    int entry=column(data,header,m.getMessage("management.sheet.entry",null,l));
+                    assertThat(data.getRow(header+1).getCell(entry).getStringCellValue()).isEqualTo("Configured loan repayment");
+                }
                 boolean audit=kind==Kind.DISBURSED_LOANS_AUDIT;
                 int offset=audit?1:0;
                 var expected=source.totals();var formatter=new DataFormatter();

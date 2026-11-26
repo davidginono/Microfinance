@@ -2,6 +2,7 @@ package com.sacco.mvp.accounting.statements.repository;
 
 import com.sacco.mvp.accounting.statements.dto.StatementModels.Parameters;
 import com.sacco.mvp.accounting.reports.PostingDescription;
+import com.sacco.mvp.accounting.reports.PostingDescriptionSql;
 import com.sacco.mvp.accounting.statements.dto.StatementSetupModels.*;
 import com.sacco.mvp.security.AppUserPrincipal;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +22,26 @@ public class StatementSetupRepository {
     public void save(AppUserPrincipal a,Setup setup,String payload,UUID key,String hash,String reason){jdbc.update("insert into statement_setup_version(sacco_id,version,payload,request_key,request_hash,actor_id,reason) values(?,?,?,?,?,?,?)",a.getSaccoId(),setup.version(),payload,key,hash,a.getMemberId(),reason);}
     public List<AccountChoice> accounts(String institution){return jdbc.query("select id,code,name,type from gl_account where sacco_id=? and kind<>'HEADING' order by code,id limit 2001",(r,n)->new AccountChoice(r.getObject(1,UUID.class),r.getString(2),r.getString(3),r.getString(4)),institution);}
     public List<Journal> journals(AppUserPrincipal a,Parameters p,int page){return jdbc.query("""
-        select j.id,j.effective_date,d.number reference,j.source_reference,j.source_type,j.reason,totals.debit,totals.credit,coalesce(c.category,'UNCLASSIFIED') category,coalesce(c.version,0) version,
+        select j.id,j.effective_date,d.number reference,j.source_reference,j.source_type,%s reason,
+            v.description voucher_description,entries.narration,coalesce(repayment_activity.name,entries.name) activity_name,
+            coalesce(repayment_activity.name_sw,entries.name_sw) activity_name_sw,
+            totals.debit,totals.credit,coalesce(c.category,'UNCLASSIFIED') category,coalesce(c.version,0) version,
             c.movement_row_id,c.movement_name,c.movement_name_sw
         from gl_journal j
         left join accounting_posted_voucher_document d on d.journal_id=j.id and d.sacco_id=j.sacco_id and d.station_id=j.station_id
+        left join accounting_voucher v on (v.journal_id,v.sacco_id,v.station_id)=(j.id,j.sacco_id,j.station_id)
+        left join accountant_loan_post p on (p.journal_id,p.sacco_id,p.station_id)=(j.id,j.sacco_id,j.station_id)
+        left join loan_applications loan on (loan.id,loan.sacco_id,loan.station_id)=(p.loan_id,p.sacco_id,p.station_id)
+        left join accountant_loan_record lr on (lr.loan_id,lr.sacco_id,lr.station_id)=(p.loan_id,p.sacco_id,p.station_id)
+        %s
+        left join lateral (
+          select %s narration,%s name,%s name_sw
+          from accounting_voucher_transaction t
+          left join gl_transaction_code def on def.id=t.transaction_id and def.sacco_id=t.sacco_id
+          where (t.voucher_id,t.sacco_id,t.station_id)=(v.id,v.sacco_id,v.station_id)
+            and exists(select 1 from accounting_voucher_posting e join gl_account a on a.id=e.account_id and a.sacco_id=e.sacco_id
+              where (e.transaction_id,e.sacco_id,e.station_id)=(t.id,t.sacco_id,t.station_id) and a.type='EQUITY')
+        ) entries on true
         join lateral(select sum(l.debit) debit,sum(l.credit) credit from gl_journal_line l
           join gl_account a on a.id=l.account_id and a.sacco_id=l.sacco_id
           where l.journal_id=j.id and l.sacco_id=j.sacco_id and l.station_id=j.station_id and a.type='EQUITY'
@@ -33,8 +50,14 @@ public class StatementSetupRepository {
           and c.sacco_id=j.sacco_id and c.station_id=j.station_id order by version desc limit 1)c on true
         where j.sacco_id=? and j.station_id=? and j.state='POSTED' and j.effective_date between ? and ?
         order by j.effective_date desc,j.id limit 31 offset ?
-        """,(r,n)->new Journal(r.getObject("id",UUID.class),r.getObject("effective_date",java.time.LocalDate.class),r.getString("reference"),
-            PostingDescription.resolve(r.getString("source_type"),r.getString("source_reference"),r.getString("reference"),r.getString("reason")),
+        """.formatted(PostingDescriptionSql.withoutLoanPickerLabel("j.reason","loan.loan_id","lr.product_name"),
+            PostingDescriptionSql.repaymentActivity("j"),
+            PostingDescriptionSql.singleValue(PostingDescriptionSql.withoutTransactionPickerLabel("t")),
+            PostingDescriptionSql.singleValue(PostingDescriptionSql.transactionName("t","def")),
+            PostingDescriptionSql.singleValue(PostingDescriptionSql.transactionNameSw("t","def"))),
+            (r,n)->new Journal(r.getObject("id",UUID.class),r.getObject("effective_date",java.time.LocalDate.class),r.getString("reference"),
+            PostingDescription.resolveWithActivity(r.getString("source_type"),r.getString("source_reference"),r.getString("reference"),
+                r.getString("activity_name"),r.getString("activity_name_sw"),r.getString("narration"),r.getString("voucher_description"),r.getString("reason")),
             Category.valueOf(r.getString("category")),r.getInt("version"),r.getBigDecimal("debit"),r.getBigDecimal("credit"),movementRow(r)),a.getSaccoId(),a.getStationId(),p.from(),p.through(),page*30);}
     public List<Movement> journal(AppUserPrincipal a,UUID id){return jdbc.query("""
         select l.account_id,a.type,sum(l.debit) debit,sum(l.credit) credit from gl_journal j
