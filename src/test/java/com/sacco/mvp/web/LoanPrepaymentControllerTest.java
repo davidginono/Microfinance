@@ -43,6 +43,18 @@ class LoanPrepaymentControllerTest {
     @Test void settlementIsNotAClientWorkspace()throws Exception{
         mvc.perform(get("/repayments/loans/"+loan+"/settlement").with(user(actor(UserClaim.MEMBER_LOANS_VIEW)))).andExpect(status().isForbidden());verifyNoInteractions(ledger);
     }
+    @Test void payoffQuoteUsesTheRequestedDateAndRequiresTheRecordingViewClaim()throws Exception{
+        String url="/finance/loan-records/"+loan+"/full-payoff";
+        mvc.perform(get(url).with(user(actor(UserClaim.LOAN_INTEREST_WAIVE))))
+            .andExpect(status().isForbidden());
+        verifyNoInteractions(ledger);
+        var date=LocalDate.of(2026,10,20);
+        mvc.perform(get(url).param("date",date.toString()).with(user(actor(UserClaim.LOAN_RECORDING_VIEW))))
+            .andExpect(status().isOk()).andExpect(view().name("repayments/full-payoff"))
+            .andExpect(model().attribute("payoffDate",date));
+        verify(ledger).settlementQuote(eq(loan),any(),eq(date));
+        verifyNoMoreInteractions(ledger);
+    }
     @Test void anAdoptionCannotUseViewPermission()throws Exception{
         mvc.perform(post("/repayments/loans/"+loan+"/prepayment-terms").param("reason","Agreed change").with(user(actor(UserClaim.LOAN_RECORDING_VIEW))).with(csrf())).andExpect(status().isForbidden());verifyNoInteractions(ledger);
     }
@@ -72,7 +84,8 @@ class LoanPrepaymentControllerTest {
         @Bean LoanRepaymentLedgerService ledger(){return mock(LoanRepaymentLedgerService.class);}
         @Bean ApplicationClock clock(){return mock(ApplicationClock.class);}
         @Bean("access") AccessControlService access(){return new AccessControlService();}
-        @Bean LoanPrepaymentController controller(LoanRepaymentLedgerService l,ApplicationClock c){return new LoanPrepaymentController(l,c);}
+        @Bean com.sacco.mvp.accounting.loans.service.LoanRecordingService recording(){return mock(com.sacco.mvp.accounting.loans.service.LoanRecordingService.class);}
+        @Bean LoanPrepaymentController controller(LoanRepaymentLedgerService l,ApplicationClock c,com.sacco.mvp.accounting.loans.service.LoanRecordingService r){return new LoanPrepaymentController(l,c,r);}
         @Bean InternalResourceViewResolver views(){return new InternalResourceViewResolver("/WEB-INF/jsp/",".jsp");}
         @Bean SecurityFilterChain security(HttpSecurity http)throws Exception{return http.authorizeHttpRequests(a->a.anyRequest().authenticated()).build();}
     }

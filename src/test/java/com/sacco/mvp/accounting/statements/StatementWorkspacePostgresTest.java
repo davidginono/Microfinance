@@ -193,7 +193,7 @@ class StatementWorkspacePostgresTest {
         assertThat(reports.read(actor,daily,accountOnly,true).rows()).hasSize(2);
     }
 
-    @Test void cashbookClassifiesEachCashPostingAgainstItsOwnVoucherTransaction() {
+    @Test void cashbookClassifiesEachCashPostingAgainstItsOwnVoucherTransaction() throws Exception {
         UUID expenseRoot=group("600000","Expenses","EXPENSE",null);
         group("610000","Operating expenses","EXPENSE",expenseRoot);
         UUID transport=account("610101","Transport","EXPENSE","OTHER");
@@ -221,7 +221,7 @@ class StatementWorkspacePostgresTest {
             journalRow(bank,income,"7.18"),
             journalRow(transport,fees,"10.00"),
             journalRow(creditor,bank,"4.16")));
-        vouchers.post(actor,VoucherDtos.Type.JOURNAL,form);
+        var posted=vouchers.post(actor,VoucherDtos.Type.JOURNAL,form);
 
         var reports=new com.sacco.mvp.accounting.reports.ManagementReportRepository(
             new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc));
@@ -230,21 +230,46 @@ class StatementWorkspacePostgresTest {
         var kind=com.sacco.mvp.accounting.management.dto.ManagementReports.Kind.CASHBOOK;
         var cashbook=reports.read(actor,kind,filters,false);
         assertThat(cashbook.rows()).hasSize(6);
+        String bankCode=jdbc.queryForObject("select code from gl_account where id=?",String.class,bank);
         assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("40.00").equals(row.get("moneyOut")))
             .singleElement().satisfies(row->{
+                assertThat(row.get("clientNumber")).isEqualTo(bankCode+", 211001");
                 assertThat((BigDecimal)row.get("expenseDr")).isEqualByComparingTo("100.00");
                 assertThat((BigDecimal)row.get("otherCreditorsCr")).isEqualByComparingTo("60.00");
             });
         assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("25.40").equals(row.get("moneyOut")))
             .singleElement().satisfies(row->assertThat((BigDecimal)row.get("expenseDr")).isEqualByComparingTo("25.40"));
         assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("16.27").equals(row.get("moneyIn")))
-            .singleElement().satisfies(row->assertThat((BigDecimal)row.get("otherIncomeCr")).isEqualByComparingTo("16.27"));
+            .singleElement().satisfies(row->{
+                assertThat(row.get("clientNumber")).isEqualTo("512001");
+                assertThat((BigDecimal)row.get("otherIncomeCr")).isEqualByComparingTo("16.27");
+            });
         assertThat(cashbook.rows()).filteredOn(row->new BigDecimal("31.56").equals(row.get("moneyIn")))
             .singleElement().satisfies(row->assertThat((BigDecimal)row.get("otherCreditorsCr")).isEqualByComparingTo("31.56"));
         assertThat(cashbook.totals().get("expenseDr")).isEqualByComparingTo("125.40");
         assertThat(cashbook.totals().get("otherIncomeCr")).isEqualByComparingTo("16.27");
         assertThat(cashbook.totals().get("otherCreditorsCr")).isEqualByComparingTo("91.56");
         assertThat(reports.read(actor,kind,filters,true).totals()).isEqualTo(cashbook.totals());
+        assertThat(reports.read(actor,kind,filters,true).rows()).extracting(row->row.get("clientNumber"))
+            .containsExactlyElementsOf(cashbook.rows().stream().map(row->row.get("clientNumber")).toList());
+
+        var messages=new org.springframework.context.support.ResourceBundleMessageSource();
+        messages.setBasename("messages");
+        messages.setDefaultEncoding("UTF-8");
+        var pdf=new com.sacco.mvp.accounting.management.service.ManagementReportPdf(messages,new ReportExportLimiter(1),clock);
+        var result=new com.sacco.mvp.accounting.management.dto.ManagementReports.Result(kind,filters,institution,"Branch",
+            com.sacco.mvp.accounting.management.dto.ManagementReports.columns(kind),cashbook.rows(),cashbook.groups(),
+            cashbook.totals(),cashbook.count(),cashbook.excluded(),false,bankCode,"");
+        try (var document=org.apache.pdfbox.Loader.loadPDF(pdf.build(result,Locale.ENGLISH))) {
+            assertThat(new org.apache.pdfbox.text.PDFTextStripper().getText(document).replaceAll("\\s+"," "))
+                .contains("Client No / Account",bankCode,"211001","512001");
+        }
+
+        var reversal=vouchers.reverse(actor,VoucherDtos.Type.JOURNAL,posted.id(),UUID.randomUUID(),from,"Correct the journal");
+        var after=new com.sacco.mvp.accounting.management.dto.ManagementReports.Parameters(from,from,OffsetDateTime.now(),bank,bank,null,"",0);
+        assertThat(reports.read(actor,kind,after,false).rows())
+            .filteredOn(row->reversal.number().equals(row.get("reference")) && new BigDecimal("40.00").equals(row.get("moneyIn")))
+            .singleElement().satisfies(row->assertThat(row.get("clientNumber")).isEqualTo("610101"));
     }
 
     @Test void splitCashReceiptsKeepAmbiguousIncomeUnknownEvenWhenFilteringToOneBank() {

@@ -9,7 +9,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 /** Small, read-only cross-workspace view. Null amounts mean no monetary total is available. */
 public final class OfficeWork {
     private OfficeWork() {}
-    public record Task(String number, String name, String stateKey, BigDecimal amount, String href) {}
+    public record Task(String number, String name, String stateKey, BigDecimal amount, String href, String reviewGroup) {
+        public Task(String number,String name,String stateKey,BigDecimal amount,String href) {
+            this(number,name,stateKey,amount,href,null);
+        }
+    }
     public record Page(List<Task> rows, int page, boolean hasNext) {
         public static Page empty(int page) { return new Page(List.of(),page,false); }
     }

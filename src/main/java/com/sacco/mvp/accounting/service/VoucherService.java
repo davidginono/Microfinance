@@ -74,6 +74,33 @@ public class VoucherService {
     public Voucher export(AppUserPrincipal actor,Type type,UUID id){
         authorize(actor,type,"VIEW");requireExport(actor);return readDocument(actor,type,id,true);
     }
+    @Transactional(readOnly=true)
+    public void prefillPayoffRefund(AppUserPrincipal actor,Form form,UUID payoff) {
+        authorize(actor,Type.PAYMENT,"CREATE");
+        ledger.requireActor(actor,"LOAN_RECORDING_VIEW");
+        var refund=vouchers.payoffRefund(actor.getSaccoId(),actor.getStationId(),payoff,false)
+            .orElseThrow(() -> new Invalid("","payoffRefund"));
+        form.setPayoffRefundId(payoff);
+        form.setParty(refund.client());
+        var row=form.getRows().getFirst();
+        row.setDebitAccountId(refund.payable());
+        row.setAmount(refund.amount());
+        row.setDescription("Interest refund · "+refund.loanNumber());
+    }
+
+    private void verifyPayoffRefund(AppUserPrincipal actor,Type type,Form form,boolean lock) {
+        if (form.getPayoffRefundId()==null) return;
+        if (!lock) ledger.requireActor(actor,"LOAN_RECORDING_VIEW");
+        var refund=vouchers.payoffRefund(actor.getSaccoId(),actor.getStationId(),form.getPayoffRefundId(),lock)
+            .orElseThrow(() -> new Invalid("","payoffRefund"));
+        require(type==Type.PAYMENT && form.getRows().size()==1 && form.getClientId()==null
+            && refund.client().equals(form.getParty().strip()) && !form.getEffectiveDate().isBefore(refund.payoffDate())
+            && form.getMoneyAccountId()!=null && form.getEvidence()!=null && !form.getEvidence().isBlank(),"","payoffRefund");
+        var row=form.getRows().getFirst();
+        require(row.getTransactionId()==null && row.getTemplateKey()==null && row.getCreditAccountId()==null
+            && (row.getEntries()==null || row.getEntries().isEmpty()) && refund.payable().equals(row.getDebitAccountId())
+            && refund.amount().compareTo(row.getAmount())==0,"","payoffRefund");
+    }
     private boolean canViewLoanVouchers(AppUserPrincipal actor){
         try{ledger.requireActor(actor,"LOAN_RECORDING_VIEW");return true;}
         catch(AccessDeniedException denied){return false;}
@@ -81,11 +108,13 @@ public class VoucherService {
     private Voucher readDocument(AppUserPrincipal actor,Type type,UUID id,boolean export){
         var ordinary=vouchers.find(actor.getSaccoId(),actor.getStationId(),type,id,false);
         if(ordinary.isPresent())return details(ordinary.get());
-        if(type==Type.RECEIPT)throw new AccessDeniedException("Receipt outside your workspace");
         ledger.requireActor(actor,"LOAN_RECORDING_VIEW");
         if(export)ledger.requireActor(actor,"LOAN_RECORDING_EXPORT");
         var v=vouchers.findSystem(actor.getSaccoId(),actor.getStationId(),type,id)
             .orElseThrow(()->new AccessDeniedException("Voucher outside your workspace"));
+        if (type==Type.RECEIPT && !vouchers.isPayoffVoucher(v.journalId())) {
+            throw new AccessDeniedException("Receipt outside your workspace");
+        }
         var entries=vouchers.systemEntries(actor.getSaccoId(),actor.getStationId(),v.journalId());
         var transaction=new Transaction(v.journalId(),1,null,null,"","TOTAL",v.description(),v.total(),null,null,entries);
         return withTransactions(v,List.of(transaction));
@@ -213,6 +242,7 @@ public class VoucherService {
         }
         UUID period=vouchers.period(actor.getSaccoId(),form.getEffectiveDate(),actor.getMemberId(),clock.now());
         var plan=plan(actor,type,form);
+        verifyPayoffRefund(actor,type,form,true);
         approvals.verifyPlan(approvalProof,plan);
         return persist(actor,type,form,hash,plan,null,null,period,client(actor,form));
     }
@@ -242,6 +272,7 @@ public class VoucherService {
         if(type!=Type.JOURNAL && reverses==null)moneyId=plan.rows().stream().flatMap(t->t.postings().stream()).filter(e->e.side().equals(type==Type.RECEIPT?"DEBIT":"CREDIT")).map(e->e.account().id()).findFirst().orElseThrow();
         var v=new Voucher(UUID.randomUUID(),number,type,f.getEffectiveDate(),f.getParty().strip(),f.postingReference(number),f.getDescription().strip(),f.getEvidence().strip(),moneyId,plan.total(),plan.rows().size(),UUID.randomUUID(),actor.getMemberId(),"",now,reverses,null,"","",plan.rows(),client==null?null:client.id(),client==null?null:client.number());
         vouchers.insert(v,actor.getSaccoId(),actor.getStationId(),f,hash,period,journal);
+        if (f.getPayoffRefundId()!=null && reverses==null) vouchers.linkPayoffRefund(f.getPayoffRefundId(),v.id());
         if(reverses!=null)equityMovements.inheritReversal(actor,type,journal,v.journalId(),f.getDescription());
         else if(plan.equityClassification()!=null)equityMovements.classifyPosted(actor,v.journalId(),plan.equityClassification(),f.getEquityReason());
         if(reverses==null)consumeNumber(actor,type,f.getRequestKey());
@@ -249,6 +280,7 @@ public class VoucherService {
         return details(scoped(actor,type,v.id(),false));
     }
     private Preview plan(AppUserPrincipal actor,Type type,Form f){
+        verifyPayoffRefund(actor,type,f,false);
         client(actor,f);
         checkActivityScope(actor,f);
         var transactionIds=f.getRows().stream().map(RowForm::getTransactionId).filter(Objects::nonNull).distinct().sorted().toList();
@@ -329,6 +361,7 @@ public class VoucherService {
     }
     static void validate(Form f,Type type,LocalDate today){
         require(f!=null && "OTHER".equals(f.getReceiptPurpose()) && f.getInterestAccountId()==null,"","request");
+        require(f.getPayoffRefundId()==null || type==Type.PAYMENT && !f.isEquity() && !f.isPettyCash() && f.selectedActivityIds().isEmpty(),"","request");
         validateActivitySelection(f);
         require(f.isEquity() || f.getEquityRow()==null && f.getEquityMovement()==null && (f.getEquityReason()==null || f.getEquityReason().isEmpty()),"equityChoice","equityActivity");
         if(f.isEquity()){

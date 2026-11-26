@@ -66,6 +66,24 @@ class LoanGroupApprovalPostgresTest {
         assertThat(f.jdbc.queryForObject("select evidence from loan_group_decision where request_id=?",String.class,request)).isEmpty();
         assertThat(status()).isEqualTo("SUBMITTED");
     }
+    @Test void loanDetailsAndRegisterShowTheNextFrozenReviewGroup() {
+        var request=submit();
+        assertThat(service.review(first,loan).request().submittedAt()).isNotNull();
+        assertThat(f.service.detail(f.actor,loan).loan().reviewGroup()).isEqualTo("ACCOUNTANT");
+        decide(first,request,"APPROVE");
+        assertThat(f.service.detail(f.actor,loan).loan().reviewGroup()).isEqualTo("ACCOUNTANT");
+        decide(second,request,"APPROVE");
+        assertThat(f.service.detail(f.actor,loan).loan().reviewGroup()).isEqualTo("MANAGER");
+        var filter=new Filter("",null,null,"SUBMITTED","newest",0,null);
+        assertThat(f.service.list(f.actor,filter).rows())
+            .filteredOn(row -> row.id().equals(loan)).extracting(LoanRow::reviewGroup).containsExactly("MANAGER");
+        assertThat(service.officeReviews(manager,Position.MANAGER,"","number",0).rows())
+            .singleElement().satisfies(row -> assertThat(row.reviewGroup()).isEqualTo("MANAGER"));
+        decide(manager,request,"APPROVE");
+        var ready=f.service.detail(f.actor,loan).loan();
+        assertThat(ready.status()).isEqualTo("READY_FOR_DISBURSEMENT");
+        assertThat(ready.reviewGroup()).isNull();
+    }
     @AfterAll void stop(){s.stop();}
     @Test void historicalReferencesStayReadOnlyAlongsideNewDecisionsWithoutReferences(){
         var request=submit();var id=UUID.randomUUID();

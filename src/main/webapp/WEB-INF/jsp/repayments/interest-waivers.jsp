@@ -54,33 +54,38 @@
             <input type="hidden" name="sequence" value="${waiverSchedule.sequence}" />
             <input type="hidden" name="effectiveDate" value="${waiverForm.effectiveDate}" />
             <section class="erp-table-wrap" data-resource-table="waiver-schedule" data-aws-no-refresh="true">
-                <div class="app-table-titlebar"><h2><spring:message code="recording.schedule" /></h2></div>
-                <p class="waiver-table-note" id="waiver-eligibility"><spring:message code="prepayment.earnedOnly" /></p>
+                <div class="app-table-titlebar">
+                    <h2><spring:message code="recording.schedule" /></h2>
+                    <c:if test="${waiverSchedule.hasEligibleInterest()}">
+                        <button class="app-btn btn-neutral" type="button" data-waiver-all hidden><spring:message code="prepayment.waiveAll" /></button>
+                    </c:if>
+                </div>
                 <div class="erp-table-scroll erp-table-scroll-lg">
                     <table class="erp-table" data-table-sort-mode="none" data-table-sort-reason="editor">
                         <thead><tr>
                             <th scope="col" data-table-column-locked><spring:message code="coa.select" /></th>
                             <th scope="col" data-table-identifier><spring:message code="recording.dueDate" /></th>
-                            <th scope="col"><spring:message code="recording.interest" /> (TZS)</th>
+                            <th scope="col"><spring:message code="prepayment.accruedUnpaid" /> (TZS)</th>
                             <th scope="col" data-table-column-locked><spring:message code="prepayment.eligible" /> (TZS)</th>
                             <th scope="col" data-table-column-locked><spring:message code="prepayment.waiverAmount" /> (TZS)</th>
+                            <th scope="col" data-table-column-locked><spring:message code="prepayment.revisedInstallment" /> (TZS)</th>
                         </tr></thead>
                         <tbody>
                             <c:forEach items="${waiverSchedule.installments}" var="row" varStatus="status">
                                 <c:set var="entered" value="${waiverEntered[row.id]}" />
-                                <tr data-waiver-row>
+                                <tr data-waiver-row data-accrued="${row.accrued}" data-installment-remaining="${row.installmentRemaining()}">
                                     <td>
                                         <c:choose><c:when test="${row.eligible gt 0}">
                                             <input type="hidden" name="selections[${status.index}].installmentId" value="${row.id}" />
                                             <input data-waiver-check type="checkbox" name="selections[${status.index}].selected" value="true"
                                                 aria-label="<spring:message code='prepayment.selectPeriod' arguments='${row.number}' />" ${entered.selected ? 'checked' : ''} />
                                         </c:when><c:otherwise>
-                                            <input type="checkbox" disabled aria-describedby="waiver-eligibility"
+                                            <input type="checkbox" disabled
                                                 aria-label="<spring:message code='prepayment.selectPeriod' arguments='${row.number}' />" />
                                         </c:otherwise></c:choose>
                                     </td>
                                     <td><c:out value="${appTime:display(row.dueDate)}" /></td>
-                                    <td><fmt:formatNumber value="${row.scheduled}" minFractionDigits="2" maxFractionDigits="2" /></td>
+                                    <td><fmt:formatNumber value="${row.accrued}" minFractionDigits="2" maxFractionDigits="2" /></td>
                                     <td><fmt:formatNumber value="${row.eligible}" minFractionDigits="2" maxFractionDigits="2" /></td>
                                     <td><c:choose><c:when test="${row.eligible gt 0}">
                                         <input class="aws-control waiver-amount" data-waiver-amount data-amount-input="true" type="number"
@@ -88,9 +93,10 @@
                                             aria-label="<spring:message code='prepayment.amountForPeriod' arguments='${row.number}' />"
                                             value="${empty entered.amount ? row.eligible : entered.amount}" />
                                     </c:when><c:otherwise>—</c:otherwise></c:choose></td>
+                                    <td data-waiver-revised><fmt:formatNumber value="${row.installmentRemaining()}" minFractionDigits="2" maxFractionDigits="2" /></td>
                                 </tr>
                             </c:forEach>
-                            <c:if test="${empty waiverSchedule.installments}"><tr><td colspan="5"><spring:message code="prepayment.error.date" /></td></tr></c:if>
+                            <c:if test="${empty waiverSchedule.installments}"><tr><td colspan="6"><spring:message code="prepayment.error.date" /></td></tr></c:if>
                         </tbody>
                     </table>
                 </div>
@@ -101,6 +107,8 @@
                     <div class="waiver-fields">
                         <dl class="erp-detail-facts">
                             <div><dt><spring:message code="prepayment.waiverAmount" /> (TZS)</dt><dd><output data-waiver-total aria-live="polite">0.00</output></dd></div>
+                            <div><dt><spring:message code="prepayment.accruedWaived" /> (TZS)</dt><dd><output data-waiver-accrued>0.00</output></dd></div>
+                            <div><dt><spring:message code="prepayment.futureWaived" /> (TZS)</dt><dd><output data-waiver-future>0.00</output></dd></div>
                         </dl>
                         <label class="waiver-field"><spring:message code="prepayment.reason" />
                             <textarea class="aws-control" name="reason" rows="3" maxlength="500" required><c:if test="${empty waiverForm.reverses}"><c:out value="${waiverForm.reason}" /></c:if></textarea>
@@ -168,6 +176,10 @@
                 <div><dt><spring:message code="voucher.reference" /></dt><dd>IW-<c:out value="${selectedWaiver.sequence}" /></dd></div>
                 <div><dt><spring:message code="voucher.date" /></dt><dd><c:out value="${appTime:display(selectedWaiver.date)}" /></dd></div>
                 <div><dt><spring:message code="prepayment.waiverAmount" /> (TZS)</dt><dd><fmt:formatNumber value="${selectedWaiver.amount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+                <c:if test="${selectedWaiver.futureAmount gt 0}">
+                    <div><dt><spring:message code="prepayment.accruedWaived" /> (TZS)</dt><dd><fmt:formatNumber value="${selectedWaiver.accruedAmount()}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+                    <div><dt><spring:message code="prepayment.futureWaived" /> (TZS)</dt><dd><fmt:formatNumber value="${selectedWaiver.futureAmount}" minFractionDigits="2" maxFractionDigits="2" /></dd></div>
+                </c:if>
                 <div><dt><spring:message code="prepayment.reason" /></dt><dd><c:out value="${selectedWaiver.reason}" /></dd></div>
             </dl>
         </section>

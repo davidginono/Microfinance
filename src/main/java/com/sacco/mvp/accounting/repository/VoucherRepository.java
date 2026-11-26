@@ -39,7 +39,8 @@ public class VoucherRepository {
     private static final String SYSTEM_HEAD="""
         select v.journal_id id,v.sacco_id,v.station_id,v.type,v.number,v.effective_date,coalesce(b.full_name,'') party,
         coalesce(original.number,'') reference,coalesce(nullif(p.notes,''),j.reason) description,j.evidence_reference evidence,
-        v.money_account_id,v.total,1 transaction_count,v.journal_id,j.maker_id posted_by,j.posted_at,original.journal_id reverses_id,
+        v.money_account_id,case when v.type='RECEIPT' and payoff.id is not null then payoff.cash else v.total end total,
+        1 transaction_count,v.journal_id,j.maker_id posted_by,j.posted_at,original.journal_id reverses_id,
         null::uuid client_id,b.member_no client_number,m.full_name posted_by_name,i.sacco_name institution_name,null::text equity_movement,
         coalesce(nullif(s.address_location,''),v.station_id) branch_name,
         correction.journal_id reversed_by,correction.number reversed_by_number,j.source_type,j.source_reference
@@ -48,7 +49,8 @@ public class VoucherRepository {
         join sacco_stations s on s.sacco_id=v.sacco_id and s.station_id=v.station_id
         left join accountant_loan_post p on p.journal_id=j.id and p.sacco_id=v.sacco_id and p.station_id=v.station_id
         left join loan_charge_command c on c.journal_id=j.id and c.sacco_id=v.sacco_id and c.station_id=v.station_id
-        left join loan_applications a on a.id=coalesce(p.loan_id,c.loan_id) and a.sacco_id=v.sacco_id and a.station_id=v.station_id
+        left join loan_payoff_post payoff on payoff.journal_id=j.id and payoff.sacco_id=v.sacco_id and payoff.station_id=v.station_id
+        left join loan_applications a on a.id=coalesce(p.loan_id,c.loan_id,payoff.loan_id) and a.sacco_id=v.sacco_id and a.station_id=v.station_id
         left join loan_borrower_directory b on b.party_id=a.borrower_party_id and b.sacco_id=a.sacco_id
         left join accounting_system_voucher original on original.journal_id=j.reverses_id
         left join gl_journal undo on undo.reverses_id=j.id and undo.state='POSTED'
@@ -59,8 +61,28 @@ public class VoucherRepository {
     public boolean sameRequest(UUID id,String hash,UUID actor){return Boolean.TRUE.equals(jdbc.queryForObject("select payload_hash=? and posted_by=? from accounting_voucher where id=?",Boolean.class,hash,actor,id));}
     public boolean loanRequestExists(String institution,String branch,UUID key){return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from accountant_loan_receipt where sacco_id=? and station_id=? and request_key=?)",Boolean.class,institution,branch,key));}
     public Optional<Voucher> find(String institution,String branch,Type type,UUID id,boolean lock){return jdbc.query(HEAD+" where v.sacco_id=? and v.station_id=? and v.type=? and v.id=?"+(lock?" for update of v":""),this::voucher,institution,branch,type.name(),id).stream().findFirst();}
+    public boolean isPayoffVoucher(UUID journal) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from loan_payoff_post where journal_id=?)",Boolean.class,journal));
+    }
     public Optional<Voucher> findSystem(String institution,String branch,Type type,UUID id){
         return jdbc.query(SYSTEM_HEAD+" where v.sacco_id=? and v.station_id=? and v.type=? and v.journal_id=?",this::voucher,institution,branch,type.name(),id).stream().findFirst();
+    }
+    public record PayoffRefund(UUID loan,String loanNumber,String client,UUID payable,java.math.BigDecimal amount,LocalDate payoffDate) {}
+    public Optional<PayoffRefund> payoffRefund(String institution,String branch,UUID id,boolean lock) {
+        return jdbc.query("""
+            select p.loan_id,a.loan_id loan_number,b.full_name,p.payable_account_id,p.refund,p.effective_date
+            from loan_payoff_post p join loan_applications a on a.id=p.loan_id
+            join loan_borrower_directory b on b.party_id=a.borrower_party_id and b.sacco_id=p.sacco_id
+            where p.sacco_id=? and p.station_id=? and p.id=? and p.refund>0 and p.reverses_id is null
+              and not exists (select 1 from loan_payoff_post u where u.reverses_id=p.id)
+              and not exists (select 1 from loan_payoff_refund r where r.payoff_id=p.id
+                  and not exists (select 1 from accounting_voucher u where u.reverses_id=r.voucher_id))
+            """+(lock?" for update of p":""),(r,n)->new PayoffRefund(r.getObject("loan_id",UUID.class),r.getString("loan_number"),
+                r.getString("full_name"),r.getObject("payable_account_id",UUID.class),r.getBigDecimal("refund"),r.getObject("effective_date",LocalDate.class)),
+            institution,branch,id).stream().findFirst();
+    }
+    public void linkPayoffRefund(UUID payoff,UUID voucher) {
+        jdbc.update("insert into loan_payoff_refund(payoff_id,voucher_id) values (?,?)",payoff,voucher);
     }
     public List<Entry> systemEntries(String institution,String branch,UUID journal){
         return jdbc.query("""

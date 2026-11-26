@@ -78,6 +78,35 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
+                        <c:set var="interestAccrualError" value="${loanSettingsFieldErrors['interestAccrualMode']}" />
+                        <label class="block">
+                            <spring:message code="prepayment.accrualMode" />
+                            <select name="interestAccrualMode" class="aws-control ${empty interestAccrualError ? '' : 'field-error-input'}"
+                                    aria-invalid="${not empty interestAccrualError}"
+                                    aria-describedby="${empty interestAccrualError ? '' : 'interest-accrual-error'}">
+                                <c:if test="${not creatingLoanProduct and empty product.interestAccrualMode}">
+                                    <option value="" selected disabled><spring:message code="prepayment.accrualMode.choose" /></option>
+                                </c:if>
+                                <option value="DAILY" ${creatingLoanProduct or product.interestAccrualMode eq 'DAILY' ? 'selected' : ''}><spring:message code="prepayment.accrualMode.daily" /></option>
+                                <option value="PERIODIC" ${product.interestAccrualMode eq 'PERIODIC' ? 'selected' : ''}><spring:message code="prepayment.accrualMode.periodic" /></option>
+                            </select>
+                            <c:if test="${not empty interestAccrualError}">
+                                <span id="interest-accrual-error" class="field-error-text" role="alert"><c:out value="${interestAccrualError}" /></span>
+                            </c:if>
+                        </label>
+                        <c:set var="earlyPayoffInterestError" value="${loanSettingsFieldErrors['earlyPayoffInterest']}" />
+                        <label class="block">
+                            <spring:message code="prepayment.payoffRule" />
+                            <select name="earlyPayoffInterest" class="aws-control ${empty earlyPayoffInterestError ? '' : 'field-error-input'}"
+                                    aria-invalid="${not empty earlyPayoffInterestError}"
+                                    aria-describedby="${empty earlyPayoffInterestError ? '' : 'early-payoff-interest-error'}">
+                                <option value="EXCLUDE_OPEN_PERIOD" ${product.earlyPayoffInterest ne 'ELAPSED_DAYS' ? 'selected' : ''}><spring:message code="prepayment.payoffRule.exclude" /></option>
+                                <option value="ELAPSED_DAYS" ${product.earlyPayoffInterest eq 'ELAPSED_DAYS' ? 'selected' : ''}><spring:message code="prepayment.payoffRule.elapsed" /></option>
+                            </select>
+                            <c:if test="${not empty earlyPayoffInterestError}">
+                                <span id="early-payoff-interest-error" class="field-error-text" role="alert"><c:out value="${earlyPayoffInterestError}" /></span>
+                            </c:if>
+                        </label>
                         <fieldset class="col-span-full space-y-2 min-w-0" data-loan-top-up-settings>
                             <legend class="font-semibold"><spring:message code="loanTopUp.settings" /></legend>
                             <input type="hidden" name="topUpSettingsPresent" value="true" />

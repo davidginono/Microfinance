@@ -27,6 +27,7 @@
 <spring:message code="voucher.error.balance" var="voucherBalanceError" />
 <form:form modelAttribute="voucherForm" method="post" action="${postUrl}" cssClass="accounting-create-form voucher-form" data-voucher-form="true" data-petty-cash="${voucherForm.pettyCash}" data-petty-account="${voucherForm.pettyCash?voucherForm.moneyAccountId:''}" data-new-voucher="${newVoucherForm eq true}" data-remove-entry-label="${voucherRemoveEntry}" data-debit-label="${voucherDebitLabel}" data-credit-label="${voucherCreditLabel}" data-amount-label="${voucherAmountLabel} (TZS)" data-balance-error="${voucherBalanceError}" data-kind="${voucherType}" data-base="${postUrl}" data-limit="${voucherLimit}" data-choose-account="${voucherChooseAccount}" data-lookup-error="${voucherLookupError}" data-number-loading="${voucherNumberLoading}" data-number-error="${voucherNumberError}" data-number-csrf-header="${_csrf.headerName}" data-number-csrf-token="${_csrf.token}">
 <form:hidden path="requestKey" /><form:hidden path="pettyCash" /><form:hidden path="equity" />
+<c:if test="${not empty voucherForm.payoffRefundId}"><form:hidden path="payoffRefundId" /></c:if>
 <div class="accounting-error-summary" role="alert" tabindex="-1"><form:errors path="*" element="p" cssClass="coa-error" /></div>
 <section class="accounting-form accounting-create-card"><h2><c:choose><c:when test="${not empty activeSaccoName}"><c:out value="${activeSaccoName}" /></c:when><c:otherwise><spring:message code="voucher.information" /></c:otherwise></c:choose></h2>
 <div class="accounting-grid">

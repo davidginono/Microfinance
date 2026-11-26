@@ -38,7 +38,7 @@ public class VoucherController {
     public static Type type(String kind){return switch(kind){case "receipts"->Type.RECEIPT;case "payments"->Type.PAYMENT;case "journals"->Type.JOURNAL;default->throw new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND);};}
     @InitBinder("voucherForm") void binder(WebDataBinder binder){
         binder.setAutoGrowCollectionLimit(50);
-        binder.setAllowedFields("equity","equityMovement","equityChoice","equityReason","pettyCash","requestKey","effectiveDate","party","description","evidence","moneyAccountId","activityId","activityIds","receiptPurpose","loanPayer","clientId","interestAccountId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
+        binder.setAllowedFields("equity","equityMovement","equityChoice","equityReason","pettyCash","requestKey","effectiveDate","party","description","evidence","moneyAccountId","activityId","activityIds","receiptPurpose","loanPayer","clientId","interestAccountId","payoffRefundId","rows[*].loanId","rows[*].transactionId","rows[*].templateKey","rows[*].component","rows[*].description","rows[*].amount","rows[*].debitAccountId","rows[*].creditAccountId","rows[*].entries[*].side","rows[*].entries[*].accountId","rows[*].entries[*].amount");
     }
     @GetMapping
     public String list(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,
@@ -50,10 +50,16 @@ public class VoucherController {
         model.addAttribute("vouchers",type(kind)==Type.RECEIPT?loanReceipts.list(actor,filter):vouchers.list(actor,type(kind),filter));return "accounting/vouchers/register";
     }
     @GetMapping("/new")
-    public String create(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="OTHER") String purpose,@RequestParam(required=false) UUID loanId,@RequestParam(defaultValue="false") boolean pettyCash,Model model){
+    public String create(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(defaultValue="OTHER") String purpose,@RequestParam(required=false) UUID loanId,@RequestParam(required=false) UUID payoffRefundId,@RequestParam(defaultValue="false") boolean pettyCash,Model model){
         vouchers.authorize(actor,type(kind),"CREATE");var f=new Form();f.setEffectiveDate(clock.today());
         if(!Set.of("OTHER","LOAN_REPAYMENT").contains(purpose) || (type(kind)!=Type.RECEIPT && !"OTHER".equals(purpose)))throw new Invalid("","request");
         f.setReceiptPurpose(purpose);if(loanId!=null){if(!"LOAN_REPAYMENT".equals(purpose))throw new Invalid("","request");loanReceipts.prefill(actor,f,loanId);}
+        if (payoffRefundId!=null) {
+            if (type(kind)!=Type.PAYMENT || pettyCash || loanId!=null) throw new Invalid("","request");
+            vouchers.prefillPayoffRefund(actor,f,payoffRefundId);
+            model.addAttribute("voucherForm",f);
+            return refundForm(actor,model);
+        }
         if(pettyCash){
             if(type(kind)!=Type.PAYMENT)throw new Invalid("","request");
             var fund=this.pettyCash.expenseFund(actor);f.setPettyCash(true);f.setMoneyAccountId(fund.accountId());
@@ -72,7 +78,7 @@ public class VoucherController {
                        BindingResult errors,@RequestParam(defaultValue="post") String action,Model model,RedirectAttributes flash){
         vouchers.authorize(actor,type(kind),"CREATE");context(kind,model);boolean loan=type(kind)==Type.RECEIPT && "LOAN_REPAYMENT".equals(form.getReceiptPurpose());
         if(!errors.hasErrors())try{
-            if("preview".equals(action)){if(loan)model.addAttribute("loanPreview",loanReceipts.preview(actor,form));else model.addAttribute("preview",vouchers.preview(actor,type(kind),form));formContext(kind,actor,form,model);return "accounting/vouchers/form";}
+            if("preview".equals(action)){if(loan)model.addAttribute("loanPreview",loanReceipts.preview(actor,form));else model.addAttribute("preview",vouchers.preview(actor,type(kind),form));if(form.getPayoffRefundId()!=null && type(kind)==Type.PAYMENT)return refundForm(actor,model);formContext(kind,actor,form,model);return "accounting/vouchers/form";}
             if("draft".equals(action) && !loan && approvalGate.required(actor,type(kind)))return "redirect:/finance/approval/"+approvalWorkflows.capture(actor,type(kind),form,false);
             if(!"post".equals(action))throw new Invalid("","request");
             if(!loan && approvalGate.required(actor,type(kind)))return "redirect:/finance/approval/"+approvalWorkflows.capture(actor,type(kind),form);
@@ -81,7 +87,13 @@ public class VoucherController {
         }catch(Invalid invalid){if(invalid.field().isEmpty())errors.reject(invalid.getMessage());else errors.rejectValue(invalid.field(),invalid.getMessage());}
          catch(DataIntegrityViolationException duplicate){errors.reject("voucher.error.duplicate");}
          catch(IllegalArgumentException invalid){errors.reject(accountingError(invalid));}
+        if(form.getPayoffRefundId()!=null && type(kind)==Type.PAYMENT)return refundForm(actor,model);
         formContext(kind,actor,form,model);return "accounting/vouchers/form";
+    }
+    private String refundForm(AppUserPrincipal actor,Model model) {
+        context("payments",model);
+        model.addAttribute("moneyAccounts",vouchers.accounts(actor,Type.PAYMENT,"",0,"MONEY"));
+        return "accounting/vouchers/payoff-refund";
     }
     @PostMapping("/batches") public String batch(@PathVariable String kind,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID requestKey){
         var id=approvalWorkflows.batch(actor,type(kind),requestKey);var details=approvalWorkflows.details(actor,id);

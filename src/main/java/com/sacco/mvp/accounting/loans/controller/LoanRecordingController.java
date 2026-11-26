@@ -40,6 +40,33 @@ public class LoanRecordingController {
     private final LoanRecordingEvidenceService evidence;
     @ExceptionHandler(IllegalArgumentException.class) @ResponseStatus(HttpStatus.BAD_REQUEST)
     public String invalidRequest(IllegalArgumentException exception,Model model){model.addAttribute("recordingError",error(exception));return "accounting/loans/error";}
+    @GetMapping("/loan-records/{id}/interest-terms")
+    @PreAuthorize("@access.has(principal,'LOAN_INTEREST_TERMS_UPDATE')")
+    public String interestTerms(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,Model model) {
+        model.addAttribute("interestTermsLoan",id);
+        model.addAttribute("interestTermsDate",service.proposedInterestChange(actor,id).orElse(null));
+        if (!model.containsAttribute("interestTermsKey")) model.addAttribute("interestTermsKey",UUID.randomUUID());
+        return "repayments/interest-terms";
+    }
+
+    @PostMapping("/loan-records/{id}/interest-terms")
+    @PreAuthorize("@access.has(principal,'LOAN_INTEREST_TERMS_UPDATE')")
+    public String recordInterestTerms(@AuthenticationPrincipal AppUserPrincipal actor,@PathVariable UUID id,
+            @RequestParam UUID requestKey,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate effectiveDate,
+            @RequestParam com.sacco.mvp.domain.EarlyPayoffInterest payoffInterest,@RequestParam String approvalReference,
+            @RequestParam org.springframework.web.multipart.MultipartFile signedAmendment,RedirectAttributes flash) {
+        try {
+            service.recordInterestChange(actor,id,requestKey,effectiveDate,payoffInterest,approvalReference,signedAmendment);
+            flash.addFlashAttribute("interestTermsSaved",effectiveDate);
+            return "redirect:/finance/loan-records/"+id;
+        } catch (IllegalArgumentException | DataIntegrityViolationException e) {
+            flash.addFlashAttribute("interestTermsError",error(e));
+            flash.addFlashAttribute("interestTermsKey",requestKey);
+            flash.addFlashAttribute("interestTermsApproval",approvalReference);
+            flash.addFlashAttribute("interestTermsRule",payoffInterest.name());
+            return "redirect:/finance/loan-records/"+id+"/interest-terms";
+        }
+    }
     @InitBinder("recordForm") public void recordBinder(WebDataBinder b){b.setAutoGrowCollectionLimit(50);b.setAllowedFields("loanFor","groupApplication.groupId","groupApplication.expectedVersion","groupApplication.signedOn","groupApplication.checked","groupApplication.removeAgreement","applicationId","expectedVersion","applicationDetails.declarationAccepted","applicationDetails.fields[*]","applicationDetails.guarantors[*].fullName","applicationDetails.guarantors[*].clientNumber","applicationDetails.guarantors[*].guaranteeBudget","applicationDetails.guarantors[*].guaranteeEvidence","applicationDetails.guarantors[*].signedOn","applicationDetails.guarantors[*].relationship","applicationDetails.guarantors[*].business","applicationDetails.guarantors[*].location","applicationDetails.guarantors[*].phone","applicationDetails.collateral[*].itemName","applicationDetails.collateral[*].itemNumber","applicationDetails.collateral[*].itemType","applicationDetails.collateral[*].description","applicationDetails.collateral[*].phone","applicationDetails.documentNames[*]","applicationDetails.documentTypes[*]","applicationDetails.requiredAttachmentIds[*]","requestKey","clientId","topUpSourceLoanId","topUpAdditionalAmount","productId","applicationDate","principal","months","tenureUnit","tenureValue","loanMode","interestEntry","interestBasis","interestPercent","interestAmount","customFrequency","customMethod","purpose","guarantors","collateral","evidence","customApplicationCharge","customProcessingCharge","insurancePremium","customProcessingPercent","customInsurancePercent","customProcessingBasis","customInsuranceBasis");}
     @GetMapping({"/loan-records","/loan-disbursements","/loan-repayments"})
     public String register(@AuthenticationPrincipal AppUserPrincipal a,@RequestParam(defaultValue="") String search,
@@ -581,7 +608,7 @@ public class LoanRecordingController {
     private String error(RuntimeException e){return e.getMessage()!=null && (e.getMessage().startsWith("simpleGroup.error.") || e.getMessage().startsWith("loanGroups.error.") || e.getMessage().startsWith("applications.error.") || e.getMessage().startsWith("kyc.error.") || e.getMessage().startsWith("credit.error.") || e.getMessage().startsWith("recording.error.") || e.getMessage().startsWith("repayment.error.") || e.getMessage().startsWith("voucher.error.") || e.getMessage().startsWith("charges.error.") || e.getMessage().startsWith("prepayment.error."))?e.getMessage():"recording.error.terms";}
 
     @PostMapping("/loan-records/{id}/submit-for-review") public String submitForReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID requestKey,RedirectAttributes flash){
-        try{groupApprovals.submit(a,id,requestKey);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));}
+        try{groupApprovals.submit(a,id,requestKey);flash.addFlashAttribute("reviewSubmitted",true);}catch(IllegalArgumentException e){flash.addFlashAttribute("groupError",error(e));}
         return "redirect:/finance/loan-records/"+id;
     }
     @PostMapping("/loan-records/{id}/review") public String decideGroupReview(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam UUID approvalRequest,@RequestParam UUID requestKey,@RequestParam String decision,@RequestParam String reason,RedirectAttributes flash){

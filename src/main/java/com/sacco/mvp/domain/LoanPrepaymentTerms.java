@@ -16,6 +16,11 @@ public record LoanPrepaymentTerms(Schedule schedule, PartialInterest partialInte
     public Map<String,String> snapshot() {
         return Map.of("version","PREPAYMENT_V1","schedule",schedule.name(),"partialInterest",partialInterest.name(),"dayBasis",dayBasis.name());
     }
+    public Map<String,String> monthlySnapshot(EarlyPayoffInterest payoff) {
+        var terms = new java.util.LinkedHashMap<>(snapshot());
+        terms.put("monthlyInterest", payoff.name());
+        return Map.copyOf(terms);
+    }
     public static LoanPrepaymentTerms read(Object raw) {
         if (!(raw instanceof Map<?,?> m) || !"PREPAYMENT_V1".equals(m.get("version"))) return null;
         return new LoanPrepaymentTerms(Schedule.valueOf(m.get("schedule").toString()),PartialInterest.valueOf(m.get("partialInterest").toString()),DayBasis.valueOf(m.get("dayBasis").toString()));

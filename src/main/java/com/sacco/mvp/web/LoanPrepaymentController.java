@@ -20,6 +20,7 @@ import java.util.*;
 public class LoanPrepaymentController {
     private final LoanRepaymentLedgerService ledger;
     private final ApplicationClock clock;
+    private final com.sacco.mvp.accounting.loans.service.LoanRecordingService recording;
     @Data public static class WaiverForm {
         private UUID requestKey;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate effectiveDate;
@@ -77,6 +78,72 @@ public class LoanPrepaymentController {
     public String retiredSettlement(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,jakarta.servlet.http.HttpServletRequest request){
         if(!actor.isStaffSession())throw new org.springframework.security.access.AccessDeniedException("Forbidden");
         return "redirect:"+loanDetails(id,request);
+    }
+    @GetMapping("/finance/loan-records/{id}/full-payoff")
+    @PreAuthorize("@access.has(principal,'LOAN_RECORDING_VIEW')")
+    public String fullPayoff(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(defaultValue="") String moneySearch,@RequestParam(defaultValue="") String payableSearch,Model model) {
+        var today=clock.today();
+        model.addAttribute("payoffDate",date==null?today:date);
+        model.addAttribute("payoffToday",today);
+        model.addAttribute("payoffLatest",today.plusYears(1));
+        model.addAttribute("payoffLoanUrl","/finance/loan-records/"+id);
+        model.addAttribute("payoffPosting",recording.latestPayoff(actor,id).orElse(null));
+        if (!model.containsAttribute("payoffRequestKey")) model.addAttribute("payoffRequestKey",UUID.randomUUID());
+        try {
+            var quote=ledger.settlementQuote(id,actor,date==null?today:date);
+            model.addAttribute("payoff",quote);
+            if (quote!=null && quote.monthly() && actor.getClaims().containsAll(Set.of("ACCOUNTING_BUSINESS_CREATE","LOAN_RECORDING_POST"))) {
+                if (quote.total().signum()>0) model.addAttribute("payoffMoneyAccounts",recording.payoffAccounts(actor,"PAYOFF_MONEY",moneySearch,0));
+                if (quote.refundDue().signum()>0) model.addAttribute("payoffPayableAccounts",recording.payoffAccounts(actor,"PAYOFF_PAYABLE",payableSearch,0));
+            }
+        } catch(IllegalArgumentException e) {
+            if (!model.containsAttribute("payoffError") && model.getAttribute("payoffPosting")==null) model.addAttribute("payoffError",error(e));
+        }
+        return "repayments/full-payoff";
+    }
+    @PostMapping("/finance/loan-records/{id}/full-payoff")
+    @PreAuthorize("@access.has(principal,'LOAN_RECORDING_POST') and @access.has(principal,'ACCOUNTING_BUSINESS_CREATE')")
+    public String postPayoff(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID requestKey,
+            @RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,@RequestParam long sequence,
+            @RequestParam BigDecimal cash,@RequestParam BigDecimal refund,@RequestParam(required=false) UUID moneyAccount,
+            @RequestParam(required=false) UUID payableAccount,@RequestParam(defaultValue="") String reference,
+            @RequestParam(defaultValue="false") boolean confirmed,RedirectAttributes flash) {
+        try {
+            if (!confirmed) throw new IllegalArgumentException("prepayment.error.confirmation");
+            recording.postMonthlyPayoff(actor,id,requestKey,date,sequence,cash,refund,moneyAccount,payableAccount,reference);
+            flash.addFlashAttribute("payoffSaved",true);
+        } catch(IllegalArgumentException | org.springframework.dao.DataIntegrityViolationException e) {
+            flash.addFlashAttribute("payoffError",payoffError(e));
+            flash.addFlashAttribute("payoffRequestKey",requestKey);
+            flash.addFlashAttribute("payoffReference",reference);
+            flash.addFlashAttribute("selectedPayoffMoney",moneyAccount);
+            flash.addFlashAttribute("selectedPayoffPayable",payableAccount);
+            flash.addAttribute("date",date);
+        }
+        return "redirect:/finance/loan-records/"+id+"/full-payoff";
+    }
+    @PostMapping("/finance/loan-records/{id}/full-payoff/reverse")
+    @PreAuthorize("@access.has(principal,'LOAN_RECORDING_REVERSE') and @access.has(principal,'ACCOUNTING_BUSINESS_REVERSE')")
+    public String reversePayoff(@PathVariable UUID id,@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam UUID original,
+            @RequestParam UUID requestKey,@RequestParam @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam String reason,RedirectAttributes flash) {
+        try {
+            recording.reverseMonthlyPayoff(actor,id,original,requestKey,date,reason);
+            flash.addFlashAttribute("payoffReversed",true);
+        } catch(IllegalArgumentException | org.springframework.dao.DataIntegrityViolationException e) {
+            flash.addFlashAttribute("payoffError",payoffError(e));
+            flash.addFlashAttribute("payoffRequestKey",requestKey);
+        }
+        return "redirect:/finance/loan-records/"+id+"/full-payoff";
+    }
+    private static String payoffError(RuntimeException e) {
+        if (e instanceof IllegalArgumentException invalid) {
+            var message=invalid.getMessage();
+            return message!=null && message.matches("recording\\.error\\.[A-Za-z]+")?message:error(invalid);
+        }
+        return "prepayment.error.conflict";
     }
     @PostMapping({"/repayments/loans/{id}/interest-waivers","/finance/loan-records/{id}/interest-waivers"})
     @PreAuthorize("@access.has(principal,'LOAN_INTEREST_WAIVE')")

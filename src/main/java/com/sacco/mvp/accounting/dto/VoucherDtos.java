@@ -47,6 +47,8 @@ public final class VoucherDtos {
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private String loanPayer;
         private UUID clientId,interestAccountId;
+        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+        private UUID payoffRefundId;
         private List<RowForm> rows=new ArrayList<>(List.of(new RowForm()));
 
         @com.fasterxml.jackson.annotation.JsonIgnore

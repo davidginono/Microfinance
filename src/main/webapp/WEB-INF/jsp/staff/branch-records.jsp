@@ -1,4 +1,5 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ taglib prefix="loanui" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="c" uri="jakarta.tags.core" %>
 <%@ taglib prefix="fmt" uri="jakarta.tags.fmt" %>
 <%@ taglib prefix="spring" uri="http://www.springframework.org/tags" %>
@@ -31,7 +32,7 @@
                 <tr>
                     <td><a class="resource-table-id-link" href="<c:out value='${recordUrl}' />"><c:out value="${row.number}" /></a></td>
                     <td><c:out value="${clientList ? row.name : row.client}" /></td>
-                    <td><span data-resource-status="${clientList ? row.state : row.status}"><spring:message code="${clientList ? 'kyc.state.'.concat(row.state) : 'recording.status.'.concat(row.status)}" text="${clientList ? row.state : row.status}" /></span></td>
+                    <td><c:choose><c:when test="${clientList}"><span data-resource-status="${row.state}"><spring:message code="kyc.state.${row.state}" text="${row.state}" /></span></c:when><c:otherwise><loanui:loanStatus status="${row.status}" reviewGroup="${row.reviewGroup}" /></c:otherwise></c:choose></td>
                     <c:if test="${not clientList}"><td><fmt:formatNumber value="${row.principal}" minFractionDigits="2" maxFractionDigits="2" /></td></c:if>
                 </tr>
             </c:forEach>

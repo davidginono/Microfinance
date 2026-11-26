@@ -121,6 +121,8 @@ management:
       enabled: false
 
 app:
+  monthly-loan-interest:
+    enabled: ${APP_MONTHLY_LOAN_INTEREST_ENABLED:false}
   bootstrap:
     admin-password: ${APP_BOOTSTRAP_ADMIN_PASSWORD:}
   base-url: ${APP_BASE_URL:http://localhost:8080}

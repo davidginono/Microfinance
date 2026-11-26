@@ -11,8 +11,7 @@
 #interest-waivers :is(.waiver-date-form label,.waiver-field){min-width:0}
 #interest-waivers :is(.waiver-date-form,.waiver-field) .aws-control{width:100%;min-width:0}
 #interest-waivers .waiver-date{max-inline-size:16rem}
-#interest-waivers [data-resource-table=waiver-schedule] td:last-child{min-inline-size:10rem}
-#interest-waivers .waiver-table-note{margin:0;padding:0 12px 10px;color:#545b64}
+#interest-waivers [data-resource-table=waiver-schedule] td:has(.waiver-amount){min-inline-size:10rem}
 #interest-waivers .waiver-actions{justify-content:flex-end;padding:0}
 #interest-waivers tr:has([data-waiver-check]:checked)>td{background-color:#f1f8fe}
 .aws-console .accounting-form {border-color:#d5dbdb;border-radius:0;box-shadow:0 1px 1px #879596;}

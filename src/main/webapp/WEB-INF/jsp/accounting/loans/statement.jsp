@@ -1,4 +1,5 @@
 <%@ taglib prefix="report" tagdir="/WEB-INF/tags" %>
+<%@ taglib prefix="loanui" tagdir="/WEB-INF/tags" %>
 <%@ taglib prefix="appTime" uri="https://sacco.local/tags/time" %>
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ include file="support.jspf" %>
@@ -39,7 +40,7 @@
                 </tr></thead>
                 <tbody>
                     <c:forEach items="${statement.page.rows}" var="l"><tr>
-                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><spring:message code="recording.loanFor.${l.loanFor}" /></td><td><c:out value="${l.product}" /></td><td><span data-resource-status="${l.status}"><spring:message code="recording.status.${l.status}" /></span></td>
+                        <td><a class="resource-table-id-link" href="<c:url value='/finance/client-ledgers/${clientId}/loans/${l.id}/statement' />"><c:out value="${l.number}" /></a></td><td><spring:message code="recording.loanFor.${l.loanFor}" /></td><td><c:out value="${l.product}" /></td><td><loanui:loanStatus status="${l.status}" reviewGroup="${l.reviewGroup}" /></td>
                         <td class="statement-money"><fmt:formatNumber value="${l.outstandingPrincipal}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.dueInterest}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.charges}" pattern="#,##0.##;(#,##0.##)" /></td><td class="statement-money"><fmt:formatNumber value="${l.arrears}" pattern="#,##0.##;(#,##0.##)" /></td>
                     </tr></c:forEach>
                     <c:if test="${empty statement.page.rows}"><tr><td colspan="8"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>
@@ -82,7 +83,7 @@
                                 <td><spring:message code="recording.loanFor.GROUP" /></td>
                                 <td><c:out value="${loan.group}" /></td>
                                 <td><c:out value="${loan.product}" /></td>
-                                <td><span data-resource-status="${loan.status}"><spring:message code="recording.status.${loan.status}" /></span></td>
+                                <td><loanui:loanStatus status="${loan.status}" reviewGroup="${loan.reviewGroup}" /></td>
                             </tr>
                         </c:forEach>
                         <c:if test="${empty statement.groupLoans.rows}"><tr><td colspan="5"><spring:message code="recording.statement.noLoans" /></td></tr></c:if>

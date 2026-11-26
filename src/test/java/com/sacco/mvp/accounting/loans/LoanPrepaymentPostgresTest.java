@@ -87,6 +87,53 @@ class LoanPrepaymentPostgresTest {
         f.ledger.reverseInterestWaiver(loan,f.operator("B1"),UUID.randomUUID(),date,"Correction",result);
         assertThat(f.ledger.waiverSchedule(loan,f.actor,date).installments()).isEqualTo(schedule.installments());
     }
+    @Test void aPartialFutureWaiverReducesLaterAccrualAndReversalRestoresItOnItsOwnDate(){
+        var loan=loan(InterestMethod.FLAT_RATE);
+        var schedule=f.ledger.waiverSchedule(loan,f.actor,PAYMENT);
+        var first=schedule.installments().getFirst();
+        var second=schedule.installments().getLast();
+        assertThat(first.accrued()).isEqualByComparingTo("10.00");
+        assertThat(first.eligible()).isEqualByComparingTo("20.00");
+        assertThat(second.accrued()).isZero();
+        assertThat(second.eligible()).isEqualByComparingTo("20.00");
+        var waiver=f.ledger.waiveInstallments(loan,f.actor,UUID.randomUUID(),PAYMENT,"Partial interest waiver",
+            schedule.sequence(),Map.of(first.id(),m("15.00")));
+        assertThat(f.ledger.interestWaivers(loan,f.actor,0).getFirst().futureAmount()).isEqualByComparingTo("5.00");
+        assertThat(f.ledger.paymentBalance(loan,f.actor,PAYMENT.minusDays(1)).dueInterest()).isEqualByComparingTo("9.33");
+        assertThat(f.ledger.paymentBalance(loan,f.actor,PAYMENT.plusDays(5)).dueInterest()).isEqualByComparingTo("1.67");
+        var date=LoanRecordingPostgresTest.TODAY;
+        f.ledger.reverseInterestWaiver(loan,f.operator("B1"),UUID.randomUUID(),date,"Independent correction",waiver);
+        assertThat(f.ledger.paymentBalance(loan,f.actor,date).dueInterest()).isEqualByComparingTo("24.52");
+        assertThat(f.ledger.paymentBalance(loan,f.actor,PAYMENT.plusDays(5)).dueInterest()).isEqualByComparingTo("1.67");
+    }
+    @Test void allRemainingInterestExcludesPriorPaymentsAndRebatesAndTheNextReceiptPaysPrincipal(){
+        var loan=loan(InterestMethod.FLAT_RATE);
+        payment(loan,"410.00",PAYMENT);
+        var date=LoanRecordingPostgresTest.TODAY;
+        var schedule=f.ledger.waiverSchedule(loan,f.actor,date);
+        var selections=new LinkedHashMap<UUID,BigDecimal>();
+        for(var row:schedule.installments()){
+            if(row.eligible().signum()>0)selections.put(row.id(),row.eligible());
+        }
+        var key=UUID.randomUUID();
+        var waiver=f.ledger.waiveInstallments(loan,f.actor,key,date,"Waive all remaining interest",schedule.sequence(),selections);
+        assertThat(f.ledger.waiveInstallments(loan,f.actor,key,date,"Waive all remaining interest",schedule.sequence(),selections)).isEqualTo(waiver);
+        var recorded=f.ledger.interestWaivers(loan,f.actor,0).getFirst();
+        assertThat(recorded.amount()).isEqualByComparingTo("18.00");
+        assertThat(recorded.accruedAmount()).isEqualByComparingTo("8.71");
+        assertThat(recorded.futureAmount()).isEqualByComparingTo("9.29");
+        var quote=f.ledger.settlementQuote(loan,f.actor,date);
+        assertThat(quote.interest()).isZero();
+        assertThat(quote.futureInterest()).isZero();
+        assertThat(quote.principal()).isEqualByComparingTo("600.00");
+        var receipt=f.receiptForm(loan);
+        receipt.setEffectiveDate(date);
+        receipt.getRows().getFirst().setAmount(m("100.00"));
+        var posted=f.receiptService().post(f.actor,receipt);
+        var line=posted.rows().getFirst();
+        assertThat(line.principal()).isEqualByComparingTo("100.00");
+        assertThat(line.interest()).isZero();
+    }
     @Test void concurrentWaiverRetriesPostOneConcessionAndViewPermissionCannotWaive()throws Exception{
         var loan=loan(InterestMethod.FLAT_RATE);var key=UUID.randomUUID();
         var viewOnly=new com.sacco.mvp.security.AppUserPrincipal(Member.builder().id(f.actor.getMemberId()).saccoId(f.institution).stationId("B1").position(Position.ACCOUNTANT).status(MemberStatus.ACTIVE).staffAccessStatus(StaffAccessStatus.ACTIVE).build(),EnumSet.of(UserClaim.LOAN_RECORDING_VIEW));

@@ -8,6 +8,7 @@ import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.RecoveryBalance;
 import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.RecoveryPayment;
 import com.sacco.mvp.accounting.repayment.service.RepaymentAllocationCalculator;
 import com.sacco.mvp.accounting.loans.repository.LoanRecordingRepository;
+import com.sacco.mvp.accounting.loans.repository.LoanRecordingRepository.PayoffPosting;
 import com.sacco.mvp.accounting.repository.VoucherRepository;
 import com.sacco.mvp.accounting.service.GeneralLedgerService;
 import com.sacco.mvp.domain.*;
@@ -95,6 +96,149 @@ public class LoanRecordingService {
     private final org.springframework.transaction.PlatformTransactionManager transactions;
     private static final BigDecimal ZERO=new BigDecimal("0.00");
     public void authorize(AppUserPrincipal actor,String action){accounting.requireActor(actor,"LOAN_RECORDING_"+action);}
+
+    @Transactional(readOnly=true)
+    public Optional<LocalDate> proposedInterestChange(AppUserPrincipal actor,UUID loan) {
+        authorize(actor,"VIEW");
+        accounting.requireActor(actor,"LOAN_INTEREST_TERMS_UPDATE");
+        records.record(actor,loan,false);
+        return repayments.proposedInterestChange(loan,actor);
+    }
+
+    @Transactional
+    public boolean recordInterestChange(AppUserPrincipal actor,UUID loan,UUID request,LocalDate effectiveDate,
+                                        EarlyPayoffInterest payoff,String approval,org.springframework.web.multipart.MultipartFile agreement) {
+        authorize(actor,"VIEW");
+        accounting.requireActor(actor,"LOAN_INTEREST_TERMS_UPDATE");
+        records.record(actor,loan,true);
+        check(approval!=null && !approval.isBlank() && approval.length()<=160,"input");
+        if (agreement==null || agreement.isEmpty() || agreement.getSize()>10L*1024*1024) {
+            throw new IllegalArgumentException("prepayment.error.signedAmendment");
+        }
+        String fingerprint;
+        try {
+            byte[] pdf=agreement.getBytes();
+            if (pdf.length<5 || !"%PDF-".equals(new String(pdf,0,5,StandardCharsets.US_ASCII))) {
+                throw new IllegalArgumentException("prepayment.error.signedAmendment");
+            }
+            fingerprint=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(pdf));
+        } catch (java.io.IOException | java.security.NoSuchAlgorithmException e) {
+            throw new IllegalArgumentException("prepayment.error.signedAmendment",e);
+        }
+        boolean applied=repayments.recordInterestChange(loan,actor,request,effectiveDate,payoff,fingerprint,approval.strip());
+        if (applied) {
+            var application=loans.findById(loan).orElseThrow();
+            application.setAttachmentsJson(attachments.store(loan,List.of(agreement),application.getAttachmentsJson(),"STAFF_ATTACHMENT"));
+        }
+        return applied;
+    }
+
+    @Transactional(readOnly=true)
+    public Optional<PayoffPosting> latestPayoff(AppUserPrincipal actor,UUID loan) {
+        authorize(actor,"VIEW");
+        records.record(actor,loan,false);
+        return records.latestPayoff(actor,loan);
+    }
+
+    @Transactional(readOnly=true)
+    public List<Choice> payoffAccounts(AppUserPrincipal actor,String purpose,String search,int page) {
+        authorize(actor,"POST");
+        accounting.requireActor(actor,"ACCOUNTING_BUSINESS_CREATE");
+        check(Set.of("PAYOFF_MONEY","PAYOFF_PAYABLE").contains(purpose) && search.length()<=100 && page>=0 && page<=10000,"filter");
+        return records.accounts(actor,purpose,search,page);
+    }
+
+    @Transactional
+    public PayoffPosting postMonthlyPayoff(AppUserPrincipal actor,UUID loan,UUID key,LocalDate date,long sequence,
+            BigDecimal cash,BigDecimal refund,UUID moneyAccount,UUID payableAccount,String reference) {
+        authorize(actor,"POST");
+        accounting.requireActor(actor,"ACCOUNTING_BUSINESS_CREATE");
+        check(key!=null && date!=null,"request");
+        nonnegativeMoney(cash);nonnegativeMoney(refund);text(reference,100,cash.signum()>0);
+        String evidence=reference==null?"":reference.strip();
+        String requestHash=hash(Arrays.asList(loan,date,sequence,cash,refund,moneyAccount,payableAccount,reference));
+        records.lockRequest(actor,key);
+        records.record(actor,loan,true);
+        var retry=records.payoffRequest(actor,key);
+        if (retry.isPresent()) return matchPayoffRetry(retry.get(),actor,loan,requestHash);
+        var quote=repayments.settlementQuote(loan,actor,date);
+        check(quote.monthly() && quote.sequence()==sequence && quote.total().compareTo(cash)==0 && quote.refundDue().compareTo(refund)==0,"payoffChanged");
+        check((cash.signum()>0)==(moneyAccount!=null) && (refund.signum()>0)==(payableAccount!=null),"account");
+        var linked=productAccounts.required(actor,loan);
+        records.account(actor,linked.principalId(),"PRINCIPAL");
+        records.account(actor,linked.interestId(),"INTEREST");
+        if (moneyAccount!=null) records.account(actor,moneyAccount,"PAYOFF_MONEY");
+        if (payableAccount!=null) records.account(actor,payableAccount,"PAYOFF_PAYABLE");
+        var chargeBalance=charges.balance(actor,loan,date);
+        check(chargeBalance.outstanding().compareTo(quote.charges())==0,"payoffChanged");
+        UUID period=periods.period(actor.getSaccoId(),date,actor.getMemberId(),clock.now());
+        UUID source=UUID.randomUUID();
+        BigDecimal returned=quote.interestCredit().add(refund);
+        boolean financial=quote.principal().add(quote.interest()).add(quote.charges()).add(returned).signum()>0;
+        UUID journal=financial?UUID.randomUUID():null;
+        var now=clock.now();
+        var lines=new ArrayList<Object[]>();
+        if (journal!=null) {
+            records.payoffJournal(actor,journal,source,key,date,requestHash,period,evidence,"Full loan payoff",null,now);
+            lines.addAll(charges.collect(actor,loan,"COLLECT",quote.charges(),date,journal,null,evidence,"Full loan payoff"));
+        }
+        var movement=repayments.closeMonthlyLoan(loan,actor,source,key,date,sequence,cash,quote.charges());
+        check(returned.compareTo(movement.getInterestReturned())==0 && quote.interest().compareTo(movement.getInterestAmount())==0,"payoffChanged");
+        records.insertPayoff(actor,source,loan,movement.getId(),journal,date,key,requestHash,now,null,linked.principalId(),
+            linked.interestId(),moneyAccount,payableAccount,cash,quote.charges(),refund);
+        if (journal!=null) {
+            addPayoffLine(lines,moneyAccount,cash,true);
+            addPayoffLine(lines,linked.interestId(),returned,true);
+            addPayoffLine(lines,linked.principalId(),movement.getPrincipalAmount(),false);
+            addPayoffLine(lines,linked.interestId(),movement.getInterestAmount(),false);
+            addPayoffLine(lines,payableAccount,refund,false);
+            records.lines(actor,journal,lines);
+            charges.recordRecoveryPayments(actor,journal,charges.allocateRecovery(actor,charges.recoveryBalances(actor,loan,date),movement.getPrincipalAmount()));
+            records.postJournal(actor,journal,now);
+        }
+        event(actor,source,"LOAN_PAYOFF_POSTED",Map.of("loan",loan,"cash",cash,"interestReturned",returned,"refund",refund));
+        return records.payoffRequest(actor,key).orElseThrow();
+    }
+
+    @Transactional
+    public PayoffPosting reverseMonthlyPayoff(AppUserPrincipal actor,UUID loan,UUID originalId,UUID key,LocalDate date,String reason) {
+        authorize(actor,"REVERSE");
+        accounting.requireActor(actor,"ACCOUNTING_BUSINESS_REVERSE");
+        check(key!=null && date!=null,"request");
+        text(reason,500,true);
+        String requestHash=hash(List.of(loan,originalId,date,reason));
+        records.lockRequest(actor,key);
+        records.record(actor,loan,true);
+        var retry=records.payoffRequest(actor,key);
+        if (retry.isPresent()) return matchPayoffRetry(retry.get(),actor,loan,requestHash);
+        var original=records.lockPayoff(actor,loan,originalId);
+        check(original.reversedBy()==null && original.reverses()==null && original.refundVoucher()==null && !original.actor().equals(actor.getMemberId()),"payoffCorrection");
+        check(original.lastRefundDate()==null || !date.isBefore(original.lastRefundDate()),"date");
+        UUID period=periods.period(actor.getSaccoId(),date,actor.getMemberId(),clock.now());
+        UUID source=UUID.randomUUID(),journal=original.journal()==null?null:UUID.randomUUID();
+        var now=clock.now();
+        if (journal!=null) {
+            records.payoffJournal(actor,journal,source,key,date,requestHash,period,originalId.toString(),reason,original.journal(),now);
+            charges.undoCollections(actor,original.journal(),journal,null,date,originalId.toString(),reason);
+            records.lines(actor,journal,records.reversedLines(original.journal()));
+            charges.reverseRecovery(actor,original.journal(),journal,"RECOVER","UNDO_RECOVERY");
+        }
+        var movement=repayments.undoMonthlyPayoff(loan,original.transaction(),actor,source,key,date,reason,original.charges(),original.cash(),original.refund());
+        records.insertPayoff(actor,source,loan,movement.getId(),journal,date,key,requestHash,now,originalId,original.principalAccount(),
+            original.interestAccount(),original.moneyAccount(),original.payableAccount(),original.cash(),original.charges(),original.refund());
+        if (journal!=null) records.postJournal(actor,journal,now);
+        event(actor,source,"LOAN_PAYOFF_REVERSED",Map.of("loan",loan,"original",originalId,"reason",reason));
+        return records.payoffRequest(actor,key).orElseThrow();
+    }
+
+    private static PayoffPosting matchPayoffRetry(PayoffPosting posting,AppUserPrincipal actor,UUID loan,String requestHash) {
+        check(posting.loan().equals(loan) && posting.actor().equals(actor.getMemberId()) && posting.hash().equals(requestHash),"retry");
+        return posting;
+    }
+
+    private static void addPayoffLine(List<Object[]> lines,UUID account,BigDecimal value,boolean debit) {
+        if (value.signum()>0) lines.add(new Object[]{account,debit?value:ZERO,debit?ZERO:value});
+    }
     @Transactional(readOnly=true)
     public List<Choice> repaymentLoans(AppUserPrincipal a,UUID client,String search,int page){
         authorize(a,"VIEW");authorize(a,"POST");check(client!=null && search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");
@@ -143,6 +287,9 @@ public class LoanRecordingService {
             check(loan.principalAccountId()!=null && loan.interestAccountId()!=null,"loanAccountsMissing");check(loan.principalAccount()!=null && loan.interestAccount()!=null,"productAccountsInvalid");
             check(loan.clientId()!=null && loan.clientId().equals(row.clientId()),"client");check(Set.of("DISBURSED","PAR","DEFAULTED").contains(loan.status()),"state");
             check(loan.disbursed()!=null && !date.isBefore(loan.disbursed()) && (loan.lastPayment()==null || !date.isBefore(loan.lastPayment())),"date");
+            if (row.amount().compareTo(loan.outstandingPrincipal().add(loan.dueInterest()).add(loan.charges()))>=0) {
+                repayments.previewPayment(loan.id(),a,date,row.amount(),List.of(),loan.charges());
+            }
             var allocation=chargeAllocation(row.amount(),loan.dueInterest(),loan.outstandingPrincipal(),loan.charges());
             var recovered=charges.allocateRecovery(a,charges.recoveryBalances(a,loan.id(),date),allocation.principal()).stream()
                 .map(RecoveryPayment::amount).reduce(ZERO,BigDecimal::add);
@@ -237,6 +384,7 @@ public class LoanRecordingService {
     public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date,UUID excluded){
         authorize(a,"VIEW");check(date!=null && !date.isAfter(clock.today()),"date");check(records.topUpEnabled(a.getSaccoId()),"topUpDisabled");
         var quote=records.topUpQuote(a,source,date,excluded==null);
+        check(!repayments.monthlyPayoffRequired(source,a,date),"monthlyTopUp");
         charges.requireNoUnrecoveredFees(a,source);check(quote.principal().signum()>0,"topUpUnavailable");check(!records.pendingTopUp(source,excluded),"topUpPending");var b=charges.balance(a,source,LocalDate.MAX);check(b.lastDate()==null || !b.lastDate().isAfter(date),"date");return new TopUpQuote(quote.sourceId(),quote.sourceNumber(),quote.clientId(),quote.client(),date,quote.principal(),quote.interest(),quote.excludedInterest(),quote.sequence(),b.outstanding(),b.sequence());
     }
     @Transactional(readOnly=true)
@@ -585,7 +733,7 @@ public class LoanRecordingService {
         tenure(f).snapshot(snapshot);snapshot.put("interestEntry",f.getInterestEntry());snapshot.put("interestBasis",f.getInterestBasis());snapshot.put("interestPercent",f.getInterestPercent());snapshot.put("loanMode",f.getLoanMode());snapshot.put("tenorMonths",f.getMonths());snapshot.put("numberOfPayments",calculation.rows().size());snapshot.put("periodicRepaymentAmount",calculation.installment());
         snapshot.put("maximumInstallmentAmount",calculation.maximumInstallment());snapshot.put("interestAmount",calculation.totalInterest());snapshot.put("recordingSource","ACCOUNTANT_DIRECT");
         var selectedProduct=products.findByIdAndSaccoId(product.getId(),a.getSaccoId()).orElseThrow();
-        snapshot.put("prepaymentTerms",LoanPrepaymentTerms.defaults().snapshot());
+        snapshot.put("prepaymentTerms","GROUP".equals(f.getLoanFor())?LoanPrepaymentTerms.defaults().snapshot():repayments.contractInterestTerms(product,tenure(f)));
         if(f.getGroupDisclosure()!=null)snapshot.put("groupDisclosure",f.getGroupDisclosure());
         if(settlement!=null){snapshot.put("topUpSourceLoanId",settlement.sourceId().toString());snapshot.put("topUpSourceLoanNumber",settlement.sourceNumber());snapshot.put("topUpSettlementAmount",settlement.total());snapshot.put("topUpRequestedAmount",f.getPrincipal().subtract(settlement.total()).subtract(chargePlan.deductions()));snapshot.put("topUpAdditionalAmount",f.getPrincipal().subtract(settlement.total()));snapshot.put("topUpSettlementCharges",settlement.charges());snapshot.put("topUpChargeSequence",settlement.chargeSequence());snapshot.put("topUpSettlementPrincipal",settlement.principal());snapshot.put("topUpSettlementInterest",settlement.interest());snapshot.put("topUpQuoteDate",settlement.date().toString());}
         boolean group="GROUP".equals(f.getLoanFor());

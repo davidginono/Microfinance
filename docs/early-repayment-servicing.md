@@ -32,7 +32,9 @@ Individual and batch receipt previews use the same payment calculation as postin
 
 The former settlement URLs redirect to the existing loan or repayment details. The Actions menu opens the dedicated **Waive interest** page, which shows scheduled and eligible interest for each actual instalment. Authorized staff select instalments, adjust the prefilled eligible amounts, and save one auditable concession. The page also shows waiver history and independent linked reversals. The transaction rechecks the selected amounts and loan sequence before saving. Future scheduled interest is not today's settlement amount.
 
-`LOAN_INTEREST_WAIVE` is assigned through **Interest waivers → Create** in the access matrix. Existing explicit assignments carry forward and role defaults exclude this claim. The schedule shows each instalment's eligible amount as of the transaction date. An instalment is selectable only when it has unpaid earned interest. A waiver records a positive exact-cent amount, effective date, reason and evidence, scoped idempotency key, and permanent audit. The current accounting model recognizes interest on collection.
+`LOAN_INTEREST_WAIVE` is assigned through **Interest waivers → Create** in the access matrix. The schedule shows accrued unpaid interest and total unpaid interest for each instalment. Staff can select individual instalments or use **Waive all remaining interest** to fill every eligible amount. The form previews each revised instalment and shows the split between accrued interest waived and future interest cancelled. Limits exclude amounts already paid, waived, or reduced by an early-payment rebate.
+
+A waiver uses the accrued unpaid interest first. Any remainder reduces future accrual over the remaining part of that instalment. Reversals restore the original amounts from their own effective date. V185 records the future-interest component alongside each total, defaults past waivers to accrued-only, and preserves the original repayment schedule. Waivers are non-cash. The current accounting model recognizes interest on collection.
 
 Waivers and parts are append-only. A different authorized officer with both the waiver and existing correction claim can reverse a waiver. Later unreversed payments/waivers must be corrected first. Waiver dates participate in subsequent payment/date guards; closed accounting periods cannot receive a new waiver. Database constraints reconcile waiver totals, parts and projections and prevent cross-loan/branch evidence. Operational portfolio/management reports subtract dated waiver evidence, rather than counting it as collected interest.
 
@@ -40,7 +42,21 @@ Waivers and parts are append-only. A different authorized officer with both the 
 
 V80 does not backfill servicing rules or rewrite old receipts, exclusions, journals or agreements. Loans without retained terms continue their original servicing conventions, retained in the loan's servicing evidence. An authorized waiver officer can explicitly adopt the default rules, with agreed-change evidence, only on an active ledger with no prior payment, waiver or adjustment sequence. Loans with existing activity require a separate reviewed conversion; do not silently reinterpret their cash history. Existing V79 full early-settlement exclusions remain supported.
 
-No new fees, refunds, unapplied credit, overdue penalty accrual, automatic interest-rate amendments or arbitrary retrospective payment insertion are introduced. Quotes support today through one year ahead; postings use verified effective dates and the established chronological safeguards. Institution/branch scope, ownership, CSRF, accounting periods, request idempotency, loan locks and independent linked corrections remain enforced.
+## Monthly interest and payoff
+
+Enable `APP_MONTHLY_LOAN_INTEREST_ENABLED=true` once the institution has approved its terms and the payoff and refund workflow is ready. Eligible new individual contracts store the early-payoff choice in their financial terms and activate it when disbursed. Ordinary receipts use the full stored interest amount from disbursement for the first instalment and from the day after the prior due date for each subsequent instalment. Weekly, day-based and group contracts retain their existing servicing. An active monthly contract must use the full-payoff workflow before a new application can replace its balance.
+
+Under **Interest terms**, staff with the explicit update claim record an approved choice with its approval reference and signed PDF. The amendment applies from the next unopened period. Earlier rules, receipts and instalment amounts remain available in the loan history.
+
+The payoff quote applies eligible paid interest to principal, due interest and allowable outstanding charges. Posting debits the receiving account for actual cash and the original interest account for eligible interest returned. It credits the original principal account, any due interest and charges, and the selected refund payable for any surplus. A linked Payment Voucher debits that payable and credits the account used to pay the client. Staff reverse an active refund voucher before a different staff member reverses its payoff. Both actions preserve the original postings and produce their own dated evidence.
+
+Payoff posting and refund vouchers require an open accounting period and follow the existing claim, date and branch safeguards. This workflow continues collection-based interest posting in the general ledger.
+
+## Product accrual
+
+Loan products can select Daily or Periodic accrual. Daily accrual spreads each instalment's interest across its actual elapsed days. Periodic accrual uses the accepted loan's tenure unit. Monthly repayment periods keep their existing opening dates. For yearly tenure, the full interest assigned to the loan year accrues at opening, and receipts can collect each instalment's share when that instalment's repayment period opens.
+
+The configured mode and accepted tenure are retained with the loan when the existing rollout is enabled. Product changes apply to future agreements. Payments, concessions and payoff corrections retain their dated evidence. Interest accrual in servicing does not create a general ledger entry.
 
 ## Verification
 

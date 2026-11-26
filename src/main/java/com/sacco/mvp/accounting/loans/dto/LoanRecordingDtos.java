@@ -18,7 +18,12 @@ public final class LoanRecordingDtos {
     }
     public record GroupRule(UUID id,UUID product,int revision,String steps) {}
     public record GroupLoan(UUID id,UUID product,UUID client,UUID recorder,String status,String termsHash,String number,String clientName,BigDecimal amount,boolean relatedActor) {}
-    public record GroupRequest(UUID id,UUID loan,UUID rule,UUID maker,int round,String termsHash,String previousStatus) {}
+    public record GroupRequest(UUID id,UUID loan,UUID rule,UUID maker,int round,String termsHash,String previousStatus,
+                               OffsetDateTime submittedAt,String submittedBy) {
+        public GroupRequest(UUID id,UUID loan,UUID rule,UUID maker,int round,String termsHash,String previousStatus) {
+            this(id,loan,rule,maker,round,termsHash,previousStatus,null,null);
+        }
+    }
     public record GroupDecision(UUID id,int step,UUID actor,String name,String decision,String reason,String evidence,OffsetDateTime at) {}
     public record ReviewDocuments(boolean required,boolean guarantorConsent,List<com.sacco.mvp.clients.applications.dto.ClientApplicationDtos.Requirement> documents) {}
     public record GroupReview(GroupRequest request,List<GroupStep> steps,List<GroupDecision> decisions,int step,boolean canApprove,boolean canReject,boolean canSubmit) {}
@@ -165,8 +170,9 @@ public final class LoanRecordingDtos {
     public record LoanRow(UUID id, String number, UUID clientId, String client, String clientNumber,
         String product, LocalDate applicationDate, BigDecimal requestedPrincipal, BigDecimal principal,
         String status, BigDecimal outstandingPrincipal, BigDecimal dueInterest, BigDecimal arrears,
-        BigDecimal futureInterest, BigDecimal principalPaid, BigDecimal interestPaid, boolean topUpEligible,BigDecimal charges,boolean cancelEligible,String loanFor) {
-        public LoanRow(UUID id,String number,UUID clientId,String client,String clientNumber,String product,LocalDate applicationDate,BigDecimal requestedPrincipal,BigDecimal principal,String status,BigDecimal outstandingPrincipal,BigDecimal dueInterest,BigDecimal arrears,BigDecimal futureInterest,BigDecimal principalPaid,BigDecimal interestPaid,boolean topUpEligible,BigDecimal charges,boolean cancelEligible){this(id,number,clientId,client,clientNumber,product,applicationDate,requestedPrincipal,principal,status,outstandingPrincipal,dueInterest,arrears,futureInterest,principalPaid,interestPaid,topUpEligible,charges,cancelEligible,null);}
+        BigDecimal futureInterest, BigDecimal principalPaid, BigDecimal interestPaid, boolean topUpEligible,BigDecimal charges,boolean cancelEligible,String loanFor,String reviewGroup,
+        BigDecimal accruedInterest) {
+        public LoanRow(UUID id,String number,UUID clientId,String client,String clientNumber,String product,LocalDate applicationDate,BigDecimal requestedPrincipal,BigDecimal principal,String status,BigDecimal outstandingPrincipal,BigDecimal dueInterest,BigDecimal arrears,BigDecimal futureInterest,BigDecimal principalPaid,BigDecimal interestPaid,boolean topUpEligible,BigDecimal charges,boolean cancelEligible){this(id,number,clientId,client,clientNumber,product,applicationDate,requestedPrincipal,principal,status,outstandingPrincipal,dueInterest,arrears,futureInterest,principalPaid,interestPaid,topUpEligible,charges,cancelEligible,null,null,dueInterest);}
         public LoanRow(UUID id,String number,UUID clientId,String client,String clientNumber,String product,LocalDate applicationDate,BigDecimal requestedPrincipal,BigDecimal principal,String status,BigDecimal outstandingPrincipal,BigDecimal dueInterest,BigDecimal arrears,BigDecimal futureInterest,BigDecimal principalPaid,BigDecimal interestPaid,boolean topUpEligible,BigDecimal charges){this(id,number,clientId,client,clientNumber,product,applicationDate,requestedPrincipal,principal,status,outstandingPrincipal,dueInterest,arrears,futureInterest,principalPaid,interestPaid,topUpEligible,charges,false);}
         public LoanRow(UUID id,String number,UUID clientId,String client,String clientNumber,String product,LocalDate applicationDate,BigDecimal requestedPrincipal,BigDecimal principal,String status,BigDecimal outstandingPrincipal,BigDecimal dueInterest,BigDecimal arrears,BigDecimal futureInterest,BigDecimal principalPaid,BigDecimal interestPaid,boolean topUpEligible){this(id,number,clientId,client,clientNumber,product,applicationDate,requestedPrincipal,principal,status,outstandingPrincipal,dueInterest,arrears,futureInterest,principalPaid,interestPaid,topUpEligible,BigDecimal.ZERO);}
         public LoanRow(UUID id,String number,UUID clientId,String client,String clientNumber,String product,LocalDate applicationDate,
@@ -232,7 +238,11 @@ public final class LoanRecordingDtos {
         }
     }
 
-    public record BranchLoan(UUID id,String number,String client,String product,String status,BigDecimal principal,LocalDate disbursed) {}
+    public record BranchLoan(UUID id,String number,String client,String product,String status,BigDecimal principal,LocalDate disbursed,String reviewGroup) {
+        public BranchLoan(UUID id,String number,String client,String product,String status,BigDecimal principal,LocalDate disbursed) {
+            this(id,number,client,product,status,principal,disbursed,null);
+        }
+    }
     public record ReviewedLoan(UUID id, String number, String client, String status, java.time.LocalDate disbursed) {}
     public record ReviewArchive(java.util.List<ReviewedLoan> rows, long count, int page, boolean hasNext) {}
 }

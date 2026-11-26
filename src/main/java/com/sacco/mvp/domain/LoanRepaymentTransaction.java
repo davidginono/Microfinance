@@ -11,7 +11,7 @@ import java.util.UUID;
 @Table(name = "loan_repayment_transactions")
 @Getter @NoArgsConstructor @AllArgsConstructor @Builder
 public class LoanRepaymentTransaction {
-    public enum Kind { PAYMENT, REVERSAL, SETTLEMENT, SETTLEMENT_UNDO }
+    public enum Kind { PAYMENT, REVERSAL, SETTLEMENT, SETTLEMENT_UNDO, PAYOFF, PAYOFF_UNDO }
     public enum Channel { CASH, BANK, MOBILE_MONEY, INTERNAL, CASH_EQUIVALENTS }
     @Id private UUID id;
     @Column(name = "loan_application_id", nullable = false) private UUID loanApplicationId;
@@ -27,6 +27,7 @@ public class LoanRepaymentTransaction {
     @Column(nullable = false, precision = 18, scale = 2) private BigDecimal amount;
     @Column(name = "principal_amount", nullable = false, precision = 18, scale = 2) private BigDecimal principalAmount;
     @Column(name = "interest_amount", nullable = false, precision = 18, scale = 2) private BigDecimal interestAmount;
+    @Builder.Default @Column(name = "interest_returned", nullable = false, precision = 18, scale = 2) private BigDecimal interestReturned = BigDecimal.ZERO;
     @Builder.Default @Column(name = "future_interest_excluded", nullable = false, precision = 18, scale = 2) private BigDecimal futureInterestExcluded = BigDecimal.ZERO;
     @Column(name = "actor_member_id", nullable = false) private UUID actorMemberId;
     @Column(name = "reverses_transaction_id") private UUID reversesTransactionId;

@@ -3082,7 +3082,7 @@ public class AdminService {
                                   LoanProductStatus productStatus,
                                   Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,boolean collateralRequired,BigDecimal collateralCoveragePercent,
                                   com.sacco.mvp.service.dto.LoanProductDocumentsForm documents,
-                                  com.sacco.mvp.service.dto.LoanTopUpForm topUpForm) {
+                                  com.sacco.mvp.service.dto.LoanProductRepaymentForm repaymentForm) {
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
@@ -3101,7 +3101,7 @@ public class AdminService {
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         if(collateralRequired || collateralCoveragePercent!=null)
             setProductCollateral(product,adminId,collateralRequired,coverage);
-        configureTopUp(product, adminId, topUpForm);
+        configureProductRepayment(product, adminId, repaymentForm);
         loanProductSettingRepository.save(product);
         if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
 
@@ -3140,7 +3140,7 @@ public class AdminService {
                                                 com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval,
                                                 boolean collateralRequired, BigDecimal collateralCoveragePercent,
                                                 com.sacco.mvp.service.dto.LoanProductDocumentsForm documents,
-                                                com.sacco.mvp.service.dto.LoanTopUpForm topUpForm) {
+                                                com.sacco.mvp.service.dto.LoanProductRepaymentForm repaymentForm) {
         if (actor == null || !saccoId.equals(actor.getSaccoId()) || !adminId.equals(actor.getMemberId()))
             throw new org.springframework.security.access.AccessDeniedException("Product scope mismatch");
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
@@ -3154,7 +3154,8 @@ public class AdminService {
 
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         setProductCollateral(product,adminId,collateralRequired,coverage);
-        configureTopUp(product, adminId, topUpForm);
+        product.setInterestAccrualMode(com.sacco.mvp.domain.InterestAccrualMode.DAILY);
+        configureProductRepayment(product, adminId, repaymentForm);
         loanProductSettingRepository.save(product);
         if (approval != null && (!approval.getGroups().isEmpty() || !approval.getApprovals().isEmpty())) {
             loanProductSettingRepository.flush();
@@ -3166,7 +3167,20 @@ public class AdminService {
         return product;
     }
 
-    private void configureTopUp(LoanProductSetting product, UUID adminId, com.sacco.mvp.service.dto.LoanTopUpForm form) {
+    private void configureProductRepayment(LoanProductSetting product, UUID adminId, com.sacco.mvp.service.dto.LoanProductRepaymentForm form) {
+        if (form != null && form.getInterestAccrualMode() != null && form.getInterestAccrualMode() != product.getInterestAccrualMode()) {
+            var previous = product.getInterestAccrualMode();
+            product.setInterestAccrualMode(form.getInterestAccrualMode());
+            auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CONFIGURE_INTEREST_ACCRUAL", adminId,
+                Map.of("interestAccrualMode", previous == null ? "" : previous.name()),
+                Map.of("interestAccrualMode", form.getInterestAccrualMode().name()));
+        }
+        if (form != null && form.getEarlyPayoffInterest() != null && form.getEarlyPayoffInterest() != product.getEarlyPayoffInterest()) {
+            var previous = product.getEarlyPayoffInterest();
+            product.setEarlyPayoffInterest(form.getEarlyPayoffInterest());
+            auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CONFIGURE_EARLY_PAYOFF_INTEREST", adminId,
+                Map.of("earlyPayoffInterest", previous.name()), Map.of("earlyPayoffInterest", form.getEarlyPayoffInterest().name()));
+        }
         if (form == null || !form.isTopUpSettingsPresent()) return;
         boolean charging = form.isTopUpAllowed() && form.isTopUpFeesEnabled();
         if (charging && !form.isTopUpApplicationFee() && !form.isTopUpInsuranceFee() && !form.isTopUpProcessingFee())

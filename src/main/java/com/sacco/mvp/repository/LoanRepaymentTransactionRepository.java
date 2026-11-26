@@ -16,7 +16,7 @@ public interface LoanRepaymentTransactionRepository extends JpaRepository<LoanRe
         LoanRepaymentTransaction.Channel channel, String reference, LoanRepaymentTransaction.Kind kind);
 
     @Query("""
-        select t from LoanRepaymentTransaction t where t.loanApplicationId = :loanId and t.kind in ('PAYMENT','SETTLEMENT')
+        select t from LoanRepaymentTransaction t where t.loanApplicationId = :loanId and t.kind in ('PAYMENT','SETTLEMENT','PAYOFF')
         and not exists (select r.id from LoanRepaymentTransaction r where r.reversesTransactionId = t.id)
         order by t.sequence desc
         """)

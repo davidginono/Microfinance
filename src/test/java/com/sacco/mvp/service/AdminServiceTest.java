@@ -431,7 +431,7 @@ class AdminServiceTest {
         var suppliedProduct=UUID.randomUUID();approval.setProductId(suppliedProduct);approval.setExpectedRevision(99);
         approval.setGroups(List.of(Position.CREDIT_OFFICER));approval.setApprovals(List.of(2));
         when(loanProductSettingRepository.save(any())).thenAnswer(call -> call.getArgument(0));
-        var topUp=new com.sacco.mvp.service.dto.LoanTopUpForm();
+        var topUp=new com.sacco.mvp.service.dto.LoanProductRepaymentForm();
         topUp.setTopUpSettingsPresent(true);topUp.setTopUpAllowed(true);topUp.setTopUpFeesEnabled(true);
         topUp.setTopUpProcessingFee(true);
         var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"WORKFLOW","Workflow Loan","Staff approval",1,

@@ -116,7 +116,7 @@ public class StaffOfficeService {
         var work=selected!=null?work(actor,office,selected.key(),search,sort.isBlank()?"number":sort,page):Page.empty(page);
         if(selected!=null) {
             var navigation=new Navigation(office,selected.key(),search,sort.isBlank()?"number":sort,page);
-            work=new Page(work.rows().stream().map(t->new Task(t.number(),t.name(),t.stateKey(),t.amount(),t.href()==null?null:navigation.attach(t.href()))).toList(),page,work.hasNext());
+            work=new Page(work.rows().stream().map(t->new Task(t.number(),t.name(),t.stateKey(),t.amount(),t.href()==null?null:navigation.attach(t.href()),t.reviewGroup())).toList(),page,work.hasNext());
         }
         return new View(office,sources,selected,work);
     }

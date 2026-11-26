@@ -80,8 +80,12 @@ public class LoanRecordingRepository {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?,0))","LOAN_GROUP_RULE/"+a.getSaccoId()+"/"+a.getStationId()+"/"+product);
     }
     public Optional<GroupRequest> groupRequest(AppUserPrincipal a,UUID loan) {
-        return jdbc.query("select id,loan_id,rule_id,maker_id,round,terms_hash,previous_status from loan_group_request where loan_id=? and sacco_id=? and station_id=? order by round desc limit 1",
-            (r,n)->new GroupRequest(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class),r.getInt(5),r.getString(6),r.getString(7)),loan,a.getSaccoId(),a.getStationId()).stream().findFirst();
+        return jdbc.query("""
+            select r.id,r.loan_id,r.rule_id,r.maker_id,r.round,r.terms_hash,r.previous_status,r.recorded_at,m.full_name
+            from loan_group_request r left join members m on m.id=r.maker_id and m.sacco_id=r.sacco_id
+            where r.loan_id=? and r.sacco_id=? and r.station_id=? order by r.round desc limit 1
+            """,(r,n)->new GroupRequest(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getObject(3,UUID.class),r.getObject(4,UUID.class),
+                r.getInt(5),r.getString(6),r.getString(7),r.getObject(8,OffsetDateTime.class),r.getString(9)),loan,a.getSaccoId(),a.getStationId()).stream().findFirst();
     }
     public String groupSteps(AppUserPrincipal a,UUID rule) {
         return jdbc.queryForObject("select steps::text from loan_group_rule where id=? and sacco_id=? and station_id=?",String.class,rule,a.getSaccoId(),a.getStationId());
@@ -132,6 +136,27 @@ public class LoanRecordingRepository {
     }
     private final JdbcTemplate jdbc;
 
+    private static final String CURRENT_REVIEW_STEP = """
+        select step.value from jsonb_array_elements(rule.steps) with ordinality step(value,n)
+        where (select count(*) from loan_group_decision d where d.request_id=request.id and d.step=step.n-1
+            and d.decision='APPROVE') < (step.value->>'approvals')::int
+        order by step.n limit 1
+        """;
+
+    private static String currentReviewJoin(String loanAlias) {
+        return ("""
+            left join lateral (
+              select current_step.value->>'group' as review_group
+              from lateral (select * from loan_group_request r where r.loan_id=%1$s.id and r.sacco_id=%1$s.sacco_id
+                  and r.station_id=%1$s.station_id order by r.round desc limit 1) request
+              join loan_group_rule rule on rule.id=request.rule_id and rule.sacco_id=request.sacco_id and rule.station_id=request.station_id
+              cross join lateral (%2$s) current_step
+              where %1$s.status='SUBMITTED' and request.terms_hash=loan_group_terms(%1$s) and not retired_group_application(%1$s.id)
+                and not exists(select 1 from loan_group_decision d where d.request_id=request.id and d.decision='REJECT')
+            ) review on %1$s.status='SUBMITTED'
+            """).formatted(loanAlias,CURRENT_REVIEW_STEP);
+    }
+
     public List<com.sacco.mvp.staffoffice.dto.OfficeWork.Task> officeReviews(AppUserPrincipal a,com.sacco.mvp.domain.Position group,String search,String sort,int page) {
         String order=switch(sort) {case "oldest"->"l.created_at,l.id";case "number"->"coalesce(l.loan_id,l.application_number::text),l.id";case "number_desc"->"coalesce(l.loan_id,l.application_number::text) desc,l.id desc";default->"l.created_at desc,l.id desc";};
         return jdbc.query("""
@@ -142,10 +167,7 @@ public class LoanRecordingRepository {
             join lateral(select * from loan_group_request r where r.loan_id=l.id and r.sacco_id=l.sacco_id
                 and r.station_id=l.station_id order by r.round desc limit 1) request on true
             join loan_group_rule rule on rule.id=request.rule_id and rule.sacco_id=l.sacco_id and rule.station_id=l.station_id
-            join lateral(select step.value from jsonb_array_elements(rule.steps) with ordinality step(value,n)
-                where (select count(*) from loan_group_decision d where d.request_id=request.id and d.step=step.n-1
-                    and d.decision='APPROVE') < (step.value->>'approvals')::int
-                order by step.n limit 1) current_step on true
+            join lateral(%s) current_step on true
             where l.sacco_id=? and l.station_id=? and l.status='SUBMITTED'
                 and request.terms_hash=loan_group_terms(l) and not retired_group_application(l.id)
                 and current_step.value->>'group'=?
@@ -154,25 +176,24 @@ public class LoanRecordingRepository {
                 and not exists(select 1 from loan_group_decision d where d.request_id=request.id
                     and (d.decision='REJECT' or d.actor_id=?::uuid))
                 and (strpos(lower(coalesce(l.loan_id,l.application_number::text)),?)>0 or strpos(lower(b.full_name),?)>0)
-            """+" order by "+order+" limit 26 offset ?",
+            """.formatted(CURRENT_REVIEW_STEP)+" order by "+order+" limit 26 offset ?",
             (r,n)->new com.sacco.mvp.staffoffice.dto.OfficeWork.Task(r.getString("number"),r.getString("full_name"),
-                "office.readyReview",r.getBigDecimal("amount"),"/finance/loan-records/"+r.getObject("id",UUID.class)),
+                "office.readyReview",r.getBigDecimal("amount"),"/finance/loan-records/"+r.getObject("id",UUID.class),group.name()),
             a.getSaccoId(),a.getStationId(),group.name(),a.getMemberId(),a.getMemberId(),a.getMemberId(),a.getMemberId(),a.getMemberId(),
             search.toLowerCase(Locale.ROOT),search.toLowerCase(Locale.ROOT),page*25);
     }
 
     private static final String BRANCH_LOANS = """
         select l.id,coalesce(l.loan_id,l.application_number::text) number,b.full_name,
-          coalesce(r.product_name,l.loan_type) product,l.status,l.amount,l.disbursement_date
+          coalesce(r.product_name,l.loan_type) product,l.status,l.amount,l.disbursement_date,review.review_group
         from loan_applications l
         join loan_borrower_directory b on b.party_id=l.borrower_party_id and b.sacco_id=l.sacco_id
         left join accountant_loan_record r on r.loan_id=l.id and r.sacco_id=l.sacco_id and r.station_id=l.station_id
-        where l.sacco_id=? and l.station_id=?
-        """;
+        """+currentReviewJoin("l")+" where l.sacco_id=? and l.station_id=? ";
 
     private final org.springframework.jdbc.core.RowMapper<BranchLoan> branchLoanMapper=(row,n) -> new BranchLoan(
         row.getObject("id",UUID.class),row.getString("number"),row.getString("full_name"),row.getString("product"),
-        row.getString("status"),row.getBigDecimal("amount"),row.getObject("disbursement_date",LocalDate.class));
+        row.getString("status"),row.getBigDecimal("amount"),row.getObject("disbursement_date",LocalDate.class),row.getString("review_group"));
 
     public List<BranchLoan> branchLoans(String institution,String branch,String search,String sort,int page) {
         String order=switch(sort) {
@@ -233,18 +254,22 @@ public class LoanRecordingRepository {
 
     private static final String LOANS="""
         select (l.loan_application_id is not null) has_ledger,coalesce(c.outstanding,0) charges,(loan_cancellation_error(a.id) is null) cancel_eligible,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.party_id client_id,m.full_name,m.member_no,case when m.kind='CLIENT' then 'INDIVIDUAL' else 'GROUP' end loan_for,r.product_name,r.application_date,r.requested_principal,
-        a.amount,a.status,(m.kind='CLIENT' and coalesce(product.top_up_allowed and not product.custom_recording_configuration,false)
+        a.amount,a.status,review.review_group,case when a.status in ('DISBURSEMENT_REVERSED','PAID') then 0 else coalesce(d.accrued,0) end accrued_interest,
+        (m.kind='CLIENT' and coalesce(product.top_up_allowed and not product.custom_recording_configuration,false)
          and a.top_up_source_loan_id is null and a.status='DISBURSED' and coalesce(l.principal-l.principal_paid,0)>0 and coalesce((select loan_top_up_enabled from sacco_settings where sacco_id=a.sacco_id),true) and not exists(select 1 from loan_applications child where child.top_up_source_loan_id=a.id and child.status not in ('WITHDRAWN','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED','DISBURSEMENT_REVERSED','PAID'))) topup_eligible,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,
         coalesce(l.interest_paid,0) interest_paid,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.interest,0) end due_interest,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.arrears,0) end arrears,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.future,0) end future_interest
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id
         left join loan_product_settings product on product.id=a.loan_product_setting_id and product.sacco_id=a.sacco_id
         left join loan_charge_balance c on c.loan_id=a.id and c.sacco_id=r.sacco_id and c.station_id=r.station_id
         left join loan_ledgers l on l.loan_application_id=a.id
-        left join lateral (select sum(loan_interest_due(id,?)) interest,
-        sum(case when due_date<? then principal-principal_paid+interest-interest_paid-interest_excluded-interest_waived else 0 end) arrears,
-        sum(greatest(0,interest-interest_paid-interest_excluded-interest_waived-loan_interest_due(id,?))) future
-        from loan_ledger_installments where loan_application_id=a.id) d on true
-        """;
+        left join lateral (select sum(loan_interest_due(i.id,cutoff.collect_on)) interest,sum(accrual.unpaid) accrued,
+        sum(case when i.due_date<cutoff.arrears_on then principal-principal_paid+interest-interest_paid-interest_excluded-interest_waived else 0 end) arrears,
+        sum(greatest(0,interest-interest_paid-interest_excluded-interest_waived-accrual.unpaid)) future
+        from loan_ledger_installments i
+        cross join (select ?::date collect_on,?::date arrears_on,?::date accrue_on) cutoff
+        cross join lateral (select loan_interest_unpaid(i.id,cutoff.accrue_on,false) unpaid) accrual
+        where i.loan_application_id=a.id) d on true
+        """+currentReviewJoin("a");
     private static final String APPLICATION_LOANS=LOANS.replace("from accountant_loan_record r join loan_applications a", """
         from (select loan_id,sacco_id,station_id,product_name,application_date,requested_principal from accountant_loan_record
           union all
@@ -595,17 +620,21 @@ public class LoanRecordingRepository {
         ((? in ('FUNDING_MONEY','MONEY') and gl_loan_disbursement_account(id,sacco_id))
         or (?='FEE_MONEY' and type='ASSET' and kind='POSTING' and purpose in ('CASH','BANK'))
         or (?='PRINCIPAL' and kind in ('POSTING','CONTROL'))
-        or (?='INTEREST' and kind in ('POSTING','CONTROL')))
+        or (?='INTEREST' and kind in ('POSTING','CONTROL'))
+        or (?='PAYOFF_MONEY' and type='ASSET' and kind='POSTING' and purpose in ('CASH','BANK','MOBILE_MONEY'))
+        or (?='PAYOFF_PAYABLE' and type='LIABILITY' and kind='POSTING' and purpose='PAYABLE'))
         and strpos(lower(code||' '||name),?)>0 order by code,id limit 26 offset ?
-        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),r.getString("purpose")),a.getSaccoId(),purpose,purpose,purpose,purpose,purpose,purpose,search.toLowerCase(Locale.ROOT),page*25);}
     public Choice account(AppUserPrincipal a,UUID id,String category){
         return account(a,id,category,true);
     }
     public Choice account(AppUserPrincipal a,UUID id,String category,boolean lock){
-        var rows=jdbc.queryForList("select code,name,purpose,kind,case when ? in ('FUNDING_MONEY','MONEY') then gl_loan_disbursement_account(id,sacco_id) else false end money_eligible from gl_account where sacco_id=? and id=? and active"+(lock?" for share":""),category,a.getSaccoId(),id);
+        var rows=jdbc.queryForList("select code,name,purpose,kind,type,case when ? in ('FUNDING_MONEY','MONEY') then gl_loan_disbursement_account(id,sacco_id) else false end money_eligible from gl_account where sacco_id=? and id=? and active"+(lock?" for share":""),category,a.getSaccoId(),id);
         if(rows.isEmpty())throw new IllegalArgumentException("recording.error.account");var r=rows.getFirst();String purpose=(String)r.get("purpose");
         boolean valid=switch(category){case "FUNDING_MONEY","MONEY"->Boolean.TRUE.equals(r.get("money_eligible"));
             case "PRINCIPAL","INTEREST"->Set.of("POSTING","CONTROL").contains(r.get("kind"));
+            case "PAYOFF_MONEY"->"ASSET".equals(r.get("type")) && "POSTING".equals(r.get("kind")) && Set.of("CASH","BANK","MOBILE_MONEY").contains(purpose);
+            case "PAYOFF_PAYABLE"->"LIABILITY".equals(r.get("type")) && "POSTING".equals(r.get("kind")) && "PAYABLE".equals(purpose);
             default->false;};
         if(!valid)throw new IllegalArgumentException("recording.error.account");return new Choice(id,r.get("code")+" - "+r.get("name"),purpose);
     }
@@ -658,8 +687,8 @@ public class LoanRecordingRepository {
                 join loan_ledger_installments i on i.loan_application_id=l.loan_application_id
             ), interest_movements as (
                 select t.id as transaction_id,t.sequence,
-                    (case when t.kind in ('PAYMENT','SETTLEMENT') then 1 else -1 end)
-                      *(t.interest_amount+t.future_interest_excluded+coalesce(u.excluded_interest,0)) as reduction
+                    (case when t.kind in ('PAYMENT','SETTLEMENT','PAYOFF') then 1 else -1 end)
+                      *(t.interest_amount-t.interest_returned+t.future_interest_excluded+coalesce(u.excluded_interest,0)) as reduction
                 from scoped_ledger l join loan_repayment_transactions t on t.loan_application_id=l.loan_application_id
                     and t.sacco_id=l.sacco_id and t.station_id=l.station_id
                 left join accountant_loan_topup u on u.transaction_id=t.id and u.source_id=t.loan_application_id
@@ -726,11 +755,65 @@ public class LoanRecordingRepository {
     }
     public void lines(AppUserPrincipal a,UUID journal,List<Object[]> amounts){var rows=new ArrayList<Object[]>();for(var line:amounts)rows.add(new Object[]{UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),line[0],line[1],line[2]});jdbc.batchUpdate("insert into gl_journal_line(id,journal_id,sacco_id,station_id,account_id,debit,credit) values(?,?,?,?,?,?,?)",rows);}
     public void postJournal(AppUserPrincipal a,UUID journal,OffsetDateTime now){jdbc.update("insert into accounting_outbox(id,journal_id,sacco_id,station_id,event_type,created_at) values(?,?,?,?,?,?)",UUID.randomUUID(),journal,a.getSaccoId(),a.getStationId(),"LOAN_RECORD_POSTED",now);jdbc.update("update gl_journal set state='POSTED',posted_at=? where id=?",now,journal);}
+
+    public record PayoffPosting(UUID id,UUID loan,UUID transaction,UUID journal,UUID actor,UUID reverses,UUID reversedBy,
+                                LocalDate date,BigDecimal cash,BigDecimal charges,BigDecimal refund,BigDecimal returned,
+                                UUID principalAccount,UUID interestAccount,UUID moneyAccount,UUID payableAccount,
+                                UUID refundVoucher,LocalDate lastRefundDate,String hash) {}
+
+    private static final String PAYOFF="""
+        select p.*, t.interest_returned,
+            (select x.id from loan_payoff_post x where x.reverses_id=p.id) reversed_by,
+            (select r.voucher_id from loan_payoff_refund r where r.payoff_id=p.id and not exists
+               (select 1 from accounting_voucher u where u.reverses_id=r.voucher_id) limit 1) refund_voucher,
+            (select max(u.effective_date) from loan_payoff_refund r join accounting_voucher u on u.reverses_id=r.voucher_id
+               where r.payoff_id=p.id) last_refund_date
+        from loan_payoff_post p join loan_repayment_transactions t on t.id=p.transaction_id
+        where p.sacco_id=? and p.station_id=?
+        """;
+
+    private PayoffPosting payoffRow(ResultSet r,int n)throws SQLException {
+        return new PayoffPosting(r.getObject("id",UUID.class),r.getObject("loan_id",UUID.class),r.getObject("transaction_id",UUID.class),
+            r.getObject("journal_id",UUID.class),r.getObject("actor_id",UUID.class),r.getObject("reverses_id",UUID.class),
+            r.getObject("reversed_by",UUID.class),r.getObject("effective_date",LocalDate.class),r.getBigDecimal("cash"),
+            r.getBigDecimal("charges"),r.getBigDecimal("refund"),r.getBigDecimal("interest_returned"),
+            r.getObject("principal_account_id",UUID.class),r.getObject("interest_account_id",UUID.class),r.getObject("money_account_id",UUID.class),
+            r.getObject("payable_account_id",UUID.class),r.getObject("refund_voucher",UUID.class),
+            r.getObject("last_refund_date",LocalDate.class),r.getString("payload_hash"));
+    }
+    public Optional<PayoffPosting> payoffRequest(AppUserPrincipal a,UUID key) {
+        return jdbc.query(PAYOFF+" and p.request_key=?",this::payoffRow,a.getSaccoId(),a.getStationId(),key).stream().findFirst();
+    }
+    public Optional<PayoffPosting> latestPayoff(AppUserPrincipal a,UUID loan) {
+        return jdbc.query(PAYOFF+" and p.loan_id=? and p.reverses_id is null order by p.recorded_at desc,p.id limit 1",
+            this::payoffRow,a.getSaccoId(),a.getStationId(),loan).stream().findFirst();
+    }
+    public PayoffPosting lockPayoff(AppUserPrincipal a,UUID loan,UUID id) {
+        return jdbc.query(PAYOFF+" and p.loan_id=? and p.id=? for update of p",this::payoffRow,a.getSaccoId(),a.getStationId(),loan,id)
+            .stream().findFirst().orElseThrow(() -> new org.springframework.security.access.AccessDeniedException("Payoff unavailable"));
+    }
+    public void insertPayoff(AppUserPrincipal a,UUID id,UUID loan,UUID movement,UUID journal,LocalDate date,UUID key,String hash,
+            OffsetDateTime now,UUID reverses,UUID principal,UUID interest,UUID money,UUID payable,BigDecimal cash,BigDecimal charges,BigDecimal refund) {
+        jdbc.update("""
+            insert into loan_payoff_post(id,loan_id,sacco_id,station_id,transaction_id,journal_id,effective_date,request_key,payload_hash,
+               actor_id,recorded_at,reverses_id,principal_account_id,interest_account_id,money_account_id,payable_account_id,cash,charges,refund)
+            values(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,id,loan,a.getSaccoId(),a.getStationId(),movement,journal,date,key,hash,a.getMemberId(),now,reverses,principal,interest,money,payable,cash,charges,refund);
+    }
+    public void payoffJournal(AppUserPrincipal a,UUID journal,UUID source,UUID key,LocalDate date,String hash,UUID period,
+                             String evidence,String reason,UUID original,OffsetDateTime now) {
+        jdbc.update("""
+            insert into gl_journal(id,sacco_id,station_id,policy_version,period_id,source_type,source_reference,request_key,payload_hash,
+                currency,state,evidence_reference,reason,effective_date,maker_id,recorded_at,reverses_id,direct_post)
+            values(?,?,?,1,?,?,?,?,?,'TZS','DRAFT',?,?,?,?,?,?,true)
+            """,journal,a.getSaccoId(),a.getStationId(),period,original==null?"MONTHLY_PAYOFF":"MONTHLY_PAYOFF_UNDO",source.toString(),key,
+            hash,evidence,reason,date,a.getMemberId(),now,original);
+    }
     public List<JournalLine> journalLines(AppUserPrincipal a,UUID journal){return jdbc.query("select g.code||' - '||g.name account,z.debit,z.credit from gl_journal_line z join gl_account g on g.id=z.account_id where z.journal_id=? and z.sacco_id=? and z.station_id=? order by z.debit desc,z.id limit 10",(r,n)->new JournalLine(r.getString(1),r.getBigDecimal(2),r.getBigDecimal(3)),journal,a.getSaccoId(),a.getStationId());}
     public List<Object[]> reversedLines(UUID journal){return jdbc.query("select account_id,credit,debit from loan_base_journal_line where journal_id=? order by account_id",(r,n)->new Object[]{r.getObject(1,UUID.class),r.getBigDecimal(2),r.getBigDecimal(3)},journal);}
     public UUID postingInterestAccount(UUID id){return jdbc.queryForObject("select interest_account_id from accountant_loan_post where id=?",UUID.class,id);}
     public UUID principalAccount(UUID loan){return jdbc.queryForObject("select principal_account_id from accountant_loan_post where loan_id=? and kind='DISBURSEMENT'",UUID.class,loan);}
-    private LoanRow loan(ResultSet r,int n)throws SQLException{return new LoanRow(r.getObject("id",UUID.class),r.getString("loan_id"),r.getObject("client_id",UUID.class),r.getString("full_name"),r.getString("member_no"),r.getString("product_name"),r.getObject("application_date",LocalDate.class),r.getBigDecimal("requested_principal"),r.getBigDecimal("amount"),r.getString("status"),r.getBigDecimal("outstanding"),r.getBigDecimal("due_interest"),r.getBigDecimal("arrears"),r.getBigDecimal("future_interest"),r.getBigDecimal("principal_paid"),r.getBigDecimal("interest_paid"),r.getBoolean("topup_eligible"),r.getBigDecimal("charges"),r.getBoolean("cancel_eligible"),r.getString("loan_for"));}
+    private LoanRow loan(ResultSet r,int n)throws SQLException{return new LoanRow(r.getObject("id",UUID.class),r.getString("loan_id"),r.getObject("client_id",UUID.class),r.getString("full_name"),r.getString("member_no"),r.getString("product_name"),r.getObject("application_date",LocalDate.class),r.getBigDecimal("requested_principal"),r.getBigDecimal("amount"),r.getString("status"),r.getBigDecimal("outstanding"),r.getBigDecimal("due_interest"),r.getBigDecimal("arrears"),r.getBigDecimal("future_interest"),r.getBigDecimal("principal_paid"),r.getBigDecimal("interest_paid"),r.getBoolean("topup_eligible"),r.getBigDecimal("charges"),r.getBoolean("cancel_eligible"),r.getString("loan_for"),r.getString("review_group"),r.getBigDecimal("accrued_interest"));}
     private Posting posting(ResultSet r,int n)throws SQLException{return posting(r,"display_reference");}
     private Posting posting(ResultSet r,String referenceColumn)throws SQLException{
         String notes=r.getString("notes");

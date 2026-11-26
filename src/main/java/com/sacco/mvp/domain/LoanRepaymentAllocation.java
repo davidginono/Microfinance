@@ -14,5 +14,6 @@ public class LoanRepaymentAllocation {
     @Column(name = "installment_id", nullable = false) private UUID installmentId;
     @Column(name = "principal_amount", nullable = false, precision = 18, scale = 2) private BigDecimal principalAmount;
     @Column(name = "interest_amount", nullable = false, precision = 18, scale = 2) private BigDecimal interestAmount;
+    @Builder.Default @Column(name = "interest_returned", nullable = false, precision = 18, scale = 2) private BigDecimal interestReturned = BigDecimal.ZERO;
     @Builder.Default @Column(name = "interest_excluded", nullable = false, precision = 18, scale = 2) private BigDecimal interestExcluded = BigDecimal.ZERO;
 }

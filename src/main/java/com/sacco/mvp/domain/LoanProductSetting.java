@@ -126,6 +126,15 @@ public class LoanProductSetting {
     @Column(name = "repayment_frequency", length = 32)
     private RepaymentFrequency repaymentFrequency;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "early_payoff_interest", length = 32, nullable = false)
+    private EarlyPayoffInterest earlyPayoffInterest = EarlyPayoffInterest.EXCLUDE_OPEN_PERIOD;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "interest_accrual_mode", length = 16)
+    private InterestAccrualMode interestAccrualMode;
+
     @Column(name = "affordability_check_required")
     private Boolean affordabilityCheckRequired;
 

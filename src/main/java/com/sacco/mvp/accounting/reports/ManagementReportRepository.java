@@ -363,7 +363,9 @@ public class ManagementReportRepository {
     private static final String CASH=CASH_RANGE+"""
         report_rows as (
           select l.code||' | '||l.name as "groupName",j.effective_date::text||j.posted_at::text||l.line_key as "rowOrder",
-            j.effective_date as date,coalesce(v.client_number,r.client_number,m.member_no) as "clientNumber",coalesce(v.party,r.party,m.full_name,'') as name,
+            j.effective_date as date,
+            coalesce(nullif(v.client_number,''),nullif(r.client_number,''),nullif(m.member_no,''),credited.codes) as "clientNumber",
+            coalesce(v.party,r.party,m.full_name,'') as name,
             j.source_type,j.source_reference,
             coalesce(repayment_activity.name,%s) activity_name,
             coalesce(repayment_activity.name_sw,def.name_sw) activity_name_sw,
@@ -420,7 +422,11 @@ public class ManagementReportRepository {
               and b.id is distinct from (case when q.kind='DISBURSEMENT_REVERSAL' then q.credit_account_id end) as eligible) component
             window movement as (partition by e.transaction_id)
           ) l
-          left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id) and a.sacco_id=j.sacco_id and a.station_id=j.station_id
+          left join loan_payoff_post payoff on payoff.journal_id=j.id and payoff.sacco_id=j.sacco_id and payoff.station_id=j.station_id
+          left join loan_payoff_refund refund on refund.voucher_id=coalesce(v.reverses_id,v.id)
+          left join loan_payoff_post refunded on refunded.id=refund.payoff_id and refunded.sacco_id=j.sacco_id and refunded.station_id=j.station_id
+          left join loan_applications a on a.id=coalesce(p.loan_id,q.loan_id,payoff.loan_id,refunded.loan_id)
+            and a.sacco_id=j.sacco_id and a.station_id=j.station_id
           left join accountant_loan_record lr on lr.loan_id=p.loan_id and lr.sacco_id=p.sacco_id and lr.station_id=p.station_id
           %s
           left join loan_borrower_contact m on m.loan_id=a.id and m.sacco_id=j.sacco_id and m.station_id=j.station_id
@@ -428,6 +434,19 @@ public class ManagementReportRepository {
           left join gl_transaction_code def on def.id=t.transaction_id and def.sacco_id=t.sacco_id
           left join accountant_loan_receipt_row x on x.posting_id=p.id and x.sacco_id=p.sacco_id and x.station_id=p.station_id
           left join accountant_loan_receipt r on r.id=x.receipt_id and r.sacco_id=j.sacco_id and r.station_id=j.station_id and r.posted_at<=:cutoff
+          left join lateral (
+            select string_agg(g.code, ', ' order by g.code collate "C") as codes
+            from (
+              select e.account_id from accounting_voucher_posting e
+              where l.transaction_id is not null and e.voucher_id=v.id and e.transaction_id=l.transaction_id
+                and e.sacco_id=j.sacco_id and e.station_id=j.station_id and e.side='CREDIT' and e.amount>0
+              union
+              select e.account_id from gl_journal_line e
+              where l.transaction_id is null and e.journal_id=j.id and e.sacco_id=j.sacco_id
+                and e.station_id=j.station_id and e.credit>0
+            ) credit join gl_account g on g.id=credit.account_id and g.sacco_id=j.sacco_id
+            where coalesce(nullif(v.client_number,''),nullif(r.client_number,''),nullif(m.member_no,'')) is null
+          ) credited on true
           where j.sacco_id=:institution and j.station_id=:branch and j.state='POSTED' and j.posted_at<=:cutoff and j.recorded_at<=:cutoff
             and j.effective_date between :from and :through
             and (l.account_id in(select id from cash_range) or (not :bounded and l.purpose in ('CASH','BANK','MOBILE_MONEY')))
