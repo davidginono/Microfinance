@@ -626,7 +626,20 @@ public class LoanRecordingRepository {
     }
     public Optional<Posting> loanOpening(AppUserPrincipal a,UUID loan){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='DISBURSEMENT' and p.state='POSTED' order by p.recorded_at,p.id limit 1",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Posting> loanPosts(AppUserPrincipal a,UUID loan,int limit,int offset){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by "+historyOrder()+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId(),limit,offset);}
+    public List<StatementMovement> loanHistory(AppUserPrincipal actor, UUID loan, int limit, int offset) {
+        var columns = Map.of("date","p.effective_date","reference","p.display_reference","kind","p.kind",
+            "amount","p.cash_amount","principal","p.principal_amount","interest","p.interest_amount",
+            "balance","p.principal_balance","interestBalance","outstanding_interest");
+        String order = com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-details-1",columns,"p.id","p.recorded_at,p.id");
+        return postsWithInterestBalance(actor,loan,limit,offset,order);
+    }
     public List<StatementMovement> statementPosts(AppUserPrincipal actor, UUID loan, int limit, int offset) {
+        return postsWithInterestBalance(actor,loan,limit,offset,"""
+            p.recorded_at,case p.kind when 'CHARGE_ASSESS' then 0 when 'DISBURSEMENT' then 1 else 2 end,
+            b.sequence nulls last,p.id
+            """);
+    }
+    private List<StatementMovement> postsWithInterestBalance(AppUserPrincipal actor, UUID loan, int limit, int offset, String order) {
         var parameters = Map.of("loan",loan,"institution",actor.getSaccoId(),"branch",actor.getStationId(),
             "limit",limit,"offset",offset);
         return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
@@ -649,19 +662,8 @@ public class LoanRecordingRepository {
                 from scoped_ledger l join loan_interest_waiver w on w.loan_id=l.loan_application_id
                     and w.sacco_id=l.sacco_id and w.station_id=l.station_id
             ), running as (
-                select transaction_id,sum(reduction) over (order by sequence rows unbounded preceding) as interest_reduced
+                select transaction_id,sequence,sum(reduction) over (order by sequence rows unbounded preceding) as interest_reduced
                 from interest_movements
-            ), page as (
-                select m.*,row_number() over (order by m.recorded_at,
-                    case m.kind when 'CHARGE_ASSESS' then 0 when 'DISBURSEMENT' then 1 else 2 end,
-                    t.sequence nulls last,m.id) as statement_order
-                from (
-            """+POSTS+"""
-                where p.loan_id=:loan and p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
-                    and a.sacco_id=p.sacco_id and a.station_id=p.station_id
-                ) m left join loan_repayment_transactions t on t.id=m.transaction_id and t.loan_application_id=m.loan_id
-                    and t.sacco_id=m.sacco_id and t.station_id=m.station_id
-                order by statement_order limit :limit offset :offset
             )
             select p.*, case
                 when c.opening_interest is null then null
@@ -669,9 +671,14 @@ public class LoanRecordingRepository {
                 when p.kind='FUNDING_UNDO' then 0
                 when b.interest_reduced between 0 and c.opening_interest then c.opening_interest-b.interest_reduced
             end as outstanding_interest
-            from page p cross join contract c left join running b on b.transaction_id=p.transaction_id
-            order by p.statement_order
-            """,parameters,(row,n)->new StatementMovement(posting(row,n),row.getBigDecimal("outstanding_interest")));
+            from (
+            """+POSTS+"""
+                where p.loan_id=:loan and p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
+                    and a.sacco_id=p.sacco_id and a.station_id=p.station_id
+            ) p cross join contract c left join running b on b.transaction_id=p.transaction_id
+            order by
+            """+order+" limit :limit offset :offset",parameters,
+            (row,n)->new StatementMovement(posting(row,n),row.getBigDecimal("outstanding_interest")));
     }
     public List<Posting> clientPosts(AppUserPrincipal a, UUID client, MovementFilter filter, int limit, int offset) {
         return jdbc.query(POSTS+"""

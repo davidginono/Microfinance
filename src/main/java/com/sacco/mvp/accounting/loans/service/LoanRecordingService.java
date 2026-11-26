@@ -832,7 +832,14 @@ public class LoanRecordingService {
         var stored=repayments.schedule(loanId,actor,page);
         return Optional.of(new Page<>(stored.stream().map(r->new ScheduleRow(r.number(),r.dueDate(),r.principal(),r.interest(),r.principal().add(r.interest()),r.beginningBalance(),r.endingBalance())).toList(),page,stored.hasNext()));
     }
-    @Transactional(readOnly=true) public Page<Posting> history(AppUserPrincipal a,UUID id,int page){authorize(a,"VIEW");check(page>=0 && page<=10000,"filter");records.record(a,id,false);var rows=records.loanPosts(a,id,26,page*25);return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);}
+    @Transactional(readOnly=true)
+    public Page<StatementMovement> history(AppUserPrincipal a, UUID id, int page) {
+        authorize(a,"VIEW");
+        check(page>=0 && page<=10000,"filter");
+        records.record(a,id,false);
+        var rows=records.loanHistory(a,id,26,page*25);
+        return new Page<>(rows.stream().limit(25).toList(),page,rows.size()>25);
+    }
     @Transactional(readOnly=true)
     public StatementMovements movements(AppUserPrincipal a, UUID client, MovementFilter filter, int page) {
         authorize(a,"VIEW");

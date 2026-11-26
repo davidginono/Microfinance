@@ -570,7 +570,9 @@ class LoanRecordingPostgresTest {
         assertThat(service.detail(actor,source).loan().futureInterest()).isZero();assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1500.00");
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("475.48");
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and kind='PAYMENT'",Integer.class,source)).isZero();
-        assertThat(service.history(actor,source,0).rows()).anySatisfy(row->assertThat(row.kind()).isEqualTo("SETTLEMENT"));
+        assertThat(service.history(actor,source,0).rows())
+            .filteredOn(row->row.posting().kind().equals("SETTLEMENT")).singleElement()
+            .satisfies(row->assertThat(row.outstandingInterest()).isZero());
         assertThat(service.loanStatement(actor,client,source,0,true).source().movements())
             .filteredOn(row->row.posting().kind().equals("SETTLEMENT")).singleElement()
             .satisfies(row->assertThat(row.outstandingInterest()).isZero());
@@ -1535,6 +1537,10 @@ class LoanRecordingPostgresTest {
         assertThat(statement).extracting(row->row.posting().kind()).containsExactly("DISBURSEMENT","PAYMENT","REVERSAL");
         assertThat(statement).extracting(StatementMovement::outstandingInterest)
             .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"),new BigDecimal("20.00"));
+        assertThat(service.history(actor,id,0).rows())
+            .extracting(row->row.posting().kind(),StatementMovement::outstandingInterest)
+            .containsExactlyInAnyOrder(tuple("DISBURSEMENT",new BigDecimal("20.00")),
+                tuple("PAYMENT",new BigDecimal("0.00")),tuple("REVERSAL",new BigDecimal("20.00")));
         var filter=new Filter("R1",TODAY,TODAY,"","newest",0,null);
         assertThat(service.report(actor,"PAYMENT",filter)).hasSize(2);
         var totals=service.totals(actor,"PAYMENT",filter);
@@ -1591,6 +1597,9 @@ class LoanRecordingPostgresTest {
         var funded=service.chargeSummary(actor,id);
         assertThat(funded.plan().supported()).isTrue();
         assertThat(funded.balance().assessed()).isEqualByComparingTo("10.00");
+        assertThat(service.history(actor,id,0).rows())
+            .filteredOn(row->row.posting().kind().equals("CHARGE_ASSESS")).singleElement()
+            .satisfies(row->assertThat(row.outstandingInterest()).isNull());
     }
 
     @Test void previewsDoNotPost(){
@@ -1617,6 +1626,23 @@ class LoanRecordingPostgresTest {
         var rows=service.loanStatement(actor,client,id,0,true).source().movements();
         assertThat(rows).extracting(StatementMovement::outstandingInterest)
             .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"));
+
+        var request=new org.springframework.mock.web.MockHttpServletRequest("GET","/finance/loan-records/"+id);
+        request.addParameter("tableSort[accounting-loans-details-1]","interestBalance");
+        request.addParameter("tableDirection[accounting-loans-details-1]","asc");
+        org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+            new org.springframework.web.context.request.ServletRequestAttributes(request));
+        try {
+            assertThat(service.history(actor,id,0).rows()).extracting(StatementMovement::outstandingInterest)
+                .containsExactly(new BigDecimal("0.00"),new BigDecimal("20.00"));
+            assertThat(service.history(actor,id,1).rows()).isEmpty();
+            assertThatThrownBy(()->service.history(operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
+            assertThat(service.loanStatement(actor,client,id,0,true).source().movements())
+                .extracting(StatementMovement::outstandingInterest)
+                .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"));
+        } finally {
+            org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+        }
     }
     @Test void individualLoanStatementKeepsOpeningOnLaterPagesAndChecksOwnership(){
         var id=service.save(actor,form());service.disburse(actor,post(id,"1000.00","D1"));
