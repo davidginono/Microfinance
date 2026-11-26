@@ -5061,5 +5061,6 @@ body.aws-console:has(.app-modal-overlay:is(.is-open,[aria-hidden="false"]):not([
 .page-action-options .app-btn { display: flex; width: 100%; height: auto; min-height: 32px;
     justify-content: flex-start; white-space: normal; text-align: start; box-sizing: border-box; }
 
+.accounting-workspace > [data-report-preview] { min-width: 0; }
 .report-preview-search { display: inline-flex; margin: 0 .5rem .5rem 0; }
 .report-preview-search input { width: min(20rem, 75vw); }
