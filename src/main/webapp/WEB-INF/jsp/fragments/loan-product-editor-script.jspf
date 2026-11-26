@@ -424,6 +424,25 @@
 
             workspace.classList.add('is-enhanced');
 
+            const topUp = form.querySelector('[data-loan-top-up-settings]');
+            if (topUp) {
+                const {topUpAllowed, topUpFeesEnabled, topUpApplicationFee, topUpInsuranceFee,
+                    topUpProcessingFee, topUpPercentageBasis} = form.elements;
+                const renderTopUp = () => {
+                    const allowed = topUpAllowed.checked;
+                    const charging = allowed && topUpFeesEnabled.checked;
+                    const percentage = charging && (topUpInsuranceFee.checked || topUpProcessingFee.checked);
+                    topUp.querySelector('[data-top-up-fees-toggle]').hidden = !allowed;
+                    topUp.querySelector('[data-top-up-fee-choices]').hidden = !charging;
+                    topUp.querySelector('[data-top-up-basis]').hidden = !percentage;
+                    topUpFeesEnabled.disabled = !allowed;
+                    topUpApplicationFee.disabled = topUpInsuranceFee.disabled = topUpProcessingFee.disabled = !charging;
+                    topUpPercentageBasis.disabled = !percentage;
+                };
+                topUp.addEventListener('change', renderTopUp);
+                renderTopUp();
+            }
+
             const stepIndex = (key) => steps.findIndex((step) => step.getAttribute('data-product-config-step') === key);
             const stepLabel = (index) => {
                 if (index < 0 || index >= steps.length) {

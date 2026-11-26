@@ -78,5 +78,45 @@
                                 <option value="REDUCING_BALANCE" ${product.interestMethod eq 'REDUCING_BALANCE' ? 'selected' : ''}><spring:message code="admin.settings.loanProducts.reducingBalance" text="Reducing Balance" /></option>
                             </select>
                         </label>
+                        <fieldset class="col-span-full space-y-2 min-w-0" data-loan-top-up-settings>
+                            <legend class="font-semibold"><spring:message code="loanTopUp.settings" /></legend>
+                            <input type="hidden" name="topUpSettingsPresent" value="true" />
+                            <label class="flex items-center gap-2">
+                                <input type="checkbox" class="admin-cloud-checkbox" name="topUpAllowed" value="true"
+                                       ${creatingLoanProduct or product.topUpAllowed ? 'checked' : ''} />
+                                <spring:message code="loanTopUp.allow" />
+                            </label>
+                            <div class="space-y-2" data-top-up-fees-toggle ${creatingLoanProduct or product.topUpAllowed ? '' : 'hidden'}>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" class="admin-cloud-checkbox" name="topUpFeesEnabled" value="true"
+                                           ${product.topUpFeesEnabled ? 'checked' : ''} />
+                                    <spring:message code="loanTopUp.chargeFees" />
+                                </label>
+                                <div class="space-y-2" data-top-up-fee-choices ${product.topUpFeesEnabled ? '' : 'hidden'}>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" class="admin-cloud-checkbox" name="topUpApplicationFee" value="true"
+                                               ${product.topUpApplicationFee ? 'checked' : ''} />
+                                        <spring:message code="charges.application" />
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" class="admin-cloud-checkbox" name="topUpInsuranceFee" value="true"
+                                               ${product.topUpInsuranceFee ? 'checked' : ''} />
+                                        <spring:message code="loanTopUp.insuranceFee" />
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" class="admin-cloud-checkbox" name="topUpProcessingFee" value="true"
+                                               ${product.topUpProcessingFee ? 'checked' : ''} />
+                                        <spring:message code="charges.processing" />
+                                    </label>
+                                    <label class="max-w-md" data-top-up-basis ${product.topUpInsuranceFee or product.topUpProcessingFee ? '' : 'hidden'}>
+                                        <spring:message code="loanTopUp.calculateOn" />
+                                        <select name="topUpPercentageBasis" class="aws-control mt-1">
+                                            <option value="ADDITIONAL_AMOUNT"><spring:message code="loanTopUp.basis.ADDITIONAL_AMOUNT" /></option>
+                                            <option value="COMBINED_NEW_PRINCIPAL" ${product.topUpPercentageBasis eq 'COMBINED_NEW_PRINCIPAL' ? 'selected' : ''}><spring:message code="loanTopUp.basis.COMBINED_NEW_PRINCIPAL" /></option>
+                                        </select>
+                                    </label>
+                                </div>
+                            </div>
+                        </fieldset>
                     </div>
                 </section>

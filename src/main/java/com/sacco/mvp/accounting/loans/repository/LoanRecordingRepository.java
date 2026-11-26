@@ -231,9 +231,11 @@ public class LoanRecordingRepository {
 
     private static final String LOANS="""
         select (l.loan_application_id is not null) has_ledger,coalesce(c.outstanding,0) charges,(loan_cancellation_error(a.id) is null) cancel_eligible,a.id,coalesce(a.loan_id,a.application_number::text) loan_id,m.party_id client_id,m.full_name,m.member_no,case when m.kind='CLIENT' then 'INDIVIDUAL' else 'GROUP' end loan_for,r.product_name,r.application_date,r.requested_principal,
-        a.amount,a.status,(m.kind='CLIENT' and a.top_up_source_loan_id is null and a.status='DISBURSED' and coalesce(l.principal-l.principal_paid,0)>0 and coalesce((select loan_top_up_enabled from sacco_settings where sacco_id=a.sacco_id),true) and not exists(select 1 from loan_applications child where child.top_up_source_loan_id=a.id and child.status not in ('WITHDRAWN','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED','DISBURSEMENT_REVERSED','PAID'))) topup_eligible,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,
+        a.amount,a.status,(m.kind='CLIENT' and coalesce(product.top_up_allowed and not product.custom_recording_configuration,false)
+         and a.top_up_source_loan_id is null and a.status='DISBURSED' and coalesce(l.principal-l.principal_paid,0)>0 and coalesce((select loan_top_up_enabled from sacco_settings where sacco_id=a.sacco_id),true) and not exists(select 1 from loan_applications child where child.top_up_source_loan_id=a.id and child.status not in ('WITHDRAWN','MANAGER_REJECTED','LOAN_OFFICER_REJECTED','CHAIRPERSON_REJECTED','BOARD_REJECTED','CREDIT_COMMITTEE_REJECTED','ACCOUNTANT_REJECTED','REJECTED','DISBURSEMENT_REVERSED','PAID'))) topup_eligible,case when a.status='DISBURSEMENT_REVERSED' then 0 else coalesce(l.principal-l.principal_paid,0) end outstanding,coalesce(l.principal_paid,0) principal_paid,
         coalesce(l.interest_paid,0) interest_paid,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.interest,0) end due_interest,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.arrears,0) end arrears,case when a.status='DISBURSEMENT_REVERSED' or exists(select 1 from accountant_loan_topup ts where ts.source_id=a.id and ts.reverses_id is null and not exists(select 1 from accountant_loan_topup tr where tr.reverses_id=ts.id)) then 0 else coalesce(d.future,0) end future_interest
         from accountant_loan_record r join loan_applications a on a.id=r.loan_id join loan_borrower_directory m on m.party_id=a.borrower_party_id and m.sacco_id=a.sacco_id
+        left join loan_product_settings product on product.id=a.loan_product_setting_id and product.sacco_id=a.sacco_id
         left join loan_charge_balance c on c.loan_id=a.id and c.sacco_id=r.sacco_id and c.station_id=r.station_id
         left join loan_ledgers l on l.loan_application_id=a.id
         left join lateral (select sum(loan_interest_due(id,?)) interest,
@@ -566,13 +568,13 @@ public class LoanRecordingRepository {
         """,(r,n)->new StatementTerms(r.getObject("id",UUID.class),r.getBigDecimal("rate"),r.getString("frequency"),
             r.getInt("tenor_months"),r.getInt("installments"),r.getObject("first_payment_date",LocalDate.class),
             r.getBigDecimal("installment"),r.getString("sacco_name"),r.getString("branch_name"),r.getString("rate_basis"),r.getString("tenure_unit"),r.getInt("tenure_value"),r.getObject("final_due_date",LocalDate.class),r.getString("charge_snapshot"),r.getBigDecimal("fixed_interest")),client,a.getSaccoId(),a.getStationId(),loan,loan);}
-    public List<Choice> products(AppUserPrincipal a,String search,int page){return jdbc.query("""
+    public List<Choice> products(AppUserPrincipal a,String search,int page,boolean topUp){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label,coalesce(tenure_unit,'MONTHS') tenure_unit,minimum_amount,maximum_amount,
         coalesce(min_tenure,case when min_repayment_months>0 then min_repayment_months else 1 end) minimum_tenure,
         coalesce(max_tenure,max_repayment_months,600) maximum_tenure from loan_product_settings where sacco_id=? and active and not custom_recording_configuration
-        and coalesce(product_status,'ACTIVE')='ACTIVE' and strpos(lower(coalesce(product_name,loan_type)),?)>0
+        and coalesce(product_status,'ACTIVE')='ACTIVE' and (not ? or top_up_allowed) and strpos(lower(coalesce(product_name,loan_type)),?)>0
         order by coalesce(display_order,2147483647),id limit 26 offset ?
-        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),"",r.getString("tenure_unit"),r.getString("minimum_amount"),r.getString("maximum_amount"),r.getInt("minimum_tenure"),r.getInt("maximum_tenure")),a.getSaccoId(),search.toLowerCase(Locale.ROOT),page*25);}
+        """,(r,n)->new Choice(r.getObject("id",UUID.class),r.getString("label"),"",r.getString("tenure_unit"),r.getString("minimum_amount"),r.getString("maximum_amount"),r.getInt("minimum_tenure"),r.getInt("maximum_tenure")),a.getSaccoId(),topUp,search.toLowerCase(Locale.ROOT),page*25);}
     public List<Choice> filterProducts(AppUserPrincipal a,String search,int page){return jdbc.query("""
         select id,coalesce(product_name,loan_type) label from loan_product_settings where sacco_id=?
         and strpos(lower(coalesce(product_name,loan_type)),?)>0
@@ -738,12 +740,14 @@ public class LoanRecordingRepository {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from members where id=any(string_to_array(?,',')::uuid[]) and sacco_id=? and station_id=? and status='ACTIVE' and coalesce(staff_access_status,'ACTIVE')='ACTIVE')",Boolean.class,ids.stream().map(UUID::toString).collect(java.util.stream.Collectors.joining(",")),actor.getSaccoId(),actor.getStationId()));
     }
 
-    public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date) {
+    public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date,boolean requireEnabledProduct) {
         return jdbc.query("""
             select l.loan_application_id,l.loan_id,l.applicant_member_id,m.full_name,l.principal-l.principal_paid principal,l.next_sequence,
               coalesce(sum(loan_interest_due(i.id,?)),0) interest,
-              coalesce(sum(greatest(0,i.interest-i.interest_paid-i.interest_excluded-i.interest_waived-loan_interest_due(i.id,?))),0) excluded
+              coalesce(sum(greatest(0,i.interest-i.interest_paid-i.interest_excluded-i.interest_waived-loan_interest_due(i.id,?))),0) excluded,
+              coalesce(bool_and(product.top_up_allowed and not product.custom_recording_configuration),false) allows_top_up
             from accountant_loan_record r join loan_applications b on b.id=r.loan_id
+            left join loan_product_settings product on product.id=b.loan_product_setting_id and product.sacco_id=b.sacco_id
             join loan_ledgers l on l.loan_application_id=b.id join members m on m.id=b.applicant_member_id
             join loan_ledger_installments i on i.loan_application_id=b.id
             join accountant_loan_post p on p.loan_id=b.id and p.kind='DISBURSEMENT' and p.state='POSTED'
@@ -755,8 +759,12 @@ public class LoanRecordingRepository {
              and ab.allowance=0 and ab.written_off=0 and (ab.last_date is null or ab.last_date<=?)
              and (coalesce((b.policy_snapshot->>'applicationFee')::numeric,0)=0 or exists(select 1 from loan_charge_contract where loan_id=b.id))
             group by l.loan_application_id,m.full_name
-            """,(r,n)->new TopUpQuote(source,r.getString("loan_id"),r.getObject("applicant_member_id",UUID.class),r.getString("full_name"),date,
-                r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("excluded"),r.getLong("next_sequence")),
+            """,(r,n)->{
+                if(requireEnabledProduct && !r.getBoolean("allows_top_up"))
+                    throw new IllegalArgumentException("recording.error.topUpSourceProduct");
+                return new TopUpQuote(source,r.getString("loan_id"),r.getObject("applicant_member_id",UUID.class),r.getString("full_name"),date,
+                    r.getBigDecimal("principal"),r.getBigDecimal("interest"),r.getBigDecimal("excluded"),r.getLong("next_sequence"));
+            },
             date,date,source,a.getSaccoId(),a.getStationId(),date,date,date).stream().findFirst().orElseThrow(()->new IllegalArgumentException("recording.error.topUpUnavailable"));
     }
     public boolean topUpEnabled(String institution){return !Boolean.FALSE.equals(jdbc.query("select loan_top_up_enabled from sacco_settings where sacco_id=?",(r,n)->r.getBoolean(1),institution).stream().findFirst().orElse(true));}

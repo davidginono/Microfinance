@@ -15,6 +15,8 @@
         <c:if test="${empty detail}">
             <div><dt><spring:message code="recording.topUp.newPrincipal" /> (TZS)</dt><dd data-topup-new-principal>—</dd></div>
             <div><dt><spring:message code="recording.topUp.deductions" /> (TZS)</dt><dd data-topup-deductions>—</dd></div>
+            <div><dt><spring:message code="charges.separate" /> (TZS)</dt><dd data-topup-separate>—</dd></div>
+            <div data-topup-basis-row hidden><dt><spring:message code="loanTopUp.calculateOn" /></dt><dd data-topup-basis></dd></div>
             <div><dt><spring:message code="recording.topUp.cash" /> (TZS)</dt><dd data-topup-net-cash>—</dd></div>
         </c:if>
     </dl>

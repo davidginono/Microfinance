@@ -57,7 +57,10 @@ public class LoanRecordingController {
         model.addAttribute("recordForm",f);recordProductContext(a,f,model);return "accounting/loans/record-form";}
     @PostMapping("/loan-records") public String save(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute RecordForm recordForm,BindingResult errors,@RequestParam(required=false) List<org.springframework.web.multipart.MultipartFile> attachments,@RequestParam(required=false) org.springframework.web.multipart.MultipartFile groupAgreement,@RequestParam(defaultValue="save") String action,Model model,RedirectAttributes flash){
         service.authorize(a,"CREATE");if(!errors.hasErrors())try{
-            if(recordForm.getTopUpSourceLoanId()!=null)recordForm.setPrincipal(null);
+            if(recordForm.getTopUpSourceLoanId()!=null){
+                recordForm.setPrincipal(null);
+                if(!Set.of("save","preview").contains(action))throw new IllegalArgumentException("recording.error.topUpUnavailable");
+            }
             if(action.equals("groupLoad")){if(!"GROUP".equals(recordForm.getLoanFor())||recordForm.getGroupApplication()==null||recordForm.getGroupApplication().getGroupId()==null)throw new IllegalArgumentException("simpleGroup.error.request");var selected=simpleGroups.setup(a,recordForm.getGroupApplication().getGroupId());recordForm.setClientId(null);recordForm.getGroupApplication().setExpectedVersion(selected.version());recordForm.getGroupApplication().setChecked(false);recordProductContext(a,recordForm,model);return "accounting/loans/record-form";}
             if(action.equals("draft")&&"GROUP".equals(recordForm.getLoanFor()))return "redirect:/finance/loan-records/new?groupDraftId="+simpleGroups.saveDraft(a,recordForm,attachments==null?List.of():attachments,groupAgreement);
             if(action.equals("draft"))return "redirect:/finance/loan-records/applications/"+evidence.saveApplication(a,recordForm,attachments==null?List.of():attachments)+"/edit";
@@ -111,7 +114,7 @@ public class LoanRecordingController {
     }
     private String recordField(RecordForm form,String key){
         return switch(key){
-            case "recording.error.product"->"productId";
+            case "recording.error.product","recording.error.topUpReplacementProduct"->"productId";
             case "recording.error.customConfiguration","charges.error.custom"->"loanMode";
             case "recording.error.client","recording.error.clientCashFlow","recording.error.clientBusiness","applications.error.client","applications.error.verification",
                  "recording.error.sharedActiveLoan","recording.error.sharedCreditHistory","recording.error.sharedApplicationPending"->"clientId";
@@ -233,14 +236,34 @@ public class LoanRecordingController {
     public ResponseEntity<?> quote(@AuthenticationPrincipal AppUserPrincipal a,@ModelAttribute RecordForm recordForm,BindingResult errors,Locale locale){
         service.authorize(a,"CREATE");if(errors.hasErrors())return ResponseEntity.badRequest().body(Map.of("error",label("recording.error.terms",locale)));
         recordForm.setFirstPaymentDate(null);
-        try{var applicationSnapshot=recordForm.getApplicationId()==null||"GROUP".equals(recordForm.getLoanFor())?null:evidence.applicationSnapshot(a,recordForm);var q=applicationSnapshot==null?service.interestQuote(a,recordForm):evidence.applicationQuote(a,recordForm,applicationSnapshot);var response=new LinkedHashMap<String,Object>(Map.of("product",q.product(),"rate",q.rate().toPlainString(),"ratePercent",q.rate().multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString(),"method",q.method(),"frequency",q.frequency(),"installment",q.installment().toPlainString(),"interest",q.interest().toPlainString(),"tenureUnit",q.tenureUnit(),"tenureValue",q.tenureValue(),"schedule",q.schedule().stream().map(r->Map.of("number",r.number(),"principal",r.principal().toPlainString(),"interest",r.interest().toPlainString(),"amount",r.amount().toPlainString(),"beginningBalance",r.beginningBalance().toPlainString(),"endingBalance",r.endingBalance().toPlainString())).toList()));if(applicationSnapshot!=null)response.put("applicationFees",applicationSnapshot);var chargePlan=applicationSnapshot==null?service.chargeQuote(a,recordForm):null;if(chargePlan!=null){
-            response.put("charges",chargeView(chargePlan,locale));
-            if(recordForm.getTopUpSourceLoanId()!=null && recordForm.getTopUpAdditionalAmount()!=null){
-                var deductions=chargePlan.plan().deductions();
+        try {
+            boolean topUp=recordForm.getTopUpSourceLoanId()!=null;
+            if(topUp)recordForm.setPrincipal(null);
+            var applicationSnapshot=topUp || recordForm.getApplicationId()==null || "GROUP".equals(recordForm.getLoanFor())
+                ?null:evidence.applicationSnapshot(a,recordForm);
+            var topUpPricing=topUp?service.topUpPricing(a,recordForm):null;
+            var q=topUp?topUpPricing.interest():applicationSnapshot==null
+                ?service.interestQuote(a,recordForm):evidence.applicationQuote(a,recordForm,applicationSnapshot);
+            var response=new LinkedHashMap<String,Object>(Map.of("product",q.product(),"rate",q.rate().toPlainString(),
+                "ratePercent",q.rate().multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString(),
+                "method",q.method(),"frequency",q.frequency(),"installment",q.installment().toPlainString(),
+                "interest",q.interest().toPlainString(),"tenureUnit",q.tenureUnit(),"tenureValue",q.tenureValue(),
+                "schedule",q.schedule().stream().map(r->Map.of("number",r.number(),"principal",r.principal().toPlainString(),
+                    "interest",r.interest().toPlainString(),"amount",r.amount().toPlainString(),
+                    "beginningBalance",r.beginningBalance().toPlainString(),"endingBalance",r.endingBalance().toPlainString())).toList()));
+            if(applicationSnapshot!=null)response.put("applicationFees",applicationSnapshot);
+            var chargeQuote=topUp?topUpPricing.charges():applicationSnapshot==null?service.chargeQuote(a,recordForm):null;
+            if(chargeQuote!=null)response.put("charges",chargeView(chargeQuote,locale));
+            if(topUp){
+                var plan=chargeQuote.plan();
+                var basis=topUpPricing.basis();
                 response.put("topUp",Map.of("principal",recordForm.getPrincipal().toPlainString(),
-                    "deductions",deductions.toPlainString(),"netCash",recordForm.getTopUpAdditionalAmount().subtract(deductions).toPlainString()));
+                    "deductions",plan.deductions().toPlainString(),"separate",plan.separate().toPlainString(),
+                    "netCash",recordForm.getTopUpAdditionalAmount().subtract(plan.deductions()).toPlainString(),
+                    "percentageBasis",basis==null?"":label("loanTopUp.basis."+basis.name(),locale)));
             }
-        }return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);}
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
+        }
         catch(IllegalArgumentException ex){return ResponseEntity.badRequest().body(Map.of("error",label(error(ex),locale)));}
     }
     @GetMapping("/loan-records/{id}/attachments/{attachmentId}")
@@ -533,7 +556,7 @@ public class LoanRecordingController {
         if(plan.terms().isEmpty())return List.of();var fields=new ArrayList<Field>();
         fields.add(printField("charges.policyReference",plan.policyReference(),locale));fields.add(printField("charges.agreementReference",plan.agreementReference(),locale));
         for(var term:plan.terms()){
-            String basis=term.basis().equals("PRINCIPAL_RATE")?term.basisValue().movePointRight(2).stripTrailingZeros().toPlainString()+"%":"TZS "+term.basisValue().toPlainString();
+            String basis=term.isPercentageRate()?term.basisValue().movePointRight(2).stripTrailingZeros().toPlainString()+"%":"TZS "+term.basisValue().toPlainString();
             fields.add(printField("charges.kind."+term.kind(),label("charges.basis."+term.basis(),locale)+" "+basis+" / TZS "+statementMoney(term.amount(),locale)+" / "+label("charges.timing."+term.timing(),locale),locale));
             if(!term.provider().isBlank())fields.add(printField("charges.provider",term.provider()+" / "+term.verification(),locale));
             if(!term.evidence().isBlank())fields.add(printField("charges.supportingEvidence",term.evidence(),locale));

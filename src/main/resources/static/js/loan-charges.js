@@ -3,6 +3,8 @@
   const region=document.querySelector('[data-charge-preview]');if(!region)return;
   const form=region.closest('form'),mode=form.elements.loanMode,error=form.querySelector('[data-charge-error]');
   const rows=[...region.querySelectorAll('[data-charge-kind]')],loading=region.querySelector('[data-charge-loading]');
+  const topUp=region.dataset.topUpCharges==='true';
+  const noFees=region.querySelector('[data-top-up-no-fees]');
   let previousMode=mode.value;
   const manual=()=>mode.value==='CUSTOM';
   function feedback(message='', field=''){
@@ -36,6 +38,7 @@
   function end(){window.AppLoading?.end(loading);if(loading)loading.hidden=true;region.setAttribute('aria-busy','false');}
   function clear(){
     end();feedback();
+    if(topUp){rows.forEach(row=>{row.hidden=true;});noFees.hidden=true;return;}
     for(const row of rows){
       const basis=row.querySelector('[data-charge-basis]')?.value||'AMOUNT';
       row.querySelectorAll('[data-charge-amount],[data-charge-percentage]').forEach(input=>{
@@ -45,11 +48,22 @@
     }
   }
   form.addEventListener('loan:quote-reset',clear);
-  form.addEventListener('loan:quote-pending',()=>{clear();region.setAttribute('aria-busy','true');if(loading){loading.hidden=false;window.AppLoading?.begin(loading,{table:false,size:'small'});}});
+  form.addEventListener('loan:quote-pending',()=>{if(!topUp)clear();region.setAttribute('aria-busy','true');if(loading){loading.hidden=false;window.AppLoading?.begin(loading,{table:false,size:'small'});}});
   form.addEventListener('loan:quote-settled',end);
   form.addEventListener('loan:quote-error',clear);
   form.addEventListener('loan:quote',event=>{
     end();const plan=event.detail.charges;if(!plan){clear();return;}
+    if(topUp){
+      for(const row of rows){
+        const term=plan.terms.find(term=>term.code===row.dataset.chargeKind);
+        row.hidden=!term;
+        if(term)row.querySelector('[data-charge-display]').textContent=term.percentage
+          ? term.amount+' ('+term.percentage+'%)':term.amount;
+      }
+      noFees.hidden=plan.terms.length!==0;
+      feedback(plan.error||'');
+      return;
+    }
     for(const term of plan.terms){
       const row=rows.find(row=>row.dataset.chargeKind===term.code);if(!row)continue;
       const amount=row.querySelector('[data-charge-amount]'),percentage=row.querySelector('[data-charge-percentage]');

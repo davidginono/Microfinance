@@ -59,14 +59,19 @@
     form.addEventListener('loan:quote',event=>{
       const result=event.detail.topUp;
       if(!result)return;
-      for(const [field,value] of Object.entries({'new-principal':result.principal,deductions:result.deductions,'net-cash':result.netCash})){
-        region.querySelector('[data-topup-'+field+']').textContent=formatMoney(value);
+      for(const [field,value] of Object.entries({'new-principal':result.principal,deductions:result.deductions,separate:result.separate,'net-cash':result.netCash})){
+        const node=region.querySelector('[data-topup-'+field+']');
+        if(node && value!=null)node.textContent=formatMoney(value);
       }
+      const basis=region.querySelector('[data-topup-basis]');
+      if(basis){basis.textContent=result.percentageBasis || '';basis.parentElement.hidden=!result.percentageBasis;}
     });
     const clearQuote=()=>{
-      for(const field of ['new-principal','deductions','net-cash']) {
+      for(const field of ['new-principal','deductions','separate','net-cash']) {
         const node=region.querySelector('[data-topup-'+field+']');if(node)node.textContent='—';
       }
+      const basis=region.querySelector('[data-topup-basis]');
+      if(basis){basis.textContent='';basis.parentElement.hidden=true;}
     };
     form.addEventListener('loan:quote-error',clearQuote);
     form.addEventListener('loan:quote-reset',clearQuote);

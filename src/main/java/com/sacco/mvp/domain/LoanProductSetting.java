@@ -76,6 +76,28 @@ public class LoanProductSetting {
     @Column(name = "processing_fee_rate", precision = 6, scale = 4)
     private BigDecimal processingFeeRate;
 
+    public enum TopUpPercentageBasis { ADDITIONAL_AMOUNT, COMBINED_NEW_PRINCIPAL }
+
+    @Builder.Default
+    @Column(name = "top_up_allowed", nullable = false)
+    private boolean topUpAllowed = true;
+
+    @Column(name = "top_up_fees_enabled", nullable = false)
+    private boolean topUpFeesEnabled;
+
+    @Column(name = "top_up_application_fee", nullable = false)
+    private boolean topUpApplicationFee;
+
+    @Column(name = "top_up_insurance_fee", nullable = false)
+    private boolean topUpInsuranceFee;
+
+    @Column(name = "top_up_processing_fee", nullable = false)
+    private boolean topUpProcessingFee;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "top_up_percentage_basis", length = 24)
+    private TopUpPercentageBasis topUpPercentageBasis;
+
     @Column(name = "interest_rate", precision = 6, scale = 4)
     private BigDecimal interestRate;
 

@@ -1,8 +1,21 @@
 <%@ page pageEncoding="UTF-8" %>
 <sec:authorize access="@access.has(principal,'LOAN_CHARGES_CUSTOM')" var="canSetCharges" />
-<section class="accounting-section loan-repayment-terms" data-charge-preview data-custom-allowed="${canSetCharges}" aria-live="polite">
+<section class="accounting-section loan-repayment-terms" data-charge-preview data-custom-allowed="${canSetCharges}"
+         data-top-up-charges="${not empty recordForm.topUpSourceLoanId}" aria-live="polite">
 <h2><spring:message code="charges.title" /><span data-charge-loading data-ui-loading-region hidden></span></h2>
-<c:if test="${empty recordForm.topUpSourceLoanId}">
+<c:choose>
+<c:when test="${not empty recordForm.topUpSourceLoanId}">
+<dl class="loan-topup-facts">
+    <c:forEach items="${['APPLICATION','INSURANCE','PROCESSING']}" var="kind">
+        <div data-charge-kind="${kind}" hidden>
+            <dt><spring:message code="charges.kind.${kind}" /> (TZS)</dt>
+            <dd><output data-charge-display>—</output></dd>
+        </div>
+    </c:forEach>
+</dl>
+<div data-top-up-no-fees hidden><spring:message code="loanTopUp.noFees" /></div>
+</c:when>
+<c:otherwise>
 <div class="loan-form-grid" data-charge-kind="APPLICATION">
 <label for="customApplicationCharge"><spring:message code="charges.application" /> (TZS)<form:input path="customApplicationCharge" id="customApplicationCharge" data-charge-amount="true" type="number" data-amount-input="true" min="0" step="0.01" cssClass="aws-control" /></label>
 </div>
@@ -11,11 +24,12 @@
 <label for="customProcessingPercent"><spring:message code="charges.processing" /> (%)<form:input path="customProcessingPercent" id="customProcessingPercent" data-charge-percentage="true" type="number" min="0" step="any" cssClass="aws-control" /></label>
 <label for="customProcessingCharge"><spring:message code="charges.processing" /> (TZS)<form:input path="customProcessingCharge" id="customProcessingCharge" data-charge-amount="true" type="number" data-amount-input="true" min="0" step="0.01" cssClass="aws-control" /></label>
 </div>
-</c:if>
 <div class="loan-form-grid" data-charge-kind="INSURANCE">
 <form:hidden path="customInsuranceBasis" data-charge-basis="true" />
 <label for="customInsurancePercent"><spring:message code="charges.insurance" /> (%)<form:input path="customInsurancePercent" id="customInsurancePercent" data-charge-percentage="true" type="number" min="0" step="any" cssClass="aws-control" /></label>
 <label for="insurancePremium"><spring:message code="charges.insurance" /> (TZS)<form:input path="insurancePremium" id="insurancePremium" data-charge-amount="true" type="number" data-amount-input="true" min="0" step="0.01" cssClass="aws-control" /></label>
 </div>
+</c:otherwise>
+</c:choose>
 <p data-charge-error class="erp-field-error" role="status" hidden></p>
 </section>

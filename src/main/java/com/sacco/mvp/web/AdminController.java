@@ -81,7 +81,8 @@ public class AdminController {
         "disbursementOfficerRequired",
         "disbursementProofRequired",
         "applicantAttachmentRequired",
-        "guarantorMinSavingsCheckRequired"
+        "guarantorMinSavingsCheckRequired",
+        "topUpAllowed", "topUpFeesEnabled", "topUpApplicationFee", "topUpInsuranceFee", "topUpProcessingFee"
     );
 
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService loanCharges;
@@ -105,6 +106,12 @@ public class AdminController {
     private final PlatformSmsGatewaySettingsService platformSmsGatewaySettingsService;
     private final org.springframework.context.MessageSource messages;
     private final LoanGroupApprovalService groupApprovals;
+
+    @InitBinder("loanTopUpForm")
+    public void bindLoanTopUpForm(org.springframework.web.bind.WebDataBinder binder) {
+        binder.setAllowedFields("topUpSettingsPresent", "topUpAllowed", "topUpFeesEnabled", "topUpApplicationFee",
+            "topUpInsuranceFee", "topUpProcessingFee", "topUpPercentageBasis");
+    }
 
     @InitBinder("groupRuleForm")
     public void approvalBinder(org.springframework.web.bind.WebDataBinder binder) {
@@ -1231,10 +1238,13 @@ public class AdminController {
                                     @RequestParam(required = false) UUID interestGlAccountId,
                                     @RequestParam(required = false) String modalKey,
                                     HttpServletRequest request,
-                                    RedirectAttributes ra) {
+                                    RedirectAttributes ra,
+                                    @ModelAttribute("loanTopUpForm") com.sacco.mvp.service.dto.LoanTopUpForm loanTopUpForm,
+                                    org.springframework.validation.BindingResult topUpErrors) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "product-" + id : normalizeLoanSettingsModalKey(modalKey);
         try {
             if(documentErrors.hasErrors())throw new IllegalArgumentException("productDocuments.invalid");
+            if(topUpErrors.hasErrors())throw new IllegalArgumentException("loanTopUp.error.settings");
             BigDecimal maxLoanSavingsRatio = percentToRatio(maxLoanSavingsPercent);
             BigDecimal processingFeeRate = percentToRatio(processingFeePercent);
             BigDecimal insuranceRate = percentToRatio(insurancePercent);
@@ -1243,7 +1253,7 @@ public class AdminController {
                 productCode, productName, productDescription, displayOrder, minimumAmount, maximumAmount, guarantorsRequired,
                 maxLoanSavingsRatio, savingsLimitCheckRequired, applicationFee, insuranceRate, processingFeeRate, annualRate, interestMethod, minRepaymentMonths, maxRepaymentMonths,
                 allowApplicationWithActiveLoan, freshFinancialDataRequired, disbursementOfficerRequired,
-                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId,collateralRequired,collateralCoveragePercent,productDocuments);
+                disbursementProofRequired, applicantAttachmentRequired, guarantorMinSavingsCheckRequired, guarantorMinimumSavings, productStatus, maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId,collateralRequired,collateralCoveragePercent,productDocuments,loanTopUpForm);
             ra.addFlashAttribute("message", "Loan product updated.");
         } catch (IllegalArgumentException | IllegalStateException ex) {
             attachLoanSettingsValidationFeedback(ra, ex.getMessage());
@@ -1325,11 +1335,14 @@ public class AdminController {
                                     @RequestParam(required = false) UUID interestGlAccountId,
                                               @RequestParam(required = false) String modalKey,
                                               HttpServletRequest request,
-                                              RedirectAttributes ra) {
+                                              RedirectAttributes ra,
+                                              @ModelAttribute("loanTopUpForm") com.sacco.mvp.service.dto.LoanTopUpForm loanTopUpForm,
+                                              org.springframework.validation.BindingResult topUpErrors) {
         String resolvedModalKey = normalizeLoanSettingsModalKey(modalKey) == null ? "create-product" : normalizeLoanSettingsModalKey(modalKey);
         try {
                 if (documentErrors.hasErrors()) throw new IllegalArgumentException("productDocuments.invalid");
                 if (groupErrors.hasErrors()) throw new IllegalArgumentException("loanGroups.error.steps");
+                if (topUpErrors.hasErrors()) throw new IllegalArgumentException("loanTopUp.error.settings");
                 LoanProductSetting product = adminService.createLoanProductTenure(
                 adminScopeService.currentSaccoId(principal),
                 principal.getMemberId(),
@@ -1358,7 +1371,7 @@ public class AdminController {
                 guarantorMinSavingsCheckRequired,
                 guarantorMinimumSavings,
                 productStatus,
-                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm,collateralRequired,collateralCoveragePercent,productDocuments
+                maximumActiveLoans, tenureUnit, principalGlAccountId, interestGlAccountId, principal, groupRuleForm,collateralRequired,collateralCoveragePercent,productDocuments,loanTopUpForm
             );
             ra.addFlashAttribute("message", "Loan product created successfully.");
             ra.addFlashAttribute("createdLoanProductId", product.getId());
@@ -1498,6 +1511,13 @@ public class AdminController {
     }
 
     private void attachLoanSettingsValidationFeedback(RedirectAttributes ra, String message) {
+        if (message != null && message.startsWith("loanTopUp.error.")) {
+            String field = "loanTopUp.error.selectFees".equals(message) ? "topUpFeesEnabled" : "topUpAllowed";
+            ra.addFlashAttribute("productErrorTab", "pricing");
+            ra.addFlashAttribute("loanSettingsFieldErrors", Map.of(field,
+                messages.getMessage(message, null, org.springframework.context.i18n.LocaleContextHolder.getLocale())));
+            return;
+        }
         if(message!=null && (message.startsWith("productCollateral.") || message.startsWith("charges.error.") || message.startsWith("loanGroups.error."))){
             String tab=message.startsWith("productCollateral.")?"eligibility":message.startsWith("charges.")?"pricing":"workflow";
             ra.addFlashAttribute("productErrorTab",tab);
@@ -1530,7 +1550,10 @@ public class AdminController {
             draft.put(name, submittedValues);
         });
         LOAN_PRODUCT_BOOLEAN_FIELDS.forEach(name ->
-            draft.put(name, List.of(Boolean.toString(requestHasTruthyParameter(request, name)))));
+            {
+                if (!name.startsWith("topUp") || requestHasTruthyParameter(request, "topUpSettingsPresent"))
+                    draft.put(name, List.of(Boolean.toString(requestHasTruthyParameter(request, name))));
+            });
         ra.addFlashAttribute("loanProductFormDraft", draft);
     }
 

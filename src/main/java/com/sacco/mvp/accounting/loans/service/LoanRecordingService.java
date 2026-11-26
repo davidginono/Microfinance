@@ -215,7 +215,11 @@ public class LoanRecordingService {
     }
     @Transactional(readOnly=true)
     public List<Choice> choices(AppUserPrincipal a,String category,String search,int page){authorize(a,"VIEW");check(search!=null && search.length()<=100 && page>=0 && page<=10000,"filter");return switch(category){
-        case "clients"->records.clients(a,search,page);case "ledger-clients"->records.ledgerClients(a,search,page);case "products"->records.products(a,search,page);
+        case "clients"->records.clients(a,search,page);case "ledger-clients"->records.ledgerClients(a,search,page);case "products"->records.products(a,search,page,false);
+        case "top-up-products"->{
+            authorize(a,"CREATE");
+            yield records.topUpEnabled(a.getSaccoId()) ? records.products(a,search,page,true) : List.of();
+        }
         case "filter-products"->records.filterProducts(a,search,page);
         case "money"->records.accounts(a,"MONEY",search,page);case "principal"->records.accounts(a,"PRINCIPAL",search,page);case "interest"->records.accounts(a,"INTEREST",search,page);
         case "disbursement-clients"->records.loans(a,new Filter(search,null,null,"READY_FOR_DISBURSEMENT","newest",page,null),clock.today(),26,page*25).stream().map(l->new Choice(l.id(),l.clientNumber()+" - "+l.client()+" ("+l.number()+")",l.status())).toList();
@@ -232,7 +236,7 @@ public class LoanRecordingService {
     @Transactional(readOnly=true)
     public TopUpQuote topUpQuote(AppUserPrincipal a,UUID source,LocalDate date,UUID excluded){
         authorize(a,"VIEW");check(date!=null && !date.isAfter(clock.today()),"date");check(records.topUpEnabled(a.getSaccoId()),"topUpDisabled");
-        var quote=records.topUpQuote(a,source,date);
+        var quote=records.topUpQuote(a,source,date,excluded==null);
         charges.requireNoUnrecoveredFees(a,source);check(quote.principal().signum()>0,"topUpUnavailable");check(!records.pendingTopUp(source,excluded),"topUpPending");var b=charges.balance(a,source,LocalDate.MAX);check(b.lastDate()==null || !b.lastDate().isAfter(date),"date");return new TopUpQuote(quote.sourceId(),quote.sourceNumber(),quote.clientId(),quote.client(),date,quote.principal(),quote.interest(),quote.excludedInterest(),quote.sequence(),b.outstanding(),b.sequence());
     }
     @Transactional(readOnly=true)
@@ -266,12 +270,14 @@ public class LoanRecordingService {
         return records.topUpRequest(a,key,hash).orElseThrow();
     }
     public record Quote(String product,BigDecimal rate,String method,String frequency,BigDecimal installment,BigDecimal interest,List<ScheduleRow> schedule,String tenureUnit,int tenureValue) {}
+    public record TopUpPricing(Quote interest,ChargeQuote charges,LoanProductSetting.TopUpPercentageBasis basis) {}
     private AllocationPreview chargeAllocation(BigDecimal amount,BigDecimal interest,BigDecimal balance,BigDecimal fees){
         var fee=RepaymentAllocationCalculator.chargePortion(amount,interest,balance,fees);
         var i=amount.min(interest);var p=amount.subtract(i).subtract(fee);return new AllocationPreview(p,i,balance.subtract(p),fee);
     }
     @Transactional(readOnly=true) public ChargeQuote chargeQuote(AppUserPrincipal a,RecordForm f){
         authorize(a,"CREATE");
+        if(f.getTopUpSourceLoanId()!=null)deriveTopUp(a,f);
         var quote=charges.quoteView(a,f,product(a,f));
         var plan=quote.plan();
         return charges.canRecordWithPendingCharges(f,plan)
@@ -298,13 +304,27 @@ public class LoanRecordingService {
     }
     @Transactional(readOnly=true)
     public Quote interestQuote(AppUserPrincipal a,RecordForm f){
-        authorize(a,"CREATE");if(f.getTopUpSourceLoanId()!=null)deriveTopUp(a,f);money(f.getPrincipal());check(Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"terms");
+        authorize(a,"CREATE");if(f.getTopUpSourceLoanId()!=null)deriveTopUp(a,f);
+        return interestQuote(f,quoteProduct(a,f));
+    }
+    @Transactional(readOnly=true)
+    public TopUpPricing topUpPricing(AppUserPrincipal a,RecordForm f){
+        authorize(a,"CREATE");
+        deriveTopUp(a,f);
+        var product=quoteProduct(a,f);
+        return new TopUpPricing(interestQuote(f,product),charges.quoteView(a,f,product),product.getTopUpPercentageBasis());
+    }
+    private LoanProductSetting quoteProduct(AppUserPrincipal a,RecordForm f){
+        money(f.getPrincipal());check(Set.of("CONFIGURED","CUSTOM").contains(f.getLoanMode()),"terms");
         if("CONFIGURED".equals(f.getLoanMode()) && f.getTenureValue()==null){
             check(f.getProductId()!=null,"product");var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));
             f.setTenureUnit(p.getResolvedTenureUnit());f.setTenureValue(p.getResolvedMinimumTenure());
         }
         if(f.getTenureValue()==null){check(f.getCustomMethod()!=InterestMethod.REDUCING_BALANCE && (!"ANNUAL".equals(f.getInterestBasis()) || "AMOUNT".equals(f.getInterestEntry())),"terms");f.setTenureUnit("MONTHS");f.setTenureValue(1);}
-        f.setMonths(tenure(f).compatibilityMonths());var p=product(a,f);var result=calculate(f,p);
+        f.setMonths(tenure(f).compatibilityMonths());return product(a,f);
+    }
+    private Quote interestQuote(RecordForm f,LoanProductSetting p){
+        var result=calculate(f,p);
         return new Quote(p.getDisplayName(),p.getInterestRate(),p.getInterestMethod().name(),p.getResolvedRepaymentFrequency().name(),result.installment(),result.totalInterest(),scheduleRows(result,null),tenure(f).unit(),tenure(f).value());
     }
     @Transactional(readOnly=true)
@@ -915,6 +935,8 @@ public class LoanRecordingService {
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ) public List<Posting> report(AppUserPrincipal a,String kind,Filter f){authorize(a,"EXPORT");filter(f,true);kind(kind);var total=records.totals(a,kind,f);check(total.count()<=500,"reportLimit");return records.posts(a,kind,f,500,0);}
     @Transactional(readOnly=true) public Totals totals(AppUserPrincipal a,String kind,Filter f){authorize(a,"VIEW");filter(f,true);kind(kind);return records.totals(a,kind,f);}
     private LoanProductSetting product(AppUserPrincipal a,RecordForm f){
+        if(f.getTopUpSourceLoanId()!=null)
+            check("CONFIGURED".equals(f.getLoanMode()) && f.getProductId()!=null,"topUpReplacementProduct");
         if ("CUSTOM".equals(f.getLoanMode())) {
             var configured=products.findBySaccoIdAndCustomRecordingConfigurationTrue(a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.customConfiguration"));
             check(configured.getStatus()==LoanProductStatus.ACTIVE,"customConfiguration");
@@ -934,6 +956,7 @@ public class LoanRecordingService {
             return LoanProductSetting.builder().id(configured.getId()).saccoId(a.getSaccoId()).loanType(LoanType.CUSTOMIZED_LOAN).productName(configured.getDisplayName()).interestRate(rate).interestMethod(f.getCustomMethod()).repaymentFrequency(f.getCustomFrequency()).guarantorsRequired(0).applicationFee(BigDecimal.ZERO).processingFeeRate(BigDecimal.ZERO).insuranceRate(configured.getInsuranceRate()).build();
         }
         var p=products.findByIdAndSaccoId(f.getProductId(),a.getSaccoId()).orElseThrow(()->new IllegalArgumentException("recording.error.product"));check(p.isAvailableForApplications() && p.getInterestRate()!=null && p.getInterestMethod()!=null,"product");
+        if(f.getTopUpSourceLoanId()!=null)check(p.isTopUpAllowed() && !p.isCustomRecordingConfiguration(),"topUpReplacementProduct");
         check((p.getMinimumAmount()==null || f.getPrincipal().compareTo(p.getMinimumAmount())>=0) && (p.getMaximumAmount()==null || f.getPrincipal().compareTo(p.getMaximumAmount())<=0),"productLimits");
         try{tenure(f).validate(p);}catch(IllegalArgumentException e){throw new FieldValidation("tenureValue",e.getMessage());}
         return p;}
@@ -962,11 +985,17 @@ public class LoanRecordingService {
     @Transactional(readOnly=true) public List<Map<String,Object>> attachments(AppUserPrincipal a,UUID id){authorize(a,"VIEW");records.record(a,id,false);return attachments.parse(loans.findById(id).orElseThrow().getAttachmentsJson());}
     @Transactional(readOnly=true) public LoanAttachmentService.AttachmentResource attachment(AppUserPrincipal a,UUID id,String attachmentId){authorize(a,"VIEW");records.record(a,id,false);return attachments.load(id,attachmentId,loans.findById(id).orElseThrow().getAttachmentsJson());}
     private TopUpQuote deriveTopUp(AppUserPrincipal actor,RecordForm form) {
+        check(form.getTopUpSourceLoanId()!=null && form.getApplicationId()==null && "INDIVIDUAL".equals(form.getLoanFor()),"topUpUnavailable");
         var settlement=topUpQuote(actor,form.getTopUpSourceLoanId(),form.getApplicationDate(),null);
         check(settlement.clientId().equals(form.getClientId()),"client");
         if(form.getTopUpAdditionalAmount()!=null){
             money(form.getTopUpAdditionalAmount());
             form.setPrincipal(settlement.total().add(form.getTopUpAdditionalAmount()));
+        }else{
+            money(form.getPrincipal());
+            var additional=form.getPrincipal().subtract(settlement.total());
+            money(additional);
+            form.setDerivedTopUpAdditionalAmount(additional);
         }
         return settlement;
     }

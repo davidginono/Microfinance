@@ -50,7 +50,10 @@ public final class LoanChargeDtos {
     }
     public record AccountSummary(Policy current,List<GeneratedAccount> generated,Map<String,String> currentMappings) {}
     public record Term(UUID id,String kind,String basis,BigDecimal basisValue,BigDecimal amount,Timing timing,
-        UUID receivableAccountId,UUID liabilityAccountId,String evidence,String provider,String verification) {}
+        UUID receivableAccountId,UUID liabilityAccountId,String evidence,String provider,String verification) {
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        public boolean isPercentageRate(){return Set.of("PRINCIPAL_RATE","TOPUP_ADDITIONAL_RATE","TOPUP_COMBINED_RATE").contains(basis);}
+    }
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown=true)
     public record Plan(UUID policyId,String policyReference,String agreementReference,List<Term> terms,boolean supported,String error) {
         public BigDecimal total(){return terms.stream().map(Term::amount).reduce(new BigDecimal("0.00"),BigDecimal::add);}

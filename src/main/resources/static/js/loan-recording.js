@@ -34,7 +34,7 @@
         const visible = [...options.values()].filter(option => !pinned.some(fixed => fixed.value === option.value)).slice(-100); select.replaceChildren(blank, ...pinned, ...visible);
         if (value && ![...select.options].some(option => option.value === value) && selected) select.add(selected);
         select.value = value; page = targetPage; loadedSearch = query;
-        if(box.dataset.category === 'products' && productFields.some(key=>selected?.dataset[key] !== select.selectedOptions[0]?.dataset[key]))
+        if(['products','top-up-products'].includes(box.dataset.category) && productFields.some(key=>selected?.dataset[key] !== select.selectedOptions[0]?.dataset[key]))
           select.dispatchEvent(new Event('change', {bubbles:true}));
         more.hidden = choices.length <= 25;
       } catch (failure) { if (version === request && select.isConnected && failure.name !== 'AbortError') {showError(true); more.hidden = true; binding.cancel();} }

@@ -1,5 +1,7 @@
 # Recorded loan charges
 
+For a new top-up, the replacement product controls whether each fee applies. Application uses the configured fixed amount. Processing and insurance use the configured rates and the selected principal basis. The charge terms retain the basis, rate, amount and collection timing when recorded. Outstanding source charges remain part of settlement. See [loan top-up settings and settlement](loan-topup-recording.md).
+
 ## Custom insurance and charge-card regression fixes (12 November 2026)
 
 Custom loan recording now retains the internal product's stored insurance ceiling when building the per-loan terms. It still takes application and processing amounts from staff entry. Premiums above that ceiling, including any positive premium against a zero ceiling, remain rejected. No pricing controls are added to the approval-only Customised Loan Configuration screen.
@@ -30,7 +32,7 @@ Verification: 85 selected Java checks passed across focused runs (64 PostgreSQL 
 
 ## Supported recording and disclosures
 
-The recording form calculates the existing product's fixed application component, processing percentage and insurance percentage on the server, using contractual principal and decimal, component-by-component HALF_UP rounding to TZS cents. Application and processing are components of one management fee, with a disclosed subtotal. A product remains available for a top-up when it has management fees for ordinary loans. Replacement quotes and saved terms omit both management components. Source-loan charges and eligible insurance retain their separate treatment.
+The recording form calculates the fixed application component, processing percentage and insurance percentage on the server using decimal, component-by-component HALF_UP rounding to TZS cents. Ordinary loans use contractual principal. Top-ups use the selected fees and percentage basis from the replacement product. Application and processing remain components of one management fee, with a disclosed subtotal.
 
 A dated, immutable product charge policy must identify the institution's existing approved policy and agreement, collection timing, and active scoped control accounts. Configuration requires both LOAN_PRODUCTS_CONFIGURE and ACCOUNTING_ACCOUNTS_UPDATE. No fee, account, policy approval, opening balance or custom-charge permission is seeded. Custom application/processing amounts additionally require LOAN_CHARGES_CUSTOM, an enabled policy permitting overrides, its combined management-fee limit and supporting evidence. The permission is not added to default accountant grants.
 
@@ -44,7 +46,7 @@ Frozen charge terms, calculation basis, amounts, timing, policy/agreement refere
 - **Deduct:** the same funding transaction assesses the charges, collects exactly the frozen deductions internally, opens the original contractual principal and pays only net cash. Principal, deductions, separately payable charges and net cash are distinct. Deductions leaving no positive cash are rejected.
 - **Financed:** visibly unavailable. Capitalization, affordability, effective-interest and accounting policy must be approved and implemented before fees can be added to principal.
 
-A source top-up quote includes remaining posted principal, due contractual interest and outstanding assessed source charges. Future scheduled interest is excluded under the existing supported settlement convention. New insurance charges/deductions belong to the replacement agreement. Source charges are settled once; they are not assessed again. Both debt and charge sequences/amounts must still match the teller's accepted dated preview. For example, source principal 1,000, due interest 20 and source charges 30, against new principal 1,500 and new insurance deduction 7.50, produce net cash 442.50. Saving or approving the application does not settle the source.
+A source top-up quote includes remaining posted principal, due contractual interest and outstanding assessed source charges. Future scheduled interest is excluded under the existing supported settlement convention. Selected new charges belong to the replacement agreement. Source charges are settled once. Both debt and charge sequences and amounts must still match the teller's accepted dated preview. For example, source principal 1,000, due interest 20 and source charges 30, against new principal 1,500 and a new deduction of 7.50, produce net cash 442.50. Saving or approving the application leaves settlement pending.
 
 ## Withheld fees recovered through repayments
 

@@ -431,13 +431,22 @@ class AdminServiceTest {
         var suppliedProduct=UUID.randomUUID();approval.setProductId(suppliedProduct);approval.setExpectedRevision(99);
         approval.setGroups(List.of(Position.CREDIT_OFFICER));approval.setApprovals(List.of(2));
         when(loanProductSettingRepository.save(any())).thenAnswer(call -> call.getArgument(0));
+        var topUp=new com.sacco.mvp.service.dto.LoanTopUpForm();
+        topUp.setTopUpSettingsPresent(true);topUp.setTopUpAllowed(true);topUp.setTopUpFeesEnabled(true);
+        topUp.setTopUpProcessingFee(true);
         var product=adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"WORKFLOW","Workflow Loan","Staff approval",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,true,new BigDecimal("75.50"),new com.sacco.mvp.service.dto.LoanProductDocumentsForm());
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,approval,true,new BigDecimal("75.50"),new com.sacco.mvp.service.dto.LoanProductDocumentsForm(),topUp);
         assertThat(approval.getProductId()).isEqualTo(product.getId()).isNotEqualTo(suppliedProduct);
         assertThat(approval.getExpectedRevision()).isZero();
         verify(groupApprovals).saveRule(actor,approval);
+        assertThat(product.isTopUpAllowed()).isTrue();
+        assertThat(product.isTopUpFeesEnabled()).isTrue();
+        assertThat(product.isTopUpProcessingFee()).isTrue();
+        assertThat(product.isTopUpApplicationFee()).isFalse();
+        assertThat(product.isTopUpInsuranceFee()).isFalse();
+        assertThat(product.getTopUpPercentageBasis()).isEqualTo(LoanProductSetting.TopUpPercentageBasis.ADDITIONAL_AMOUNT);
         assertThat(product.getMinTenure()).isEqualTo(1);
         assertThat(product.getMaxTenure()).isEqualTo(12);
         assertThat(product.isCollateralRequired()).isTrue();
@@ -451,7 +460,7 @@ class AdminServiceTest {
         assertThatThrownBy(()->adminService.createLoanProductTenure("SACCO-01",actor.getMemberId(),"CHARGES","Fee loan","Charges",1,
             new BigDecimal("100"),new BigDecimal("1000"),0,BigDecimal.ONE,false,BigDecimal.TEN,BigDecimal.ZERO,new BigDecimal("0.01"),
             BigDecimal.ZERO,InterestMethod.FLAT_RATE,1,12,false,false,true,true,false,false,BigDecimal.ZERO,
-            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,false,null,new com.sacco.mvp.service.dto.LoanProductDocumentsForm()))
+            LoanProductStatus.ACTIVE,null,"MONTHS",null,null,actor,null,false,null,new com.sacco.mvp.service.dto.LoanProductDocumentsForm(),null))
             .hasMessage("charges.error.policy");
         verify(loanProductSettingRepository,never()).save(any());
     }

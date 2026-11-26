@@ -3081,7 +3081,8 @@ public class AdminService {
                                   BigDecimal guarantorMinimumSavings,
                                   LoanProductStatus productStatus,
                                   Integer maximumActiveLoans, String tenureUnit, UUID principalGlAccountId, UUID interestGlAccountId,boolean collateralRequired,BigDecimal collateralCoveragePercent,
-                                  com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
+                                  com.sacco.mvp.service.dto.LoanProductDocumentsForm documents,
+                                  com.sacco.mvp.service.dto.LoanTopUpForm topUpForm) {
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
         var maximum = new LoanTenure(tenureUnit,maxRepaymentMonths);
         if(minimum.months().compareTo(maximum.months())>0)throw new IllegalArgumentException("recording.error.terms");
@@ -3100,6 +3101,7 @@ public class AdminService {
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         if(collateralRequired || collateralCoveragePercent!=null)
             setProductCollateral(product,adminId,collateralRequired,coverage);
+        configureTopUp(product, adminId, topUpForm);
         loanProductSettingRepository.save(product);
         if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
 
@@ -3137,7 +3139,8 @@ public class AdminService {
                                                 com.sacco.mvp.security.AppUserPrincipal actor,
                                                 com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupRuleForm approval,
                                                 boolean collateralRequired, BigDecimal collateralCoveragePercent,
-                                                com.sacco.mvp.service.dto.LoanProductDocumentsForm documents) {
+                                                com.sacco.mvp.service.dto.LoanProductDocumentsForm documents,
+                                                com.sacco.mvp.service.dto.LoanTopUpForm topUpForm) {
         if (actor == null || !saccoId.equals(actor.getSaccoId()) || !adminId.equals(actor.getMemberId()))
             throw new org.springframework.security.access.AccessDeniedException("Product scope mismatch");
         var minimum = new LoanTenure(tenureUnit,minRepaymentMonths);
@@ -3151,6 +3154,7 @@ public class AdminService {
 
         product.setTenureUnit(tenureUnit);product.setMinTenure(minRepaymentMonths);product.setMaxTenure(maxRepaymentMonths);
         setProductCollateral(product,adminId,collateralRequired,coverage);
+        configureTopUp(product, adminId, topUpForm);
         loanProductSettingRepository.save(product);
         if (approval != null && (!approval.getGroups().isEmpty() || !approval.getApprovals().isEmpty())) {
             loanProductSettingRepository.flush();
@@ -3160,6 +3164,31 @@ public class AdminService {
         }
         if(applicantAttachmentRequired)productDocuments.replaceForProduct(product.getId(),documents);
         return product;
+    }
+
+    private void configureTopUp(LoanProductSetting product, UUID adminId, com.sacco.mvp.service.dto.LoanTopUpForm form) {
+        if (form == null || !form.isTopUpSettingsPresent()) return;
+        boolean charging = form.isTopUpAllowed() && form.isTopUpFeesEnabled();
+        if (charging && !form.isTopUpApplicationFee() && !form.isTopUpInsuranceFee() && !form.isTopUpProcessingFee())
+            throw new IllegalArgumentException("loanTopUp.error.selectFees");
+        var before = snapshotTopUp(product);
+        product.setTopUpAllowed(form.isTopUpAllowed());
+        product.setTopUpFeesEnabled(charging);
+        product.setTopUpApplicationFee(charging && form.isTopUpApplicationFee());
+        product.setTopUpInsuranceFee(charging && form.isTopUpInsuranceFee());
+        product.setTopUpProcessingFee(charging && form.isTopUpProcessingFee());
+        product.setTopUpPercentageBasis(charging && (form.isTopUpInsuranceFee() || form.isTopUpProcessingFee())
+            ? java.util.Objects.requireNonNullElse(form.getTopUpPercentageBasis(), LoanProductSetting.TopUpPercentageBasis.ADDITIONAL_AMOUNT)
+            : null);
+        var after = snapshotTopUp(product);
+        if (!before.equals(after))
+            auditService.log("LOAN_PRODUCT", product.getId(), "ADMIN_CONFIGURE_LOAN_TOP_UP", adminId, before, after);
+    }
+
+    private Map<String, Object> snapshotTopUp(LoanProductSetting product) {
+        return Map.of("allowed", product.isTopUpAllowed(), "feesEnabled", product.isTopUpFeesEnabled(),
+            "applicationFee", product.isTopUpApplicationFee(), "insuranceFee", product.isTopUpInsuranceFee(),
+            "processingFee", product.isTopUpProcessingFee(), "percentageBasis", java.util.Objects.toString(product.getTopUpPercentageBasis(), ""));
     }
 
 

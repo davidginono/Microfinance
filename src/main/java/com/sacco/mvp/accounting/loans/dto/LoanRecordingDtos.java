@@ -47,6 +47,8 @@ public final class LoanRecordingDtos {
         private UUID topUpSourceLoanId;
         @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
         private BigDecimal topUpAdditionalAmount;
+        @com.fasterxml.jackson.annotation.JsonIgnore
+        private BigDecimal derivedTopUpAdditionalAmount;
         private UUID productId;
         @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) private LocalDate applicationDate;
         private BigDecimal requestedPrincipal;

@@ -465,15 +465,56 @@ class LoanRecordingPostgresTest {
         for(var account:List.of(cash,principal,chargeAccount,managementAccount,processingAccount,insuranceAccount))assertThat(jdbc.queryForObject("select coalesce(sum(debit-credit),0) from gl_journal_line where account_id=?",BigDecimal.class,account)).isZero();
         assertThatThrownBy(()->jdbc.update("delete from loan_charge_event where loan_id=?",id)).isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
-    @Test void sourceChargesSettleOnceAndNewInsuranceDeductionIsIndependentlyDisclosed(){
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "ADDITIONAL_AMOUNT,TOPUP_ADDITIONAL_RATE,10.00,5.00,460.00",
+        "COMBINED_NEW_PRINCIPAL,TOPUP_COMBINED_RATE,31.00,15.50,428.50"
+    })
+    void topUpFeesUseTheSelectedBasisAndFundingUsesFrozenTerms(String basis,String termBasis,
+                                                              String processing,String insurance,String cashPaid){
         chargePolicy("DEDUCT");var source=chargedLoan();service.disburse(actor,chargedFunding(source));
         // Use an unpaid source for settlement, preserving the first loan's original terms.
         var p=chargeService().policy(actor,product).orElseThrow();var policy=new com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.PolicyForm();policy.setExpectedVersion(p.id());policy.setProductId(product);policy.setEffectiveFrom(LocalDate.of(2026,8,1));policy.setEnabled(true);policy.setPolicyReference("Synthetic separate collection policy");policy.setAgreementReference("Synthetic bilingual agreement");policy.setReceivableAccountId(chargeAccount);policy.setApplicationAccountId(managementAccount);policy.setProcessingAccountId(processingAccount);policy.setInsuranceAccountId(insuranceAccount);policy.setInsurer("Synthetic insurer");policy.setInsurerVerification("Synthetic licensed insurance evidence");chargeService().savePolicy(actor,policy);
         var original=chargedLoan();service.disburse(actor,chargedFunding(original));
-        jdbc.update("update loan_product_settings set insurance_rate=0.005 where id=?",product);
-        var latest=chargeService().policy(actor,product).orElseThrow();policy.setRequestKey(UUID.randomUUID());policy.setExpectedVersion(latest.id());policy.setEffectiveFrom(LocalDate.of(2026,10,1));policy.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT);chargeService().savePolicy(actor,policy);
-        var f=form();f.setTopUpSourceLoanId(original);f.setPrincipal(new BigDecimal("1500.00"));f.setApplicationDate(TODAY);f.setFirstPaymentDate(null);f.setInsurancePremium(new BigDecimal("7.50"));f.setInsuranceEvidence("Synthetic actual new insurer premium");f.setEvidence("Synthetic signed replacement agreement");var id=service.save(actor,f);var funding=topUpPost(id);var quote=service.disbursementTopUp(actor,id,TODAY).orElseThrow();funding.setSettlementCharges(quote.charges());funding.setSettlementChargeSequence(quote.chargeSequence());service.disburse(actor,funding);
-        var topup=service.topUp(actor,id).orElseThrow();assertThat(topup.sourceCharges()).isEqualByComparingTo("30.00");assertThat(topup.newDeductions()).isEqualByComparingTo("7.50");assertThat(topup.cash()).isEqualByComparingTo("442.50");assertThat(service.chargeSummary(actor,original).balance().outstanding()).isZero();assertThat(service.chargeSummary(actor,id).balance().outstanding()).isZero();
+        jdbc.update("""
+            update loan_product_settings set application_fee=25,processing_fee_rate=0.02,insurance_rate=0.01,
+                top_up_fees_enabled=true,top_up_application_fee=true,top_up_processing_fee=true,
+                top_up_insurance_fee=true,top_up_percentage_basis=? where id=?
+            """,basis,product);
+        var latest=chargeService().policy(actor,product).orElseThrow();
+        policy.setRequestKey(UUID.randomUUID());policy.setExpectedVersion(latest.id());policy.setEffectiveFrom(LocalDate.of(2026,10,1));
+        policy.setInsuranceTiming(com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing.DEDUCT);
+        chargeService().savePolicy(actor,policy);
+        var f=form();f.setTopUpSourceLoanId(original);f.setTopUpAdditionalAmount(new BigDecimal("500.00"));
+        f.setApplicationDate(TODAY);f.setFirstPaymentDate(null);
+        f.setInsuranceEvidence("Synthetic actual new insurer premium");f.setEvidence("Synthetic signed replacement agreement");
+        var preview=service.topUpPricing(actor,f);
+        assertThat(f.getPrincipal()).isEqualByComparingTo("1550.00");
+        assertThat(preview.charges().plan().terms()).extracting(t->t.basis()).containsExactly("FIXED",termBasis,termBasis);
+        assertThat(preview.charges().plan().terms()).extracting(t->t.amount())
+            .containsExactly(new BigDecimal("25.00"),new BigDecimal(processing),new BigDecimal(insurance));
+        var id=service.save(actor,f);
+        assertThat(service.save(actor,f)).isEqualTo(id);
+        jdbc.update("""
+            update loan_product_settings set top_up_allowed=false,top_up_fees_enabled=false,top_up_application_fee=false,
+                top_up_processing_fee=false,top_up_insurance_fee=false,top_up_percentage_basis=null where id=?
+            """,product);
+        var funding=topUpPost(id);funding.setAmount(new BigDecimal("1550.00"));
+        var quote=service.disbursementTopUp(actor,id,TODAY).orElseThrow();
+        funding.setSettlementCharges(quote.charges());funding.setSettlementChargeSequence(quote.chargeSequence());
+        var frozen=service.chargeSummary(actor,id).plan();
+        assertThat(frozen.terms()).extracting(t->t.basis()).containsExactly("FIXED",termBasis,termBasis);
+        assertThat(frozen.terms()).extracting(t->t.amount())
+            .containsExactly(new BigDecimal("25.00"),new BigDecimal(processing),new BigDecimal(insurance));
+        funding.setDeductChargeIds(frozen.terms().stream().filter(t->!t.kind().equals("INSURANCE")).map(t->t.id()).toList());
+        var posting=service.disburse(actor,funding);
+        assertThat(service.disburse(actor,funding).id()).isEqualTo(posting.id());
+        var topup=service.topUp(actor,id).orElseThrow();
+        assertThat(topup.sourceCharges()).isEqualByComparingTo("30.00");
+        assertThat(topup.newDeductions()).isEqualByComparingTo(new BigDecimal("500.00").subtract(new BigDecimal(cashPaid)));
+        assertThat(topup.cash()).isEqualByComparingTo(cashPaid);
+        assertThat(service.chargeSummary(actor,original).balance().outstanding()).isZero();
+        assertThat(service.chargeSummary(actor,id).balance().outstanding()).isZero();
         service.reverseTopUp(operator("B1"),id,UUID.randomUUID(),TODAY,"Synthetic returned transfer","Synthetic correction evidence");assertThat(service.chargeSummary(actor,original).balance().outstanding()).isEqualByComparingTo("30.00");assertThat(service.chargeSummary(actor,id).balance().assessed()).isZero();
     }
     @Test void assessmentRequiresEvidenceAndCorrectionsAreIndependentWithScopeAndClosedPeriodProtection(){
@@ -549,6 +590,33 @@ class LoanRecordingPostgresTest {
         assertThat(service.detail(actor,replacement).loan().principal()).isEqualByComparingTo("1500.00");
         service.disburse(actor,topUpPost(replacement));
         assertThat(service.topUp(actor,replacement).orElseThrow().cash()).isEqualByComparingTo("475.48");
+    }
+    @Test void productSwitchBlocksNewTopUpsInChoicesPreviewAndRecording(){
+        var source=topUpSource();
+        var f=form();f.setTopUpSourceLoanId(source);f.setApplicationDate(TODAY);
+        f.setTopUpAdditionalAmount(new BigDecimal("500.00"));f.setFirstPaymentDate(null);
+        f.setLoanMode("CUSTOM");
+        assertThatThrownBy(()->service.topUpPricing(actor,f)).hasMessage("recording.error.topUpReplacementProduct");
+        f.setLoanMode("CONFIGURED");
+        var replacement=UUID.randomUUID();
+        jdbc.update("""
+            insert into loan_product_settings
+            select (jsonb_populate_record(null::loan_product_settings,to_jsonb(p)||jsonb_build_object(
+                'id',?::text,'product_code','TOP-UP-OFF','product_name','Top-up off','top_up_allowed',false))).*
+            from loan_product_settings p where id=?
+            """,replacement,product);
+        f.setProductId(replacement);
+        assertThat(service.choices(actor,"products","",0)).anyMatch(candidate->candidate.id().equals(replacement));
+        assertThat(service.choices(actor,"top-up-products","",0)).noneMatch(candidate->candidate.id().equals(replacement));
+        assertThatThrownBy(()->service.topUpPricing(actor,f)).hasMessage("recording.error.topUpReplacementProduct");
+        assertThatThrownBy(()->service.save(actor,f)).hasMessage("recording.error.topUpReplacementProduct");
+        f.setProductId(product);
+        jdbc.update("update loan_product_settings set top_up_allowed=false where id=?",product);
+        assertThat(service.choices(actor,"products","",0)).anyMatch(candidate->candidate.id().equals(product));
+        assertThat(service.choices(actor,"top-up-products","",0)).noneMatch(candidate->candidate.id().equals(product));
+        assertThat(service.detail(actor,source).loan().topUpEligible()).isFalse();
+        assertThatThrownBy(()->service.topUpPricing(actor,f)).hasMessage("recording.error.topUpSourceProduct");
+        assertThatThrownBy(()->service.save(actor,f)).hasMessage("recording.error.topUpSourceProduct");
     }
     @Test void topUpSeparatesInternalSettlementFromCashAndExcludesFutureInterest(){
         var source=topUpSource();assertThat(service.detail(actor,source).loan().topUpEligible()).isTrue();

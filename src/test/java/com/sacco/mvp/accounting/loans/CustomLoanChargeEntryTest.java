@@ -54,7 +54,7 @@ class CustomLoanChargeEntryTest {
         f.setCustomApplicationCharge(money("-0.01"));
         assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.amount");
     }
-    @Test void policyCapInsuranceLimitAndTopUpRulesStillApplyWithoutEvidenceInputs(){
+    @Test void policyCapAndInsuranceLimitStillApplyWithoutEvidenceInputs(){
         var f=form();f.setCustomApplicationCharge(money("21"));
         assertThatThrownBy(()->service.quote(actor,f,product,true)).hasMessage("charges.error.custom");
         f.setCustomApplicationCharge(money("3.21"));f.setInsurancePremium(money("10.01"));
@@ -62,15 +62,18 @@ class CustomLoanChargeEntryTest {
         f.setInsurancePremium(money("7.65"));f.setInsuranceEvidence("");
         f.setEvidence("");
         assertThat(service.quote(actor,f,product,true).terms()).allSatisfy(t->assertThat(t.evidence()).startsWith("Loan charge entry / "));
-        f.setInsuranceEvidence("Actual premium document");f.setTopUpSourceLoanId(UUID.randomUUID());
-        assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::kind).containsExactly("INSURANCE");
     }
     @Test void configuredProductsRetainTheirCalculatedFees(){
         var f=form();f.setLoanMode("CONFIGURED");f.setCustomApplicationCharge(money("99"));f.setCustomProcessingCharge(money("99"));f.setInsurancePremium(null);f.setInsuranceEvidence(null);
         assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::amount).containsExactly(money("10.00"),money("20.00"),money("10.00"));
     }
-    @Test void topUpUsesTheConfiguredProductWithoutCopyingItsOrdinaryLoanFees(){
+    @Test void topUpChargesAreOffByDefaultAndCanSelectAnIndividualFee(){
         var f=form();f.setLoanMode("CONFIGURED");f.setTopUpSourceLoanId(UUID.randomUUID());
+        assertThat(service.quote(actor,f,product,true).terms()).isEmpty();
+        assertThat(service.quoteView(actor,f,product).fields()).isEmpty();
+        product.setTopUpFeesEnabled(true);
+        product.setTopUpInsuranceFee(true);
+        product.setTopUpPercentageBasis(LoanProductSetting.TopUpPercentageBasis.COMBINED_NEW_PRINCIPAL);
         assertThat(service.quote(actor,f,product,true).terms()).extracting(Term::kind).containsExactly("INSURANCE");
         assertThat(service.quoteView(actor,f,product).fields()).extracting(field->field.code()).containsExactly("INSURANCE");
     }

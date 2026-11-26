@@ -40,6 +40,48 @@ test('product tabs follow displayed order and keep approval in its own form',()=
   }finally{w.close();}
 });
 
+test('top-up fee controls serialize independent choices and hide inactive settings',()=>{
+  const settings=`<fieldset data-loan-top-up-settings>
+    <input type="checkbox" name="topUpAllowed" value="true" checked>
+    <div data-top-up-fees-toggle><input type="checkbox" name="topUpFeesEnabled" value="true">
+      <div data-top-up-fee-choices>
+        <input type="checkbox" name="topUpApplicationFee" value="true">
+        <input type="checkbox" name="topUpProcessingFee" value="true">
+        <input type="checkbox" name="topUpInsuranceFee" value="true">
+        <label data-top-up-basis><select name="topUpPercentageBasis">
+          <option value="ADDITIONAL_AMOUNT">Additional amount</option>
+          <option value="COMBINED_NEW_PRINCIPAL">Combined new principal</option>
+        </select></label>
+      </div>
+    </div>
+  </fieldset>`;
+  const dom=setup('',false,settings);
+  const w=dom.window,d=w.document,form=d.querySelector('[data-product-config-form]');
+  try{
+    const {topUpAllowed,topUpFeesEnabled,topUpApplicationFee,topUpProcessingFee,topUpInsuranceFee,topUpPercentageBasis}=form.elements;
+    const data=()=>new w.FormData(form);
+    assert.equal(d.querySelector('[data-top-up-fee-choices]').hidden,true);
+    topUpFeesEnabled.click();topUpApplicationFee.click();
+    assert.equal(topUpPercentageBasis.disabled,true);
+    topUpProcessingFee.click();topUpInsuranceFee.click();
+    assert.equal(data().get('topUpPercentageBasis'),'ADDITIONAL_AMOUNT');
+    topUpPercentageBasis.value='COMBINED_NEW_PRINCIPAL';
+    topUpProcessingFee.click();
+    assert.equal(data().get('topUpApplicationFee'),'true');
+    assert.equal(data().get('topUpInsuranceFee'),'true');
+    assert.equal(data().has('topUpProcessingFee'),false);
+    assert.equal(data().get('topUpPercentageBasis'),'COMBINED_NEW_PRINCIPAL');
+    topUpAllowed.click();
+    assert.equal(d.querySelector('[data-top-up-fees-toggle]').hidden,true);
+    assert.equal(data().has('topUpFeesEnabled'),false);
+    assert.equal(data().has('topUpInsuranceFee'),false);
+    assert.equal(data().has('topUpPercentageBasis'),false);
+    topUpAllowed.click();
+    assert.equal(data().get('topUpInsuranceFee'),'true');
+    assert.equal(data().get('topUpPercentageBasis'),'COMBINED_NEW_PRINCIPAL');
+  }finally{w.close();}
+});
+
 test('workflow guarantor count belongs to the product save, retains its bounds and reveals errors from another tab',()=>{
   const dom=setup(),w=dom.window,d=w.document;try{
     const product=d.querySelector('[data-product-config-form]'),approval=d.querySelector('[data-product-approval-form]'),count=product.elements.guarantorsRequired;
