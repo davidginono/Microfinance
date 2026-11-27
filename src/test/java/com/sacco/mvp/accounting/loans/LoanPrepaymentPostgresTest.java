@@ -44,17 +44,25 @@ class LoanPrepaymentPostgresTest {
         assertThat(finalInstalment.remainingPrincipal()).isEqualByComparingTo("100.00");
         assertThat(finalInstalment.remainingInterest()).isEqualByComparingTo("12.00");
         assertThat(finalInstalment.remainingTotal()).isEqualByComparingTo("112.00");
-        assertThat(page.history().rows()).anySatisfy(movement->{
-            assertThat(movement.posting().id()).isEqualTo(post.id());
-            assertThat(movement.posting().principal()).isEqualByComparingTo("400.00");
-            assertThat(movement.posting().interest()).isEqualByComparingTo("10.00");
-            assertThat(movement.outstandingTotal()).isEqualByComparingTo("618.00");
+        assertThat(page.repaymentSchedule().rows()).extracting(row->row.kind())
+            .containsExactly("DISBURSEMENT","PAYMENT","SCHEDULED","SCHEDULED");
+        assertThat(page.repaymentSchedule().rows().get(1)).satisfies(movement->{
+            assertThat(movement.postingId()).isEqualTo(post.id());
+            assertThat(movement.principal()).isEqualByComparingTo("400.00");
+            assertThat(movement.interest()).isEqualByComparingTo("10.00");
+            assertThat(movement.remainingTotal()).isEqualByComparingTo("618.00");
+        });
+        assertThat(page.repaymentSchedule().rows().getLast()).satisfies(row->{
+            assertThat(row.amount()).isEqualByComparingTo("520.00");
+            assertThat(row.remainingTotal()).isEqualByComparingTo("112.00");
         });
         var request=new MockHttpServletRequest("GET","/finance/loan-records/"+loan);
-        request.setParameter("tableSort[accounting-loans-details-1]","totalBalance");
+        request.setParameter("tableSort[loan-repayment-schedule]","remainingTotal");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
         try {
-            assertThat(f.service.detailPage(f.actor,loan,0).history().rows().getFirst().posting().id()).isEqualTo(post.id());
+            var sorted=f.service.detailPage(f.actor,loan,0).repaymentSchedule().rows();
+            assertThat(sorted.stream().map(row->row.remainingTotal()).toList()).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(m("112.00"),m("506.00"),m("618.00"),m("1040.00"));
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }

@@ -662,24 +662,7 @@ public class LoanRecordingRepository {
     }
     public Optional<Posting> loanOpening(AppUserPrincipal a,UUID loan){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.kind='DISBURSEMENT' and p.state='POSTED' order by p.recorded_at,p.id limit 1",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId()).stream().findFirst();}
     public List<Posting> loanPosts(AppUserPrincipal a,UUID loan,int limit,int offset){return jdbc.query(POSTS+" where p.loan_id=? and p.sacco_id=? and p.station_id=? and p.state='POSTED' order by "+historyOrder()+" limit ? offset ?",(org.springframework.jdbc.core.RowMapper<Posting>) this::posting,loan,a.getSaccoId(),a.getStationId(),limit,offset);}
-    public List<StatementMovement> loanHistory(AppUserPrincipal actor, UUID loan, int limit, int offset) {
-        var columns = Map.of("date","p.effective_date","reference","p.display_reference","kind","p.kind",
-            "amount","p.cash_amount","principal","p.principal_amount","interest","p.interest_amount",
-            "balance","p.principal_balance","interestBalance","balance.outstanding_interest",
-            "totalBalance","p.principal_balance+balance.outstanding_interest");
-        String order = com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-details-1",columns,"p.id","p.recorded_at,p.id");
-        return postsWithInterestBalance(actor,loan,limit,offset,order);
-    }
-    public List<StatementMovement> statementPosts(AppUserPrincipal actor, UUID loan, int limit, int offset) {
-        return postsWithInterestBalance(actor,loan,limit,offset,"""
-            p.recorded_at,case p.kind when 'CHARGE_ASSESS' then 0 when 'DISBURSEMENT' then 1 else 2 end,
-            b.sequence nulls last,p.id
-            """);
-    }
-    private List<StatementMovement> postsWithInterestBalance(AppUserPrincipal actor, UUID loan, int limit, int offset, String order) {
-        var parameters = Map.of("loan",loan,"institution",actor.getSaccoId(),"branch",actor.getStationId(),
-            "limit",limit,"offset",offset);
-        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query("""
+    private static final String POSTED_LOAN_MOVEMENTS = """
             with scoped_ledger as (
                 select loan_application_id,sacco_id,station_id from loan_ledgers
                 where loan_application_id=:loan and sacco_id=:institution and station_id=:branch
@@ -701,8 +684,8 @@ public class LoanRecordingRepository {
             ), running as (
                 select transaction_id,sequence,sum(reduction) over (order by sequence rows unbounded preceding) as interest_reduced
                 from interest_movements
-            )
-            select p.*, balance.outstanding_interest
+            ), posted as (
+            select p.*, b.sequence as movement_sequence, balance.outstanding_interest
             from (
             """+POSTS+"""
                 where p.loan_id=:loan and p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
@@ -716,9 +699,52 @@ public class LoanRecordingRepository {
                     when b.interest_reduced between 0 and c.opening_interest then c.opening_interest-b.interest_reduced
                 end as outstanding_interest
             ) balance
-            order by
-            """+order+" limit :limit offset :offset",parameters,
+            )
+            """;
+
+    public List<StatementMovement> statementPosts(AppUserPrincipal actor, UUID loan, int limit, int offset) {
+        var parameters = Map.of("loan",loan,"institution",actor.getSaccoId(),"branch",actor.getStationId(),
+            "limit",limit,"offset",offset);
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query(POSTED_LOAN_MOVEMENTS+"""
+            select * from posted p
+            order by p.recorded_at,case p.kind when 'CHARGE_ASSESS' then 0 when 'DISBURSEMENT' then 1 else 2 end,
+                p.movement_sequence nulls last,p.id
+            limit :limit offset :offset
+            """,parameters,
             (row,n)->new StatementMovement(posting(row,n),row.getBigDecimal("outstanding_interest")));
+    }
+
+    public List<RepaymentScheduleRow> repaymentSchedule(AppUserPrincipal actor,UUID loan,String plan,int limit,int offset) {
+        var columns=Map.ofEntries(Map.entry("number","number"),Map.entry("date","date"),Map.entry("kind","kind"),
+            Map.entry("reference","reference"),Map.entry("beginning","beginning_balance"),Map.entry("payment","amount"),
+            Map.entry("principal","principal"),Map.entry("interest","interest"),Map.entry("ending","ending_balance"),
+            Map.entry("remainingPrincipal","remaining_principal"),Map.entry("remainingInterest","remaining_interest"),
+            Map.entry("remainingTotal","remaining_total"));
+        String tie="number nulls last,recorded_at,posting_id";
+        String order=com.sacco.mvp.support.ResourceTableSort.order("loan-repayment-schedule",columns,tie,"date nulls last,"+tie);
+        var parameters=Map.of("loan",loan,"institution",actor.getSaccoId(),"branch",actor.getStationId(),
+            "plan",plan,"limit",limit,"offset",offset);
+        return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc).query(POSTED_LOAN_MOVEMENTS+"""
+            , schedule_rows as (
+                select s.number,s.date,'SCHEDULED' as kind,null::uuid as posting_id,null::text as reference,false as reversed,
+                    s.beginning_balance,s.amount,s.principal,s.interest,s.ending_balance,s.remaining_principal,s.remaining_interest,
+                    null::timestamptz as recorded_at
+                from jsonb_to_recordset(cast(:plan as jsonb)) as s(number int,date date,beginning_balance numeric,amount numeric,
+                    principal numeric,interest numeric,ending_balance numeric,remaining_principal numeric,remaining_interest numeric)
+                union all
+                select null,p.effective_date,p.kind,p.id,p.display_reference,p.reversed_by is not null,
+                    null,p.cash_amount,p.principal_amount,p.interest_amount,null,p.principal_balance,p.outstanding_interest,p.recorded_at
+                from posted p
+            )
+            select *, remaining_principal+remaining_interest as remaining_total
+            from schedule_rows
+            order by
+            """+order+" limit :limit offset :offset",parameters,(row,n)->new RepaymentScheduleRow(
+                row.getObject("number",Integer.class),row.getObject("date",LocalDate.class),row.getString("kind"),
+                row.getObject("posting_id",UUID.class),row.getString("reference"),row.getBoolean("reversed"),
+                row.getBigDecimal("beginning_balance"),row.getBigDecimal("amount"),row.getBigDecimal("principal"),
+                row.getBigDecimal("interest"),row.getBigDecimal("ending_balance"),row.getBigDecimal("remaining_principal"),
+                row.getBigDecimal("remaining_interest"),row.getBigDecimal("remaining_total")));
     }
     public List<Posting> clientPosts(AppUserPrincipal a, UUID client, MovementFilter filter, int limit, int offset) {
         return jdbc.query(POSTS+"""
@@ -732,8 +758,7 @@ public class LoanRecordingRepository {
     }
     private String historyOrder() {
         var columns=Map.of("date","p.effective_date","loan","a.loan_id","product","r.product_name","reference","display_reference","kind","p.kind","amount","cash_amount","principal","p.principal_amount","interest","p.interest_amount","balance","p.principal_balance");
-        String order=com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-details-1",columns,"p.id","p.recorded_at,p.id");
-        return com.sacco.mvp.support.ResourceTableSort.order("client-statement-movements",columns,"p.id",order);
+        return com.sacco.mvp.support.ResourceTableSort.order("client-statement-movements",columns,"p.id","p.recorded_at,p.id");
     }
     private String postWhere(){return """
         where p.sacco_id=? and p.station_id=? and (p.kind=? or (?='PAYMENT' and p.kind='REVERSAL') or (?='DISBURSEMENT' and p.kind='FUNDING_UNDO')) and p.state='POSTED'

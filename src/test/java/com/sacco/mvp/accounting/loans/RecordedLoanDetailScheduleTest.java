@@ -70,7 +70,7 @@ class RecordedLoanDetailScheduleTest {
         var loan=fixture(true);
         var detail=service.detail(actor,loan.getId());
         assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,today.plusMonths(1),money("1000.00"),money("17.03"),money("1017.03"),money("1017.03"),money("0.00")));
-        when(records.loanHistory(actor,loan.getId(),26,0)).thenReturn(List.of());
+        when(records.repaymentSchedule(eq(actor),eq(loan.getId()),anyString(),eq(26),eq(0))).thenReturn(List.of());
         assertThat(service.detailPage(actor,loan.getId(),0).detail().schedule()).isEqualTo(detail.schedule());
         verify(repayments,never()).schedule(loan.getId(),actor);
         assertThat(detail.firstPaymentDate()).isEqualTo(today.plusMonths(1));

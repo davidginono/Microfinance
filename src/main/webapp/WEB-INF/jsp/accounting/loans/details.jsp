@@ -47,62 +47,19 @@
 <%@ include file="recording-application-details.jspf" %>
 <section class="accounting-section erp-detail-card"><h2><spring:message code="recording.balances" /> (TZS)</h2><dl class="erp-detail-facts"><div><dt><spring:message code="recording.outstandingPrincipal" /></dt><dd><fmt:formatNumber value="${detail.loan.outstandingPrincipal}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.dueInterest" /></dt><dd><fmt:formatNumber value="${detail.loan.dueInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><c:if test="${detail.loan.accruedInterest gt detail.loan.dueInterest}"><div><dt><spring:message code="prepayment.accruedUnpaid" /></dt><dd><fmt:formatNumber value="${detail.loan.accruedInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div></c:if><div><dt><spring:message code="recording.arrears" /></dt><dd><fmt:formatNumber value="${detail.loan.arrears}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.futureInterest" /></dt><dd><fmt:formatNumber value="${detail.loan.futureInterest}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.principalPaid" /></dt><dd><fmt:formatNumber value="${detail.loan.principalPaid}" minFractionDigits="2" maxFractionDigits="2" /></dd></div><div><dt><spring:message code="recording.interestPaid" /></dt><dd><fmt:formatNumber value="${detail.loan.interestPaid}" minFractionDigits="2" maxFractionDigits="2" /></dd></div></dl><p><spring:message code="recording.balanceHelp" /></p></section>
 <section class="accounting-section erp-detail-card"><h2><spring:message code="recording.supporting" /></h2><dl class="erp-detail-facts"><div><dt><spring:message code="recording.business" /></dt><dd><c:out value="${detail.business}" /></dd></div><div><dt><spring:message code="recording.income" /></dt><dd><c:out value="${detail.income}" default="—" /></dd></div><div><dt><spring:message code="recording.otherDebt" /></dt><dd><c:out value="${detail.otherDebt}" default="—" /></dd></div><c:if test="${not empty detail.guarantors}"><div><dt><spring:message code="recording.guarantorNotes" /></dt><dd><c:out value="${detail.guarantors}" /></dd></div></c:if><div><dt><spring:message code="recording.collateral" /></dt><dd><c:out value="${detail.collateral}" /></dd></div><div><dt><spring:message code="voucher.evidence" /></dt><dd><c:out value="${detail.evidence}" /></dd></div><div><dt><spring:message code="voucher.description" /></dt><dd><c:out value="${detail.notes}" /></dd></div></dl><p><spring:message code="recording.source.${detail.informationSource}" /></p></section>
-<section data-resource-table="accounting-loans-details-1" data-table-page-param="historyPage" class="erp-table-wrap" data-aws-table-region>
-  <div class="app-table-titlebar"><h2 id="posted-transactions-title"><spring:message code="recording.history" /></h2></div>
-  <div class="erp-table-scroll" role="region" tabindex="0" aria-labelledby="posted-transactions-title">
-    <table class="erp-table">
-      <thead><tr>
-        <th scope="col" data-table-order="date"><spring:message code="voucher.date" /></th>
-        <th scope="col" data-table-order="reference"><spring:message code="voucher.reference" /></th>
-        <th scope="col" data-table-order="kind"><spring:message code="voucher.type" /></th>
-        <th scope="col" data-table-order="amount"><spring:message code="voucher.total" /> (TZS)</th>
-        <th scope="col" data-table-order="principal"><spring:message code="recording.principal" /> (TZS)</th>
-        <th scope="col" data-table-order="interest"><spring:message code="recording.interest" /> (TZS)</th>
-        <th scope="col" data-table-order="balance"><spring:message code="recording.remainingPrincipal" /> (TZS)</th>
-        <th scope="col" data-table-order="interestBalance"><spring:message code="recording.remainingInterest" /> (TZS)</th>
-        <th scope="col" data-table-order="totalBalance"><spring:message code="recording.remainingTotal" /> (TZS)</th>
-      </tr></thead>
-      <tbody>
-        <c:forEach items="${history.rows}" var="movement">
-          <c:set var="p" value="${movement.posting}" />
-          <tr>
-            <td>${appTime:display(p.date)}</td>
-            <td><a class="resource-table-id-link" href="<c:url value='/finance/loan-postings/${p.id}' />"><c:out value="${p.reference}" /></a></td>
-            <td><spring:message code="recording.document.${p.kind}" /><c:if test="${not empty p.reversedBy}"> · <span data-resource-status="REVERSED"><spring:message code="voucher.status.REVERSED" /></span></c:if></td>
-            <td><fmt:formatNumber value="${p.amount}" minFractionDigits="2" maxFractionDigits="2" /></td>
-            <td><fmt:formatNumber value="${p.principal}" minFractionDigits="2" maxFractionDigits="2" /></td>
-            <td><fmt:formatNumber value="${p.interest}" minFractionDigits="2" maxFractionDigits="2" /></td>
-            <c:forEach items="${[p.principalBalance, movement.outstandingInterest, movement.outstandingTotal()]}" var="balance">
-              <td><c:choose>
-                <c:when test="${balance ne null}"><fmt:formatNumber value="${balance}" minFractionDigits="2" maxFractionDigits="2" /></c:when>
-                <c:otherwise><span role="img" aria-label="<spring:message code='common.notAvailable' />">&mdash;</span></c:otherwise>
-              </c:choose></td>
-            </c:forEach>
-          </tr>
-        </c:forEach>
-        <c:if test="${empty history.rows}"><tr><td colspan="9" class="erp-table-empty"><spring:message code="recording.statement.empty" /></td></tr></c:if>
-      </tbody>
-    </table>
-  </div>
-  <div data-table-pagination data-page="${history.page}" data-table-for="accounting-loans-details-1" class="voucher-pagination">
-    <spring:message code="voucher.page" /> ${history.page+1}
-    <div class="accounting-actions">
-      <c:if test="${history.page>0}"><a data-page-direction="previous" class="app-btn btn-neutral" href="?historyPage=${history.page-1}&amp;schedulePage=${schedulePage}"><spring:message code="common.previous" /></a></c:if>
-      <c:if test="${history.hasNext}"><a data-page-direction="next" class="app-btn btn-neutral" href="?historyPage=${history.page+1}&amp;schedulePage=${schedulePage}"><spring:message code="common.next" /></a></c:if>
-    </div>
-  </div>
-</section>
 <c:set var="datedSchedule" value="${not empty detail.firstPaymentDate}" />
-<section data-resource-table="accounting-loans-details-2" data-table-page-param="schedulePage" class="erp-table-wrap" data-aws-table-region>
+<section data-resource-table="loan-repayment-schedule" data-table-page-param="schedulePage" class="erp-table-wrap" data-aws-table-region>
   <div class="app-table-titlebar"><h2 id="repayment-schedule-title"><spring:message code="${datedSchedule?'recording.schedule':'repayment.estimatedSchedule'}" /></h2></div>
-  <c:if test="${not datedSchedule}"><p class="voucher-help px-4"><spring:message code="recording.beforeDisbursement" /></p></c:if>
+  <p class="voucher-help px-4"><spring:message code="${datedSchedule?'recording.schedule.balanceScope':'recording.beforeDisbursement'}" /></p>
   <div class="erp-table-scroll" role="region" tabindex="0" aria-labelledby="repayment-schedule-title">
     <table class="erp-table">
       <thead><tr>
         <th scope="col" data-table-order="number">#</th>
-        <th scope="col" data-table-order="due"><spring:message code="recording.dueDate" /></th>
+        <th scope="col" data-table-order="date"><spring:message code="voucher.date" /></th>
+        <th scope="col" data-table-order="kind"><spring:message code="voucher.type" /></th>
+        <th scope="col" data-table-order="reference"><spring:message code="voucher.reference" /></th>
         <th scope="col" data-table-order="beginning"><spring:message code="repayment.beginningBalance" /> (TZS)</th>
-        <th scope="col" data-table-order="payment"><spring:message code="repayment.scheduledPayment" /> (TZS)</th>
+        <th scope="col" data-table-order="payment"><spring:message code="voucher.total" /> (TZS)</th>
         <th scope="col" data-table-order="principal"><spring:message code="recording.principal" /> (TZS)</th>
         <th scope="col" data-table-order="interest"><spring:message code="recording.interest" /> (TZS)</th>
         <th scope="col" data-table-order="ending"><spring:message code="repayment.endingBalance" /> (TZS)</th>
@@ -113,35 +70,50 @@
         </c:if>
       </tr></thead>
       <tbody>
-        <c:forEach items="${scheduleRows}" var="s"><tr>
-          <td><c:out value="${s.number}" /></td>
-          <td><c:choose>
-            <c:when test="${empty s.date}"><spring:message code="repayment.period.${detail.frequency}" arguments="${s.number}" /></c:when>
-            <c:otherwise><c:out value="${appTime:display(s.date)}" /></c:otherwise>
-          </c:choose></td>
-          <td><fmt:formatNumber value="${s.beginningBalance}" minFractionDigits="2" maxFractionDigits="2" /></td>
-          <td><fmt:formatNumber value="${s.amount}" minFractionDigits="2" maxFractionDigits="2" /></td>
-          <td><fmt:formatNumber value="${s.principal}" minFractionDigits="2" maxFractionDigits="2" /></td>
-          <td><fmt:formatNumber value="${s.interest}" minFractionDigits="2" maxFractionDigits="2" /></td>
-          <td><fmt:formatNumber value="${s.endingBalance}" minFractionDigits="2" maxFractionDigits="2" /></td>
-          <c:if test="${datedSchedule}">
-            <c:forEach items="${[s.remainingPrincipal, s.remainingInterest, s.remainingTotal()]}" var="balance">
+        <c:forEach items="${repaymentSchedule.rows}" var="row">
+          <tr data-repayment-row="${empty row.postingId?'scheduled':'posted'}">
+            <td><c:out value="${row.number}" default="—" /></td>
+            <td><c:choose>
+              <c:when test="${empty row.date}"><spring:message code="repayment.period.${detail.frequency}" arguments="${row.number}" /></c:when>
+              <c:otherwise><c:out value="${appTime:display(row.date)}" /></c:otherwise>
+            </c:choose></td>
+            <td>
+              <c:choose>
+                <c:when test="${row.kind=='SCHEDULED'}"><spring:message code="recording.schedule.instalment" /></c:when>
+                <c:when test="${row.kind=='PAYMENT'}"><spring:message code="recording.schedule.postedPayment" /></c:when>
+                <c:otherwise><spring:message code="recording.document.${row.kind}" /></c:otherwise>
+              </c:choose>
+              <c:if test="${row.reversed}"> · <span data-resource-status="REVERSED"><spring:message code="voucher.status.REVERSED" /></span></c:if>
+            </td>
+            <td><c:choose>
+              <c:when test="${not empty row.postingId}"><a class="resource-table-id-link" href="<c:url value='/finance/loan-postings/${row.postingId}' />"><c:out value="${row.reference}" /></a></c:when>
+              <c:otherwise>&mdash;</c:otherwise>
+            </c:choose></td>
+            <c:forEach items="${[row.beginningBalance, row.amount, row.principal, row.interest, row.endingBalance]}" var="amount">
               <td><c:choose>
-                <c:when test="${balance ne null}"><fmt:formatNumber value="${balance}" minFractionDigits="2" maxFractionDigits="2" /></c:when>
-                <c:otherwise><span role="img" aria-label="<spring:message code='common.notAvailable' />">&mdash;</span></c:otherwise>
+                <c:when test="${amount ne null}"><fmt:formatNumber value="${amount}" minFractionDigits="2" maxFractionDigits="2" /></c:when>
+                <c:otherwise>&mdash;</c:otherwise>
               </c:choose></td>
             </c:forEach>
-          </c:if>
-        </tr></c:forEach>
-        <c:if test="${empty scheduleRows}"><tr><td colspan="${datedSchedule?10:7}" class="erp-table-empty"><spring:message code="recording.scheduleEmptyPage" /></td></tr></c:if>
+            <c:if test="${datedSchedule}">
+              <c:forEach items="${[row.remainingPrincipal, row.remainingInterest, row.remainingTotal]}" var="balance">
+                <td><c:choose>
+                  <c:when test="${balance ne null}"><fmt:formatNumber value="${balance}" minFractionDigits="2" maxFractionDigits="2" /></c:when>
+                  <c:otherwise><span role="img" aria-label="<spring:message code='common.notAvailable' />">&mdash;</span></c:otherwise>
+                </c:choose></td>
+              </c:forEach>
+            </c:if>
+          </tr>
+        </c:forEach>
+        <c:if test="${empty repaymentSchedule.rows}"><tr><td colspan="${datedSchedule?12:9}" class="erp-table-empty"><spring:message code="recording.scheduleEmptyPage" /></td></tr></c:if>
       </tbody>
     </table>
   </div>
-  <div data-table-pagination data-page="${schedulePage}" data-table-for="accounting-loans-details-2" class="voucher-pagination">
-    <spring:message code="voucher.page" /> ${schedulePage+1}
+  <div data-table-pagination data-page="${repaymentSchedule.page}" data-table-for="loan-repayment-schedule" class="voucher-pagination">
+    <spring:message code="voucher.page" /> ${repaymentSchedule.page+1}
     <div class="accounting-actions">
-      <c:if test="${schedulePage>0}"><a data-page-direction="previous" class="app-btn btn-neutral" href="?schedulePage=${schedulePage-1}&amp;historyPage=${history.page}"><spring:message code="common.previous" /></a></c:if>
-      <c:if test="${scheduleHasNext}"><a data-page-direction="next" class="app-btn btn-neutral" href="?schedulePage=${schedulePage+1}&amp;historyPage=${history.page}"><spring:message code="common.next" /></a></c:if>
+      <c:if test="${repaymentSchedule.page>0}"><a data-page-direction="previous" class="app-btn btn-neutral" href="?schedulePage=${repaymentSchedule.page-1}"><spring:message code="common.previous" /></a></c:if>
+      <c:if test="${repaymentSchedule.hasNext}"><a data-page-direction="next" class="app-btn btn-neutral" href="?schedulePage=${repaymentSchedule.page+1}"><spring:message code="common.next" /></a></c:if>
     </div>
   </div>
 </section>

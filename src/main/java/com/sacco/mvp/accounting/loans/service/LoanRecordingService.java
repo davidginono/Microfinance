@@ -792,11 +792,19 @@ public class LoanRecordingService {
     }
 
     @Transactional(readOnly=true,isolation=Isolation.REPEATABLE_READ)
-    public DetailPage detailPage(AppUserPrincipal a,UUID id,int historyPage){
-        check(historyPage>=0 && historyPage<=10000,"filter");
+    public DetailPage detailPage(AppUserPrincipal a,UUID id,int schedulePage){
+        check(schedulePage>=0 && schedulePage<=10000,"filter");
         var detail=detail(a,id,true);
-        var rows=records.loanHistory(a,id,26,historyPage*25);
-        return new DetailPage(detail,new Page<>(rows.stream().limit(25).toList(),historyPage,rows.size()>25));
+        var plan=json.createArrayNode();
+        for(var row:detail.schedule()){
+            plan.addObject().put("number",row.number())
+                .put("date",row.date()==null?null:row.date().toString())
+                .put("beginning_balance",row.beginningBalance()).put("amount",row.amount())
+                .put("principal",row.principal()).put("interest",row.interest()).put("ending_balance",row.endingBalance())
+                .put("remaining_principal",row.remainingPrincipal()).put("remaining_interest",row.remainingInterest());
+        }
+        var rows=records.repaymentSchedule(a,id,write(plan),26,schedulePage*25);
+        return new DetailPage(detail,new Page<>(rows.stream().limit(25).toList(),schedulePage,rows.size()>25));
     }
 
     private Detail detail(AppUserPrincipal a,UUID id,boolean includeRemainingSchedule){

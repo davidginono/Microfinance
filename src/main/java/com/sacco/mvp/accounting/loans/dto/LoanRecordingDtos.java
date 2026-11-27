@@ -191,11 +191,7 @@ public final class LoanRecordingDtos {
         public BigDecimal charges(){return Set.of("PAYMENT","REVERSAL").contains(kind)?amount.subtract(principal).subtract(interest):new BigDecimal("0.00");}
         public BigDecimal getCharges(){return charges();}
     }
-    public record StatementMovement(Posting posting, BigDecimal outstandingInterest) {
-        public BigDecimal outstandingTotal() {
-            return posting.principalBalance()==null || outstandingInterest==null ? null : posting.principalBalance().add(outstandingInterest);
-        }
-    }
+    public record StatementMovement(Posting posting, BigDecimal outstandingInterest) {}
     public record Detail(LoanRow loan, String institution, String branch, String recordedBy, OffsetDateTime recordedAt,
         String purpose, String business, BigDecimal income, BigDecimal otherDebt,
         String informationSource, String guarantors, String collateral, String evidence, String notes,
@@ -204,7 +200,11 @@ public final class LoanRecordingDtos {
         String tenureUnit,int tenureValue,String interestBasis,String loanMode,String interestEntry) {
         public Detail(LoanRow loan,String institution,String branch,String recordedBy,OffsetDateTime recordedAt,String purpose,String business,BigDecimal income,BigDecimal otherDebt,String informationSource,String guarantors,String collateral,String evidence,String notes,BigDecimal rate,String method,String frequency,int months,LocalDate firstPaymentDate,BigDecimal installment,BigDecimal contractualInterest,List<ScheduleRow> schedule){this(loan,institution,branch,recordedBy,recordedAt,purpose,business,income,otherDebt,informationSource,guarantors,collateral,evidence,notes,rate,method,frequency,months,firstPaymentDate,installment,contractualInterest,schedule,"MONTHS",months,"ANNUAL","CONFIGURED","PERCENTAGE");}
     }
-    public record DetailPage(Detail detail, Page<StatementMovement> history) {}
+    public record DetailPage(Detail detail, Page<RepaymentScheduleRow> repaymentSchedule) {}
+    public record RepaymentScheduleRow(Integer number, LocalDate date, String kind, UUID postingId, String reference,
+                                      boolean reversed, BigDecimal beginningBalance, BigDecimal amount, BigDecimal principal,
+                                      BigDecimal interest, BigDecimal endingBalance, BigDecimal remainingPrincipal,
+                                      BigDecimal remainingInterest, BigDecimal remainingTotal) {}
     public record ScheduleRow(int number, LocalDate date, BigDecimal principal, BigDecimal interest, BigDecimal amount,
                               BigDecimal beginningBalance, BigDecimal endingBalance,
                               BigDecimal remainingPrincipal, BigDecimal remainingInterest) {

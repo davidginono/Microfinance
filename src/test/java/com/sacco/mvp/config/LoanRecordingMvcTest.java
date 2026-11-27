@@ -273,21 +273,15 @@ class LoanRecordingMvcTest {
         verify(approvals).review(actor,id);
     }
 
-    @Test void loanDetailsSortRemainingAmountsBeforePaginationAndLoadTheLoansPostedHistory() throws Exception {
+    @Test void loanDetailsShowsScheduledAndPostedRowsOnOnePage() throws Exception {
         var id=UUID.randomUUID();
         var detail=mock(Detail.class);
-        var history=new Page<>(List.of(new StatementMovement(mock(Posting.class),new BigDecimal("12.00"))),1,false);
-        var fullAmount=new BigDecimal("102.00");
-        var rows=java.util.stream.IntStream.rangeClosed(1,26).mapToObj(number->new ScheduleRow(
-            number,null,new BigDecimal("100.00"),new BigDecimal("2.00"),fullAmount,fullAmount,BigDecimal.ZERO,
-            number==26?BigDecimal.ZERO:new BigDecimal("100.00"),new BigDecimal("1.00"))).toList();
-        when(service.detailPage(actor,id,1)).thenReturn(new DetailPage(detail,history));
-        when(detail.schedule()).thenReturn(rows);
-        mvc.perform(get("/finance/loan-records/"+id).with(user(actor))
-                .param("tableSort[accounting-loans-details-2]","remainingTotal").param("historyPage","1"))
-            .andExpect(status().isOk()).andExpect(model().attribute("scheduleHasNext",true)).andExpect(model().attribute("history",history))
-            .andExpect(model().attribute("scheduleRows",org.hamcrest.Matchers.contains(
-                java.util.stream.Stream.concat(java.util.stream.Stream.of(rows.getLast()),rows.stream().limit(24)).toArray())));
+        var scheduled=mock(RepaymentScheduleRow.class);
+        var payment=mock(RepaymentScheduleRow.class);
+        var schedule=new Page<>(List.of(scheduled,payment),1,true);
+        when(service.detailPage(actor,id,1)).thenReturn(new DetailPage(detail,schedule));
+        mvc.perform(get("/finance/loan-records/"+id).with(user(actor)).param("schedulePage","1"))
+            .andExpect(status().isOk()).andExpect(model().attribute("repaymentSchedule",schedule));
         verify(service).detailPage(actor,id,1);
     }
     @Test void topUpPreviewIsScopedUncacheableAndPreservesDecimalStrings() throws Exception {

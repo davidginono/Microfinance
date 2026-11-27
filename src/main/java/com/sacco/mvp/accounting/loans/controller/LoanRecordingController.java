@@ -7,7 +7,6 @@ import com.sacco.mvp.grouplending.service.SimpleGroupLoanService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.SaccoLogoStorageService;
-import com.sacco.mvp.support.ResourceTableSort;
 import com.sacco.mvp.accounting.reports.VoucherPdfDocument;
 import com.sacco.mvp.accounting.reports.LoanAmortizationPdfDocument;
 import com.sacco.mvp.accounting.reports.VoucherPdfDocument.Field;
@@ -303,11 +302,10 @@ public class LoanRecordingController {
     }
     @GetMapping("/loan-records/{id}")
     public String detail(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,
-                         @RequestParam(defaultValue="0") int historyPage,@RequestParam(defaultValue="0") int schedulePage,Model model){
-        if(schedulePage<0 || schedulePage>24)throw new IllegalArgumentException("recording.error.filter");
+                         @RequestParam(defaultValue="0") int schedulePage,Model model){
         model.addAttribute("supportingDetails",service.supportingDetails(a,id));
         model.addAttribute("evidenceGuarantorLabels",service.supportingGuarantors(a,id));
-        var page=service.detailPage(a,id,historyPage);
+        var page=service.detailPage(a,id,schedulePage);
         var detail=page.detail();
         model.addAttribute("detail",detail);
         model.addAttribute("canEdit",service.editable(a,id));
@@ -328,24 +326,7 @@ public class LoanRecordingController {
             model.addAttribute("topUpQuote",service.recordedTopUpQuote(a,id).orElse(null));
         }catch(IllegalArgumentException e){model.addAttribute("topUpError",error(e));}
         model.addAttribute("attachments",service.attachments(a,id));
-        model.addAttribute("history",page.history());
-
-        var moneyOrder=Comparator.nullsLast(Comparator.<BigDecimal>naturalOrder());
-        var rowNumber=Comparator.comparingInt(ScheduleRow::number);
-        var sortedSchedule=ResourceTableSort.rows("accounting-loans-details-2",detail.schedule(),Map.of(
-            "number",rowNumber,
-            "due",Comparator.comparing(ScheduleRow::date,Comparator.nullsLast(Comparator.naturalOrder())),
-            "beginning",Comparator.comparing(ScheduleRow::beginningBalance,moneyOrder),
-            "payment",Comparator.comparing(ScheduleRow::amount,moneyOrder),
-            "principal",Comparator.comparing(ScheduleRow::principal,moneyOrder),
-            "interest",Comparator.comparing(ScheduleRow::interest,moneyOrder),
-            "ending",Comparator.comparing(ScheduleRow::endingBalance,moneyOrder),
-            "remainingPrincipal",Comparator.comparing(ScheduleRow::remainingPrincipal,moneyOrder),
-            "remainingInterest",Comparator.comparing(ScheduleRow::remainingInterest,moneyOrder),
-            "remainingTotal",Comparator.comparing(ScheduleRow::remainingTotal,moneyOrder)),rowNumber);
-        model.addAttribute("schedulePage",schedulePage);
-        model.addAttribute("scheduleRows",sortedSchedule.stream().skip(schedulePage*25L).limit(25).toList());
-        model.addAttribute("scheduleHasNext",sortedSchedule.size()>(schedulePage+1)*25);
+        model.addAttribute("repaymentSchedule",page.repaymentSchedule());
         return "accounting/loans/details";
     }
     @GetMapping({"/loan-disbursements/new","/loan-repayments/new"}) public String postingForm(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID loanId,jakarta.servlet.http.HttpServletRequest request,Model model) {
