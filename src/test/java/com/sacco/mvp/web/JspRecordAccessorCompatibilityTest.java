@@ -1,5 +1,7 @@
 package com.sacco.mvp.web;
 
+import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Term;
+import com.sacco.mvp.accounting.charges.dto.LoanChargeDtos.Timing;
 import com.sacco.mvp.domain.IncidentStatus;
 import com.sacco.mvp.domain.LoanStatus;
 import com.sacco.mvp.domain.MemberStatus;
@@ -36,6 +38,18 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JspRecordAccessorCompatibilityTest {
+    @Test
+    void loanChargeDetailsResolveTheRateCheckForPopulatedChargeRows() throws IOException {
+        var fragment = Files.readString(Path.of("src/main/webapp/WEB-INF/jsp/accounting/loans/charges-details.jspf"));
+        var rateCheck = Pattern.compile("<c:when test=\"\\$\\{charge\\.([^}]+)}\">").matcher(fragment);
+        assertTrue(rateCheck.find(), "The charge breakdown must distinguish rates from fixed amounts");
+        for (String basis : List.of("FIXED", "PRINCIPAL_RATE", "TOPUP_ADDITIONAL_RATE", "TOPUP_COMBINED_RATE")) {
+            var term = new Term(UUID.randomUUID(), "PROCESSING", basis, new BigDecimal("0.025"),
+                new BigDecimal("25.00"), Timing.SEPARATE, null, null, "", "", "");
+            assertElProperty("charge", term, rateCheck.group(1), !basis.equals("FIXED"));
+        }
+    }
+
     @Test
     void borrowerProfileMessagesExistInBothLanguages() throws IOException {
         var keys=new HashSet<String>(List.of("member.memberNo","group.code","loan.borrowerKind.CLIENT","loan.borrowerKind.JOINT_GROUP","loan.borrowerKind.ORGANIZATION"));
