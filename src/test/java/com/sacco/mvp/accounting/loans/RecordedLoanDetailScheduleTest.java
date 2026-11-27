@@ -34,7 +34,8 @@ class RecordedLoanDetailScheduleTest {
     private final AppUserPrincipal actor=mock(AppUserPrincipal.class);
     private final ObjectMapper json=new ObjectMapper();
     private final com.sacco.mvp.accounting.charges.service.LoanChargeService charges=mock(com.sacco.mvp.accounting.charges.service.LoanChargeService.class);
-    private final LoanRecordingService service=new LoanRecordingService(records,loans,null,null,schedules,null,accounting,null,json,clock,null,null,null,null,null,null,charges,null,null,null,null,null,null);
+    private final LoanRepaymentLedgerService repayments=mock(LoanRepaymentLedgerService.class);
+    private final LoanRecordingService service=new LoanRecordingService(records,loans,null,null,schedules,repayments,accounting,null,json,clock,null,null,null,null,null,null,charges,null,null,null,null,null,null);
     private final LocalDate today=LocalDate.of(2026,10,15);
 
     @Test void exportIsBoundedScopedAndUsesRecordedPaymentHistory()throws Exception {
@@ -69,6 +70,9 @@ class RecordedLoanDetailScheduleTest {
         var loan=fixture(true);
         var detail=service.detail(actor,loan.getId());
         assertThat(detail.schedule()).containsExactly(new ScheduleRow(1,today.plusMonths(1),money("1000.00"),money("17.03"),money("1017.03"),money("1017.03"),money("0.00")));
+        when(records.loanHistory(actor,loan.getId(),26,0)).thenReturn(List.of());
+        assertThat(service.detailPage(actor,loan.getId(),0).detail().schedule()).isEqualTo(detail.schedule());
+        verify(repayments,never()).schedule(loan.getId(),actor);
         assertThat(detail.firstPaymentDate()).isEqualTo(today.plusMonths(1));
         verify(loans,never()).save(any());
     }

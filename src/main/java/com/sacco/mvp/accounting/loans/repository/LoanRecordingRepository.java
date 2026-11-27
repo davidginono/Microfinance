@@ -665,7 +665,8 @@ public class LoanRecordingRepository {
     public List<StatementMovement> loanHistory(AppUserPrincipal actor, UUID loan, int limit, int offset) {
         var columns = Map.of("date","p.effective_date","reference","p.display_reference","kind","p.kind",
             "amount","p.cash_amount","principal","p.principal_amount","interest","p.interest_amount",
-            "balance","p.principal_balance","interestBalance","outstanding_interest");
+            "balance","p.principal_balance","interestBalance","balance.outstanding_interest",
+            "totalBalance","p.principal_balance+balance.outstanding_interest");
         String order = com.sacco.mvp.support.ResourceTableSort.order("accounting-loans-details-1",columns,"p.id","p.recorded_at,p.id");
         return postsWithInterestBalance(actor,loan,limit,offset,order);
     }
@@ -701,17 +702,20 @@ public class LoanRecordingRepository {
                 select transaction_id,sequence,sum(reduction) over (order by sequence rows unbounded preceding) as interest_reduced
                 from interest_movements
             )
-            select p.*, case
-                when c.opening_interest is null then null
-                when p.kind='DISBURSEMENT' then c.opening_interest
-                when p.kind='FUNDING_UNDO' then 0
-                when b.interest_reduced between 0 and c.opening_interest then c.opening_interest-b.interest_reduced
-            end as outstanding_interest
+            select p.*, balance.outstanding_interest
             from (
             """+POSTS+"""
                 where p.loan_id=:loan and p.sacco_id=:institution and p.station_id=:branch and p.state='POSTED'
                     and a.sacco_id=p.sacco_id and a.station_id=p.station_id
             ) p cross join contract c left join running b on b.transaction_id=p.transaction_id
+            cross join lateral (
+                select case
+                    when c.opening_interest is null then null
+                    when p.kind='DISBURSEMENT' then c.opening_interest
+                    when p.kind='FUNDING_UNDO' then 0
+                    when b.interest_reduced between 0 and c.opening_interest then c.opening_interest-b.interest_reduced
+                end as outstanding_interest
+            ) balance
             order by
             """+order+" limit :limit offset :offset",parameters,
             (row,n)->new StatementMovement(posting(row,n),row.getBigDecimal("outstanding_interest")));

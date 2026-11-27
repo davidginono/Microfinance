@@ -1,6 +1,7 @@
 package com.sacco.mvp.config;
 
 import com.sacco.mvp.accounting.loans.controller.LoanRecordingController;
+import com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.*;
 import com.sacco.mvp.accounting.loans.service.*;
 import com.sacco.mvp.domain.*;
 import com.sacco.mvp.security.AppUserPrincipal;
@@ -261,14 +262,33 @@ class LoanRecordingMvcTest {
             .andExpect(status().isForbidden());
     }
     @Test void loanDetailsIncludeTheCurrentStaffReviewEligibility() throws Exception {
-        var id=UUID.randomUUID();var detail=mock(com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.Detail.class);
-        when(service.detail(actor,id)).thenReturn(detail);when(detail.schedule()).thenReturn(List.of());
+        var id=UUID.randomUUID();var detail=mock(Detail.class);
+        when(service.detailPage(actor,id,0)).thenReturn(new DetailPage(detail,new Page<>(List.of(),0,false)));
+        when(detail.schedule()).thenReturn(List.of());
         var approvals=context.getBean(LoanGroupApprovalService.class);reset(approvals);
         var review=new com.sacco.mvp.accounting.loans.dto.LoanRecordingDtos.GroupReview(null,List.of(),List.of(),0,false,false,false);
         when(approvals.review(actor,id)).thenReturn(review);
         mvc.perform(get("/finance/loan-records/"+id).with(user(actor))).andExpect(status().isOk()).andExpect(view().name("accounting/loans/details"))
             .andExpect(model().attribute("groupReview",review)).andExpect(model().attributeExists("reviewRequestKey"));
         verify(approvals).review(actor,id);
+    }
+
+    @Test void loanDetailsSortRemainingAmountsBeforePaginationAndLoadTheLoansPostedHistory() throws Exception {
+        var id=UUID.randomUUID();
+        var detail=mock(Detail.class);
+        var history=new Page<>(List.of(new StatementMovement(mock(Posting.class),new BigDecimal("12.00"))),1,false);
+        var fullAmount=new BigDecimal("102.00");
+        var rows=java.util.stream.IntStream.rangeClosed(1,26).mapToObj(number->new ScheduleRow(
+            number,null,new BigDecimal("100.00"),new BigDecimal("2.00"),fullAmount,fullAmount,BigDecimal.ZERO,
+            number==26?BigDecimal.ZERO:new BigDecimal("100.00"),new BigDecimal("1.00"))).toList();
+        when(service.detailPage(actor,id,1)).thenReturn(new DetailPage(detail,history));
+        when(detail.schedule()).thenReturn(rows);
+        mvc.perform(get("/finance/loan-records/"+id).with(user(actor))
+                .param("tableSort[accounting-loans-details-2]","remainingTotal").param("historyPage","1"))
+            .andExpect(status().isOk()).andExpect(model().attribute("scheduleHasNext",true)).andExpect(model().attribute("history",history))
+            .andExpect(model().attribute("scheduleRows",org.hamcrest.Matchers.contains(
+                java.util.stream.Stream.concat(java.util.stream.Stream.of(rows.getLast()),rows.stream().limit(24)).toArray())));
+        verify(service).detailPage(actor,id,1);
     }
     @Test void topUpPreviewIsScopedUncacheableAndPreservesDecimalStrings() throws Exception {
         var source=UUID.randomUUID();var date=java.time.LocalDate.of(2026,10,8);

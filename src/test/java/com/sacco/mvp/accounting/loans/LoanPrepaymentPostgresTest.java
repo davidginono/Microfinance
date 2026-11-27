@@ -3,6 +3,9 @@ package com.sacco.mvp.accounting.loans;
 import com.sacco.mvp.domain.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
@@ -25,8 +28,38 @@ class LoanPrepaymentPostgresTest {
         var post=f.post(loan,amount,"PREPAY-"+UUID.randomUUID());post.setEffectiveDate(date);return f.service.repay(f.actor,post);
     }
     @Test void partialFlatAdvanceRebatesOnlyUnearnedInterestAndCurrentProjectionsUseTheEffectiveDate(){
-        var loan=loan(InterestMethod.FLAT_RATE);var post=payment(loan,"410.00",PAYMENT);
+        var loan=loan(InterestMethod.FLAT_RATE);
+        var original=f.service.detailPage(f.actor,loan,0).detail().schedule();
+        var post=payment(loan,"410.00",PAYMENT);
         assertThat(post.interest()).isEqualByComparingTo("10.00");assertThat(post.principal()).isEqualByComparingTo("400.00");
+        var page=f.service.detailPage(f.actor,loan,0);
+        var remaining=page.detail().schedule();
+        assertThat(remaining).hasSameSizeAs(original);
+        assertThat(remaining.getFirst().remainingTotal()).isEqualByComparingTo("506.00");
+        var finalInstalment=remaining.getLast();
+        assertThat(finalInstalment.date()).isEqualTo(original.getLast().date());
+        assertThat(finalInstalment.amount()).isEqualByComparingTo("520.00");
+        assertThat(finalInstalment.principal()).isEqualByComparingTo("500.00");
+        assertThat(finalInstalment.interest()).isEqualByComparingTo("20.00");
+        assertThat(finalInstalment.remainingPrincipal()).isEqualByComparingTo("100.00");
+        assertThat(finalInstalment.remainingInterest()).isEqualByComparingTo("12.00");
+        assertThat(finalInstalment.remainingTotal()).isEqualByComparingTo("112.00");
+        assertThat(page.history().rows()).anySatisfy(movement->{
+            assertThat(movement.posting().id()).isEqualTo(post.id());
+            assertThat(movement.posting().principal()).isEqualByComparingTo("400.00");
+            assertThat(movement.posting().interest()).isEqualByComparingTo("10.00");
+            assertThat(movement.outstandingTotal()).isEqualByComparingTo("618.00");
+        });
+        var request=new MockHttpServletRequest("GET","/finance/loan-records/"+loan);
+        request.setParameter("tableSort[accounting-loans-details-1]","totalBalance");
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+        try {
+            assertThat(f.service.detailPage(f.actor,loan,0).history().rows().getFirst().posting().id()).isEqualTo(post.id());
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+        assertThatThrownBy(()->f.service.detailPage(f.operator("B2"),loan,0))
+            .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
         assertThat(f.jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("12.00");
         assertThat(f.ledger.paymentBalance(loan,f.actor,PAYMENT).dueInterest()).isZero();
         assertThat(f.service.detail(f.actor,loan).loan().dueInterest()).isEqualByComparingTo("8.71");
@@ -35,11 +68,19 @@ class LoanPrepaymentPostgresTest {
         assertThat(f.jdbc.queryForObject("select sum(interest) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo("40.00");
     }
     @Test void reducingBalanceAdvanceRecomputesFutureInterestAndAnIndependentReversalRestoresIt(){
-        var loan=loan(InterestMethod.REDUCING_BALANCE);var post=payment(loan,"410.00",PAYMENT);
+        var loan=loan(InterestMethod.REDUCING_BALANCE);
+        var originalSchedule=f.service.detailPage(f.actor,loan,0).detail().schedule();
+        var post=payment(loan,"410.00",PAYMENT);
+        var finalInstalment=f.service.detailPage(f.actor,loan,0).detail().schedule().getLast();
+        assertThat(finalInstalment.amount()).isEqualByComparingTo(originalSchedule.getLast().amount());
+        assertThat(finalInstalment.remainingPrincipal()).isEqualByComparingTo("104.95");
+        assertThat(finalInstalment.remainingInterest()).isEqualByComparingTo("2.10");
+        assertThat(finalInstalment.remainingTotal()).isEqualByComparingTo("107.05");
         var original=f.jdbc.queryForObject("select sum(interest) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan);
         assertThat(original).isGreaterThan(m("20.00"));
         assertThat(f.jdbc.queryForObject("select interest_excluded from loan_ledger_installments where loan_application_id=? and installment_number=2",BigDecimal.class,loan)).isEqualByComparingTo("8.00");
         f.service.reverse(f.operator("B1"),post.id(),UUID.randomUUID(),LoanRecordingPostgresTest.TODAY,"Independent servicing correction");
+        assertThat(f.service.detailPage(f.actor,loan,0).detail().schedule()).isEqualTo(originalSchedule);
         assertThat(f.jdbc.queryForObject("select sum(interest_excluded) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isZero();
         assertThat(f.jdbc.queryForObject("select sum(interest) from loan_ledger_installments where loan_application_id=?",BigDecimal.class,loan)).isEqualByComparingTo(original);
     }

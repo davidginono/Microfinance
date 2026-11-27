@@ -351,6 +351,14 @@ public class LoanRepaymentLedgerService {
     }
 
     @Transactional(readOnly = true)
+    public List<InstallmentRow> schedule(UUID loanId, AppUserPrincipal actor) {
+        readableLedger(loanId,actor);
+        var rows=rows(loanId);
+        var beginning=rows.stream().map(row->row.getPrincipal().add(row.getInterest())).reduce(ZERO,BigDecimal::add);
+        return scheduleRows(rows,beginning);
+    }
+
+    @Transactional(readOnly = true)
     public LedgerView view(UUID loanId, AppUserPrincipal actor, int page, int schedulePage) {
         LoanLedger ledger = readableLedger(loanId, actor);
         List<LoanLedgerInstallment> rows = rows(loanId);

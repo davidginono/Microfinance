@@ -191,7 +191,11 @@ public final class LoanRecordingDtos {
         public BigDecimal charges(){return Set.of("PAYMENT","REVERSAL").contains(kind)?amount.subtract(principal).subtract(interest):new BigDecimal("0.00");}
         public BigDecimal getCharges(){return charges();}
     }
-    public record StatementMovement(Posting posting, BigDecimal outstandingInterest) {}
+    public record StatementMovement(Posting posting, BigDecimal outstandingInterest) {
+        public BigDecimal outstandingTotal() {
+            return posting.principalBalance()==null || outstandingInterest==null ? null : posting.principalBalance().add(outstandingInterest);
+        }
+    }
     public record Detail(LoanRow loan, String institution, String branch, String recordedBy, OffsetDateTime recordedAt,
         String purpose, String business, BigDecimal income, BigDecimal otherDebt,
         String informationSource, String guarantors, String collateral, String evidence, String notes,
@@ -200,9 +204,18 @@ public final class LoanRecordingDtos {
         String tenureUnit,int tenureValue,String interestBasis,String loanMode,String interestEntry) {
         public Detail(LoanRow loan,String institution,String branch,String recordedBy,OffsetDateTime recordedAt,String purpose,String business,BigDecimal income,BigDecimal otherDebt,String informationSource,String guarantors,String collateral,String evidence,String notes,BigDecimal rate,String method,String frequency,int months,LocalDate firstPaymentDate,BigDecimal installment,BigDecimal contractualInterest,List<ScheduleRow> schedule){this(loan,institution,branch,recordedBy,recordedAt,purpose,business,income,otherDebt,informationSource,guarantors,collateral,evidence,notes,rate,method,frequency,months,firstPaymentDate,installment,contractualInterest,schedule,"MONTHS",months,"ANNUAL","CONFIGURED","PERCENTAGE");}
     }
+    public record DetailPage(Detail detail, Page<StatementMovement> history) {}
     public record ScheduleRow(int number, LocalDate date, BigDecimal principal, BigDecimal interest, BigDecimal amount,
-                              BigDecimal beginningBalance, BigDecimal endingBalance) {
+                              BigDecimal beginningBalance, BigDecimal endingBalance,
+                              BigDecimal remainingPrincipal, BigDecimal remainingInterest) {
+        public ScheduleRow(int number,LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal amount,
+                           BigDecimal beginningBalance,BigDecimal endingBalance) {
+            this(number,date,principal,interest,amount,beginningBalance,endingBalance,null,null);
+        }
         public ScheduleRow(int number,LocalDate date,BigDecimal principal,BigDecimal interest,BigDecimal amount){this(number,date,principal,interest,amount,null,null);}
+        public BigDecimal remainingTotal() {
+            return remainingPrincipal==null || remainingInterest==null ? null : remainingPrincipal.add(remainingInterest);
+        }
     }
     public record CollectionAmount(UUID loanId,UUID clientId,BigDecimal amount) {}
     public record AllocationPreview(BigDecimal principal,BigDecimal interest,BigDecimal principalBalance,BigDecimal charges,BigDecimal feesRecovered) {

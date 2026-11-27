@@ -636,9 +636,11 @@ class LoanRecordingPostgresTest {
         });
         assertThat(ledger.riskBalance(source,TODAY).orElseThrow().currentOutstanding()).isZero();assertThat(ledger.view(source,actor,0,0).futureInterest()).isZero();
         assertThat(service.detail(actor,source).loan().futureInterest()).isZero();assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isEqualByComparingTo("1500.00");
+        assertThat(service.detailPage(actor,source,0).detail().schedule()).isNotEmpty().allSatisfy(row->
+            assertThat(row.remainingTotal()).isZero());
         assertThat(jdbc.queryForObject("select sum(credit-debit) from gl_journal_line where journal_id=? and account_id=?",BigDecimal.class,p.journalId(),cash)).isEqualByComparingTo("475.48");
         assertThat(jdbc.queryForObject("select count(*) from loan_repayment_transactions where loan_application_id=? and kind='PAYMENT'",Integer.class,source)).isZero();
-        assertThat(service.history(actor,source,0).rows())
+        assertThat(service.detailPage(actor,source,0).history().rows())
             .filteredOn(row->row.posting().kind().equals("SETTLEMENT")).singleElement()
             .satisfies(row->assertThat(row.outstandingInterest()).isZero());
         assertThat(service.loanStatement(actor,client,source,0,true).source().movements())
@@ -663,6 +665,12 @@ class LoanRecordingPostgresTest {
         assertThat(service.reverseTopUp(other,loan,key,TODAY,"Correct transfer","Synthetic cash return proof").id()).isEqualTo(reversal.id());
         assertThat(status(source)).isEqualTo("DISBURSED");assertThat(status(loan)).isEqualTo("DISBURSEMENT_REVERSED");
         assertThat(service.detail(actor,source).loan().outstandingPrincipal()).isEqualByComparingTo("1000.00");assertThat(service.detail(actor,source).loan().futureInterest()).isEqualByComparingTo("15.48");
+        assertThat(service.detailPage(actor,source,0).detail().schedule()).isNotEmpty().allSatisfy(row->
+            assertThat(row.remainingTotal()).isEqualByComparingTo(row.amount()));
+        assertThat(service.detailPage(actor,loan,0).detail().schedule()).isNotEmpty().allSatisfy(row->{
+            assertThat(row.amount()).isPositive();
+            assertThat(row.remainingTotal()).isNull();
+        });
         assertThat(service.detail(actor,loan).loan().outstandingPrincipal()).isZero();assertThat(service.topUp(actor,loan).orElseThrow().reversedBy()).isEqualTo(reversal.id());
         assertThat(jdbc.queryForObject("select (financial_snapshot->>'paymentSummaryTotalOutstanding')::numeric from loan_applications where id=?",BigDecimal.class,loan)).isZero();
         assertThat(jdbc.queryForObject("select sum(debit-credit) from gl_journal_line where journal_id in (?,?)",BigDecimal.class,original.journalId(),reversal.journalId())).isZero();
@@ -1632,7 +1640,7 @@ class LoanRecordingPostgresTest {
         assertThat(statement).extracting(row->row.posting().kind()).containsExactly("DISBURSEMENT","PAYMENT","REVERSAL");
         assertThat(statement).extracting(StatementMovement::outstandingInterest)
             .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"),new BigDecimal("20.00"));
-        assertThat(service.history(actor,id,0).rows())
+        assertThat(service.detailPage(actor,id,0).history().rows())
             .extracting(row->row.posting().kind(),StatementMovement::outstandingInterest)
             .containsExactlyInAnyOrder(tuple("DISBURSEMENT",new BigDecimal("20.00")),
                 tuple("PAYMENT",new BigDecimal("0.00")),tuple("REVERSAL",new BigDecimal("20.00")));
@@ -1692,7 +1700,7 @@ class LoanRecordingPostgresTest {
         var funded=service.chargeSummary(actor,id);
         assertThat(funded.plan().supported()).isTrue();
         assertThat(funded.balance().assessed()).isEqualByComparingTo("10.00");
-        assertThat(service.history(actor,id,0).rows())
+        assertThat(service.detailPage(actor,id,0).history().rows())
             .filteredOn(row->row.posting().kind().equals("CHARGE_ASSESS")).singleElement()
             .satisfies(row->assertThat(row.outstandingInterest()).isNull());
     }
@@ -1728,10 +1736,10 @@ class LoanRecordingPostgresTest {
         org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
             new org.springframework.web.context.request.ServletRequestAttributes(request));
         try {
-            assertThat(service.history(actor,id,0).rows()).extracting(StatementMovement::outstandingInterest)
+            assertThat(service.detailPage(actor,id,0).history().rows()).extracting(StatementMovement::outstandingInterest)
                 .containsExactly(new BigDecimal("0.00"),new BigDecimal("20.00"));
-            assertThat(service.history(actor,id,1).rows()).isEmpty();
-            assertThatThrownBy(()->service.history(operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
+            assertThat(service.detailPage(actor,id,1).history().rows()).isEmpty();
+            assertThatThrownBy(()->service.detailPage(operator("B2"),id,0)).isInstanceOf(AccessDeniedException.class);
             assertThat(service.loanStatement(actor,client,id,0,true).source().movements())
                 .extracting(StatementMovement::outstandingInterest)
                 .containsExactly(new BigDecimal("20.00"),new BigDecimal("0.00"));

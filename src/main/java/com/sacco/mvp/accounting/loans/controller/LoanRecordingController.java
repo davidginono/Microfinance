@@ -7,6 +7,7 @@ import com.sacco.mvp.grouplending.service.SimpleGroupLoanService;
 import com.sacco.mvp.security.AppUserPrincipal;
 import com.sacco.mvp.service.ApplicationClock;
 import com.sacco.mvp.service.SaccoLogoStorageService;
+import com.sacco.mvp.support.ResourceTableSort;
 import com.sacco.mvp.accounting.reports.VoucherPdfDocument;
 import com.sacco.mvp.accounting.reports.LoanAmortizationPdfDocument;
 import com.sacco.mvp.accounting.reports.VoucherPdfDocument.Field;
@@ -300,7 +301,53 @@ public class LoanRecordingController {
         try{service.linkExistingProductAccounts(a,id);flash.addFlashAttribute("recordingSaved",true);}catch(IllegalArgumentException ex){flash.addFlashAttribute("productAccountsError",error(ex));}
         return "redirect:/finance/loan-records/"+id;
     }
-    @GetMapping("/loan-records/{id}") public String detail(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,@RequestParam(defaultValue="0") int historyPage,@RequestParam(defaultValue="0") int schedulePage,Model model){if(schedulePage<0 || schedulePage>24)throw new IllegalArgumentException("recording.error.filter");model.addAttribute("supportingDetails",service.supportingDetails(a,id));model.addAttribute("evidenceGuarantorLabels",service.supportingGuarantors(a,id));var d=service.detail(a,id);model.addAttribute("detail",d);model.addAttribute("canEdit",service.editable(a,id));model.addAttribute("groupReview",groupApprovals.review(a,id));model.addAttribute("retiredGroupApplication",service.retiredGroup(a,id));model.addAttribute("reviewRequestKey",model.containsAttribute("reviewRequestKey")?model.getAttribute("reviewRequestKey"):UUID.randomUUID());model.addAttribute("simpleGroup",simpleGroups.contract(a,id).orElse(null));model.addAttribute("canWithdrawGroup",service.groupWithdrawalAvailable(a,id));if(a.getClaims().containsAll(Set.of("GROUP_LENDING_VIEW","LOAN_DOCUMENTS_VIEW")))model.addAttribute("hasGroupHistory",simpleGroups.hasHistory(a,id));model.addAttribute("productAccountsLinked",service.linkedAccounts(a,id).isPresent());model.addAttribute("chargeSummary",service.chargeSummary(a,id));model.addAttribute("chargeRequestKey",UUID.randomUUID());model.addAttribute("topUpPosting",service.topUp(a,id).orElse(null));model.addAttribute("sourceTopUp",service.sourceTopUp(a,id).orElse(null));model.addAttribute("topUpReverseKey",model.containsAttribute("topUpReverseKey")?model.getAttribute("topUpReverseKey"):UUID.randomUUID());model.addAttribute("today",clock.today());if(model.getAttribute("topUpPosting")==null)try{model.addAttribute("topUpQuote",service.recordedTopUpQuote(a,id).orElse(null));}catch(IllegalArgumentException e){model.addAttribute("topUpError",error(e));}model.addAttribute("attachments",service.attachments(a,id));model.addAttribute("history",service.history(a,id,historyPage));model.addAttribute("schedulePage",schedulePage);model.addAttribute("scheduleRows",com.sacco.mvp.support.ResourceTableSort.rows("accounting-loans-details-2",d.schedule(),Map.<String,java.util.Comparator<ScheduleRow>>of("number",java.util.Comparator.comparing(ScheduleRow::number,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())),"due",java.util.Comparator.comparing(ScheduleRow::date,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())),"beginning",java.util.Comparator.comparing(ScheduleRow::beginningBalance,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())),"payment",java.util.Comparator.comparing(ScheduleRow::amount,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())),"principal",java.util.Comparator.comparing(ScheduleRow::principal,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())),"interest",java.util.Comparator.comparing(ScheduleRow::interest,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())),"ending",java.util.Comparator.comparing(ScheduleRow::endingBalance,java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder()))),java.util.Comparator.comparing(ScheduleRow::number)).stream().skip(schedulePage*25L).limit(25).toList());model.addAttribute("scheduleHasNext",d.schedule().size()>(schedulePage+1)*25);return "accounting/loans/details";}
+    @GetMapping("/loan-records/{id}")
+    public String detail(@AuthenticationPrincipal AppUserPrincipal a,@PathVariable UUID id,
+                         @RequestParam(defaultValue="0") int historyPage,@RequestParam(defaultValue="0") int schedulePage,Model model){
+        if(schedulePage<0 || schedulePage>24)throw new IllegalArgumentException("recording.error.filter");
+        model.addAttribute("supportingDetails",service.supportingDetails(a,id));
+        model.addAttribute("evidenceGuarantorLabels",service.supportingGuarantors(a,id));
+        var page=service.detailPage(a,id,historyPage);
+        var detail=page.detail();
+        model.addAttribute("detail",detail);
+        model.addAttribute("canEdit",service.editable(a,id));
+        model.addAttribute("groupReview",groupApprovals.review(a,id));
+        model.addAttribute("retiredGroupApplication",service.retiredGroup(a,id));
+        model.addAttribute("reviewRequestKey",model.containsAttribute("reviewRequestKey")?model.getAttribute("reviewRequestKey"):UUID.randomUUID());
+        model.addAttribute("simpleGroup",simpleGroups.contract(a,id).orElse(null));
+        model.addAttribute("canWithdrawGroup",service.groupWithdrawalAvailable(a,id));
+        if(a.getClaims().containsAll(Set.of("GROUP_LENDING_VIEW","LOAN_DOCUMENTS_VIEW")))model.addAttribute("hasGroupHistory",simpleGroups.hasHistory(a,id));
+        model.addAttribute("productAccountsLinked",service.linkedAccounts(a,id).isPresent());
+        model.addAttribute("chargeSummary",service.chargeSummary(a,id));
+        model.addAttribute("chargeRequestKey",UUID.randomUUID());
+        model.addAttribute("topUpPosting",service.topUp(a,id).orElse(null));
+        model.addAttribute("sourceTopUp",service.sourceTopUp(a,id).orElse(null));
+        model.addAttribute("topUpReverseKey",model.containsAttribute("topUpReverseKey")?model.getAttribute("topUpReverseKey"):UUID.randomUUID());
+        model.addAttribute("today",clock.today());
+        if(model.getAttribute("topUpPosting")==null)try{
+            model.addAttribute("topUpQuote",service.recordedTopUpQuote(a,id).orElse(null));
+        }catch(IllegalArgumentException e){model.addAttribute("topUpError",error(e));}
+        model.addAttribute("attachments",service.attachments(a,id));
+        model.addAttribute("history",page.history());
+
+        var moneyOrder=Comparator.nullsLast(Comparator.<BigDecimal>naturalOrder());
+        var rowNumber=Comparator.comparingInt(ScheduleRow::number);
+        var sortedSchedule=ResourceTableSort.rows("accounting-loans-details-2",detail.schedule(),Map.of(
+            "number",rowNumber,
+            "due",Comparator.comparing(ScheduleRow::date,Comparator.nullsLast(Comparator.naturalOrder())),
+            "beginning",Comparator.comparing(ScheduleRow::beginningBalance,moneyOrder),
+            "payment",Comparator.comparing(ScheduleRow::amount,moneyOrder),
+            "principal",Comparator.comparing(ScheduleRow::principal,moneyOrder),
+            "interest",Comparator.comparing(ScheduleRow::interest,moneyOrder),
+            "ending",Comparator.comparing(ScheduleRow::endingBalance,moneyOrder),
+            "remainingPrincipal",Comparator.comparing(ScheduleRow::remainingPrincipal,moneyOrder),
+            "remainingInterest",Comparator.comparing(ScheduleRow::remainingInterest,moneyOrder),
+            "remainingTotal",Comparator.comparing(ScheduleRow::remainingTotal,moneyOrder)),rowNumber);
+        model.addAttribute("schedulePage",schedulePage);
+        model.addAttribute("scheduleRows",sortedSchedule.stream().skip(schedulePage*25L).limit(25).toList());
+        model.addAttribute("scheduleHasNext",sortedSchedule.size()>(schedulePage+1)*25);
+        return "accounting/loans/details";
+    }
     @GetMapping({"/loan-disbursements/new","/loan-repayments/new"}) public String postingForm(@AuthenticationPrincipal AppUserPrincipal actor,@RequestParam(required=false) UUID loanId,jakarta.servlet.http.HttpServletRequest request,Model model) {
         if(kind(request).equals("PAYMENT")){service.authorize(actor,"POST");if(loanId!=null)service.receiptLoan(actor,loanId);return "redirect:/finance/vouchers/receipts/new?purpose=LOAN_REPAYMENT"+(loanId==null?"":"&loanId="+loanId);}
         service.authorize(actor,"VIEW");if(loanId!=null)service.detail(actor,loanId);
